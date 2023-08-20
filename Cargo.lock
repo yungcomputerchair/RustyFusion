@@ -3,5 +3,5 @@
 version = 3
 
 [[package]]
-name = "RustyFusion"
+name = "rusty_fusion"
 version = "0.1.0"

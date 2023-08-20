@@ -7,15 +7,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'RustyFusion'",
+            "name": "Debug",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=RustyFusion",
-                    "--package=RustyFusion"
+                    "--bin=rusty_fusion",
+                    "--package=rusty_fusion"
                 ],
                 "filter": {
-                    "name": "RustyFusion",
+                    "name": "rusty_fusion",
                     "kind": "bin"
                 }
             },
@@ -25,16 +25,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'RustyFusion'",
+            "name": "Debug unit tests",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=RustyFusion",
-                    "--package=RustyFusion"
+                    "--bin=rusty_fusion",
+                    "--package=rusty_fusion"
                 ],
                 "filter": {
-                    "name": "RustyFusion",
+                    "name": "rusty_fusion",
                     "kind": "bin"
                 }
             },
