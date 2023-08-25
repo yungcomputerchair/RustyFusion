@@ -7,15 +7,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug",
+            "name": "Debug login server",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=rusty_fusion",
+                    "--bin=login_server",
                     "--package=rusty_fusion"
                 ],
                 "filter": {
-                    "name": "rusty_fusion",
+                    "name": "login_server",
                     "kind": "bin"
                 }
             },
@@ -25,21 +25,20 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests",
+            "name": "Debug shard server",
             "cargo": {
                 "args": [
-                    "test",
-                    "--no-run",
-                    "--bin=rusty_fusion",
+                    "build",
+                    "--bin=shard_server",
                     "--package=rusty_fusion"
                 ],
                 "filter": {
-                    "name": "rusty_fusion",
+                    "name": "shard_server",
                     "kind": "bin"
                 }
             },
             "args": [],
             "cwd": "${workspaceFolder}"
-        }
+        },
     ]
 }
