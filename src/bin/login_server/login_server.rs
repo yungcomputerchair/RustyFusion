@@ -1,4 +1,4 @@
-use std::{time::Duration, net::{TcpListener, TcpStream, SocketAddr}, collections::HashMap};
+use std::{time::Duration, net::{TcpListener, TcpStream, SocketAddr}, collections::HashMap, io::ErrorKind};
 use polling::{Poller, Event, PollMode};
 use rusty_fusion::{Result, net::cnserver::{CNServer, sock_read}};
 
@@ -33,8 +33,14 @@ impl CNServer for LoginServer {
         let sock: &mut TcpListener = &mut self.sock;
         let poller: &mut Poller = &mut self.poller;
         self.events.clear();
-        //println!("Waiting...")
-        poller.wait(&mut self.events, self.poll_timeout)?;
+        //println!("Waiting...");
+        let res = poller.wait(&mut self.events, self.poll_timeout);
+        if let Err(e) = res {
+            match e.kind() {
+                ErrorKind::Interrupted => { return Ok(()) }, // this is fine
+                _ => { return Err(Box::new(e)); }
+            }
+        }
         for ev in &self.events {
             //dbg!(ev);
             if ev.key == EPOLL_KEY_SELF {
