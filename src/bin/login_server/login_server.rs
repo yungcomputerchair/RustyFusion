@@ -33,8 +33,10 @@ impl CNServer for LoginServer {
         let sock: &mut TcpListener = &mut self.sock;
         let poller: &mut Poller = &mut self.poller;
         self.events.clear();
+        //println!("Waiting...")
         poller.wait(&mut self.events, self.poll_timeout)?;
         for ev in &self.events {
+            //dbg!(ev);
             if ev.key == EPOLL_KEY_SELF {
                 let conn_data: (TcpStream, SocketAddr) = sock.accept()?;
                 println!("New connection from {}", conn_data.1);
@@ -46,6 +48,7 @@ impl CNServer for LoginServer {
                     new_sock, Event::all(new_sock_key), PollMode::Edge)?;
             } else {
                 let sock: &mut TcpStream = &mut self.clients.get_mut(&ev.key).unwrap().0;
+                if !ev.readable { continue };
                 if let Err(e) = sock_read(sock) {
                     println!("err {e}");
                 }
