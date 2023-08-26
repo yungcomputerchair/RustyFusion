@@ -51,6 +51,8 @@ impl CNServer for LoginServer {
                 if !ev.readable { continue };
                 if let Err(e) = sock_read(sock) {
                     println!("err {e}");
+                    poller.delete(&*sock)?;
+                    self.clients.remove(&ev.key);
                 }
             }
         }
