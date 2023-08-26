@@ -1,8 +1,8 @@
-use std::{net::TcpStream, io::Read};
+use std::{net::TcpStream, io::Read, time::Duration};
 use crate::Result;
 
 pub trait CNServer {
-    fn init(&mut self) -> Result<()>;
+    fn new(poll_timeout: Option<Duration>) -> Result<Self> where Self: Sized;
     fn poll(&mut self) -> Result<()>;
 }
 

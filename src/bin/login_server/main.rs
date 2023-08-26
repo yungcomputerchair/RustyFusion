@@ -5,8 +5,7 @@ mod login_server;
 
 fn main() -> Result<()> {
     println!("Hello from login server!");
-    let mut server: LoginServer = LoginServer::new(None);
-    server.init()?;
+    let mut server: LoginServer = LoginServer::new(None).unwrap();
     loop {
         server.poll()?;
     }
