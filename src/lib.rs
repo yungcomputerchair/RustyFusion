@@ -29,7 +29,12 @@ pub mod error {
 
     #[derive(Debug)]
     pub struct BadPacketID {
-        pub packet_id: u32,
+        packet_id: u32,
+    }
+    impl BadPacketID {
+        pub fn new(packet_id: u32) -> Self {
+            Self { packet_id }
+        }
     }
     impl Error for BadPacketID {}
     impl Display for BadPacketID {
