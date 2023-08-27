@@ -63,7 +63,7 @@ impl CNServer for LoginServer {
                 poller.add_with_mode(new_sock, Event::all(new_sock_key), PollMode::Edge)?;
             } else {
                 let sock: &mut TcpStream = &mut self.clients.get_mut(&ev.key).unwrap().0;
-                if !ev.readable {
+                if !ev.readable || !ev.writable {
                     continue;
                 };
                 if let Err(e) = sock_read(sock) {

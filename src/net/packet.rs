@@ -3,7 +3,7 @@
 #![allow(dead_code)]
 
 #[repr(u32)]
-#[derive(Debug)]
+#[derive(Debug, FromPrimitive, ToPrimitive)]
 pub enum PacketID {
     P_CL2LS_REQ_LOGIN = 0x12000001,             // 301989889
     P_CL2LS_REQ_CHECK_CHAR_NAME = 0x12000002,   // 301989890

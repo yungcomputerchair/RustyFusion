@@ -1,4 +1,7 @@
+use num_traits::FromPrimitive;
+
 use crate::{
+    error::BadPacketID,
     net::{crypto, packet::*},
     util::{get_time, parse_utf16},
     Result, CN_PACKET_BUFFER_SIZE,
@@ -46,7 +49,13 @@ pub fn sock_read(sock: &mut TcpStream) -> Result<()> {
     crypto::decrypt_packet(body, crypto::DEFAULT_KEY);
 
     let id: u32 = u32::from_le_bytes(body[0..4].try_into().unwrap());
-    println!("packet id {id}");
+    let id: PacketID = match PacketID::from_u32(id) {
+        Some(id) => id,
+        None => {
+            return Err(Box::new(BadPacketID { packet_id: id }));
+        }
+    };
+    dbg!(id);
 
     let pack: &sP_CL2LS_REQ_LOGIN = unsafe { bytes_to_struct(&body[4..]) };
     println!(

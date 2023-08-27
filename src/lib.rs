@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate num_derive;
+
 use std::{error::Error, result};
 
 pub type Result<T> = result::Result<T, Box<dyn Error>>;
@@ -18,5 +21,20 @@ pub mod util {
         let now: SystemTime = SystemTime::now();
         let diff: Duration = now.duration_since(UNIX_EPOCH).unwrap();
         diff.as_millis()
+    }
+}
+
+pub mod error {
+    use std::{error::Error, fmt::Display};
+
+    #[derive(Debug)]
+    pub struct BadPacketID {
+        pub packet_id: u32,
+    }
+    impl Error for BadPacketID {}
+    impl Display for BadPacketID {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "Bad packet ID {}", self.packet_id)
+        }
     }
 }
