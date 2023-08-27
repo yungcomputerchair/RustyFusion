@@ -1,5 +1,7 @@
-use rusty_fusion::{Result, net::cnserver::CNServer};
+extern crate bcrypt;
+
 use login_server::LoginServer;
+use rusty_fusion::{net::cnserver::CNServer, Result};
 
 mod login_server;
 

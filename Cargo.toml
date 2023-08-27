@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 polling = "2.8.0"
+bcrypt = "0.15"

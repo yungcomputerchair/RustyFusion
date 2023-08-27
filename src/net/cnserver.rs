@@ -1,8 +1,20 @@
-use std::{net::TcpStream, io::{Read, Write}, time::Duration, slice::from_raw_parts, mem::size_of};
-use crate::{Result, net::{crypto, packet::*}, CN_PACKET_BUFFER_SIZE, util::{parse_utf16, get_time}};
+use crate::{
+    net::{crypto, packet::*},
+    util::{get_time, parse_utf16},
+    Result, CN_PACKET_BUFFER_SIZE,
+};
+use std::{
+    io::{Read, Write},
+    mem::size_of,
+    net::TcpStream,
+    slice::from_raw_parts,
+    time::Duration,
+};
 
 pub trait CNServer {
-    fn new(poll_timeout: Option<Duration>) -> Result<Self> where Self: Sized;
+    fn new(poll_timeout: Option<Duration>) -> Result<Self>
+    where
+        Self: Sized;
     fn poll(&mut self) -> Result<()>;
 }
 
@@ -37,7 +49,11 @@ pub fn sock_read(sock: &mut TcpStream) -> Result<()> {
     println!("packet id {id}");
 
     let pack: &sP_CL2LS_REQ_LOGIN = unsafe { bytes_to_struct(&body[4..]) };
-    println!("login request from {} ({})", parse_utf16(&pack.szID), parse_utf16(&pack.szPassword));
+    println!(
+        "login request from {} ({})",
+        parse_utf16(&pack.szID),
+        parse_utf16(&pack.szPassword)
+    );
 
     let pack = sP_LS2CL_REP_LOGIN_SUCC {
         iCharCount: 0,

@@ -1,6 +1,14 @@
-use std::{time::Duration, net::{TcpListener, TcpStream, SocketAddr}, collections::HashMap, io::ErrorKind};
-use polling::{Poller, Event, PollMode};
-use rusty_fusion::{Result, net::cnserver::{CNServer, sock_read}};
+use polling::{Event, PollMode, Poller};
+use rusty_fusion::{
+    net::cnserver::{sock_read, CNServer},
+    Result,
+};
+use std::{
+    collections::HashMap,
+    io::ErrorKind,
+    net::{SocketAddr, TcpListener, TcpStream},
+    time::Duration,
+};
 
 const EPOLL_KEY_SELF: usize = 0;
 
@@ -21,11 +29,11 @@ impl CNServer for LoginServer {
             poller: Poller::new()?,
             events: Vec::new(),
             next_epoll_key: EPOLL_KEY_SELF + 1,
-            clients: HashMap::new()
+            clients: HashMap::new(),
         };
         ls.sock.set_nonblocking(true)?;
-        ls.poller.add_with_mode(
-            &ls.sock, Event::all(EPOLL_KEY_SELF), PollMode::Edge)?;
+        ls.poller
+            .add_with_mode(&ls.sock, Event::all(EPOLL_KEY_SELF), PollMode::Edge)?;
         Ok(ls)
     }
 
@@ -37,8 +45,10 @@ impl CNServer for LoginServer {
         let res = poller.wait(&mut self.events, self.poll_timeout);
         if let Err(e) = res {
             match e.kind() {
-                ErrorKind::Interrupted => { return Ok(()) }, // this is fine
-                _ => { return Err(Box::new(e)); }
+                ErrorKind::Interrupted => return Ok(()), // this is fine
+                _ => {
+                    return Err(Box::new(e));
+                }
             }
         }
         for ev in &self.events {
@@ -50,11 +60,12 @@ impl CNServer for LoginServer {
                 self.next_epoll_key += 1;
                 self.clients.insert(new_sock_key, conn_data);
                 let new_sock: &TcpStream = &self.clients.get(&new_sock_key).unwrap().0;
-                poller.add_with_mode(
-                    new_sock, Event::all(new_sock_key), PollMode::Edge)?;
+                poller.add_with_mode(new_sock, Event::all(new_sock_key), PollMode::Edge)?;
             } else {
                 let sock: &mut TcpStream = &mut self.clients.get_mut(&ev.key).unwrap().0;
-                if !ev.readable { continue };
+                if !ev.readable {
+                    continue;
+                };
                 if let Err(e) = sock_read(sock) {
                     println!("err {e}");
                     poller.delete(&*sock)?;

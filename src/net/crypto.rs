@@ -1,4 +1,3 @@
-
 const CRYPTO_KEY_SIZE: usize = 8;
 pub const DEFAULT_KEY: &[u8] = b"m@rQn~W#";
 
@@ -16,7 +15,7 @@ fn byte_swap(er_size: usize, buf: &mut [u8], size: usize) -> usize {
     while num + er_size <= size {
         let num4: usize = num + num3;
         let num5: usize = num + (er_size - 1 - num3);
-        
+
         let tmp: u8 = buf[num4];
         buf[num4] = buf[num5];
         buf[num5] = tmp;
