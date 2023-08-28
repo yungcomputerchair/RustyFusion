@@ -1,9 +1,6 @@
 use polling::{Event, PollMode, Poller};
 
-use crate::{
-    net::{bytes_to_struct, packet::*},
-    Result,
-};
+use crate::Result;
 use std::{
     collections::HashMap,
     io::ErrorKind,
@@ -11,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-use super::cnclient::CNClient;
+use super::{cnclient::CNClient, packet::PacketID};
 
 const EPOLL_KEY_SELF: usize = 0;
 
@@ -39,7 +36,7 @@ impl CNServer {
         Ok(server)
     }
 
-    pub fn poll(&mut self) -> Result<()> {
+    pub fn poll(&mut self, handler: &dyn Fn(&mut CNClient, PacketID) -> Result<()>) -> Result<()> {
         let mut events: Vec<Event> = Vec::new();
         //println!("Waiting...");
         if let Err(e) = self.poller.wait(&mut events, self.poll_timeout) {
@@ -62,15 +59,8 @@ impl CNServer {
                 };
                 let client: &mut CNClient = &mut self.clients.get_mut(&ev.key).unwrap();
                 match client.read_packet() {
-                    Ok((id, buf)) => {
-                        println!("got packet {:?}", id);
-                        match id {
-                            PacketID::P_CL2LS_REQ_LOGIN => {
-                                let pkt: &sP_CL2LS_REQ_LOGIN = unsafe { bytes_to_struct(buf) };
-                                todo!()
-                            }
-                            _ => (),
-                        }
+                    Ok(pkt) => {
+                        handler(client, pkt)?;
                     }
                     Err(e) => {
                         println!("err on socket {}: {}", ev.key, e);

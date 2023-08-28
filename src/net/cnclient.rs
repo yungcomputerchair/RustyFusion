@@ -11,6 +11,7 @@ use crate::{
 };
 
 use super::{
+    bytes_to_struct,
     crypto::{decrypt_packet, encrypt_packet, EncryptionMode, CRYPTO_KEY_SIZE, DEFAULT_KEY},
     packet::PacketID,
 };
@@ -19,6 +20,7 @@ pub struct CNClient {
     sock: TcpStream,
     addr: SocketAddr,
     buf: [u8; CN_PACKET_BUFFER_SIZE],
+    last_pkt_sz: usize,
     e_key: [u8; CRYPTO_KEY_SIZE],
     fe_key: [u8; CRYPTO_KEY_SIZE],
     enc_mode: EncryptionMode,
@@ -32,6 +34,7 @@ impl CNClient {
             sock: conn_data.0,
             addr: conn_data.1,
             buf: [0; CN_PACKET_BUFFER_SIZE],
+            last_pkt_sz: 0,
             e_key: default_key,
             fe_key: default_key,
             enc_mode: EncryptionMode::EKey,
@@ -47,7 +50,12 @@ impl CNClient {
         self.addr.to_string()
     }
 
-    pub fn read_packet(&mut self) -> Result<(PacketID, &[u8])> {
+    pub fn get_packet<T>(&self) -> &T {
+        let pkt_buf: &[u8] = &self.buf[4..self.last_pkt_sz];
+        unsafe { bytes_to_struct(pkt_buf) }
+    }
+
+    pub fn read_packet(&mut self) -> Result<PacketID> {
         self.last_heartbeat = get_time();
 
         // read the size
@@ -72,9 +80,9 @@ impl CNClient {
                 return Err(Box::new(BadPacketID::new(id)));
             }
         };
-        println!("{:?}", id);
 
-        Ok((id, &buf[4..]))
+        self.last_pkt_sz = sz;
+        Ok(id)
     }
 
     pub fn send_packet<T>(&mut self, pkt_id: PacketID, pkt: &T) -> Result<()> {
