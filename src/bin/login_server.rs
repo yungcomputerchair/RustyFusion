@@ -2,6 +2,7 @@ use rusty_fusion::{
     net::{
         cnclient::CNClient,
         cnserver::CNServer,
+        crypto::{gen_key, DEFAULT_KEY},
         packet::{
             sP_CL2LS_REQ_LOGIN, sP_LS2CL_REP_LOGIN_SUCC,
             PacketID::{self, *},
@@ -41,7 +42,17 @@ fn req_login(client: &mut CNClient) -> Result<()> {
         szID: pkt.szID,
         iOpenBetaFlag: 0,
     };
+    let e_base: u64 = resp.uiSvrTime;
+    let e_iv1: i32 = (resp.iCharCount + 1) as i32;
+    let e_iv2: i32 = (resp.iSlotNum + 1) as i32;
+    let fe_base: u64 = u64::from_le_bytes(DEFAULT_KEY.try_into().unwrap());
+    let fe_iv1: i32 = pkt.iClientVerC;
+    let fe_iv2: i32 = 1;
+
     client.send_packet(P_LS2CL_REP_LOGIN_SUCC, &resp)?;
+
+    client.set_e_key(gen_key(e_base, e_iv1, e_iv2));
+    client.set_fe_key(gen_key(fe_base, fe_iv1, fe_iv2));
 
     Ok(())
 }

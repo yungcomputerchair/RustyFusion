@@ -1,3 +1,5 @@
+use std::num::Wrapping;
+
 pub const DEFAULT_KEY: &[u8] = b"m@rQn~W#";
 pub const CRYPTO_KEY_SIZE: usize = DEFAULT_KEY.len();
 
@@ -47,4 +49,14 @@ pub fn encrypt_packet(buf: &mut [u8], key: &[u8]) {
     let er_size: usize = buf.len() % (CRYPTO_KEY_SIZE / 2 + 1) * 2 + CRYPTO_KEY_SIZE;
     xor(buf, key, buf.len());
     byte_swap(er_size, buf, buf.len());
+}
+
+pub fn gen_key(time: u64, iv1: i32, iv2: i32) -> [u8; CRYPTO_KEY_SIZE] {
+    let time = Wrapping(time);
+    let num = Wrapping((iv1 + 1) as u64);
+    let num2 = Wrapping((iv2 + 1) as u64);
+    let default_key = Wrapping(u64::from_le_bytes(DEFAULT_KEY.try_into().unwrap()));
+    let result: u64 = (default_key * (time * num * num2)).0;
+
+    result.to_le_bytes()
 }

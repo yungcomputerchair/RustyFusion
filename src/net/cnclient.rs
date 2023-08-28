@@ -50,6 +50,14 @@ impl CNClient {
         self.addr.to_string()
     }
 
+    pub fn set_e_key(&mut self, key: [u8; CRYPTO_KEY_SIZE]) {
+        self.e_key = key;
+    }
+
+    pub fn set_fe_key(&mut self, key: [u8; CRYPTO_KEY_SIZE]) {
+        self.fe_key = key;
+    }
+
     pub fn get_packet<T>(&self) -> &T {
         let pkt_buf: &[u8] = &self.buf[4..self.last_pkt_sz];
         unsafe { bytes_to_struct(pkt_buf) }
