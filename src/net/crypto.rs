@@ -1,5 +1,10 @@
-const CRYPTO_KEY_SIZE: usize = 8;
 pub const DEFAULT_KEY: &[u8] = b"m@rQn~W#";
+pub const CRYPTO_KEY_SIZE: usize = DEFAULT_KEY.len();
+
+pub enum EncryptionMode {
+    EKey,
+    FEKey,
+}
 
 fn xor(buf: &mut [u8], key: &[u8], size: usize) {
     for i in 0..size {
