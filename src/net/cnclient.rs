@@ -87,7 +87,7 @@ impl CNClient {
 
     pub fn send_packet<T>(&mut self, pkt_id: PacketID, pkt: &T) -> Result<()> {
         // send the size
-        let sz: usize = size_of::<T>();
+        let sz: usize = 4 + size_of::<T>();
         let mut sz_buf: [u8; 4] = u32::to_le_bytes(sz as u32);
         self.sock.write_all(&sz_buf)?;
 
