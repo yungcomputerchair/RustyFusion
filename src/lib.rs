@@ -17,10 +17,10 @@ pub mod util {
         String::from_utf16_lossy(&chars[..end_pos])
     }
 
-    pub fn get_time() -> u128 {
+    pub fn get_time() -> u64 {
         let now: SystemTime = SystemTime::now();
         let diff: Duration = now.duration_since(UNIX_EPOCH).unwrap();
-        diff.as_millis()
+        diff.as_millis() as u64
     }
 }
 
