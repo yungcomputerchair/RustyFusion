@@ -21,10 +21,10 @@ pub struct CNServer {
 }
 
 impl CNServer {
-    pub fn new(poll_timeout: Option<Duration>) -> Result<Self> {
+    pub fn new(addr: SocketAddr, poll_timeout: Option<Duration>) -> Result<Self> {
         let server: Self = Self {
             poll_timeout,
-            sock: TcpListener::bind("127.0.0.1:23000")?,
+            sock: TcpListener::bind(addr)?,
             poller: Poller::new()?,
             next_epoll_key: EPOLL_KEY_SELF + 1,
             clients: HashMap::new(),
@@ -70,6 +70,10 @@ impl CNServer {
             }
         }
         Ok(())
+    }
+
+    pub fn get_endpoint(&self) -> String {
+        self.sock.local_addr().unwrap().to_string()
     }
 
     fn get_next_epoll_key(&mut self) -> usize {

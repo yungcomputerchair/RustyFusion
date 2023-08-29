@@ -1,16 +1,15 @@
-use std::sync::atomic::{AtomicI64, Ordering};
+use std::{
+    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+    sync::atomic::{AtomicI64, Ordering},
+    time::Duration,
+};
 
 use rusty_fusion::{
     net::{
         cnclient::CNClient,
         cnserver::CNServer,
         crypto::{gen_key, DEFAULT_KEY},
-        packet::{
-            sP_CL2LS_REQ_CHECK_CHAR_NAME, sP_CL2LS_REQ_LOGIN, sP_CL2LS_REQ_SAVE_CHAR_NAME,
-            sP_LS2CL_REP_CHECK_CHAR_NAME_SUCC, sP_LS2CL_REP_LOGIN_SUCC,
-            sP_LS2CL_REP_SAVE_CHAR_NAME_SUCC,
-            PacketID::{self, *},
-        },
+        packet::PacketID::{self, *},
     },
     util::get_time,
     Result,
@@ -19,8 +18,11 @@ use rusty_fusion::{
 static NEXT_PC_UID: AtomicI64 = AtomicI64::new(1);
 
 fn main() -> Result<()> {
-    println!("Hello from login server!");
-    let mut server: CNServer = CNServer::new(None).unwrap();
+    let addr = "127.0.0.1:23000";
+    let addr: SocketAddr = addr.parse().expect("Bad binding address");
+    let polling_interval: Duration = Duration::from_millis(50);
+    let mut server: CNServer = CNServer::new(addr, Some(polling_interval))?;
+    println!("Login server listening on {addr}");
     loop {
         server.poll(&handle_packet)?;
     }
@@ -47,6 +49,7 @@ fn get_next_pc_uid() -> i64 {
 
 mod handlers {
     use super::*;
+    use rusty_fusion::net::packet::*;
 
     pub fn login(client: &mut CNClient) -> Result<()> {
         let pkt: &sP_CL2LS_REQ_LOGIN = client.get_packet();
