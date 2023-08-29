@@ -515,9 +515,9 @@ pub enum PacketID {
     P_LS2CL_REP_SHARD_LIST_INFO_SUCC = 0x21000019,  // 553648153
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sPCStyle {
     pub iPC_UID: i64,
     pub iNameCheck: i8,
@@ -534,18 +534,18 @@ pub struct sPCStyle {
     pub iClass: i32,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sPCStyle2 {
     pub iAppearanceFlag: i8,
     pub iTutorialFlag: i8,
     pub iPayzoneFlag: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sRunningQuest {
     pub m_aCurrTaskID: i32,
     pub m_aKillNPCID: [i32; 3],
@@ -554,9 +554,9 @@ pub struct sRunningQuest {
     pub m_aNeededItemCount: [i32; 3],
 }
 
-#[repr(align(2))]
+#[repr(packed(2))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sOnItem {
     pub iEquipHandID: i16,
     pub iEquipUBID: i16,
@@ -567,9 +567,9 @@ pub struct sOnItem {
     pub iEquipBackID: i16,
 }
 
-#[repr(align(2))]
+#[repr(packed(2))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sOnItem_Index {
     pub iEquipUBID_index: i16,
     pub iEquipLBID_index: i16,
@@ -578,9 +578,9 @@ pub struct sOnItem_Index {
     pub iHairStyle: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sItemBase {
     pub iType: i16,
     pub iID: i16,
@@ -588,9 +588,9 @@ pub struct sItemBase {
     pub iTimeLimit: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sItemTrade {
     pub iType: i16,
     pub iID: i16,
@@ -599,9 +599,9 @@ pub struct sItemTrade {
     pub iSlotNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sItemVendor {
     pub iVendorID: i32,
     pub fBuyCost: f32,
@@ -609,42 +609,42 @@ pub struct sItemVendor {
     pub iSortNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sItemReward {
     pub sItem: sItemBase,
     pub eIL: i32,
     pub iSlotNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sTimeLimitItemDeleteInfo2CL {
     pub eIL: i32,
     pub iSlotNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sNanoTuneNeedItemInfo2CL {
     pub iSlotNum: i32,
     pub ItemBase: sItemBase,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sEmailItemInfoFromCL {
     pub iSlotNum: i32,
     pub ItemInven: sItemBase,
 }
 
-#[repr(align(2))]
+#[repr(packed(2))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sEPRecord {
     pub uiScore: i16,
     pub uiRank: i8,
@@ -652,9 +652,9 @@ pub struct sEPRecord {
     pub uiTime: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sBuddyBaseInfo {
     pub iID: i32,
     pub iPCUID: i64,
@@ -667,17 +667,17 @@ pub struct sBuddyBaseInfo {
     pub iNameCheckFlag: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sBuddyStyleInfo {
     pub sBuddyStyle: sPCStyle,
     pub aEquip: [sItemBase; 9],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sSYSTEMTIME {
     pub wYear: i32,
     pub wMonth: i32,
@@ -689,9 +689,9 @@ pub struct sSYSTEMTIME {
     pub wMilliseconds: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sEmailInfo {
     pub iEmailIndex: i64,
     pub iFromPCUID: i64,
@@ -704,26 +704,26 @@ pub struct sEmailInfo {
     pub iItemCandyFlag: i32,
 }
 
-#[repr(align(2))]
+#[repr(packed(2))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sNano {
     pub iID: i16,
     pub iSkillID: i16,
     pub iStamina: i16,
 }
 
-#[repr(align(2))]
+#[repr(packed(2))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sNanoBank {
     pub iSkillID: i16,
     pub iStamina: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sTimeBuff {
     pub iTimeLimit: u64,
     pub iTimeDuration: u64,
@@ -732,9 +732,9 @@ pub struct sTimeBuff {
     pub iConfirmNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sTimeBuff_Svr {
     pub iTimeLimit: u64,
     pub iTimeDuration: u64,
@@ -744,9 +744,9 @@ pub struct sTimeBuff_Svr {
     pub iTimeFlow: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sPCLoadData2CL {
     pub iUserLevel: i16,
     pub PCStyle: sPCStyle,
@@ -789,9 +789,9 @@ pub struct sPCLoadData2CL {
     pub aiPCSkill: [i32; 33],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sPCAppearanceData {
     pub iID: i32,
     pub PCStyle: sPCStyle,
@@ -810,9 +810,9 @@ pub struct sPCAppearanceData {
     pub eRT: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sNPCAppearanceData {
     pub iNPC_ID: i32,
     pub iNPCType: i32,
@@ -825,9 +825,9 @@ pub struct sNPCAppearanceData {
     pub iBarkerType: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sBulletAppearanceData {
     pub iBullet_ID: i32,
     pub iX: i32,
@@ -836,9 +836,9 @@ pub struct sBulletAppearanceData {
     pub iAngle: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sTransportationLoadData {
     pub iAISvrID: i32,
     pub eTT: i32,
@@ -850,9 +850,9 @@ pub struct sTransportationLoadData {
     pub iZ: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sTransportationAppearanceData {
     pub eTT: i32,
     pub iT_ID: i32,
@@ -862,9 +862,9 @@ pub struct sTransportationAppearanceData {
     pub iZ: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sShinyAppearanceData {
     pub iShiny_ID: i32,
     pub iShinyType: i32,
@@ -874,9 +874,9 @@ pub struct sShinyAppearanceData {
     pub iZ: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sAttackResult {
     pub eCT: i32,
     pub iID: i32,
@@ -886,9 +886,9 @@ pub struct sAttackResult {
     pub iHitFlag: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sCAttackResult {
     pub eCT: i32,
     pub iID: i32,
@@ -904,9 +904,9 @@ pub struct sCAttackResult {
     pub eCSTB___Del: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sSkillResult_Damage {
     pub eCT: i32,
     pub iID: i32,
@@ -915,9 +915,9 @@ pub struct sSkillResult_Damage {
     pub iHP: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sSkillResult_DotDamage {
     pub eCT: i32,
     pub iID: i32,
@@ -929,9 +929,9 @@ pub struct sSkillResult_DotDamage {
     pub iConditionBitFlag: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sSkillResult_Heal_HP {
     pub eCT: i32,
     pub iID: i32,
@@ -939,9 +939,9 @@ pub struct sSkillResult_Heal_HP {
     pub iHP: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sSkillResult_Heal_Stamina {
     pub eCT: i32,
     pub iID: i32,
@@ -949,9 +949,9 @@ pub struct sSkillResult_Heal_Stamina {
     pub Nano: sNano,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sSkillResult_Stamina_Self {
     pub eCT: i32,
     pub iID: i32,
@@ -961,9 +961,9 @@ pub struct sSkillResult_Stamina_Self {
     pub Nano: sNano,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sSkillResult_Damage_N_Debuff {
     pub eCT: i32,
     pub iID: i32,
@@ -975,9 +975,9 @@ pub struct sSkillResult_Damage_N_Debuff {
     pub iConditionBitFlag: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sSkillResult_Buff {
     pub eCT: i32,
     pub iID: i32,
@@ -985,9 +985,9 @@ pub struct sSkillResult_Buff {
     pub iConditionBitFlag: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sSkillResult_BatteryDrain {
     pub eCT: i32,
     pub iID: i32,
@@ -1001,9 +1001,9 @@ pub struct sSkillResult_BatteryDrain {
     pub iConditionBitFlag: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sSkillResult_Damage_N_Move {
     pub eCT: i32,
     pub iID: i32,
@@ -1016,9 +1016,9 @@ pub struct sSkillResult_Damage_N_Move {
     pub iBlockMove: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sSkillResult_Move {
     pub eCT: i32,
     pub iID: i32,
@@ -1028,52 +1028,52 @@ pub struct sSkillResult_Move {
     pub iMoveZ: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sSkillResult_Resurrect {
     pub eCT: i32,
     pub iID: i32,
     pub iRegenHP: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sPC_HP {
     pub iPC_ID: i32,
     pub iHP: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sPC_BATTERYs {
     pub iPC_ID: i32,
     pub iBatteryW: i32,
     pub iBatteryN: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sPC_NanoSlots {
     pub aNanoSlots: [i32; 3],
     pub iActiveNanoSlotNum: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sPC_Nano {
     pub iPC_ID: i32,
     pub Nano: sNano,
     pub iActiveNanoSlotNum: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sPCRegenData {
     pub iHP: i32,
     pub iMapNum: i32,
@@ -1084,9 +1084,9 @@ pub struct sPCRegenData {
     pub Nanos: [sNano; 3],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sPCRegenDataForOtherPC {
     pub iPC_ID: i32,
     pub iHP: i32,
@@ -1100,18 +1100,18 @@ pub struct sPCRegenDataForOtherPC {
     pub Nano: sNano,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sPCBullet {
     pub eAT: i32,
     pub iID: i32,
     pub bCharged: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sNPCBullet {
     pub eAT: i32,
     pub iID: i32,
@@ -1119,9 +1119,9 @@ pub struct sNPCBullet {
     pub eST: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sNPCLocationData {
     pub iNPC_Type: i32,
     pub iX: i32,
@@ -1131,9 +1131,9 @@ pub struct sNPCLocationData {
     pub iRoute: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sGroupNPCLocationData {
     pub iGroupType: i32,
     pub iX: i32,
@@ -1144,9 +1144,9 @@ pub struct sGroupNPCLocationData {
     pub aGroupNPCIDs: [i32; 5],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sPCGroupMemberInfo {
     pub iPC_ID: i32,
     pub iPCUID: u64,
@@ -1166,9 +1166,9 @@ pub struct sPCGroupMemberInfo {
     pub Nano: sNano,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sNPCGroupMemberInfo {
     pub iNPC_ID: i32,
     pub iNPC_Type: i32,
@@ -1180,9 +1180,9 @@ pub struct sNPCGroupMemberInfo {
     pub iZ: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sEPElement {
     pub iLID: i32,
     pub iGID: i32,
@@ -1195,42 +1195,42 @@ pub struct sEPElement {
     pub iONOFF: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sCNStreetStall_ItemInfo_for_Client {
     pub iListNum: i32,
     pub Item: sItemBase,
     pub iPrice: i32,
 }
 
-#[repr(align(2))]
+#[repr(packed(2))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sQuickSlot {
     pub iType: i16,
     pub iID: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_ENTER {
     pub szID: [u16; 33],
     pub iTempValue: i32,
     pub iEnterSerialKey: i64,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_EXIT {
     pub iID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_MOVE {
     pub iCliTime: u64,
     pub iX: i32,
@@ -1244,9 +1244,9 @@ pub struct sP_CL2FE_REQ_PC_MOVE {
     pub iSpeed: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_STOP {
     pub iCliTime: u64,
     pub iX: i32,
@@ -1254,9 +1254,9 @@ pub struct sP_CL2FE_REQ_PC_STOP {
     pub iZ: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_JUMP {
     pub iCliTime: u64,
     pub iX: i32,
@@ -1270,41 +1270,41 @@ pub struct sP_CL2FE_REQ_PC_JUMP {
     pub iSpeed: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_ATTACK_NPCs {
     pub iNPCCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_SEND_FREECHAT_MESSAGE {
     pub szFreeChat: [u16; 128],
     pub iEmoteCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_SEND_MENUCHAT_MESSAGE {
     pub szFreeChat: [u16; 128],
     pub iEmoteCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_REGEN {
     pub iRegenType: i32,
     pub eIL: i32,
     pub iIndex: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_ITEM_MOVE {
     pub eFrom: i32,
     pub iFromSlotNum: i32,
@@ -1312,18 +1312,18 @@ pub struct sP_CL2FE_REQ_ITEM_MOVE {
     pub iToSlotNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_TASK_START {
     pub iTaskNum: i32,
     pub iNPC_ID: i32,
     pub iEscortNPC_ID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_TASK_END {
     pub iTaskNum: i32,
     pub iNPC_ID: i32,
@@ -1332,40 +1332,40 @@ pub struct sP_CL2FE_REQ_PC_TASK_END {
     pub iEscortNPC_ID: i32,
 }
 
-#[repr(align(2))]
+#[repr(packed(2))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_NANO_EQUIP {
     pub iNanoID: i16,
     pub iNanoSlotNum: i16,
 }
 
-#[repr(align(2))]
+#[repr(packed(2))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_NANO_UNEQUIP {
     pub iNanoSlotNum: i16,
 }
 
-#[repr(align(2))]
+#[repr(packed(2))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_NANO_ACTIVE {
     pub iNanoSlotNum: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_NANO_TUNE {
     pub iNanoID: i16,
     pub iTuneID: i16,
     pub aiNeedItemSlotNum: [i32; 10],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_NANO_SKILL_USE {
     pub iBulletID: i8,
     pub iArg1: i32,
@@ -1374,46 +1374,46 @@ pub struct sP_CL2FE_REQ_NANO_SKILL_USE {
     pub iTargetCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_TASK_STOP {
     pub iTaskNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_TASK_CONTINUE {
     pub iTaskNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_GOTO {
     pub iToX: i32,
     pub iToY: i32,
     pub iToZ: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_CHARGE_NANO_STAMINA {
     pub iPC_ID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_KILL_QUEST_NPCs {
     pub iNPCCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_VENDOR_ITEM_BUY {
     pub iNPC_ID: i32,
     pub iVendorID: i32,
@@ -1422,25 +1422,25 @@ pub struct sP_CL2FE_REQ_PC_VENDOR_ITEM_BUY {
     pub iInvenSlotNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_VENDOR_ITEM_SELL {
     pub iInvenSlotNum: i32,
     pub iItemCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_ITEM_DELETE {
     pub eIL: i32,
     pub iSlotNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_GIVE_ITEM {
     pub eIL: i32,
     pub iSlotNum: i32,
@@ -1448,16 +1448,16 @@ pub struct sP_CL2FE_REQ_PC_GIVE_ITEM {
     pub iTimeLeft: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_ROCKET_STYLE_READY {
     pub iSkillID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_ROCKET_STYLE_FIRE {
     pub iSkillID: i32,
     pub iX: i32,
@@ -1468,9 +1468,9 @@ pub struct sP_CL2FE_REQ_PC_ROCKET_STYLE_FIRE {
     pub iToZ: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_ROCKET_STYLE_HIT {
     pub iBulletID: i8,
     pub iX: i32,
@@ -1479,16 +1479,16 @@ pub struct sP_CL2FE_REQ_PC_ROCKET_STYLE_HIT {
     pub iTargetCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_GRENADE_STYLE_READY {
     pub iSkillID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_GRENADE_STYLE_FIRE {
     pub iSkillID: i32,
     pub iToX: i32,
@@ -1496,9 +1496,9 @@ pub struct sP_CL2FE_REQ_PC_GRENADE_STYLE_FIRE {
     pub iToZ: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_GRENADE_STYLE_HIT {
     pub iBulletID: i8,
     pub iX: i32,
@@ -1507,53 +1507,53 @@ pub struct sP_CL2FE_REQ_PC_GRENADE_STYLE_HIT {
     pub iTargetCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_NANO_CREATE {
     pub iNanoID: i16,
     pub iNeedQuestItemSlotNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_TRADE_OFFER {
     pub iID_Request: i32,
     pub iID_From: i32,
     pub iID_To: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_TRADE_OFFER_CANCEL {
     pub iID_Request: i32,
     pub iID_From: i32,
     pub iID_To: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_TRADE_OFFER_ACCEPT {
     pub iID_Request: i32,
     pub iID_From: i32,
     pub iID_To: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_TRADE_OFFER_REFUSAL {
     pub iID_Request: i32,
     pub iID_From: i32,
     pub iID_To: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_TRADE_OFFER_ABORT {
     pub iID_Request: i32,
     pub iID_From: i32,
@@ -1561,36 +1561,36 @@ pub struct sP_CL2FE_REQ_PC_TRADE_OFFER_ABORT {
     pub iErrorCode: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_TRADE_CONFIRM {
     pub iID_Request: i32,
     pub iID_From: i32,
     pub iID_To: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_TRADE_CONFIRM_CANCEL {
     pub iID_Request: i32,
     pub iID_From: i32,
     pub iID_To: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_TRADE_CONFIRM_ABORT {
     pub iID_Request: i32,
     pub iID_From: i32,
     pub iID_To: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_TRADE_ITEM_REGISTER {
     pub iID_Request: i32,
     pub iID_From: i32,
@@ -1598,9 +1598,9 @@ pub struct sP_CL2FE_REQ_PC_TRADE_ITEM_REGISTER {
     pub Item: sItemTrade,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_TRADE_ITEM_UNREGISTER {
     pub iID_Request: i32,
     pub iID_From: i32,
@@ -1608,9 +1608,9 @@ pub struct sP_CL2FE_REQ_PC_TRADE_ITEM_UNREGISTER {
     pub Item: sItemTrade,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_TRADE_CASH_REGISTER {
     pub iID_Request: i32,
     pub iID_From: i32,
@@ -1618,9 +1618,9 @@ pub struct sP_CL2FE_REQ_PC_TRADE_CASH_REGISTER {
     pub iCandy: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_TRADE_EMOTES_CHAT {
     pub iID_Request: i32,
     pub iID_From: i32,
@@ -1630,39 +1630,39 @@ pub struct sP_CL2FE_REQ_PC_TRADE_EMOTES_CHAT {
     pub iFreeChatUse: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_BANK_OPEN {
     pub iPC_ID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_BANK_CLOSE {
     pub iPC_ID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_VENDOR_START {
     pub iNPC_ID: i32,
     pub iVendorID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_VENDOR_TABLE_UPDATE {
     pub iNPC_ID: i32,
     pub iVendorID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_VENDOR_ITEM_RESTORE_BUY {
     pub iNPC_ID: i32,
     pub iVendorID: i32,
@@ -1671,40 +1671,40 @@ pub struct sP_CL2FE_REQ_PC_VENDOR_ITEM_RESTORE_BUY {
     pub iInvenSlotNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_COMBAT_BEGIN {
     pub iPC_ID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_COMBAT_END {
     pub iPC_ID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_REQUEST_MAKE_BUDDY {
     pub iBuddyID: i32,
     pub iBuddyPCUID: i64,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_ACCEPT_MAKE_BUDDY {
     pub iAcceptFlag: i8,
     pub iBuddyID: i32,
     pub iBuddyPCUID: i64,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_SEND_BUDDY_FREECHAT_MESSAGE {
     pub szFreeChat: [u16; 128],
     pub iEmoteCode: i32,
@@ -1712,9 +1712,9 @@ pub struct sP_CL2FE_REQ_SEND_BUDDY_FREECHAT_MESSAGE {
     pub iBuddySlot: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_SEND_BUDDY_MENUCHAT_MESSAGE {
     pub szFreeChat: [u16; 128],
     pub iEmoteCode: i32,
@@ -1722,40 +1722,40 @@ pub struct sP_CL2FE_REQ_SEND_BUDDY_MENUCHAT_MESSAGE {
     pub iBuddySlot: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_GET_BUDDY_STYLE {
     pub iBuddyPCUID: i64,
     pub iBuddySlot: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_SET_BUDDY_BLOCK {
     pub iBuddyPCUID: i64,
     pub iBuddySlot: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_REMOVE_BUDDY {
     pub iBuddyPCUID: i64,
     pub iBuddySlot: i8,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_GET_BUDDY_STATE {
     pub UNUSED: u8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_JUMPPAD {
     pub iCliTime: u64,
     pub iX: i32,
@@ -1768,9 +1768,9 @@ pub struct sP_CL2FE_REQ_PC_JUMPPAD {
     pub cKeyValue: u8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_LAUNCHER {
     pub iCliTime: u64,
     pub iX: i32,
@@ -1783,9 +1783,9 @@ pub struct sP_CL2FE_REQ_PC_LAUNCHER {
     pub iSpeed: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_ZIPLINE {
     pub iCliTime: u64,
     pub iStX: i32,
@@ -1807,9 +1807,9 @@ pub struct sP_CL2FE_REQ_PC_ZIPLINE {
     pub iSpeed: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_MOVEPLATFORM {
     pub iCliTime: u64,
     pub iLcX: i32,
@@ -1828,9 +1828,9 @@ pub struct sP_CL2FE_REQ_PC_MOVEPLATFORM {
     pub iSpeed: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_SLOPE {
     pub iCliTime: u64,
     pub iX: i32,
@@ -1845,69 +1845,69 @@ pub struct sP_CL2FE_REQ_PC_SLOPE {
     pub iSlopeID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_STATE_CHANGE {
     pub iState: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_MAP_WARP {
     pub iMapNum: i32,
 }
 
-#[repr(align(2))]
+#[repr(packed(2))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_GIVE_NANO {
     pub iNanoID: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_NPC_SUMMON {
     pub iNPCType: i32,
     pub iNPCCnt: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_NPC_UNSUMMON {
     pub iNPC_ID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_ITEM_CHEST_OPEN {
     pub eIL: i32,
     pub iSlotNum: i32,
     pub ChestItem: sItemBase,
 }
 
-#[repr(align(2))]
+#[repr(packed(2))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_GIVE_NANO_SKILL {
     pub iNanoID: i16,
     pub iNanoSkillID: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_DOT_DAMAGE_ONOFF {
     pub iFlag: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_VENDOR_BATTERY_BUY {
     pub iNPC_ID: i32,
     pub iVendorID: i32,
@@ -1915,9 +1915,9 @@ pub struct sP_CL2FE_REQ_PC_VENDOR_BATTERY_BUY {
     pub Item: sItemBase,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_WARP_USE_NPC {
     pub iNPC_ID: i32,
     pub iWarpID: i32,
@@ -1927,166 +1927,166 @@ pub struct sP_CL2FE_REQ_PC_WARP_USE_NPC {
     pub iItemSlot2: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_GROUP_INVITE {
     pub iID_To: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_GROUP_INVITE_REFUSE {
     pub iID_From: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_GROUP_JOIN {
     pub iID_From: i32,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_GROUP_LEAVE {
     pub UNUSED: u8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_AVATAR_EMOTES_CHAT {
     pub iID_From: i32,
     pub iEmoteCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_BUDDY_WARP {
     pub iBuddyPCUID: i64,
     pub iSlotNum: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_GET_MEMBER_STYLE {
     pub iMemberID: i32,
     pub iMemberUID: i64,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_GET_GROUP_STYLE {
     pub UNUSED: u8,
 }
 
-#[repr(align(2))]
+#[repr(packed(2))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_CHANGE_MENTOR {
     pub iMentor: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_GET_BUDDY_LOCATION {
     pub iBuddyPCUID: i64,
     pub iSlotNum: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_NPC_GROUP_SUMMON {
     pub iNPCGroupType: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_WARP_TO_PC {
     pub iPC_ID: i32,
     pub iPCUID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_EP_RANK_GET_LIST {
     pub iRankListPageNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_EP_RANK_GET_DETAIL {
     pub iEP_ID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_EP_RANK_GET_PC_INFO {
     pub iEP_ID: i32,
     pub szFirstName: [u16; 9],
     pub szLastName: [u16; 17],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_EP_RACE_START {
     pub iStartEcomID: i32,
     pub iEPRaceMode: i32,
     pub iEPTicketItemSlotNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_EP_RACE_END {
     pub iEndEcomID: i32,
     pub iEPTicketItemSlotNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_EP_RACE_CANCEL {
     pub iStartEcomID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_EP_GET_RING {
     pub iRingLID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_IM_CHANGE_SWITCH_STATUS {
     pub iSwitchLID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_SHINY_PICKUP {
     pub iShinyID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_SHINY_SUMMON {
     pub iShinyType: i32,
     pub iX: i32,
@@ -2094,9 +2094,9 @@ pub struct sP_CL2FE_REQ_SHINY_SUMMON {
     pub iZ: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_MOVETRANSPORTATION {
     pub iCliTime: u64,
     pub iLcX: i32,
@@ -2114,60 +2114,60 @@ pub struct sP_CL2FE_REQ_PC_MOVETRANSPORTATION {
     pub iSpeed: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_SEND_ALL_GROUP_FREECHAT_MESSAGE {
     pub szFreeChat: [u16; 128],
     pub iEmoteCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_SEND_ANY_GROUP_FREECHAT_MESSAGE {
     pub szFreeChat: [u16; 128],
     pub iEmoteCode: i32,
     pub iGroupPC_ID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_BARKER {
     pub iMissionTaskID: i32,
     pub iNPC_ID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_SEND_ALL_GROUP_MENUCHAT_MESSAGE {
     pub szFreeChat: [u16; 128],
     pub iEmoteCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_SEND_ANY_GROUP_MENUCHAT_MESSAGE {
     pub szFreeChat: [u16; 128],
     pub iEmoteCode: i32,
     pub iGroupPC_ID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_REGIST_TRANSPORTATION_LOCATION {
     pub eTT: i32,
     pub iNPC_ID: i32,
     pub iLocationID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_WARP_USE_TRANSPORTATION {
     pub iNPC_ID: i32,
     pub iTransporationID: i32,
@@ -2175,26 +2175,26 @@ pub struct sP_CL2FE_REQ_PC_WARP_USE_TRANSPORTATION {
     pub iSlotNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_GM_REQ_PC_SPECIAL_STATE_SWITCH {
     pub iPC_ID: i32,
     pub iSpecialStateFlag: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_GM_REQ_PC_SET_VALUE {
     pub iPC_ID: i32,
     pub iSetValueType: i32,
     pub iSetValue: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_GM_REQ_KICK_PLAYER {
     pub iPC_ID: i32,
     pub eTargetSearchBy: i32,
@@ -2204,9 +2204,9 @@ pub struct sP_CL2FE_GM_REQ_KICK_PLAYER {
     pub iTargetPC_UID: i64,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_GM_REQ_TARGET_PC_TELEPORT {
     pub iPC_ID: i32,
     pub eTargetPCSearchBy: i32,
@@ -2227,9 +2227,9 @@ pub struct sP_CL2FE_GM_REQ_TARGET_PC_TELEPORT {
     pub iGoalPC_UID: i64,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_GM_REQ_PC_LOCATION {
     pub eTargetSearchBy: i32,
     pub iTargetPC_ID: i32,
@@ -2238,9 +2238,9 @@ pub struct sP_CL2FE_GM_REQ_PC_LOCATION {
     pub iTargetPC_UID: i64,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_GM_REQ_PC_ANNOUNCE {
     pub iAreaType: i8,
     pub iAnnounceType: i8,
@@ -2248,120 +2248,120 @@ pub struct sP_CL2FE_GM_REQ_PC_ANNOUNCE {
     pub szAnnounceMsg: [u16; 512],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_SET_PC_BLOCK {
     pub iBlock_ID: i32,
     pub iBlock_PCUID: i64,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_REGIST_RXCOM {
     pub iNPCID: i32,
 }
 
-#[repr(align(2))]
+#[repr(packed(2))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_GM_REQ_PC_MOTD_REGISTER {
     pub iType: i8,
     pub szSystemMsg: [u16; 512],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_ITEM_USE {
     pub eIL: i32,
     pub iSlotNum: i32,
     pub iNanoSlot: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_WARP_USE_RECALL {
     pub iGroupMemberID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REP_LIVE_CHECK {
     pub iTempValue: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_MISSION_COMPLETE {
     pub iMissionNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_TASK_COMPLETE {
     pub iTaskNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_NPC_INTERACTION {
     pub iNPC_ID: i32,
     pub bFlag: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_DOT_HEAL_ONOFF {
     pub iFlag: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH {
     pub iPC_ID: i32,
     pub iSpecialStateFlag: i8,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_EMAIL_UPDATE_CHECK {
     pub UNUSED: u8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_READ_EMAIL {
     pub iEmailIndex: i64,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_RECV_EMAIL_PAGE_LIST {
     pub iPageNum: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_DELETE_EMAIL {
     pub iEmailIndexArray: [i64; 5],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_SEND_EMAIL {
     pub iTo_PCUID: i64,
     pub szSubject: [u16; 32],
@@ -2370,25 +2370,25 @@ pub struct sP_CL2FE_REQ_PC_SEND_EMAIL {
     pub iCash: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_RECV_EMAIL_ITEM {
     pub iEmailIndex: i64,
     pub iSlotNum: i32,
     pub iEmailItemSlot: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_RECV_EMAIL_CANDY {
     pub iEmailIndex: i64,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF {
     pub eTargetSearchBy: i32,
     pub iTargetPC_ID: i32,
@@ -2399,37 +2399,37 @@ pub struct sP_CL2FE_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF {
     pub iSpecialStateFlag: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_SET_CURRENT_MISSION_ID {
     pub iCurrentMissionID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_NPC_GROUP_INVITE {
     pub iNPC_ID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_NPC_GROUP_KICK {
     pub iNPC_ID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_FIRST_USE_FLAG_SET {
     pub iFlagCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_TRANSPORT_WARP {
     pub iTransport_ID: i32,
     pub iLcX: i32,
@@ -2437,9 +2437,9 @@ pub struct sP_CL2FE_REQ_PC_TRANSPORT_WARP {
     pub iLcZ: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_TIME_TO_GO_WARP {
     pub iNPC_ID: i32,
     pub iWarpID: i32,
@@ -2451,53 +2451,53 @@ pub struct sP_CL2FE_REQ_PC_TIME_TO_GO_WARP {
     pub iPayFlag: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_RECV_EMAIL_ITEM_ALL {
     pub iEmailIndex: i64,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_CHANNEL_INFO {
     pub UNUSED: u8,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_CHANNEL_NUM {
     pub UNUSED: u8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_WARP_CHANNEL {
     pub iChannelNum: i32,
     pub iWarpType: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_LOADING_COMPLETE {
     pub iPC_ID: i32,
 }
 
-#[repr(align(2))]
+#[repr(packed(2))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_FIND_NAME_MAKE_BUDDY {
     pub szFirstName: [u16; 9],
     pub szLastName: [u16; 17],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_FIND_NAME_ACCEPT_BUDDY {
     pub iAcceptFlag: i32,
     pub iBuddyPCUID: i64,
@@ -2505,30 +2505,30 @@ pub struct sP_CL2FE_REQ_PC_FIND_NAME_ACCEPT_BUDDY {
     pub szLastName: [u16; 17],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_ATTACK_CHARs {
     pub iTargetCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_PC_STREETSTALL_REQ_READY {
     pub iStreetStallItemInvenSlotNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_PC_STREETSTALL_REQ_CANCEL {
     pub iPC_ID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_PC_STREETSTALL_REQ_REGIST_ITEM {
     pub iItemListNum: i32,
     pub iItemInvenSlotNum: i32,
@@ -2536,39 +2536,39 @@ pub struct sP_CL2FE_PC_STREETSTALL_REQ_REGIST_ITEM {
     pub iPrice: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_PC_STREETSTALL_REQ_UNREGIST_ITEM {
     pub iItemListNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_PC_STREETSTALL_REQ_SALE_START {
     pub iStreetStallItemInvenSlotNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_PC_STREETSTALL_REQ_ITEM_LIST {
     pub iStreetStallPC_ID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_PC_STREETSTALL_REQ_ITEM_BUY {
     pub iStreetStallPC_ID: i32,
     pub iItemListNum: i32,
     pub iEmptyInvenSlotNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_ITEM_COMBINATION {
     pub iCostumeItemSlot: i32,
     pub iStatItemSlot: i32,
@@ -2576,17 +2576,17 @@ pub struct sP_CL2FE_REQ_PC_ITEM_COMBINATION {
     pub iCashItemSlot2: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_GM_REQ_SET_PC_SKILL {
     pub iSkillSlotNum: i32,
     pub iSkillID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_SKILL_ADD {
     pub iSkillSlotNum: i32,
     pub iSkillID: i32,
@@ -2595,17 +2595,17 @@ pub struct sP_CL2FE_REQ_PC_SKILL_ADD {
     pub iPreSkillID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_SKILL_DEL {
     pub iSkillSlotNum: i32,
     pub iSkillID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_SKILL_USE {
     pub iSkillSlotNum: i32,
     pub iSkillID: i32,
@@ -2624,9 +2624,9 @@ pub struct sP_CL2FE_REQ_PC_SKILL_USE {
     pub iTargetCount: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_ROPE {
     pub iCliTime: u64,
     pub iX: i32,
@@ -2641,9 +2641,9 @@ pub struct sP_CL2FE_REQ_PC_ROPE {
     pub iSpeed: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_BELT {
     pub iCliTime: u64,
     pub iLcX: i32,
@@ -2662,39 +2662,39 @@ pub struct sP_CL2FE_REQ_PC_BELT {
     pub iSpeed: i32,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_VEHICLE_ON {
     pub UNUSED: u8,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_VEHICLE_OFF {
     pub UNUSED: u8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_REGIST_QUICK_SLOT {
     pub iSlotNum: i32,
     pub iItemType: i16,
     pub iItemID: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_DISASSEMBLE_ITEM {
     pub iItemSlot: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_GM_REQ_REWARD_RATE {
     pub iGetSet: i32,
     pub iRewardType: i32,
@@ -2702,9 +2702,9 @@ pub struct sP_CL2FE_GM_REQ_REWARD_RATE {
     pub iSetRateValue: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2FE_REQ_PC_ITEM_ENCHANT {
     pub iEnchantItemSlot: i32,
     pub iWeaponMaterialItemSlot: i32,
@@ -2713,9 +2713,9 @@ pub struct sP_CL2FE_REQ_PC_ITEM_ENCHANT {
     pub iCashItemSlot2: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2LS_REQ_LOGIN {
     pub szID: [u16; 33],
     pub szPassword: [u16; 33],
@@ -2727,9 +2727,9 @@ pub struct sP_CL2LS_REQ_LOGIN {
     pub szCookie_authid: [u8; 255],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2LS_REQ_CHECK_CHAR_NAME {
     pub iFNCode: i32,
     pub iLNCode: i32,
@@ -2738,9 +2738,9 @@ pub struct sP_CL2LS_REQ_CHECK_CHAR_NAME {
     pub szLastName: [u16; 17],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2LS_REQ_SAVE_CHAR_NAME {
     pub iSlotNum: i8,
     pub iGender: i8,
@@ -2751,78 +2751,78 @@ pub struct sP_CL2LS_REQ_SAVE_CHAR_NAME {
     pub szLastName: [u16; 17],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2LS_REQ_CHAR_CREATE {
     pub PCStyle: sPCStyle,
     pub sOn_Item: sOnItem,
     pub sOn_Item_Index: sOnItem_Index,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2LS_REQ_CHAR_SELECT {
     pub iPC_UID: i64,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2LS_REQ_CHAR_DELETE {
     pub iPC_UID: i64,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2LS_REQ_SHARD_SELECT {
     pub ShardNum: i8,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2LS_REQ_SHARD_LIST_INFO {
     pub UNUSED: u8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2LS_CHECK_NAME_LIST {
     pub iFNCode: i32,
     pub iMNCode: i32,
     pub iLNCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2LS_REQ_SAVE_CHAR_TUTOR {
     pub iPC_UID: i64,
     pub iTutorialFlag: i8,
 }
 
-#[repr(align(2))]
+#[repr(packed(2))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2LS_REQ_PC_EXIT_DUPLICATE {
     pub szID: [u16; 33],
     pub szPassword: [u16; 33],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2LS_REP_LIVE_CHECK {
     pub iTempValue: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2LS_REQ_CHANGE_CHAR_NAME {
     pub iPCUID: i64,
     pub iSlotNum: i8,
@@ -2834,111 +2834,111 @@ pub struct sP_CL2LS_REQ_CHANGE_CHAR_NAME {
     pub szLastName: [u16; 17],
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_CL2LS_REQ_SERVER_SELECT {
     pub ServerNum: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sPacket {
     pub dwType: u32,
     pub szData: [u8; 4096],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sPacket_Full {
     pub dwSize: u32,
     pub dwType: u32,
     pub szData: [u8; 4096],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sPacket2x {
     pub dwType: u32,
     pub szData: [u8; 8192],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sPacket2x_Full {
     pub dwSize: u32,
     pub dwType: u32,
     pub szData: [u8; 8192],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_ERROR {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_ENTER_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_ENTER_SUCC {
     pub iID: i32,
     pub PCLoadData2CL: sPCLoadData2CL,
     pub uiSvrTime: u64,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_NEW {
     pub PCAppearanceData: sPCAppearanceData,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_EXIT_FAIL {
     pub iID: i32,
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_EXIT_SUCC {
     pub iID: i32,
     pub iExitCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_EXIT {
     pub iID: i32,
     pub iExitType: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_AROUND {
     pub iPCCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_MOVE {
     pub iCliTime: u64,
     pub iX: i32,
@@ -2954,9 +2954,9 @@ pub struct sP_FE2CL_PC_MOVE {
     pub iSvrTime: u64,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_STOP {
     pub iCliTime: u64,
     pub iX: i32,
@@ -2966,9 +2966,9 @@ pub struct sP_FE2CL_PC_STOP {
     pub iSvrTime: u64,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_JUMP {
     pub iCliTime: u64,
     pub iX: i32,
@@ -2984,23 +2984,23 @@ pub struct sP_FE2CL_PC_JUMP {
     pub iSvrTime: u64,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_NPC_ENTER {
     pub NPCAppearanceData: sNPCAppearanceData,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_NPC_EXIT {
     pub iNPC_ID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_NPC_MOVE {
     pub iNPC_ID: i32,
     pub iToX: i32,
@@ -3010,106 +3010,106 @@ pub struct sP_FE2CL_NPC_MOVE {
     pub iMoveStyle: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_NPC_NEW {
     pub NPCAppearanceData: sNPCAppearanceData,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_NPC_AROUND {
     pub iNPCCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_AROUND_DEL_PC {
     pub iPCCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_AROUND_DEL_NPC {
     pub iNPCCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_SEND_FREECHAT_MESSAGE_SUCC {
     pub iPC_ID: i32,
     pub szFreeChat: [u16; 128],
     pub iEmoteCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_SEND_FREECHAT_MESSAGE_FAIL {
     pub iErrorCode: i32,
     pub szFreeChat: [u16; 128],
     pub iEmoteCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_ATTACK_NPCs_SUCC {
     pub iBatteryW: i32,
     pub iNPCCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_ATTACK_NPCs {
     pub iPC_ID: i32,
     pub iNPCCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_NPC_ATTACK_PCs {
     pub iNPC_ID: i32,
     pub iPCCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_REGEN_SUCC {
     pub PCRegenData: sPCRegenData,
     pub bMoveLocation: i32,
     pub iFusionMatter: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_SEND_MENUCHAT_MESSAGE_SUCC {
     pub iPC_ID: i32,
     pub szFreeChat: [u16; 128],
     pub iEmoteCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_SEND_MENUCHAT_MESSAGE_FAIL {
     pub iErrorCode: i32,
     pub szFreeChat: [u16; 128],
     pub iEmoteCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_ITEM_MOVE_SUCC {
     pub eFrom: i32,
     pub iFromSlotNum: i32,
@@ -3119,49 +3119,49 @@ pub struct sP_FE2CL_PC_ITEM_MOVE_SUCC {
     pub ToSlotItem: sItemBase,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_EQUIP_CHANGE {
     pub iPC_ID: i32,
     pub iEquipSlotNum: i32,
     pub EquipSlotItem: sItemBase,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TASK_START_SUCC {
     pub iTaskNum: i32,
     pub iRemainTime: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TASK_START_FAIL {
     pub iTaskNum: i32,
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TASK_END_SUCC {
     pub iTaskNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TASK_END_FAIL {
     pub iTaskNum: i32,
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_NPC_SKILL_READY {
     pub iNPC_ID: i32,
     pub iSkillID: i16,
@@ -3170,9 +3170,9 @@ pub struct sP_FE2CL_NPC_SKILL_READY {
     pub iValue3: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_NPC_SKILL_FIRE {
     pub iNPC_ID: i32,
     pub iSkillID: i16,
@@ -3181,9 +3181,9 @@ pub struct sP_FE2CL_NPC_SKILL_FIRE {
     pub iVZ: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_NPC_SKILL_HIT {
     pub iNPC_ID: i32,
     pub iSkillID: i16,
@@ -3194,9 +3194,9 @@ pub struct sP_FE2CL_NPC_SKILL_HIT {
     pub iTargetCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_NPC_SKILL_CORRUPTION_READY {
     pub iNPC_ID: i32,
     pub iSkillID: i16,
@@ -3206,9 +3206,9 @@ pub struct sP_FE2CL_NPC_SKILL_CORRUPTION_READY {
     pub iValue3: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_NPC_SKILL_CORRUPTION_HIT {
     pub iNPC_ID: i32,
     pub iSkillID: i16,
@@ -3219,41 +3219,41 @@ pub struct sP_FE2CL_NPC_SKILL_CORRUPTION_HIT {
     pub iTargetCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_NPC_SKILL_CANCEL {
     pub iNPC_ID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_NANO_EQUIP_SUCC {
     pub iNanoID: i16,
     pub iNanoSlotNum: i16,
     pub bNanoDeactive: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_NANO_UNEQUIP_SUCC {
     pub iNanoSlotNum: i16,
     pub bNanoDeactive: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_NANO_ACTIVE_SUCC {
     pub iActiveNanoSlotNum: i16,
     pub eCSTB___Add: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_NANO_TUNE_SUCC {
     pub iNanoID: i16,
     pub iSkillID: i16,
@@ -3262,9 +3262,9 @@ pub struct sP_FE2CL_REP_NANO_TUNE_SUCC {
     pub aItem: [sItemBase; 10],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_NANO_ACTIVE {
     pub iPC_ID: i32,
     pub Nano: sNano,
@@ -3272,9 +3272,9 @@ pub struct sP_FE2CL_NANO_ACTIVE {
     pub eCSTB___Add: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_NANO_SKILL_USE_SUCC {
     pub iPC_ID: i32,
     pub iBulletID: i8,
@@ -3289,9 +3289,9 @@ pub struct sP_FE2CL_NANO_SKILL_USE_SUCC {
     pub iTargetCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_NANO_SKILL_USE {
     pub iPC_ID: i32,
     pub iBulletID: i8,
@@ -3306,55 +3306,55 @@ pub struct sP_FE2CL_NANO_SKILL_USE {
     pub iTargetCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TASK_STOP_SUCC {
     pub iTaskNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TASK_STOP_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TASK_CONTINUE_SUCC {
     pub iTaskNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TASK_CONTINUE_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_GOTO_SUCC {
     pub iX: i32,
     pub iY: i32,
     pub iZ: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_CHARGE_NANO_STAMINA {
     pub iBatteryN: i32,
     pub iNanoID: i16,
     pub iNanoStamina: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TICK {
     pub iHP: i32,
     pub aNano: [sNano; 3],
@@ -3362,32 +3362,32 @@ pub struct sP_FE2CL_REP_PC_TICK {
     pub bResetMissionFlag: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_KILL_QUEST_NPCs_SUCC {
     pub iNPCID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_VENDOR_ITEM_BUY_SUCC {
     pub iCandy: i32,
     pub iInvenSlotNum: i32,
     pub Item: sItemBase,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_VENDOR_ITEM_BUY_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_VENDOR_ITEM_SELL_SUCC {
     pub iCandy: i32,
     pub iInvenSlotNum: i32,
@@ -3395,32 +3395,32 @@ pub struct sP_FE2CL_REP_PC_VENDOR_ITEM_SELL_SUCC {
     pub ItemStay: sItemBase,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_VENDOR_ITEM_SELL_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_ITEM_DELETE_SUCC {
     pub eIL: i32,
     pub iSlotNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_ROCKET_STYLE_READY {
     pub iPC_ID: i32,
     pub iSkillID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_ROCKET_STYLE_FIRE_SUCC {
     pub iSkillID: i32,
     pub iX: i32,
@@ -3437,9 +3437,9 @@ pub struct sP_FE2CL_REP_PC_ROCKET_STYLE_FIRE_SUCC {
     pub iNanoStamina: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_ROCKET_STYLE_FIRE {
     pub iPC_ID: i32,
     pub iX: i32,
@@ -3453,9 +3453,9 @@ pub struct sP_FE2CL_PC_ROCKET_STYLE_FIRE {
     pub bNanoDeactive: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_ROCKET_STYLE_HIT {
     pub iPC_ID: i32,
     pub iBulletID: i8,
@@ -3463,17 +3463,17 @@ pub struct sP_FE2CL_PC_ROCKET_STYLE_HIT {
     pub iTargetCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_GRENADE_STYLE_READY {
     pub iPC_ID: i32,
     pub iSkillID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_GRENADE_STYLE_FIRE_SUCC {
     pub iSkillID: i32,
     pub iToX: i32,
@@ -3487,9 +3487,9 @@ pub struct sP_FE2CL_REP_PC_GRENADE_STYLE_FIRE_SUCC {
     pub iNanoStamina: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_GRENADE_STYLE_FIRE {
     pub iPC_ID: i32,
     pub iToX: i32,
@@ -3500,9 +3500,9 @@ pub struct sP_FE2CL_PC_GRENADE_STYLE_FIRE {
     pub bNanoDeactive: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_GRENADE_STYLE_HIT {
     pub iPC_ID: i32,
     pub iBulletID: i8,
@@ -3510,45 +3510,45 @@ pub struct sP_FE2CL_PC_GRENADE_STYLE_HIT {
     pub iTargetCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TRADE_OFFER {
     pub iID_Request: i32,
     pub iID_From: i32,
     pub iID_To: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TRADE_OFFER_CANCEL {
     pub iID_Request: i32,
     pub iID_From: i32,
     pub iID_To: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TRADE_OFFER_SUCC {
     pub iID_Request: i32,
     pub iID_From: i32,
     pub iID_To: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TRADE_OFFER_REFUSAL {
     pub iID_Request: i32,
     pub iID_From: i32,
     pub iID_To: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TRADE_OFFER_ABORT {
     pub iID_Request: i32,
     pub iID_From: i32,
@@ -3556,36 +3556,36 @@ pub struct sP_FE2CL_REP_PC_TRADE_OFFER_ABORT {
     pub iErrorCode: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TRADE_CONFIRM {
     pub iID_Request: i32,
     pub iID_From: i32,
     pub iID_To: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL {
     pub iID_Request: i32,
     pub iID_From: i32,
     pub iID_To: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TRADE_CONFIRM_ABORT {
     pub iID_Request: i32,
     pub iID_From: i32,
     pub iID_To: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TRADE_CONFIRM_SUCC {
     pub iID_Request: i32,
     pub iID_From: i32,
@@ -3595,9 +3595,9 @@ pub struct sP_FE2CL_REP_PC_TRADE_CONFIRM_SUCC {
     pub ItemStay: [sItemTrade; 12],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TRADE_CONFIRM_FAIL {
     pub iID_Request: i32,
     pub iID_From: i32,
@@ -3605,9 +3605,9 @@ pub struct sP_FE2CL_REP_PC_TRADE_CONFIRM_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TRADE_ITEM_REGISTER_SUCC {
     pub iID_Request: i32,
     pub iID_From: i32,
@@ -3616,9 +3616,9 @@ pub struct sP_FE2CL_REP_PC_TRADE_ITEM_REGISTER_SUCC {
     pub InvenItem: sItemTrade,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TRADE_ITEM_REGISTER_FAIL {
     pub iID_Request: i32,
     pub iID_From: i32,
@@ -3626,9 +3626,9 @@ pub struct sP_FE2CL_REP_PC_TRADE_ITEM_REGISTER_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TRADE_ITEM_UNREGISTER_SUCC {
     pub iID_Request: i32,
     pub iID_From: i32,
@@ -3637,9 +3637,9 @@ pub struct sP_FE2CL_REP_PC_TRADE_ITEM_UNREGISTER_SUCC {
     pub InvenItem: sItemTrade,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TRADE_ITEM_UNREGISTER_FAIL {
     pub iID_Request: i32,
     pub iID_From: i32,
@@ -3647,9 +3647,9 @@ pub struct sP_FE2CL_REP_PC_TRADE_ITEM_UNREGISTER_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TRADE_CASH_REGISTER_SUCC {
     pub iID_Request: i32,
     pub iID_From: i32,
@@ -3657,9 +3657,9 @@ pub struct sP_FE2CL_REP_PC_TRADE_CASH_REGISTER_SUCC {
     pub iCandy: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TRADE_CASH_REGISTER_FAIL {
     pub iID_Request: i32,
     pub iID_From: i32,
@@ -3667,9 +3667,9 @@ pub struct sP_FE2CL_REP_PC_TRADE_CASH_REGISTER_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TRADE_EMOTES_CHAT {
     pub iID_Request: i32,
     pub iID_From: i32,
@@ -3678,9 +3678,9 @@ pub struct sP_FE2CL_REP_PC_TRADE_EMOTES_CHAT {
     pub iEmoteCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_NANO_CREATE_SUCC {
     pub iPC_FusionMatter: i32,
     pub iQuestItemSlotNum: i32,
@@ -3689,124 +3689,124 @@ pub struct sP_FE2CL_REP_PC_NANO_CREATE_SUCC {
     pub iPC_Level: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_NANO_CREATE_FAIL {
     pub iPC_ID: i32,
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_NANO_TUNE_FAIL {
     pub iPC_ID: i32,
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_BANK_OPEN_SUCC {
     pub aBank: [sItemBase; 119],
     pub iExtraBank: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_BANK_OPEN_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_BANK_CLOSE_SUCC {
     pub iPC_ID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_BANK_CLOSE_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_VENDOR_START_SUCC {
     pub iNPC_ID: i32,
     pub iVendorID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_VENDOR_START_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_SUCC {
     pub item: [sItemVendor; 20],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_VENDOR_ITEM_RESTORE_BUY_SUCC {
     pub iCandy: i32,
     pub iInvenSlotNum: i32,
     pub Item: sItemBase,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_VENDOR_ITEM_RESTORE_BUY_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_CHAR_TIME_BUFF_TIME_OUT {
     pub eCT: i32,
     pub iID: i32,
     pub iConditionBitFlag: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_GIVE_ITEM_SUCC {
     pub eIL: i32,
     pub iSlotNum: i32,
     pub Item: sItemBase,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_GIVE_ITEM_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_BUDDYLIST_INFO_SUCC {
     pub iID: i32,
     pub iPCUID: i64,
@@ -3814,51 +3814,51 @@ pub struct sP_FE2CL_REP_PC_BUDDYLIST_INFO_SUCC {
     pub iBuddyCnt: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_BUDDYLIST_INFO_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_REQUEST_MAKE_BUDDY_SUCC {
     pub iRequestID: i32,
     pub iBuddyID: i32,
     pub iBuddyPCUID: i64,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_REQUEST_MAKE_BUDDY_FAIL {
     pub iBuddyID: i32,
     pub iBuddyPCUID: i64,
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC {
     pub iBuddySlot: i8,
     pub BuddyInfo: sBuddyBaseInfo,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_ACCEPT_MAKE_BUDDY_FAIL {
     pub iBuddyID: i32,
     pub iBuddyPCUID: i64,
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC {
     pub iFromPCUID: i64,
     pub iToPCUID: i64,
@@ -3866,9 +3866,9 @@ pub struct sP_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC {
     pub iEmoteCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_FAIL {
     pub iErrorCode: i32,
     pub iToPCUID: i64,
@@ -3876,9 +3876,9 @@ pub struct sP_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_FAIL {
     pub iEmoteCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC {
     pub iFromPCUID: i64,
     pub iToPCUID: i64,
@@ -3886,9 +3886,9 @@ pub struct sP_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC {
     pub iEmoteCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_FAIL {
     pub iErrorCode: i32,
     pub iToPCUID: i64,
@@ -3896,73 +3896,73 @@ pub struct sP_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_FAIL {
     pub iEmoteCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_GET_BUDDY_STYLE_SUCC {
     pub iBuddyPCUID: i64,
     pub iBuddySlot: i8,
     pub sBuddyStyle: sBuddyStyleInfo,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_GET_BUDDY_STYLE_FAIL {
     pub iErrorCode: i32,
     pub iBuddyPCUID: i64,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_GET_BUDDY_STATE_SUCC {
     pub aBuddyID: [i32; 50],
     pub aBuddyState: [u8; 50],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_GET_BUDDY_STATE_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_SET_BUDDY_BLOCK_SUCC {
     pub iBuddyPCUID: i64,
     pub iBuddySlot: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_SET_BUDDY_BLOCK_FAIL {
     pub iBuddyPCUID: i64,
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_REMOVE_BUDDY_SUCC {
     pub iBuddyPCUID: i64,
     pub iBuddySlot: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_REMOVE_BUDDY_FAIL {
     pub iBuddyPCUID: i64,
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_JUMPPAD {
     pub iCliTime: u64,
     pub iX: i32,
@@ -3977,9 +3977,9 @@ pub struct sP_FE2CL_PC_JUMPPAD {
     pub iSvrTime: u64,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_LAUNCHER {
     pub iCliTime: u64,
     pub iX: i32,
@@ -3994,9 +3994,9 @@ pub struct sP_FE2CL_PC_LAUNCHER {
     pub iSvrTime: u64,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_ZIPLINE {
     pub iCliTime: u64,
     pub iStX: i32,
@@ -4020,9 +4020,9 @@ pub struct sP_FE2CL_PC_ZIPLINE {
     pub iSvrTime: u64,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_MOVEPLATFORM {
     pub iCliTime: u64,
     pub iLcX: i32,
@@ -4043,9 +4043,9 @@ pub struct sP_FE2CL_PC_MOVEPLATFORM {
     pub iSvrTime: u64,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_SLOPE {
     pub iCliTime: u64,
     pub iX: i32,
@@ -4062,17 +4062,17 @@ pub struct sP_FE2CL_PC_SLOPE {
     pub iSlopeID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_STATE_CHANGE {
     pub iPC_ID: i32,
     pub iState: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_REQUEST_MAKE_BUDDY_SUCC_TO_ACCEPTER {
     pub iRequestID: i32,
     pub iBuddyID: i32,
@@ -4080,9 +4080,9 @@ pub struct sP_FE2CL_REP_REQUEST_MAKE_BUDDY_SUCC_TO_ACCEPTER {
     pub szLastName: [u16; 17],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_REWARD_ITEM {
     pub m_iCandy: i32,
     pub m_iFusionMatter: i32,
@@ -4095,49 +4095,49 @@ pub struct sP_FE2CL_REP_REWARD_ITEM {
     pub iTaskID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_ITEM_CHEST_OPEN_SUCC {
     pub iSlotNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_ITEM_CHEST_OPEN_FAIL {
     pub iSlotNum: i32,
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_CHAR_TIME_BUFF_TIME_TICK {
     pub eCT: i32,
     pub iID: i32,
     pub iTB_ID: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_VENDOR_BATTERY_BUY_SUCC {
     pub iCandy: i32,
     pub iBatteryW: i32,
     pub iBatteryN: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_VENDOR_BATTERY_BUY_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_NPC_ROCKET_STYLE_FIRE {
     pub iNPC_ID: i32,
     pub iX: i32,
@@ -4150,9 +4150,9 @@ pub struct sP_FE2CL_NPC_ROCKET_STYLE_FIRE {
     pub Bullet: sNPCBullet,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_NPC_GRENADE_STYLE_FIRE {
     pub iNPC_ID: i32,
     pub iToX: i32,
@@ -4162,9 +4162,9 @@ pub struct sP_FE2CL_NPC_GRENADE_STYLE_FIRE {
     pub Bullet: sNPCBullet,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_NPC_BULLET_STYLE_HIT {
     pub iNPC_ID: i32,
     pub iBulletID: i8,
@@ -4172,98 +4172,98 @@ pub struct sP_FE2CL_NPC_BULLET_STYLE_HIT {
     pub iTargetCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_CHARACTER_ATTACK_CHARACTERs {
     pub eCT: i32,
     pub iCharacterID: i32,
     pub iTargetCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_GROUP_INVITE {
     pub iHostID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_GROUP_INVITE_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_GROUP_INVITE_REFUSE {
     pub iID_To: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_GROUP_JOIN {
     pub iID_NewMember: i32,
     pub iMemberPCCnt: i32,
     pub iMemberNPCCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_GROUP_JOIN_FAIL {
     pub iID: i32,
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_GROUP_JOIN_SUCC {
     pub iID_NewMember: i32,
     pub iMemberPCCnt: i32,
     pub iMemberNPCCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_GROUP_LEAVE {
     pub iID_LeaveMember: i32,
     pub iMemberPCCnt: i32,
     pub iMemberNPCCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_GROUP_LEAVE_FAIL {
     pub iID: i32,
     pub iErrorCode: i32,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_GROUP_LEAVE_SUCC {
     pub UNUSED: u8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_GROUP_MEMBER_INFO {
     pub iID: i32,
     pub iMemberPCCnt: i32,
     pub iMemberNPCCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_WARP_USE_NPC_SUCC {
     pub iX: i32,
     pub iY: i32,
@@ -4274,78 +4274,78 @@ pub struct sP_FE2CL_REP_PC_WARP_USE_NPC_SUCC {
     pub iCandy: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_WARP_USE_NPC_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_AVATAR_EMOTES_CHAT {
     pub iID_From: i32,
     pub iEmoteCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_CHANGE_MENTOR_SUCC {
     pub iMentor: i16,
     pub iMentorCnt: i16,
     pub iFusionMatter: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_CHANGE_MENTOR_FAIL {
     pub iMentor: i16,
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_GET_MEMBER_STYLE_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_GET_MEMBER_STYLE_SUCC {
     pub iMemberID: i32,
     pub iMemberUID: i64,
     pub BuddyStyleInfo: sBuddyStyleInfo,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_GET_GROUP_STYLE_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_GET_GROUP_STYLE_SUCC {
     pub iMemberCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_REGEN {
     pub PCRegenDataForOtherPC: sPCRegenDataForOtherPC,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_INSTANCE_MAP_INFO {
     pub iInstanceMapNum: i32,
     pub iCreateTick: u64,
@@ -4363,24 +4363,24 @@ pub struct sP_FE2CL_INSTANCE_MAP_INFO {
     pub iEPSwitch_StatusON_Cnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_TRANSPORTATION_ENTER {
     pub AppearanceData: sTransportationAppearanceData,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_TRANSPORTATION_EXIT {
     pub eTT: i32,
     pub iT_ID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_TRANSPORTATION_MOVE {
     pub eTT: i32,
     pub iT_ID: i32,
@@ -4391,67 +4391,67 @@ pub struct sP_FE2CL_TRANSPORTATION_MOVE {
     pub iMoveStyle: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_TRANSPORTATION_NEW {
     pub AppearanceData: sTransportationAppearanceData,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_TRANSPORTATION_AROUND {
     pub iCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_AROUND_DEL_TRANSPORTATION {
     pub eTT: i32,
     pub iCnt: i32,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_EP_RANK_LIST {
     pub UNUSED: u8,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_EP_RANK_DETAIL {
     pub UNUSED: u8,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_EP_RANK_PC_INFO {
     pub UNUSED: u8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_EP_RACE_START_SUCC {
     pub iStartTick: u64,
     pub iLimitTime: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_EP_RACE_START_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_EP_RACE_END_SUCC {
     pub iEPRaceMode: i32,
     pub iEPRaceTime: i32,
@@ -4469,45 +4469,45 @@ pub struct sP_FE2CL_REP_EP_RACE_END_SUCC {
     pub iFatigue_Level: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_EP_RACE_END_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_EP_RACE_CANCEL_SUCC {
     pub iTemp: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_EP_RACE_CANCEL_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_EP_GET_RING_SUCC {
     pub iRingLID: i32,
     pub iRingCount_Get: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_EP_GET_RING_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_IM_CHANGE_SWITCH_STATUS {
     pub iMapNum: i32,
     pub iSwitchLID: i32,
@@ -4515,59 +4515,59 @@ pub struct sP_FE2CL_REP_IM_CHANGE_SWITCH_STATUS {
     pub iSwitchStatus: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_SHINY_ENTER {
     pub ShinyAppearanceData: sShinyAppearanceData,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_SHINY_EXIT {
     pub iShinyID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_SHINY_NEW {
     pub ShinyAppearanceData: sShinyAppearanceData,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_SHINY_AROUND {
     pub iShinyCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_AROUND_DEL_SHINY {
     pub iShinyCnt: i32,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_SHINY_PICKUP_FAIL {
     pub UNUSED: u8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_SHINY_PICKUP_SUCC {
     pub iSkillID: i16,
     pub eCSTB: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_MOVETRANSPORTATION {
     pub iCliTime: u64,
     pub iLcX: i32,
@@ -4587,18 +4587,18 @@ pub struct sP_FE2CL_PC_MOVETRANSPORTATION {
     pub iSvrTime: u64,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_SEND_ALL_GROUP_FREECHAT_MESSAGE_SUCC {
     pub iSendPCID: i32,
     pub szFreeChat: [u16; 128],
     pub iEmoteCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_SEND_ALL_GROUP_FREECHAT_MESSAGE_FAIL {
     pub iSendPCID: i32,
     pub szFreeChat: [u16; 128],
@@ -4606,9 +4606,9 @@ pub struct sP_FE2CL_REP_SEND_ALL_GROUP_FREECHAT_MESSAGE_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_SEND_ANY_GROUP_FREECHAT_MESSAGE_SUCC {
     pub iSendPCID: i32,
     pub iGroupPC_ID: i32,
@@ -4616,9 +4616,9 @@ pub struct sP_FE2CL_REP_SEND_ANY_GROUP_FREECHAT_MESSAGE_SUCC {
     pub iEmoteCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_SEND_ANY_GROUP_FREECHAT_MESSAGE_FAIL {
     pub iSendPCID: i32,
     pub iGroupPC_ID: i32,
@@ -4627,26 +4627,26 @@ pub struct sP_FE2CL_REP_SEND_ANY_GROUP_FREECHAT_MESSAGE_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_BARKER {
     pub iNPC_ID: i32,
     pub iMissionStringID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_SEND_ALL_GROUP_MENUCHAT_MESSAGE_SUCC {
     pub iSendPCID: i32,
     pub szFreeChat: [u16; 128],
     pub iEmoteCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_SEND_ALL_GROUP_MENUCHAT_MESSAGE_FAIL {
     pub iSendPCID: i32,
     pub szFreeChat: [u16; 128],
@@ -4654,9 +4654,9 @@ pub struct sP_FE2CL_REP_SEND_ALL_GROUP_MENUCHAT_MESSAGE_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_SEND_ANY_GROUP_MENUCHAT_MESSAGE_SUCC {
     pub iSendPCID: i32,
     pub iGroupPC_ID: i32,
@@ -4664,9 +4664,9 @@ pub struct sP_FE2CL_REP_SEND_ANY_GROUP_MENUCHAT_MESSAGE_SUCC {
     pub iEmoteCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_SEND_ANY_GROUP_MENUCHAT_MESSAGE_FAIL {
     pub iSendPCID: i32,
     pub iGroupPC_ID: i32,
@@ -4675,18 +4675,18 @@ pub struct sP_FE2CL_REP_SEND_ANY_GROUP_MENUCHAT_MESSAGE_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_REGIST_TRANSPORTATION_LOCATION_FAIL {
     pub eTT: i32,
     pub iLocationID: i32,
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_REGIST_TRANSPORTATION_LOCATION_SUCC {
     pub eTT: i32,
     pub iLocationID: i32,
@@ -4694,17 +4694,17 @@ pub struct sP_FE2CL_REP_PC_REGIST_TRANSPORTATION_LOCATION_SUCC {
     pub aWyvernLocationFlag: [i64; 2],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_WARP_USE_TRANSPORTATION_FAIL {
     pub iTransportationID: i32,
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_WARP_USE_TRANSPORTATION_SUCC {
     pub eTT: i32,
     pub iX: i32,
@@ -4713,54 +4713,54 @@ pub struct sP_FE2CL_REP_PC_WARP_USE_TRANSPORTATION_SUCC {
     pub iCandy: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_ANNOUNCE_MSG {
     pub iAnnounceType: i8,
     pub iDuringTime: i32,
     pub szAnnounceMsg: [u16; 512],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC {
     pub iPC_ID: i32,
     pub iReqSpecialStateFlag: i8,
     pub iSpecialState: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_SPECIAL_STATE_CHANGE {
     pub iPC_ID: i32,
     pub iReqSpecialStateFlag: i8,
     pub iSpecialState: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_GM_REP_PC_SET_VALUE {
     pub iPC_ID: i32,
     pub iSetValueType: i32,
     pub iSetValue: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_GM_PC_CHANGE_VALUE {
     pub iPC_ID: i32,
     pub iSetValueType: i32,
     pub iSetValue: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_GM_REP_PC_LOCATION {
     pub iTargetPC_UID: i64,
     pub iTargetPC_ID: i32,
@@ -4775,52 +4775,52 @@ pub struct sP_FE2CL_GM_REP_PC_LOCATION {
     pub szTargetPC_LastName: [u16; 18],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_GM_REP_PC_ANNOUNCE {
     pub iAnnounceType: i8,
     pub iDuringTime: i32,
     pub szAnnounceMsg: [u16; 512],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_BUDDY_WARP_FAIL {
     pub iBuddyPCUID: i64,
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_CHANGE_LEVEL {
     pub iPC_ID: i32,
     pub iPC_Level: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_SET_PC_BLOCK_SUCC {
     pub iBlock_ID: i32,
     pub iBlock_PCUID: i64,
     pub iBuddySlot: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_SET_PC_BLOCK_FAIL {
     pub iBlock_ID: i32,
     pub iBlock_PCUID: i64,
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_REGIST_RXCOM {
     pub iMapNum: i32,
     pub iX: i32,
@@ -4828,46 +4828,46 @@ pub struct sP_FE2CL_REP_REGIST_RXCOM {
     pub iZ: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_REGIST_RXCOM_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_INVEN_FULL_MSG {
     pub iType: i8,
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REQ_LIVE_CHECK {
     pub iTempValue: i32,
 }
 
-#[repr(align(2))]
+#[repr(packed(2))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_MOTD_LOGIN {
     pub iType: i8,
     pub szSystemMsg: [u16; 512],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_ITEM_USE_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_ITEM_USE_SUCC {
     pub iPC_ID: i32,
     pub eIL: i32,
@@ -4878,9 +4878,9 @@ pub struct sP_FE2CL_REP_PC_ITEM_USE_SUCC {
     pub iTargetCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_ITEM_USE {
     pub iPC_ID: i32,
     pub iSkillID: i16,
@@ -4888,9 +4888,9 @@ pub struct sP_FE2CL_PC_ITEM_USE {
     pub iTargetCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_GET_BUDDY_LOCATION_SUCC {
     pub iBuddyPCUID: i64,
     pub iSlotNum: i8,
@@ -4900,41 +4900,41 @@ pub struct sP_FE2CL_REP_GET_BUDDY_LOCATION_SUCC {
     pub iShardNum: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_GET_BUDDY_LOCATION_FAIL {
     pub iBuddyPCUID: i64,
     pub iSlotNum: i8,
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_RIDING_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_RIDING_SUCC {
     pub iPC_ID: i32,
     pub eRT: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_RIDING {
     pub iPC_ID: i32,
     pub eRT: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_BROOMSTICK_MOVE {
     pub iPC_ID: i32,
     pub iToX: i32,
@@ -4943,39 +4943,39 @@ pub struct sP_FE2CL_PC_BROOMSTICK_MOVE {
     pub iSpeed: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_BUDDY_WARP_OTHER_SHARD_SUCC {
     pub iBuddyPCUID: i64,
     pub iShardNum: i8,
     pub iChannelNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_WARP_USE_RECALL_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_EXIT_DUPLICATE {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_MISSION_COMPLETE_SUCC {
     pub iMissionNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_BUFF_UPDATE {
     pub eCSTB: i32,
     pub eTBU: i32,
@@ -4984,16 +4984,16 @@ pub struct sP_FE2CL_PC_BUFF_UPDATE {
     pub iConditionBitFlag: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_NEW_EMAIL {
     pub iNewEmailCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_READ_EMAIL_SUCC {
     pub iEmailIndex: i64,
     pub szContent: [u16; 512],
@@ -5001,74 +5001,74 @@ pub struct sP_FE2CL_REP_PC_READ_EMAIL_SUCC {
     pub iCash: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_READ_EMAIL_FAIL {
     pub iEmailIndex: i64,
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_RECV_EMAIL_PAGE_LIST_SUCC {
     pub iPageNum: i8,
     pub aEmailInfo: [sEmailInfo; 5],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_RECV_EMAIL_PAGE_LIST_FAIL {
     pub iPageNum: i8,
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_DELETE_EMAIL_SUCC {
     pub iEmailIndexArray: [i64; 5],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_DELETE_EMAIL_FAIL {
     pub iEmailIndexArray: [i64; 5],
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_SEND_EMAIL_SUCC {
     pub iTo_PCUID: i64,
     pub iCandy: i32,
     pub aItem: [sEmailItemInfoFromCL; 4],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_SEND_EMAIL_FAIL {
     pub iTo_PCUID: i64,
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_RECV_EMAIL_ITEM_SUCC {
     pub iEmailIndex: i64,
     pub iSlotNum: i32,
     pub iEmailItemSlot: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_RECV_EMAIL_ITEM_FAIL {
     pub iEmailIndex: i64,
     pub iSlotNum: i32,
@@ -5076,25 +5076,25 @@ pub struct sP_FE2CL_REP_PC_RECV_EMAIL_ITEM_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_RECV_EMAIL_CANDY_SUCC {
     pub iEmailIndex: i64,
     pub iCandy: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_RECV_EMAIL_CANDY_FAIL {
     pub iEmailIndex: i64,
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_SUDDEN_DEAD {
     pub iPC_ID: i32,
     pub iSuddenDeadReason: i32,
@@ -5102,9 +5102,9 @@ pub struct sP_FE2CL_PC_SUDDEN_DEAD {
     pub iHP: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF_SUCC {
     pub iTargetPC_ID: i32,
     pub szTargetPC_FirstName: [u16; 10],
@@ -5113,23 +5113,23 @@ pub struct sP_FE2CL_REP_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF_SUCC {
     pub iSpecialState: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_SET_CURRENT_MISSION_ID {
     pub iCurrentMissionID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_NPC_GROUP_INVITE_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_NPC_GROUP_INVITE_SUCC {
     pub iPC_ID: i32,
     pub iNPC_ID: i32,
@@ -5137,16 +5137,16 @@ pub struct sP_FE2CL_REP_NPC_GROUP_INVITE_SUCC {
     pub iMemberNPCCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_NPC_GROUP_KICK_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_NPC_GROUP_KICK_SUCC {
     pub iPC_ID: i32,
     pub iNPC_ID: i32,
@@ -5154,9 +5154,9 @@ pub struct sP_FE2CL_REP_NPC_GROUP_KICK_SUCC {
     pub iMemberNPCCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_EVENT {
     pub iPC_ID: i32,
     pub iEventID: i32,
@@ -5165,9 +5165,9 @@ pub struct sP_FE2CL_PC_EVENT {
     pub iEventValue3: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TRANSPORT_WARP_SUCC {
     pub TransportationAppearanceData: sTransportationAppearanceData,
     pub iLcX: i32,
@@ -5175,9 +5175,9 @@ pub struct sP_FE2CL_REP_PC_TRANSPORT_WARP_SUCC {
     pub iLcZ: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_TRADE_EMOTES_CHAT_FAIL {
     pub iID_Request: i32,
     pub iID_From: i32,
@@ -5187,68 +5187,68 @@ pub struct sP_FE2CL_REP_PC_TRADE_EMOTES_CHAT_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_RECV_EMAIL_ITEM_ALL_SUCC {
     pub iEmailIndex: i64,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_RECV_EMAIL_ITEM_ALL_FAIL {
     pub iEmailIndex: i64,
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_LOADING_COMPLETE_SUCC {
     pub iPC_ID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sChannelInfo {
     pub iChannelNum: i32,
     pub iCurrentUserCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_CHANNEL_INFO {
     pub iCurrChannelNum: i32,
     pub iChannelCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_CHANNEL_NUM {
     pub iChannelNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_WARP_CHANNEL_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_WARP_CHANNEL_SUCC {
     pub UNUSED: u8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_FIND_NAME_MAKE_BUDDY_SUCC {
     pub szFirstName: [u16; 9],
     pub szLastName: [u16; 17],
@@ -5256,18 +5256,18 @@ pub struct sP_FE2CL_REP_PC_FIND_NAME_MAKE_BUDDY_SUCC {
     pub iNameCheckFlag: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_FIND_NAME_MAKE_BUDDY_FAIL {
     pub szFirstName: [u16; 9],
     pub szLastName: [u16; 17],
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_FIND_NAME_ACCEPT_BUDDY_FAIL {
     pub szFirstName: [u16; 9],
     pub szLastName: [u16; 17],
@@ -5276,56 +5276,56 @@ pub struct sP_FE2CL_REP_PC_FIND_NAME_ACCEPT_BUDDY_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_BUDDY_WARP_SAME_SHARD_SUCC {
     pub UNUSED: u8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_ATTACK_CHARs_SUCC {
     pub iBatteryW: i32,
     pub iTargetCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_ATTACK_CHARs {
     pub iPC_ID: i32,
     pub iTargetCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_NPC_ATTACK_CHARs {
     pub iNPC_ID: i32,
     pub iTargetCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_CHANGE_LEVEL_SUCC {
     pub iLevel: i32,
     pub iFusionMatter: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_NANO_CREATE {
     pub iPC_ID: i32,
     pub iNanoID: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_STREETSTALL_REP_READY_SUCC {
     pub iStreetStallItemInvenSlotNum: i32,
     pub iItemListCountMax: i32,
@@ -5333,30 +5333,30 @@ pub struct sP_FE2CL_PC_STREETSTALL_REP_READY_SUCC {
     pub iPCCharState: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_STREETSTALL_REP_READY_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_STREETSTALL_REP_CANCEL_SUCC {
     pub iPCCharState: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_STREETSTALL_REP_CANCEL_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_STREETSTALL_REP_REGIST_ITEM_SUCC {
     pub iItemListNum: i32,
     pub iItemInvenSlotNum: i32,
@@ -5364,61 +5364,61 @@ pub struct sP_FE2CL_PC_STREETSTALL_REP_REGIST_ITEM_SUCC {
     pub iPrice: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_STREETSTALL_REP_REGIST_ITEM_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_STREETSTALL_REP_UNREGIST_ITEM_SUCC {
     pub iItemListNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_STREETSTALL_REP_UNREGIST_ITEM_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_STREETSTALL_REP_SALE_START_SUCC {
     pub iStreetStallItemInvenSlotNum: i32,
     pub OpenItem: sItemBase,
     pub ePCCharState: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_STREETSTALL_REP_SALE_START_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_STREETSTALL_REP_ITEM_LIST {
     pub iStreetStallPC_ID: i32,
     pub iItemListCount: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_STREETSTALL_REP_ITEM_LIST_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_STREETSTALL_REP_ITEM_BUY_SUCC_BUYER {
     pub iStreetStallPC_ID: i32,
     pub iPC_Candy: i32,
@@ -5427,9 +5427,9 @@ pub struct sP_FE2CL_PC_STREETSTALL_REP_ITEM_BUY_SUCC_BUYER {
     pub iItemListNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_STREETSTALL_REP_ITEM_BUY_SUCC_SELLER {
     pub iBuyerPC_ID: i32,
     pub iStreetStallPC_Candy: i32,
@@ -5438,16 +5438,16 @@ pub struct sP_FE2CL_PC_STREETSTALL_REP_ITEM_BUY_SUCC_SELLER {
     pub iItemListNum: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_STREETSTALL_REP_ITEM_BUY_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_ITEM_COMBINATION_SUCC {
     pub iNewItemSlot: i32,
     pub sNewItem: sItemBase,
@@ -5458,9 +5458,9 @@ pub struct sP_FE2CL_REP_PC_ITEM_COMBINATION_SUCC {
     pub iSuccessFlag: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_ITEM_COMBINATION_FAIL {
     pub iErrorCode: i32,
     pub iCostumeItemSlot: i32,
@@ -5469,9 +5469,9 @@ pub struct sP_FE2CL_REP_PC_ITEM_COMBINATION_FAIL {
     pub iCashItemSlot2: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_CASH_BUFF_UPDATE {
     pub eCSTB: i32,
     pub eTBU: i32,
@@ -5479,9 +5479,9 @@ pub struct sP_FE2CL_PC_CASH_BUFF_UPDATE {
     pub iConditionBitFlag: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_SKILL_ADD_SUCC {
     pub iSkillSlotNum: i32,
     pub iSkillID: i32,
@@ -5489,31 +5489,31 @@ pub struct sP_FE2CL_REP_PC_SKILL_ADD_SUCC {
     pub SkillItem: sItemBase,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_SKILL_ADD_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_SKILL_DEL_SUCC {
     pub iSkillSlotNum: i32,
     pub iSkillID: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_SKILL_DEL_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_SKILL_USE_SUCC {
     pub iPC_ID: i32,
     pub iSkillSlotNum: i32,
@@ -5532,16 +5532,16 @@ pub struct sP_FE2CL_REP_PC_SKILL_USE_SUCC {
     pub iTargetCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_SKILL_USE_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_SKILL_USE {
     pub iPC_ID: i32,
     pub iSkillSlotNum: i32,
@@ -5560,9 +5560,9 @@ pub struct sP_FE2CL_PC_SKILL_USE {
     pub iTargetCnt: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_ROPE {
     pub iCliTime: u64,
     pub iX: i32,
@@ -5579,9 +5579,9 @@ pub struct sP_FE2CL_PC_ROPE {
     pub iSvrTime: u64,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_BELT {
     pub iCliTime: u64,
     pub iLcX: i32,
@@ -5602,91 +5602,91 @@ pub struct sP_FE2CL_PC_BELT {
     pub iSvrTime: u64,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_VEHICLE_ON_SUCC {
     pub UNUSED: u8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_VEHICLE_ON_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_VEHICLE_OFF_SUCC {
     pub UNUSED: u8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_VEHICLE_OFF_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(2))]
+#[repr(packed(2))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_QUICK_SLOT_INFO {
     pub aQuickSlot: [sQuickSlot; 8],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_REGIST_QUICK_SLOT_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_REGIST_QUICK_SLOT_SUCC {
     pub iSlotNum: i32,
     pub iItemType: i16,
     pub iItemID: i16,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_PC_DELETE_TIME_LIMIT_ITEM {
     pub iItemListCount: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_DISASSEMBLE_ITEM_SUCC {
     pub iNewItemSlot: i32,
     pub sNewItem: sItemBase,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_DISASSEMBLE_ITEM_FAIL {
     pub iErrorCode: i32,
     pub iItemSlot: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_GM_REP_REWARD_RATE_SUCC {
     pub afRewardRate_Taros: [f32; 5],
     pub afRewardRate_FusionMatter: [f32; 5],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_ITEM_ENCHANT_SUCC {
     pub iEnchantItemSlot: i32,
     pub sEnchantItem: sItemBase,
@@ -5700,9 +5700,9 @@ pub struct sP_FE2CL_REP_PC_ITEM_ENCHANT_SUCC {
     pub iSuccessFlag: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2CL_REP_PC_ITEM_ENCHANT_FAIL {
     pub iErrorCode: i32,
     pub iEnchantItemSlot: i32,
@@ -5712,9 +5712,9 @@ pub struct sP_FE2CL_REP_PC_ITEM_ENCHANT_FAIL {
     pub iCashItemSlot2: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REP_LOGIN_SUCC {
     pub iCharCount: i8,
     pub iSlotNum: i8,
@@ -5725,17 +5725,17 @@ pub struct sP_LS2CL_REP_LOGIN_SUCC {
     pub iOpenBetaFlag: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REP_LOGIN_FAIL {
     pub iErrorCode: i32,
     pub szID: [u16; 33],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REP_CHAR_INFO {
     pub iSlot: i8,
     pub iLevel: i16,
@@ -5747,24 +5747,24 @@ pub struct sP_LS2CL_REP_CHAR_INFO {
     pub aEquip: [sItemBase; 9],
 }
 
-#[repr(align(2))]
+#[repr(packed(2))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REP_CHECK_CHAR_NAME_SUCC {
     pub szFirstName: [u16; 9],
     pub szLastName: [u16; 17],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REP_CHECK_CHAR_NAME_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REP_SAVE_CHAR_NAME_SUCC {
     pub iPC_UID: i64,
     pub iSlotNum: i8,
@@ -5773,16 +5773,16 @@ pub struct sP_LS2CL_REP_SAVE_CHAR_NAME_SUCC {
     pub szLastName: [u16; 17],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REP_SAVE_CHAR_NAME_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REP_CHAR_CREATE_SUCC {
     pub iLevel: i16,
     pub sPC_Style: sPCStyle,
@@ -5790,74 +5790,74 @@ pub struct sP_LS2CL_REP_CHAR_CREATE_SUCC {
     pub sOn_Item: sOnItem,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REP_CHAR_CREATE_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REP_CHAR_SELECT_SUCC {
     pub UNUSED: u8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REP_CHAR_SELECT_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REP_CHAR_DELETE_SUCC {
     pub iSlotNum: i8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REP_CHAR_DELETE_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REP_SHARD_SELECT_SUCC {
     pub g_FE_ServerIP: [u8; 16],
     pub g_FE_ServerPort: i32,
     pub iEnterSerialKey: i64,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REP_SHARD_SELECT_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REP_VERSION_CHECK_SUCC {
     pub UNUSED: u8,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REP_VERSION_CHECK_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REP_CHECK_NAME_LIST_SUCC {
     pub iFNCode: i32,
     pub iMNCode: i32,
@@ -5865,9 +5865,9 @@ pub struct sP_LS2CL_REP_CHECK_NAME_LIST_SUCC {
     pub aNameCodeFlag: [i64; 8],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REP_CHECK_NAME_LIST_FAIL {
     pub iFNCode: i32,
     pub iMNCode: i32,
@@ -5875,23 +5875,23 @@ pub struct sP_LS2CL_REP_CHECK_NAME_LIST_FAIL {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REP_PC_EXIT_DUPLICATE {
     pub iErrorCode: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REQ_LIVE_CHECK {
     pub iTempValue: i32,
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REP_CHANGE_CHAR_NAME_SUCC {
     pub iPC_UID: i64,
     pub iSlotNum: i8,
@@ -5899,18 +5899,18 @@ pub struct sP_LS2CL_REP_CHANGE_CHAR_NAME_SUCC {
     pub szLastName: [u16; 17],
 }
 
-#[repr(align(4))]
+#[repr(packed(4))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REP_CHANGE_CHAR_NAME_FAIL {
     pub iPC_UID: i64,
     pub iSlotNum: i8,
     pub iErrorCode: i32,
 }
 
-#[repr(align(1))]
+#[repr(packed(1))]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REP_SHARD_LIST_INFO_SUCC {
     pub aShardConnectFlag: [u8; 26],
 }

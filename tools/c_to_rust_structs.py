@@ -12,12 +12,12 @@ type_mappings = {
 regex_rules = [
     (
         r"#pragma pack\((\d+)\)",
-        r"#[repr(align(\1))]"
+        r"#[repr(packed(\1))]"
     ),
     (
         r"struct",
         r"""#[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct"""
     ),
     (

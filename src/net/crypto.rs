@@ -91,6 +91,6 @@ mod tests {
 
         let pkt_dec: sP_LS2CL_REP_LOGIN_SUCC = unsafe { *bytes_to_struct(&buf) };
         //dbg!(pkt_dec);
-        assert_eq!(pkt.uiSvrTime, pkt_dec.uiSvrTime);
+        assert_eq!({ pkt.uiSvrTime }, { pkt_dec.uiSvrTime });
     }
 }
