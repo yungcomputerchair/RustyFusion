@@ -1,5 +1,5 @@
 use std::{
-    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+    net::SocketAddr,
     sync::atomic::{AtomicI64, Ordering},
     time::Duration,
 };
@@ -34,6 +34,8 @@ fn handle_packet(client: &mut CNClient, pkt_id: PacketID) -> Result<()> {
         P_CL2LS_REQ_LOGIN => handlers::login(client),
         P_CL2LS_REQ_CHECK_CHAR_NAME => handlers::check_char_name(client),
         P_CL2LS_REQ_SAVE_CHAR_NAME => handlers::save_char_name(client),
+        P_CL2LS_REQ_CHAR_CREATE => handlers::char_create(client),
+        P_CL2LS_REQ_CHAR_SELECT => handlers::char_select(client),
         other => {
             println!("Unhandled packet: {:?}", other);
             Ok(())
@@ -98,6 +100,37 @@ mod handlers {
             szLastName: pkt.szLastName,
         };
         client.send_packet(P_LS2CL_REP_SAVE_CHAR_NAME_SUCC, &resp)?;
+
+        Ok(())
+    }
+
+    pub fn char_create(client: &mut CNClient) -> Result<()> {
+        let pkt: &sP_CL2LS_REQ_CHAR_CREATE = client.get_packet();
+        let resp = sP_LS2CL_REP_CHAR_CREATE_SUCC {
+            iLevel: 1,
+            sPC_Style: pkt.PCStyle,
+            sPC_Style2: sPCStyle2 {
+                iAppearanceFlag: 0,
+                iTutorialFlag: 1,
+                iPayzoneFlag: 0,
+            },
+            sOn_Item: pkt.sOn_Item,
+        };
+        client.send_packet(P_LS2CL_REP_CHAR_CREATE_SUCC, &resp)?;
+
+        Ok(())
+    }
+
+    pub fn char_select(client: &mut CNClient) -> Result<()> {
+        let mut shard_ip: [u8; 16] = [0; 16];
+        let ip_str = b"127.0.0.1";
+        shard_ip[..ip_str.len()].copy_from_slice(ip_str);
+        let resp = sP_LS2CL_REP_SHARD_SELECT_SUCC {
+            g_FE_ServerIP: shard_ip,
+            g_FE_ServerPort: 23001,
+            iEnterSerialKey: rand::random(),
+        };
+        client.send_packet(P_LS2CL_REP_SHARD_SELECT_SUCC, &resp)?;
 
         Ok(())
     }
