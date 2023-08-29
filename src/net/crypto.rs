@@ -57,6 +57,40 @@ pub fn gen_key(time: u64, iv1: i32, iv2: i32) -> [u8; CRYPTO_KEY_SIZE] {
     let num2 = Wrapping((iv2 + 1) as u64);
     let default_key = Wrapping(u64::from_le_bytes(DEFAULT_KEY.try_into().unwrap()));
     let result: u64 = (default_key * (time * num * num2)).0;
-
     result.to_le_bytes()
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::net::bytes_to_struct;
+    use crate::net::packet::*;
+    use crate::net::struct_to_bytes;
+    use crate::util::get_time;
+
+    use super::{decrypt_packet, encrypt_packet, CRYPTO_KEY_SIZE};
+
+    #[test]
+    fn test_enc_dec() {
+        let pkt = sP_LS2CL_REP_LOGIN_SUCC {
+            iCharCount: 1,
+            iSlotNum: 2,
+            iPaymentFlag: 3,
+            iTempForPacking4: 4,
+            uiSvrTime: get_time(),
+            szID: [6; 33],
+            iOpenBetaFlag: 7,
+        };
+        let bytes: &[u8] = unsafe { struct_to_bytes(&pkt) };
+        let mut buf: Vec<u8> = bytes.to_vec();
+
+        let key: [u8; CRYPTO_KEY_SIZE] = (4382366871217075016 as u64).to_le_bytes();
+        encrypt_packet(&mut buf, &key);
+        assert_ne!(buf.as_slice(), bytes);
+        decrypt_packet(&mut buf, &key);
+        assert_eq!(buf.as_slice(), bytes);
+
+        let pkt_dec: sP_LS2CL_REP_LOGIN_SUCC = unsafe { *bytes_to_struct(&buf) };
+        //dbg!(pkt_dec);
+        assert_eq!(pkt.uiSvrTime, pkt_dec.uiSvrTime);
+    }
 }
