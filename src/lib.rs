@@ -27,6 +27,8 @@ pub mod util {
 pub mod error {
     use std::{error::Error, fmt::Display};
 
+    use crate::net::{cnclient::ClientType, packet::PacketID};
+
     #[derive(Debug)]
     pub struct BadPacketID {
         packet_id: u32,
@@ -40,6 +42,32 @@ pub mod error {
     impl Display for BadPacketID {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             write!(f, "Bad packet ID {}", self.packet_id)
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct BadRequest {
+        addr: String,
+        packet_id: PacketID,
+        client_type: ClientType,
+    }
+    impl BadRequest {
+        pub fn new(addr: String, packet_id: PacketID, client_type: ClientType) -> Self {
+            Self {
+                addr,
+                packet_id,
+                client_type,
+            }
+        }
+    }
+    impl Error for BadRequest {}
+    impl Display for BadRequest {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(
+                f,
+                "Bad request from {} (client type {:?}): {:?}",
+                self.addr, self.client_type, self.packet_id
+            )
         }
     }
 }

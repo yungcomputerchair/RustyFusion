@@ -6,7 +6,7 @@ use std::{
 
 use rusty_fusion::{
     net::{
-        cnclient::{CNClient, ClientType},
+        cnclient::CNClient,
         cnserver::CNServer,
         crypto::{gen_key, DEFAULT_KEY},
         packet::{
@@ -103,7 +103,8 @@ mod handlers {
         client.set_e_key(gen_key(e_base, e_iv1, e_iv2));
         client.set_fe_key(gen_key(fe_base, fe_iv1, fe_iv2));
 
-        client.set_client_type(ClientType::GameClient);
+        let serial_key: i64 = random();
+        client.set_client_type(ClientType::GameClient(serial_key));
 
         Ok(())
     }

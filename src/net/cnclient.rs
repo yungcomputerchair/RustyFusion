@@ -16,11 +16,12 @@ use super::{
     packet::PacketID,
 };
 
+#[derive(Debug, Clone)]
 pub enum ClientType {
     Unknown,
-    GameClient,
+    GameClient(i64), // iEnterSerialKey
     LoginServer,
-    ShardServer,
+    ShardServer(i64), // iConn_UID
 }
 
 pub struct CNClient {
