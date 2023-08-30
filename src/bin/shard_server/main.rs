@@ -62,6 +62,7 @@ fn handle_packet(
         P_CL2LS_REQ_LOGIN => wrong_server(client),
         //
         P_CL2FE_REQ_PC_ENTER => pc_enter(client),
+        P_CL2FE_REQ_PC_LOADING_COMPLETE => pc_loading_complete(client),
         other => {
             println!("Unhandled packet: {:?}", other);
             Ok(())
@@ -186,6 +187,14 @@ fn pc_enter(client: &mut CNClient) -> Result<()> {
     client.set_enc_mode(EncryptionMode::FEKey);
 
     client.send_packet(P_FE2CL_REP_PC_ENTER_SUCC, &resp)?;
+    Ok(())
+}
+
+fn pc_loading_complete(client: &mut CNClient) -> Result<()> {
+    let pkt: &sP_CL2FE_REQ_PC_LOADING_COMPLETE = client.get_packet();
+    let resp = sP_FE2CL_REP_PC_LOADING_COMPLETE_SUCC { iPC_ID: pkt.iPC_ID };
+    client.send_packet(P_FE2CL_REP_PC_LOADING_COMPLETE_SUCC, &resp)?;
+
     Ok(())
 }
 
