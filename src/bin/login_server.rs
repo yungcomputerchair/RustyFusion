@@ -1,5 +1,4 @@
 use std::{
-    net::SocketAddr,
     sync::atomic::{AtomicI64, Ordering},
     time::Duration,
 };
@@ -18,8 +17,7 @@ use rusty_fusion::{
 static NEXT_PC_UID: AtomicI64 = AtomicI64::new(1);
 
 fn main() -> Result<()> {
-    let addr = "127.0.0.1:23000";
-    let addr: SocketAddr = addr.parse().expect("Bad binding address");
+    let addr: &str = "127.0.0.1:23000";
     let polling_interval: Duration = Duration::from_millis(50);
     let mut server: CNServer = CNServer::new(addr, Some(polling_interval))?;
     println!("Login server listening on {addr}");

@@ -21,7 +21,7 @@ pub struct CNServer {
 }
 
 impl CNServer {
-    pub fn new(addr: SocketAddr, poll_timeout: Option<Duration>) -> Result<Self> {
+    pub fn new(addr: &str, poll_timeout: Option<Duration>) -> Result<Self> {
         let server: Self = Self {
             poll_timeout,
             sock: TcpListener::bind(addr)?,

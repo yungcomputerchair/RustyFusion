@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, time::Duration};
+use std::time::Duration;
 
 use rusty_fusion::{
     net::{
@@ -14,7 +14,6 @@ use rusty_fusion::{
 
 fn main() -> Result<()> {
     let addr = "127.0.0.1:23001";
-    let addr: SocketAddr = addr.parse().expect("Bad binding address");
     let polling_interval: Duration = Duration::from_millis(50);
     let mut server: CNServer = CNServer::new(addr, Some(polling_interval))?;
     println!("Shard server listening on {addr}");
