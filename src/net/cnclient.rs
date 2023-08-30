@@ -75,11 +75,8 @@ impl CNClient {
         let buf: &mut [u8] = &mut self.buf[..sz];
         self.sock.read_exact(buf)?;
 
-        // decrypt the packet
-        match self.enc_mode {
-            EncryptionMode::EKey => decrypt_packet(buf, &self.e_key),
-            EncryptionMode::FEKey => decrypt_packet(buf, &self.fe_key),
-        }
+        // decrypt the packet (client always encrypts with E key)
+        decrypt_packet(buf, &self.e_key);
 
         let id: u32 = u32::from_le_bytes(buf[..4].try_into().unwrap());
         let id: PacketID = match PacketID::from_u32(id) {
@@ -104,7 +101,7 @@ impl CNClient {
         let pkt_buf: &[u8] = unsafe { struct_to_bytes(pkt) };
         let mut out_buf: Vec<u8> = [&sz_buf, pkt_buf].concat();
 
-        // encrypt the packet
+        // encrypt the packet (client decrypts with either E or FE key)
         match self.enc_mode {
             EncryptionMode::EKey => encrypt_packet(&mut out_buf, &self.e_key),
             EncryptionMode::FEKey => encrypt_packet(&mut out_buf, &self.fe_key),
