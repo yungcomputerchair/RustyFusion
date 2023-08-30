@@ -39,14 +39,16 @@ impl CNServer {
         Ok(server)
     }
 
-    pub fn connect(&mut self, addr: &str, cltype: ClientType) {
+    pub fn connect(&mut self, addr: &str, cltype: ClientType) -> &mut CNClient {
         let addr: SocketAddr = addr.parse().expect("Bad address");
         let stream: TcpStream = TcpStream::connect(addr).expect("Failed to connect");
         let conn_data: (TcpStream, SocketAddr) = (stream, addr);
         let key: usize = self
             .register_client(conn_data)
             .expect("Couldn't register client");
-        self.clients.get_mut(&key).unwrap().set_client_type(cltype);
+        let client: &mut CNClient = self.clients.get_mut(&key).unwrap();
+        client.set_client_type(cltype);
+        client
     }
 
     pub fn poll(&mut self, handler: &dyn Fn(&mut CNClient, PacketID) -> Result<()>) -> Result<()> {

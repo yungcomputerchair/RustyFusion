@@ -8,13 +8,17 @@ use rusty_fusion::{
         cnclient::CNClient,
         cnserver::CNServer,
         crypto::{gen_key, DEFAULT_KEY},
-        packet::PacketID::{self, *},
+        packet::{
+            sP_LS2FE_REP_CONNECT_SUCC,
+            PacketID::{self, *},
+        },
     },
     util::get_time,
     Result,
 };
 
 static NEXT_PC_UID: AtomicI64 = AtomicI64::new(1);
+static NEXT_SHARD_UID: AtomicI64 = AtomicI64::new(1);
 
 fn main() -> Result<()> {
     let addr: &str = "127.0.0.1:23000";
@@ -29,6 +33,8 @@ fn main() -> Result<()> {
 fn handle_packet(client: &mut CNClient, pkt_id: PacketID) -> Result<()> {
     println!("{} sent {:?}", client.get_addr(), pkt_id);
     match pkt_id {
+        P_FE2LS_REQ_CONNECT => shard_handshake(client),
+        //
         P_CL2LS_REQ_LOGIN => handlers::login(client),
         P_CL2LS_REQ_CHECK_CHAR_NAME => handlers::check_char_name(client),
         P_CL2LS_REQ_SAVE_CHAR_NAME => handlers::save_char_name(client),
@@ -45,6 +51,22 @@ fn get_next_pc_uid() -> i64 {
     let next_id: i64 = NEXT_PC_UID.load(Ordering::Acquire);
     NEXT_PC_UID.store(next_id + 1, Ordering::Release);
     next_id
+}
+
+fn get_next_shard_uid() -> i64 {
+    let next_id: i64 = NEXT_SHARD_UID.load(Ordering::Acquire);
+    NEXT_SHARD_UID.store(next_id + 1, Ordering::Release);
+    next_id
+}
+
+fn shard_handshake(server: &mut CNClient) -> Result<()> {
+    let conn_id: i64 = get_next_shard_uid();
+    let resp = sP_LS2FE_REP_CONNECT_SUCC {
+        uiSvrTime: get_time(),
+        iConn_UID: conn_id,
+    };
+    server.send_packet(P_LS2FE_REP_CONNECT_SUCC, &resp)?;
+    Ok(())
 }
 
 mod handlers {
