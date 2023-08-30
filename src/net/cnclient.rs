@@ -16,6 +16,13 @@ use super::{
     packet::PacketID,
 };
 
+pub enum ClientType {
+    Unknown,
+    GameClient,
+    LoginServer,
+    ShardServer,
+}
+
 pub struct CNClient {
     sock: TcpStream,
     addr: SocketAddr,
@@ -24,6 +31,7 @@ pub struct CNClient {
     e_key: [u8; CRYPTO_KEY_SIZE],
     fe_key: [u8; CRYPTO_KEY_SIZE],
     enc_mode: EncryptionMode,
+    client_type: ClientType,
     last_heartbeat: u64,
 }
 
@@ -38,6 +46,7 @@ impl CNClient {
             e_key: default_key,
             fe_key: default_key,
             enc_mode: EncryptionMode::EKey,
+            client_type: ClientType::Unknown,
             last_heartbeat: get_time(),
         }
     }
@@ -56,6 +65,18 @@ impl CNClient {
 
     pub fn set_fe_key(&mut self, key: [u8; CRYPTO_KEY_SIZE]) {
         self.fe_key = key;
+    }
+
+    pub fn set_enc_mode(&mut self, mode: EncryptionMode) {
+        self.enc_mode = mode;
+    }
+
+    pub fn get_client_type(&self) -> &ClientType {
+        &self.client_type
+    }
+
+    pub fn set_client_type(&mut self, cltype: ClientType) {
+        self.client_type = cltype;
     }
 
     pub fn get_packet<T>(&self) -> &T {

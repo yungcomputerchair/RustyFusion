@@ -8,7 +8,10 @@ use std::{
     time::Duration,
 };
 
-use super::{cnclient::CNClient, packet::PacketID};
+use super::{
+    cnclient::{CNClient, ClientType},
+    packet::PacketID,
+};
 
 const EPOLL_KEY_SELF: usize = 0;
 
@@ -34,6 +37,16 @@ impl CNServer {
             .poller
             .add_with_mode(&server.sock, Event::all(EPOLL_KEY_SELF), PollMode::Edge)?;
         Ok(server)
+    }
+
+    pub fn connect(&mut self, addr: &str, cltype: ClientType) {
+        let addr: SocketAddr = addr.parse().expect("Bad address");
+        let stream: TcpStream = TcpStream::connect(addr).expect("Failed to connect");
+        let conn_data: (TcpStream, SocketAddr) = (stream, addr);
+        let key: usize = self
+            .register_client(conn_data)
+            .expect("Couldn't register client");
+        self.clients.get_mut(&key).unwrap().set_client_type(cltype);
     }
 
     pub fn poll(&mut self, handler: &dyn Fn(&mut CNClient, PacketID) -> Result<()>) -> Result<()> {
@@ -92,6 +105,10 @@ impl CNServer {
 
     fn unregister_client(&mut self, key: usize) -> Result<()> {
         let client: &CNClient = self.clients.get(&key).unwrap();
+        match client.get_client_type() {
+            ClientType::LoginServer => panic!("Lost connection to login server"),
+            _ => {}
+        }
         self.poller.delete(client.get_sock())?;
         Ok(())
     }

@@ -49,7 +49,7 @@ fn get_next_pc_uid() -> i64 {
 
 mod handlers {
     use super::*;
-    use rusty_fusion::net::packet::*;
+    use rusty_fusion::net::{cnclient::ClientType, packet::*};
 
     pub fn login(client: &mut CNClient) -> Result<()> {
         let pkt: &sP_CL2LS_REQ_LOGIN = client.get_packet();
@@ -73,6 +73,8 @@ mod handlers {
 
         client.set_e_key(gen_key(e_base, e_iv1, e_iv2));
         client.set_fe_key(gen_key(fe_base, fe_iv1, fe_iv2));
+
+        client.set_client_type(ClientType::GameClient);
 
         Ok(())
     }

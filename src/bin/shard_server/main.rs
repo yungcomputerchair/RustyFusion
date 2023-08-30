@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use rusty_fusion::{
     net::{
-        cnclient::CNClient,
+        cnclient::{CNClient, ClientType},
         cnserver::CNServer,
         packet::{
             sP_CL2LS_REQ_LOGIN, sP_LS2CL_REP_LOGIN_FAIL,
@@ -16,6 +16,8 @@ fn main() -> Result<()> {
     let addr = "127.0.0.1:23001";
     let polling_interval: Duration = Duration::from_millis(50);
     let mut server: CNServer = CNServer::new(addr, Some(polling_interval))?;
+    let ls_addr: &str = "127.0.0.1:23000";
+    server.connect(ls_addr, ClientType::LoginServer);
     println!("Shard server listening on {addr}");
     loop {
         server.poll(&handle_packet)?;
