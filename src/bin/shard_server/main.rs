@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     sync::atomic::{AtomicI64, Ordering},
     thread,
     time::Duration,
@@ -38,7 +39,12 @@ fn main() -> Result<()> {
     }
 }
 
-fn handle_packet(client: &mut CNClient, pkt_id: PacketID) -> Result<()> {
+fn handle_packet(
+    key: &usize,
+    clients: &mut HashMap<usize, CNClient>,
+    pkt_id: PacketID,
+) -> Result<()> {
+    let client: &mut CNClient = clients.get_mut(key).unwrap();
     println!("{} sent {:?}", client.get_addr(), pkt_id);
     match pkt_id {
         P_LS2FE_REP_CONNECT_SUCC => login_server_connect_succ(client),

@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     sync::atomic::{AtomicI64, Ordering},
     time::Duration,
 };
@@ -30,7 +31,12 @@ fn main() -> Result<()> {
     }
 }
 
-fn handle_packet(client: &mut CNClient, pkt_id: PacketID) -> Result<()> {
+fn handle_packet(
+    key: &usize,
+    clients: &mut HashMap<usize, CNClient>,
+    pkt_id: PacketID,
+) -> Result<()> {
+    let client: &mut CNClient = clients.get_mut(key).unwrap();
     println!("{} sent {:?}", client.get_addr(), pkt_id);
     match pkt_id {
         P_FE2LS_REQ_CONNECT => shard_handshake(client),

@@ -51,7 +51,10 @@ impl CNServer {
         client
     }
 
-    pub fn poll(&mut self, handler: &dyn Fn(&mut CNClient, PacketID) -> Result<()>) -> Result<()> {
+    pub fn poll(
+        &mut self,
+        handler: &dyn Fn(&usize, &mut HashMap<usize, CNClient>, PacketID) -> Result<()>,
+    ) -> Result<()> {
         let mut events: Vec<Event> = Vec::new();
         //println!("Waiting...");
         if let Err(e) = self.poller.wait(&mut events, self.poll_timeout) {
@@ -72,10 +75,11 @@ impl CNServer {
                 if !ev.readable || !ev.writable {
                     continue;
                 };
-                let client: &mut CNClient = &mut self.clients.get_mut(&ev.key).unwrap();
+                let clients: &mut HashMap<usize, CNClient> = &mut self.clients;
+                let client: &mut CNClient = &mut clients.get_mut(&ev.key).unwrap();
                 match client.read_packet() {
                     Ok(pkt) => {
-                        handler(client, pkt)?;
+                        handler(&ev.key, clients, pkt)?;
                     }
                     Err(e) => {
                         println!("err on socket {}: {}", ev.key, e);
