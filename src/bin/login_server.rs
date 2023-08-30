@@ -39,13 +39,15 @@ fn handle_packet(
     let client: &mut CNClient = clients.get_mut(key).unwrap();
     println!("{} sent {:?}", client.get_addr(), pkt_id);
     match pkt_id {
-        P_FE2LS_REQ_CONNECT => shard_handshake(client),
+        P_FE2LS_REQ_CONNECT => shard::shard_handshake(client),
+        P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC => shard::shard_accept(key, clients),
+        P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL => shard::shard_reject(key, clients),
         //
         P_CL2LS_REQ_LOGIN => handlers::login(client),
         P_CL2LS_REQ_CHECK_CHAR_NAME => handlers::check_char_name(client),
         P_CL2LS_REQ_SAVE_CHAR_NAME => handlers::save_char_name(client),
         P_CL2LS_REQ_CHAR_CREATE => handlers::char_create(client),
-        P_CL2LS_REQ_CHAR_SELECT => handlers::char_select(client),
+        P_CL2LS_REQ_CHAR_SELECT => handlers::char_select(key, clients),
         other => {
             println!("Unhandled packet: {:?}", other);
             Ok(())
@@ -65,20 +67,72 @@ fn get_next_shard_uid() -> i64 {
     next_id
 }
 
-fn shard_handshake(server: &mut CNClient) -> Result<()> {
-    server.set_client_type(ClientType::ShardServer);
-    let conn_id: i64 = get_next_shard_uid();
-    let resp = sP_LS2FE_REP_CONNECT_SUCC {
-        uiSvrTime: get_time(),
-        iConn_UID: conn_id,
-    };
-    server.send_packet(P_LS2FE_REP_CONNECT_SUCC, &resp)?;
-    Ok(())
+mod shard {
+    use super::*;
+    use rusty_fusion::net::{cnclient::ClientType, packet::*};
+
+    pub fn shard_handshake(server: &mut CNClient) -> Result<()> {
+        let conn_id: i64 = get_next_shard_uid();
+        server.set_client_type(ClientType::ShardServer(conn_id));
+        let resp = sP_LS2FE_REP_CONNECT_SUCC {
+            uiSvrTime: get_time(),
+            iConn_UID: conn_id,
+        };
+        server.send_packet(P_LS2FE_REP_CONNECT_SUCC, &resp)?;
+        Ok(())
+    }
+
+    pub fn shard_accept(shard_key: &usize, clients: &mut HashMap<usize, CNClient>) -> Result<()> {
+        let server: &mut CNClient = clients.get_mut(shard_key).unwrap();
+        let pkt: &sP_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC = server.get_packet();
+
+        let resp = sP_LS2CL_REP_SHARD_SELECT_SUCC {
+            g_FE_ServerIP: pkt.g_FE_ServerIP,
+            g_FE_ServerPort: pkt.g_FE_ServerPort,
+            iEnterSerialKey: pkt.iEnterSerialKey,
+        };
+
+        let client: &mut CNClient = clients
+            .values_mut()
+            .find(|c| match c.get_client_type() {
+                ClientType::GameClient(key) => *key == resp.iEnterSerialKey,
+                _ => false,
+            })
+            .unwrap();
+        client.send_packet(P_LS2CL_REP_SHARD_SELECT_SUCC, &resp)?;
+
+        Ok(())
+    }
+
+    pub fn shard_reject(shard_key: &usize, clients: &mut HashMap<usize, CNClient>) -> Result<()> {
+        let server: &mut CNClient = clients.get_mut(shard_key).unwrap();
+        let pkt: &sP_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL = server.get_packet();
+        let resp = sP_LS2CL_REP_CHAR_SELECT_FAIL {
+            iErrorCode: pkt.iErrorCode,
+        };
+
+        let serial_key: i64 = pkt.iEnterSerialKey;
+        let client: &mut CNClient = clients
+            .values_mut()
+            .find(|c| match c.get_client_type() {
+                ClientType::GameClient(key) => *key == serial_key,
+                _ => false,
+            })
+            .unwrap();
+
+        client.send_packet(P_LS2CL_REP_CHAR_SELECT_FAIL, &resp)?;
+
+        Ok(())
+    }
 }
 
 mod handlers {
     use super::*;
-    use rusty_fusion::net::{cnclient::ClientType, packet::*};
+    use rand::random;
+    use rusty_fusion::{
+        error::BadRequest,
+        net::{cnclient::ClientType, packet::*},
+    };
 
     pub fn login(client: &mut CNClient) -> Result<()> {
         let pkt: &sP_CL2LS_REQ_LOGIN = client.get_packet();
@@ -151,17 +205,33 @@ mod handlers {
         Ok(())
     }
 
-    pub fn char_select(client: &mut CNClient) -> Result<()> {
-        let mut shard_ip: [u8; 16] = [0; 16];
-        let ip_str = b"127.0.0.1";
-        shard_ip[..ip_str.len()].copy_from_slice(ip_str);
-        let resp = sP_LS2CL_REP_SHARD_SELECT_SUCC {
-            g_FE_ServerIP: shard_ip,
-            g_FE_ServerPort: 23001,
-            iEnterSerialKey: rand::random(),
-        };
-        client.send_packet(P_LS2CL_REP_SHARD_SELECT_SUCC, &resp)?;
+    pub fn char_select(client_key: &usize, clients: &mut HashMap<usize, CNClient>) -> Result<()> {
+        let client: &mut CNClient = clients.get_mut(client_key).unwrap();
+        if let ClientType::GameClient(serial_key) = client.get_client_type() {
+            let pkt: &sP_CL2LS_REQ_CHAR_SELECT = client.get_packet();
+            let login_info = sP_LS2FE_REQ_UPDATE_LOGIN_INFO {
+                iEnterSerialKey: *serial_key,
+                iPC_UID: pkt.iPC_UID,
+                uiFEKey: client.get_fe_key_uint(),
+                uiSvrTime: get_time(),
+            };
 
-        Ok(())
+            let shard_server: &mut CNClient = clients
+                .values_mut()
+                .find(|c| match c.get_client_type() {
+                    ClientType::ShardServer(_) => true,
+                    _ => false,
+                })
+                .unwrap();
+            shard_server.send_packet(P_LS2FE_REQ_UPDATE_LOGIN_INFO, &login_info)?;
+
+            return Ok(());
+        }
+
+        Err(Box::new(BadRequest::new(
+            client.get_addr(),
+            client.get_packet_id(),
+            client.get_client_type().clone(),
+        )))
     }
 }

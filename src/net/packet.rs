@@ -3,8 +3,10 @@
 #![allow(dead_code)]
 
 #[repr(u32)]
-#[derive(Debug, FromPrimitive, ToPrimitive)]
+#[derive(Debug, FromPrimitive, ToPrimitive, Clone, Copy)]
 pub enum PacketID {
+    P_NULL = 0,
+
     P_CL2LS_REQ_LOGIN = 0x12000001,             // 301989889
     P_CL2LS_REQ_CHECK_CHAR_NAME = 0x12000002,   // 301989890
     P_CL2LS_REQ_SAVE_CHAR_NAME = 0x12000003,    // 301989891
@@ -5954,6 +5956,7 @@ pub struct sP_LS2FE_REQ_LIVE_CHECK {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct sP_LS2FE_REQ_UPDATE_LOGIN_INFO {
+    pub iEnterSerialKey: i64,
     pub iPC_UID: i64,
     pub uiFEKey: u64,
     pub uiSvrTime: u64,
@@ -5977,13 +5980,15 @@ pub struct sP_FE2LS_REP_LIVE_CHECK {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct sP_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC {
-    pub iPC_UID: i64,
     pub iEnterSerialKey: i64,
+    pub g_FE_ServerIP: [u8; 16],
+    pub g_FE_ServerPort: i32,
 }
 
 #[repr(packed(4))]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct sP_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL {
-    pub iPC_UID: i64,
+    pub iEnterSerialKey: i64,
+    pub iErrorCode: i32,
 }

@@ -28,6 +28,7 @@ pub struct CNClient {
     sock: TcpStream,
     addr: SocketAddr,
     buf: [u8; CN_PACKET_BUFFER_SIZE],
+    last_pkt_id: PacketID,
     last_pkt_sz: usize,
     e_key: [u8; CRYPTO_KEY_SIZE],
     fe_key: [u8; CRYPTO_KEY_SIZE],
@@ -43,6 +44,7 @@ impl CNClient {
             sock: conn_data.0,
             addr: conn_data.1,
             buf: [0; CN_PACKET_BUFFER_SIZE],
+            last_pkt_id: PacketID::P_NULL,
             last_pkt_sz: 0,
             e_key: default_key,
             fe_key: default_key,
@@ -58,6 +60,10 @@ impl CNClient {
 
     pub fn get_addr(&self) -> String {
         self.addr.to_string()
+    }
+
+    pub fn get_fe_key_uint(&self) -> u64 {
+        u64::from_le_bytes(self.fe_key)
     }
 
     pub fn set_e_key(&mut self, key: [u8; CRYPTO_KEY_SIZE]) {
@@ -78,6 +84,10 @@ impl CNClient {
 
     pub fn set_client_type(&mut self, cltype: ClientType) {
         self.client_type = cltype;
+    }
+
+    pub fn get_packet_id(&self) -> PacketID {
+        self.last_pkt_id
     }
 
     pub fn get_packet<T>(&self) -> &T {
@@ -108,6 +118,7 @@ impl CNClient {
             }
         };
 
+        self.last_pkt_id = id;
         self.last_pkt_sz = sz;
         Ok(id)
     }
