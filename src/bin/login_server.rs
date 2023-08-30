@@ -1,6 +1,9 @@
 use std::{
     collections::HashMap,
-    sync::atomic::{AtomicI64, Ordering},
+    sync::{
+        atomic::{AtomicI64, Ordering},
+        Mutex, OnceLock,
+    },
     time::Duration,
 };
 
@@ -10,7 +13,7 @@ use rusty_fusion::{
         cnserver::CNServer,
         crypto::{gen_key, DEFAULT_KEY},
         packet::{
-            sP_LS2FE_REP_CONNECT_SUCC,
+            sPCStyle, sPCStyle2, sP_LS2FE_REP_CONNECT_SUCC,
             PacketID::{self, *},
         },
     },
@@ -66,6 +69,11 @@ fn get_next_shard_uid() -> i64 {
     let next_id: i64 = NEXT_SHARD_UID.load(Ordering::Acquire);
     NEXT_SHARD_UID.store(next_id + 1, Ordering::Release);
     next_id
+}
+
+fn pc_styles() -> &'static Mutex<HashMap<i64, sPCStyle>> {
+    static MAP: OnceLock<Mutex<HashMap<i64, sPCStyle>>> = OnceLock::new();
+    MAP.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 mod shard {
@@ -206,8 +214,11 @@ mod handlers {
             },
             sOn_Item: pkt.sOn_Item,
         };
-        client.send_packet(P_LS2CL_REP_CHAR_CREATE_SUCC, &resp)?;
 
+        let pc_uid: i64 = pkt.PCStyle.iPC_UID;
+        pc_styles().lock().unwrap().insert(pc_uid, pkt.PCStyle);
+
+        client.send_packet(P_LS2CL_REP_CHAR_CREATE_SUCC, &resp)?;
         Ok(())
     }
 
@@ -215,11 +226,13 @@ mod handlers {
         let client: &mut CNClient = clients.get_mut(client_key).unwrap();
         if let ClientType::GameClient(serial_key) = client.get_client_type() {
             let pkt: &sP_CL2LS_REQ_CHAR_SELECT = client.get_packet();
+            let pc_uid: i64 = pkt.iPC_UID;
             let login_info = sP_LS2FE_REQ_UPDATE_LOGIN_INFO {
                 iEnterSerialKey: *serial_key,
-                iPC_UID: pkt.iPC_UID,
+                iPC_UID: pc_uid,
                 uiFEKey: client.get_fe_key_uint(),
                 uiSvrTime: get_time(),
+                PCStyle: *pc_styles().lock().unwrap().get(&pc_uid).unwrap(),
             };
 
             let shard_server: &mut CNClient = clients

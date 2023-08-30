@@ -12,13 +12,14 @@ use rusty_fusion::{
     net::{
         cnclient::{CNClient, ClientType},
         cnserver::CNServer,
-        crypto::gen_key,
+        crypto::{gen_key, EncryptionMode},
         packet::{
             PacketID::{self, *},
             *,
         },
         LoginData,
     },
+    util::get_time,
     Result,
 };
 
@@ -60,6 +61,7 @@ fn handle_packet(
         //
         P_CL2LS_REQ_LOGIN => wrong_server(client),
         //
+        P_CL2FE_REQ_PC_ENTER => pc_enter(client),
         other => {
             println!("Unhandled packet: {:?}", other);
             Ok(())
@@ -88,6 +90,103 @@ fn verify_login_server_conn() {
 fn login_data() -> &'static Mutex<HashMap<i64, LoginData>> {
     static MAP: OnceLock<Mutex<HashMap<i64, LoginData>>> = OnceLock::new();
     MAP.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn pc_enter(client: &mut CNClient) -> Result<()> {
+    let pkt: &sP_CL2FE_REQ_PC_ENTER = client.get_packet();
+    let serial_key: i64 = pkt.iEnterSerialKey;
+    let login_data = login_data().lock().unwrap();
+    let login_data: &LoginData = login_data.get(&serial_key).unwrap();
+
+    let resp = sP_FE2CL_REP_PC_ENTER_SUCC {
+        iID: login_data.iPC_UID as i32,
+        PCLoadData2CL: sPCLoadData2CL {
+            iUserLevel: 1,
+            PCStyle: login_data.PCStyle,
+            PCStyle2: sPCStyle2 {
+                iAppearanceFlag: 0,
+                iTutorialFlag: 1,
+                iPayzoneFlag: 0,
+            },
+            iLevel: 1,
+            iMentor: 0,
+            iMentorCount: 0,
+            iHP: 9999,
+            iBatteryW: 0,
+            iBatteryN: 0,
+            iCandy: 0,
+            iFusionMatter: 0,
+            iSpecialState: 0,
+            iMapNum: 0,
+            iX: 632032,
+            iY: 187177,
+            iZ: -5500,
+            iAngle: 0,
+            aEquip: [sItemBase {
+                iType: 0,
+                iID: 0,
+                iOpt: 0,
+                iTimeLimit: 0,
+            }; 9],
+            aInven: [sItemBase {
+                iType: 0,
+                iID: 0,
+                iOpt: 0,
+                iTimeLimit: 0,
+            }; 50],
+            aQInven: [sItemBase {
+                iType: 0,
+                iID: 0,
+                iOpt: 0,
+                iTimeLimit: 0,
+            }; 50],
+            aNanoBank: [sNano {
+                iID: 0,
+                iSkillID: 0,
+                iStamina: 0,
+            }; 37],
+            aNanoSlots: [0; 3],
+            iActiveNanoSlotNum: 0,
+            iConditionBitFlag: 0,
+            eCSTB___Add: 0,
+            TimeBuff: sTimeBuff {
+                iTimeLimit: 0,
+                iTimeDuration: 0,
+                iTimeRepeat: 0,
+                iValue: 0,
+                iConfirmNum: 0,
+            },
+            aQuestFlag: [0; 32],
+            aRepeatQuestFlag: [0; 8],
+            aRunningQuest: [sRunningQuest {
+                m_aCurrTaskID: 0,
+                m_aKillNPCID: [0; 3],
+                m_aKillNPCCount: [0; 3],
+                m_aNeededItemID: [0; 3],
+                m_aNeededItemCount: [0; 3],
+            }; 9],
+            iCurrentMissionID: 0,
+            iWarpLocationFlag: 0,
+            aWyvernLocationFlag: [0; 2],
+            iBuddyWarpTime: 0,
+            iFatigue: 0,
+            iFatigue_Level: 0,
+            iFatigueRate: 0,
+            iFirstUseFlag1: 0,
+            iFirstUseFlag2: 0,
+            aiPCSkill: [0; 33],
+        },
+        uiSvrTime: get_time(),
+    };
+
+    let iv1: i32 = (resp.iID + 1) as i32;
+    let iv2: i32 = resp.PCLoadData2CL.iFusionMatter + 1;
+    client.set_e_key(gen_key(resp.uiSvrTime, iv1, iv2));
+    client.set_fe_key(login_data.uiFEKey.to_le_bytes());
+    client.set_enc_mode(EncryptionMode::FEKey);
+
+    client.send_packet(P_FE2CL_REP_PC_ENTER_SUCC, &resp)?;
+    Ok(())
 }
 
 mod login {
@@ -137,13 +236,26 @@ mod login {
             g_FE_ServerPort: public_addr.port() as i32,
         };
 
+        let serial_key = resp.iEnterSerialKey;
         let mut ld = login_data().lock().unwrap();
+        if ld.contains_key(&serial_key) {
+            // this serial key was already registered...
+            // extremely unlikely?
+            let resp = sP_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL {
+                iEnterSerialKey: serial_key,
+                iErrorCode: 1,
+            };
+            server.send_packet(P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL, &resp)?;
+            return Ok(());
+        }
         ld.insert(
-            resp.iEnterSerialKey,
+            serial_key,
             LoginData {
                 iPC_UID: pkt.iPC_UID,
                 uiFEKey: pkt.uiFEKey,
                 uiSvrTime: pkt.uiSvrTime,
+                // this should ideally be fetched from DB
+                PCStyle: pkt.PCStyle,
             },
         );
 

@@ -5960,6 +5960,7 @@ pub struct sP_LS2FE_REQ_UPDATE_LOGIN_INFO {
     pub iPC_UID: i64,
     pub uiFEKey: u64,
     pub uiSvrTime: u64,
+    pub PCStyle: sPCStyle,
 }
 
 #[repr(packed(4))]
