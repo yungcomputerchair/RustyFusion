@@ -513,6 +513,17 @@ pub enum PacketID {
     P_LS2CL_REP_CHANGE_CHAR_NAME_SUCC = 0x21000017, // 553648151
     P_LS2CL_REP_CHANGE_CHAR_NAME_FAIL = 0x21000018, // 553648152
     P_LS2CL_REP_SHARD_LIST_INFO_SUCC = 0x21000019,  // 553648153
+
+    // custom packets
+    P_LS2FE_REP_CONNECT_SUCC = 0x23000001,      // 587202561
+    P_LS2FE_REP_CONNECT_FAIL = 0x23000002,      // 587202562
+    P_LS2FE_REQ_LIVE_CHECK = 0x23000003,        // 587202563
+    P_LS2FE_REQ_UPDATE_LOGIN_INFO = 0x23000004, // 587202564
+
+    P_FE2LS_REQ_CONNECT = 0x32000001,                // 838860801
+    P_FE2LS_REP_LIVE_CHECK = 0x32000002,             // 838860802
+    P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC = 0x32000003, // 838860803
+    P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL = 0x32000004, // 838860804
 }
 
 #[repr(packed(4))]
@@ -5913,4 +5924,66 @@ pub struct sP_LS2CL_REP_CHANGE_CHAR_NAME_FAIL {
 #[derive(Debug, Copy, Clone)]
 pub struct sP_LS2CL_REP_SHARD_LIST_INFO_SUCC {
     pub aShardConnectFlag: [u8; 26],
+}
+
+// custom packets
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_LS2FE_REP_CONNECT_SUCC {
+    pub uiSvrTime: u64,
+    pub iConn_UID: i64,
+}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_LS2FE_REP_CONNECT_FAIL {
+    pub iErrorCode: i32,
+}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_LS2FE_REQ_LIVE_CHECK {
+    pub iTempValue: i32,
+}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_LS2FE_REQ_UPDATE_LOGIN_INFO {
+    pub iPC_UID: i64,
+    pub uiFEKey: u64,
+    pub uiSvrTime: u64,
+}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_REQ_CONNECT {
+    pub iTempValue: i32,
+}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_REP_LIVE_CHECK {
+    pub iTempValue: i32,
+}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC {
+    pub iPC_UID: i64,
+    pub iEnterSerialKey: i64,
+}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL {
+    pub iPC_UID: i64,
 }
