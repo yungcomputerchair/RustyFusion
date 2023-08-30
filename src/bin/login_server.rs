@@ -79,6 +79,11 @@ mod shard {
             iConn_UID: conn_id,
         };
         server.send_packet(P_LS2FE_REP_CONNECT_SUCC, &resp)?;
+
+        let iv1: i32 = (conn_id + 1) as i32;
+        let iv2: i32 = 69;
+        server.set_e_key(gen_key(resp.uiSvrTime, iv1, iv2));
+
         Ok(())
     }
 
