@@ -5,7 +5,7 @@ use std::{
 
 use rusty_fusion::{
     net::{
-        cnclient::CNClient,
+        cnclient::{CNClient, ClientType},
         cnserver::CNServer,
         crypto::{gen_key, DEFAULT_KEY},
         packet::{
@@ -60,6 +60,7 @@ fn get_next_shard_uid() -> i64 {
 }
 
 fn shard_handshake(server: &mut CNClient) -> Result<()> {
+    server.set_client_type(ClientType::ShardServer);
     let conn_id: i64 = get_next_shard_uid();
     let resp = sP_LS2FE_REP_CONNECT_SUCC {
         uiSvrTime: get_time(),

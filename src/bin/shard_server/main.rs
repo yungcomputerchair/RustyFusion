@@ -8,6 +8,7 @@ use rusty_fusion::{
     net::{
         cnclient::{CNClient, ClientType},
         cnserver::CNServer,
+        crypto::gen_key,
         packet::{
             PacketID::{self, *},
             *,
@@ -72,7 +73,12 @@ fn login_server_connect_req(server: &mut CNClient) {
 fn login_server_connect_succ(server: &mut CNClient) -> Result<()> {
     let pkt: &sP_LS2FE_REP_CONNECT_SUCC = server.get_packet();
     let conn_id: i64 = pkt.iConn_UID;
-    let _conn_time: u64 = pkt.uiSvrTime;
+    let conn_time: u64 = pkt.uiSvrTime;
+
+    let iv1: i32 = (conn_id + 1) as i32;
+    let iv2: i32 = 69;
+    server.set_e_key(gen_key(conn_time, iv1, iv2));
+
     LOGIN_SERVER_CONN_ID.store(conn_id, Ordering::Relaxed);
     println!("Connected to login server ({})", server.get_addr());
     Ok(())
