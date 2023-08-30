@@ -18,14 +18,15 @@ use rusty_fusion::{
     Result,
 };
 
+const LOGIN_LISTEN_ADDR: &str = "127.0.0.1:23000";
+
 static NEXT_PC_UID: AtomicI64 = AtomicI64::new(1);
 static NEXT_SHARD_UID: AtomicI64 = AtomicI64::new(1);
 
 fn main() -> Result<()> {
-    let addr: &str = "127.0.0.1:23000";
     let polling_interval: Duration = Duration::from_millis(50);
-    let mut server: CNServer = CNServer::new(addr, Some(polling_interval))?;
-    println!("Login server listening on {addr}");
+    let mut server: CNServer = CNServer::new(LOGIN_LISTEN_ADDR, Some(polling_interval))?;
+    println!("Login server listening on {}", server.get_endpoint());
     loop {
         server.poll(&handle_packet)?;
     }
