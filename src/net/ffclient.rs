@@ -13,7 +13,7 @@ use crate::{
 use super::{
     bytes_to_struct,
     crypto::{decrypt_packet, encrypt_packet, EncryptionMode, CRYPTO_KEY_SIZE, DEFAULT_KEY},
-    packet::PacketID,
+    packet::{FFPacket, PacketID},
 };
 
 #[derive(Debug, Clone)]
@@ -90,7 +90,7 @@ impl FFClient {
         self.last_pkt_id
     }
 
-    pub fn get_packet<T>(&self) -> &T {
+    pub fn get_packet<T: FFPacket>(&self) -> &T {
         let pkt_buf: &[u8] = &self.buf[4..self.last_pkt_sz];
         unsafe { bytes_to_struct(pkt_buf) }
     }
@@ -123,7 +123,7 @@ impl FFClient {
         Ok(id)
     }
 
-    pub fn send_packet<T>(&mut self, pkt_id: PacketID, pkt: &T) -> Result<()> {
+    pub fn send_packet<T: FFPacket>(&mut self, pkt_id: PacketID, pkt: &T) -> Result<()> {
         // send the size
         let sz: usize = 4 + size_of::<T>();
         let mut sz_buf: [u8; 4] = u32::to_le_bytes(sz as u32);

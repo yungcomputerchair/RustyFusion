@@ -5,20 +5,17 @@ fname = sys.argv[1]
 with open(fname, "r") as fi:
     code = fi.read()
 
-type_mappings = {
-    "uint"
-}
-
 regex_rules = [
     (
         r"#pragma pack\((\d+)\)",
         r"#[repr(packed(\1))]"
     ),
     (
-        r"struct",
+        r"struct (\S+) {([\S\s]+?)};",
         r"""#[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct"""
+pub struct \1 {\2}
+impl FFPacket for \1 {}"""
     ),
     (
         r"uint(\d+)_t (\S+;)",
@@ -52,10 +49,6 @@ pub struct"""
         r"(\S+|\[.+\]) (\S+);",
         r"pub \2: \1,"
     ),
-    (
-        r"};",
-        r"}"
-    )
 ]
 
 for rule in regex_rules:
