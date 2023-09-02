@@ -116,6 +116,7 @@ impl CNServer {
             _ => {}
         }
         self.poller.delete(client.get_sock())?;
+        self.clients.remove(&key);
         Ok(())
     }
 }
