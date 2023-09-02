@@ -63,6 +63,8 @@ fn handle_packet(
         //
         P_CL2FE_REQ_PC_ENTER => pc_enter(client),
         P_CL2FE_REQ_PC_LOADING_COMPLETE => pc_loading_complete(client),
+        P_CL2FE_GM_REQ_PC_SET_VALUE => set_player_value(client),
+        P_CL2FE_REQ_PC_GOTO => player_goto(client),
         other => {
             println!("Unhandled packet: {:?}", other);
             Ok(())
@@ -194,6 +196,32 @@ fn pc_loading_complete(client: &mut FFClient) -> Result<()> {
     let pkt: &sP_CL2FE_REQ_PC_LOADING_COMPLETE = client.get_packet();
     let resp = sP_FE2CL_REP_PC_LOADING_COMPLETE_SUCC { iPC_ID: pkt.iPC_ID };
     client.send_packet(P_FE2CL_REP_PC_LOADING_COMPLETE_SUCC, &resp)?;
+
+    Ok(())
+}
+
+fn set_player_value(client: &mut FFClient) -> Result<()> {
+    let pkt: &sP_CL2FE_GM_REQ_PC_SET_VALUE = client.get_packet();
+    let resp = sP_FE2CL_GM_REP_PC_SET_VALUE {
+        iPC_ID: pkt.iPC_ID,
+        iSetValue: pkt.iSetValue,
+        iSetValueType: pkt.iSetValueType,
+    };
+
+    client.send_packet(P_FE2CL_GM_REP_PC_SET_VALUE, &resp)?;
+
+    Ok(())
+}
+
+fn player_goto(client: &mut FFClient) -> Result<()> {
+    let pkt: &sP_CL2FE_REQ_PC_GOTO = client.get_packet();
+    let resp = sP_FE2CL_REP_PC_GOTO_SUCC {
+        iX: pkt.iToX,
+        iY: pkt.iToY,
+        iZ: pkt.iToZ,
+    };
+
+    client.send_packet(P_FE2CL_REP_PC_GOTO_SUCC, &resp)?;
 
     Ok(())
 }
