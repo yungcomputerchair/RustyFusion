@@ -10,9 +10,9 @@ use std::{
 
 use rusty_fusion::{
     net::{
-        cnclient::{CNClient, ClientType},
-        cnserver::CNServer,
         crypto::{gen_key, EncryptionMode},
+        ffclient::{ClientType, FFClient},
+        ffserver::FFServer,
         packet::{
             PacketID::{self, *},
             *,
@@ -33,9 +33,9 @@ static LOGIN_SERVER_CONN_ID: AtomicI64 = AtomicI64::new(CONN_ID_DISCONNECTED);
 
 fn main() -> Result<()> {
     let polling_interval: Duration = Duration::from_millis(50);
-    let mut server: CNServer = CNServer::new(SHARD_LISTEN_ADDR, Some(polling_interval))?;
+    let mut server: FFServer = FFServer::new(SHARD_LISTEN_ADDR, Some(polling_interval))?;
 
-    let ls: &mut CNClient = server.connect(LOGIN_SERVER_ADDR, ClientType::LoginServer);
+    let ls: &mut FFClient = server.connect(LOGIN_SERVER_ADDR, ClientType::LoginServer);
     login::login_connect_req(ls);
     thread::sleep(Duration::from_millis(2000));
     server.poll(&handle_packet)?;
@@ -49,10 +49,10 @@ fn main() -> Result<()> {
 
 fn handle_packet(
     key: &usize,
-    clients: &mut HashMap<usize, CNClient>,
+    clients: &mut HashMap<usize, FFClient>,
     pkt_id: PacketID,
 ) -> Result<()> {
-    let client: &mut CNClient = clients.get_mut(key).unwrap();
+    let client: &mut FFClient = clients.get_mut(key).unwrap();
     println!("{} sent {:?}", client.get_addr(), pkt_id);
     match pkt_id {
         P_LS2FE_REP_CONNECT_SUCC => login::login_connect_succ(client),
@@ -70,7 +70,7 @@ fn handle_packet(
     }
 }
 
-fn wrong_server(client: &mut CNClient) -> Result<()> {
+fn wrong_server(client: &mut FFClient) -> Result<()> {
     let pkt: &sP_CL2LS_REQ_LOGIN = client.get_packet();
     let resp = sP_LS2CL_REP_LOGIN_FAIL {
         iErrorCode: 4, // "Login error"
@@ -93,7 +93,7 @@ fn login_data() -> &'static Mutex<HashMap<i64, LoginData>> {
     MAP.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-fn pc_enter(client: &mut CNClient) -> Result<()> {
+fn pc_enter(client: &mut FFClient) -> Result<()> {
     let pkt: &sP_CL2FE_REQ_PC_ENTER = client.get_packet();
     let serial_key: i64 = pkt.iEnterSerialKey;
     let login_data = login_data().lock().unwrap();
@@ -190,7 +190,7 @@ fn pc_enter(client: &mut CNClient) -> Result<()> {
     Ok(())
 }
 
-fn pc_loading_complete(client: &mut CNClient) -> Result<()> {
+fn pc_loading_complete(client: &mut FFClient) -> Result<()> {
     let pkt: &sP_CL2FE_REQ_PC_LOADING_COMPLETE = client.get_packet();
     let resp = sP_FE2CL_REP_PC_LOADING_COMPLETE_SUCC { iPC_ID: pkt.iPC_ID };
     client.send_packet(P_FE2CL_REP_PC_LOADING_COMPLETE_SUCC, &resp)?;
@@ -203,14 +203,14 @@ mod login {
 
     use super::*;
 
-    pub fn login_connect_req(server: &mut CNClient) {
+    pub fn login_connect_req(server: &mut FFClient) {
         let pkt = sP_FE2LS_REQ_CONNECT { iTempValue: 0 };
         server
             .send_packet(P_FE2LS_REQ_CONNECT, &pkt)
             .expect("Couldn't connect to login server");
     }
 
-    pub fn login_connect_succ(server: &mut CNClient) -> Result<()> {
+    pub fn login_connect_succ(server: &mut FFClient) -> Result<()> {
         let pkt: &sP_LS2FE_REP_CONNECT_SUCC = server.get_packet();
         let conn_id: i64 = pkt.iConn_UID;
         let conn_time: u64 = pkt.uiSvrTime;
@@ -224,14 +224,14 @@ mod login {
         Ok(())
     }
 
-    pub fn login_connect_fail(server: &mut CNClient) -> Result<()> {
+    pub fn login_connect_fail(server: &mut FFClient) -> Result<()> {
         let pkt: &sP_LS2FE_REP_CONNECT_FAIL = server.get_packet();
         panic!("Login server refused to connect (error {})", {
             pkt.iErrorCode
         });
     }
 
-    pub fn login_update_info(server: &mut CNClient) -> Result<()> {
+    pub fn login_update_info(server: &mut FFClient) -> Result<()> {
         let public_addr: SocketAddr = SHARD_PUBLIC_ADDR.parse().expect("Bad public address");
         let mut ip_buf: [u8; 16] = [0; 16];
         let ip_str: &str = &public_addr.ip().to_string();

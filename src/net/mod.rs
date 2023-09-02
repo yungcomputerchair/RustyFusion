@@ -2,9 +2,9 @@ use std::{mem::size_of, slice::from_raw_parts};
 
 use self::packet::sPCStyle;
 
-pub mod cnclient;
-pub mod cnserver;
 pub mod crypto;
+pub mod ffclient;
+pub mod ffserver;
 pub mod packet;
 
 #[allow(non_snake_case)]

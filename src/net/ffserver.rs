@@ -9,21 +9,21 @@ use std::{
 };
 
 use super::{
-    cnclient::{CNClient, ClientType},
+    ffclient::{ClientType, FFClient},
     packet::PacketID,
 };
 
 const EPOLL_KEY_SELF: usize = 0;
 
-pub struct CNServer {
+pub struct FFServer {
     poll_timeout: Option<Duration>,
     sock: TcpListener,
     poller: Poller,
     next_epoll_key: usize,
-    clients: HashMap<usize, CNClient>,
+    clients: HashMap<usize, FFClient>,
 }
 
-impl CNServer {
+impl FFServer {
     pub fn new(addr: &str, poll_timeout: Option<Duration>) -> Result<Self> {
         let server: Self = Self {
             poll_timeout,
@@ -39,21 +39,21 @@ impl CNServer {
         Ok(server)
     }
 
-    pub fn connect(&mut self, addr: &str, cltype: ClientType) -> &mut CNClient {
+    pub fn connect(&mut self, addr: &str, cltype: ClientType) -> &mut FFClient {
         let addr: SocketAddr = addr.parse().expect("Bad address");
         let stream: TcpStream = TcpStream::connect(addr).expect("Failed to connect");
         let conn_data: (TcpStream, SocketAddr) = (stream, addr);
         let key: usize = self
             .register_client(conn_data)
             .expect("Couldn't register client");
-        let client: &mut CNClient = self.clients.get_mut(&key).unwrap();
+        let client: &mut FFClient = self.clients.get_mut(&key).unwrap();
         client.set_client_type(cltype);
         client
     }
 
     pub fn poll(
         &mut self,
-        handler: &dyn Fn(&usize, &mut HashMap<usize, CNClient>, PacketID) -> Result<()>,
+        handler: &dyn Fn(&usize, &mut HashMap<usize, FFClient>, PacketID) -> Result<()>,
     ) -> Result<()> {
         let mut events: Vec<Event> = Vec::new();
         //println!("Waiting...");
@@ -75,8 +75,8 @@ impl CNServer {
                 if !ev.readable || !ev.writable {
                     continue;
                 };
-                let clients: &mut HashMap<usize, CNClient> = &mut self.clients;
-                let client: &mut CNClient = &mut clients.get_mut(&ev.key).unwrap();
+                let clients: &mut HashMap<usize, FFClient> = &mut self.clients;
+                let client: &mut FFClient = &mut clients.get_mut(&ev.key).unwrap();
                 match client.read_packet() {
                     Ok(pkt) => {
                         handler(&ev.key, clients, pkt)?;
@@ -105,12 +105,12 @@ impl CNServer {
         let key: usize = self.get_next_epoll_key();
         self.poller
             .add_with_mode(&conn_data.0, Event::all(key), PollMode::Edge)?;
-        self.clients.insert(key, CNClient::new(conn_data));
+        self.clients.insert(key, FFClient::new(conn_data));
         Ok(key)
     }
 
     fn unregister_client(&mut self, key: usize) -> Result<()> {
-        let client: &CNClient = self.clients.get(&key).unwrap();
+        let client: &FFClient = self.clients.get(&key).unwrap();
         match client.get_client_type() {
             ClientType::LoginServer => panic!("Lost connection to login server"),
             _ => {}

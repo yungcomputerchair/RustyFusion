@@ -27,7 +27,7 @@ pub mod util {
 pub mod error {
     use std::{error::Error, fmt::Display};
 
-    use crate::net::{cnclient::ClientType, packet::PacketID};
+    use crate::net::{ffclient::ClientType, packet::PacketID};
 
     #[derive(Debug)]
     pub struct BadPacketID {

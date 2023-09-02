@@ -24,7 +24,7 @@ pub enum ClientType {
     ShardServer(i64), // iConn_UID
 }
 
-pub struct CNClient {
+pub struct FFClient {
     sock: TcpStream,
     addr: SocketAddr,
     buf: [u8; CN_PACKET_BUFFER_SIZE],
@@ -37,7 +37,7 @@ pub struct CNClient {
     last_heartbeat: u64,
 }
 
-impl CNClient {
+impl FFClient {
     pub fn new(conn_data: (TcpStream, SocketAddr)) -> Self {
         let default_key: [u8; CRYPTO_KEY_SIZE] = DEFAULT_KEY.try_into().unwrap();
         Self {

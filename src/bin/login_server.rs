@@ -9,9 +9,9 @@ use std::{
 
 use rusty_fusion::{
     net::{
-        cnclient::CNClient,
-        cnserver::CNServer,
         crypto::{gen_key, DEFAULT_KEY},
+        ffclient::FFClient,
+        ffserver::FFServer,
         packet::{
             sPCStyle, sPCStyle2, sP_LS2FE_REP_CONNECT_SUCC,
             PacketID::{self, *},
@@ -28,7 +28,7 @@ static NEXT_SHARD_UID: AtomicI64 = AtomicI64::new(1);
 
 fn main() -> Result<()> {
     let polling_interval: Duration = Duration::from_millis(50);
-    let mut server: CNServer = CNServer::new(LOGIN_LISTEN_ADDR, Some(polling_interval))?;
+    let mut server: FFServer = FFServer::new(LOGIN_LISTEN_ADDR, Some(polling_interval))?;
     println!("Login server listening on {}", server.get_endpoint());
     loop {
         server.poll(&handle_packet)?;
@@ -37,10 +37,10 @@ fn main() -> Result<()> {
 
 fn handle_packet(
     key: &usize,
-    clients: &mut HashMap<usize, CNClient>,
+    clients: &mut HashMap<usize, FFClient>,
     pkt_id: PacketID,
 ) -> Result<()> {
-    let client: &mut CNClient = clients.get_mut(key).unwrap();
+    let client: &mut FFClient = clients.get_mut(key).unwrap();
     println!("{} sent {:?}", client.get_addr(), pkt_id);
     match pkt_id {
         P_FE2LS_REQ_CONNECT => shard::shard_handshake(client),
@@ -78,9 +78,9 @@ fn pc_styles() -> &'static Mutex<HashMap<i64, sPCStyle>> {
 
 mod shard {
     use super::*;
-    use rusty_fusion::net::{cnclient::ClientType, packet::*};
+    use rusty_fusion::net::{ffclient::ClientType, packet::*};
 
-    pub fn shard_handshake(server: &mut CNClient) -> Result<()> {
+    pub fn shard_handshake(server: &mut FFClient) -> Result<()> {
         let conn_id: i64 = get_next_shard_uid();
         server.set_client_type(ClientType::ShardServer(conn_id));
         let resp = sP_LS2FE_REP_CONNECT_SUCC {
@@ -96,8 +96,8 @@ mod shard {
         Ok(())
     }
 
-    pub fn shard_accept(shard_key: &usize, clients: &mut HashMap<usize, CNClient>) -> Result<()> {
-        let server: &mut CNClient = clients.get_mut(shard_key).unwrap();
+    pub fn shard_accept(shard_key: &usize, clients: &mut HashMap<usize, FFClient>) -> Result<()> {
+        let server: &mut FFClient = clients.get_mut(shard_key).unwrap();
         let pkt: &sP_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC = server.get_packet();
 
         let resp = sP_LS2CL_REP_SHARD_SELECT_SUCC {
@@ -106,7 +106,7 @@ mod shard {
             iEnterSerialKey: pkt.iEnterSerialKey,
         };
 
-        let client: &mut CNClient = clients
+        let client: &mut FFClient = clients
             .values_mut()
             .find(|c| match c.get_client_type() {
                 ClientType::GameClient(key) => *key == resp.iEnterSerialKey,
@@ -118,15 +118,15 @@ mod shard {
         Ok(())
     }
 
-    pub fn shard_reject(shard_key: &usize, clients: &mut HashMap<usize, CNClient>) -> Result<()> {
-        let server: &mut CNClient = clients.get_mut(shard_key).unwrap();
+    pub fn shard_reject(shard_key: &usize, clients: &mut HashMap<usize, FFClient>) -> Result<()> {
+        let server: &mut FFClient = clients.get_mut(shard_key).unwrap();
         let pkt: &sP_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL = server.get_packet();
         let resp = sP_LS2CL_REP_CHAR_SELECT_FAIL {
             iErrorCode: pkt.iErrorCode,
         };
 
         let serial_key: i64 = pkt.iEnterSerialKey;
-        let client: &mut CNClient = clients
+        let client: &mut FFClient = clients
             .values_mut()
             .find(|c| match c.get_client_type() {
                 ClientType::GameClient(key) => *key == serial_key,
@@ -145,10 +145,10 @@ mod handlers {
     use rand::random;
     use rusty_fusion::{
         error::BadRequest,
-        net::{cnclient::ClientType, packet::*},
+        net::{ffclient::ClientType, packet::*},
     };
 
-    pub fn login(client: &mut CNClient) -> Result<()> {
+    pub fn login(client: &mut FFClient) -> Result<()> {
         let pkt: &sP_CL2LS_REQ_LOGIN = client.get_packet();
         let resp = sP_LS2CL_REP_LOGIN_SUCC {
             iCharCount: 0,
@@ -177,7 +177,7 @@ mod handlers {
         Ok(())
     }
 
-    pub fn check_char_name(client: &mut CNClient) -> Result<()> {
+    pub fn check_char_name(client: &mut FFClient) -> Result<()> {
         let pkt: &sP_CL2LS_REQ_CHECK_CHAR_NAME = client.get_packet();
         let resp = sP_LS2CL_REP_CHECK_CHAR_NAME_SUCC {
             szFirstName: pkt.szFirstName,
@@ -188,7 +188,7 @@ mod handlers {
         Ok(())
     }
 
-    pub fn save_char_name(client: &mut CNClient) -> Result<()> {
+    pub fn save_char_name(client: &mut FFClient) -> Result<()> {
         let pkt: &sP_CL2LS_REQ_SAVE_CHAR_NAME = client.get_packet();
         let resp = sP_LS2CL_REP_SAVE_CHAR_NAME_SUCC {
             iPC_UID: get_next_pc_uid(),
@@ -202,7 +202,7 @@ mod handlers {
         Ok(())
     }
 
-    pub fn char_create(client: &mut CNClient) -> Result<()> {
+    pub fn char_create(client: &mut FFClient) -> Result<()> {
         let pkt: &sP_CL2LS_REQ_CHAR_CREATE = client.get_packet();
         let resp = sP_LS2CL_REP_CHAR_CREATE_SUCC {
             iLevel: 1,
@@ -222,8 +222,8 @@ mod handlers {
         Ok(())
     }
 
-    pub fn char_select(client_key: &usize, clients: &mut HashMap<usize, CNClient>) -> Result<()> {
-        let client: &mut CNClient = clients.get_mut(client_key).unwrap();
+    pub fn char_select(client_key: &usize, clients: &mut HashMap<usize, FFClient>) -> Result<()> {
+        let client: &mut FFClient = clients.get_mut(client_key).unwrap();
         if let ClientType::GameClient(serial_key) = client.get_client_type() {
             let pkt: &sP_CL2LS_REQ_CHAR_SELECT = client.get_packet();
             let pc_uid: i64 = pkt.iPC_UID;
@@ -235,7 +235,7 @@ mod handlers {
                 PCStyle: *pc_styles().lock().unwrap().get(&pc_uid).unwrap(),
             };
 
-            let shard_server: &mut CNClient = clients
+            let shard_server: &mut FFClient = clients
                 .values_mut()
                 .find(|c| match c.get_client_type() {
                     ClientType::ShardServer(_) => true,
