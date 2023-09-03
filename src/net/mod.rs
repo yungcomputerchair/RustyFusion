@@ -1,7 +1,7 @@
 use std::{collections::HashMap, mem::size_of, slice::from_raw_parts};
 
 use self::{
-    ffclient::FFClient,
+    ffclient::{ClientType, FFClient},
     packet::{sPCStyle, FFPacket, PacketID},
 };
 use crate::Result;
@@ -34,4 +34,20 @@ unsafe fn struct_to_bytes<T: FFPacket>(pkt: &T) -> &[u8] {
     let struct_ptr: *const T = pkt;
     let buf_ptr: *const u8 = struct_ptr.cast();
     from_raw_parts(buf_ptr, sz)
+}
+
+pub fn send_to_others<T: FFPacket>(
+    pkt_id: PacketID,
+    pkt: &T,
+    our_pc_uid: i64,
+    clients: &mut HashMap<usize, FFClient>,
+) -> Result<()> {
+    clients
+        .values_mut()
+        .filter(|c| {
+            matches!(c.get_client_type(), ClientType::GameClient {
+        pc_uid: Some(other_id), ..
+    } if *other_id != our_pc_uid)
+        })
+        .try_for_each(|co| co.send_packet(pkt_id, pkt))
 }
