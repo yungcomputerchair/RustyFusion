@@ -35,7 +35,7 @@ impl FFServer {
         server.sock.set_nonblocking(true)?;
         server
             .poller
-            .add_with_mode(&server.sock, Event::all(EPOLL_KEY_SELF), PollMode::Edge)?;
+            .add_with_mode(&server.sock, Event::all(EPOLL_KEY_SELF), PollMode::Level)?;
         Ok(server)
     }
 
@@ -104,7 +104,7 @@ impl FFServer {
     fn register_client(&mut self, conn_data: (TcpStream, SocketAddr)) -> Result<usize> {
         let key: usize = self.get_next_epoll_key();
         self.poller
-            .add_with_mode(&conn_data.0, Event::all(key), PollMode::Edge)?;
+            .add_with_mode(&conn_data.0, Event::all(key), PollMode::Level)?;
         self.clients.insert(key, FFClient::new(conn_data));
         Ok(key)
     }
