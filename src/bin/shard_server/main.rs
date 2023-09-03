@@ -103,8 +103,8 @@ fn handle_packet(
         //
         P_CL2FE_REQ_PC_ENTER => pc_enter(client),
         P_CL2FE_REQ_PC_LOADING_COMPLETE => pc_loading_complete(client),
-        P_CL2FE_GM_REQ_PC_SET_VALUE => set_player_value(client),
-        P_CL2FE_REQ_PC_GOTO => player_goto(client),
+        P_CL2FE_GM_REQ_PC_SET_VALUE => gm_pc_set_value(client),
+        P_CL2FE_REQ_PC_GOTO => pc_goto(client),
         other => {
             println!("Unhandled packet: {:?}", other);
             Ok(())
@@ -233,7 +233,7 @@ fn pc_loading_complete(client: &mut FFClient) -> Result<()> {
     Ok(())
 }
 
-fn set_player_value(client: &mut FFClient) -> Result<()> {
+fn gm_pc_set_value(client: &mut FFClient) -> Result<()> {
     let pkt: &sP_CL2FE_GM_REQ_PC_SET_VALUE = client.get_packet();
     let resp = sP_FE2CL_GM_REP_PC_SET_VALUE {
         iPC_ID: pkt.iPC_ID,
@@ -246,7 +246,7 @@ fn set_player_value(client: &mut FFClient) -> Result<()> {
     Ok(())
 }
 
-fn player_goto(client: &mut FFClient) -> Result<()> {
+fn pc_goto(client: &mut FFClient) -> Result<()> {
     let pkt: &sP_CL2FE_REQ_PC_GOTO = client.get_packet();
     let resp = sP_FE2CL_REP_PC_GOTO_SUCC {
         iX: pkt.iToX,

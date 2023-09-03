@@ -70,9 +70,9 @@ fn handle_packet(
     let client: &mut FFClient = clients.get_mut(key).unwrap();
     println!("{} sent {:?}", client.get_addr(), pkt_id);
     match pkt_id {
-        P_FE2LS_REQ_CONNECT => shard::shard_handshake(client),
-        P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC => shard::shard_accept(key, clients),
-        P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL => shard::shard_reject(key, clients),
+        P_FE2LS_REQ_CONNECT => shard::connect(client),
+        P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC => shard::update_login_info_succ(key, clients),
+        P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL => shard::update_login_info_fail(key, clients),
         //
         P_CL2LS_REQ_LOGIN => handlers::login(client),
         P_CL2LS_REQ_CHECK_CHAR_NAME => handlers::check_char_name(client),
@@ -90,7 +90,7 @@ mod shard {
     use super::*;
     use rusty_fusion::net::{ffclient::ClientType, packet::*};
 
-    pub fn shard_handshake(server: &mut FFClient) -> Result<()> {
+    pub fn connect(server: &mut FFClient) -> Result<()> {
         let conn_id: i64 = state().lock().unwrap().get_next_shard_id();
         server.set_client_type(ClientType::ShardServer(conn_id));
         let resp = sP_LS2FE_REP_CONNECT_SUCC {
@@ -106,7 +106,10 @@ mod shard {
         Ok(())
     }
 
-    pub fn shard_accept(shard_key: &usize, clients: &mut HashMap<usize, FFClient>) -> Result<()> {
+    pub fn update_login_info_succ(
+        shard_key: &usize,
+        clients: &mut HashMap<usize, FFClient>,
+    ) -> Result<()> {
         let server: &mut FFClient = clients.get_mut(shard_key).unwrap();
         let pkt: &sP_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC = server.get_packet();
 
@@ -128,7 +131,10 @@ mod shard {
         Ok(())
     }
 
-    pub fn shard_reject(shard_key: &usize, clients: &mut HashMap<usize, FFClient>) -> Result<()> {
+    pub fn update_login_info_fail(
+        shard_key: &usize,
+        clients: &mut HashMap<usize, FFClient>,
+    ) -> Result<()> {
         let server: &mut FFClient = clients.get_mut(shard_key).unwrap();
         let pkt: &sP_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL = server.get_packet();
         let resp = sP_LS2CL_REP_CHAR_SELECT_FAIL {
