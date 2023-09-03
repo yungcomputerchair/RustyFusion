@@ -1,9 +1,6 @@
 use std::{
     collections::HashMap,
-    sync::{
-        atomic::{AtomicI64, Ordering},
-        Mutex, OnceLock,
-    },
+    sync::{Mutex, OnceLock},
     thread,
     time::Duration,
 };
@@ -29,7 +26,33 @@ const SHARD_PUBLIC_ADDR: &str = SHARD_LISTEN_ADDR;
 const LOGIN_SERVER_ADDR: &str = "127.0.0.1:23000";
 
 const CONN_ID_DISCONNECTED: i64 = -1;
-static LOGIN_SERVER_CONN_ID: AtomicI64 = AtomicI64::new(CONN_ID_DISCONNECTED);
+
+struct ShardServerState {
+    login_server_conn_id: i64,
+    login_data: HashMap<i64, LoginData>,
+}
+
+impl ShardServerState {
+    pub fn new() -> Self {
+        Self {
+            login_server_conn_id: CONN_ID_DISCONNECTED,
+            login_data: HashMap::new(),
+        }
+    }
+
+    pub fn get_login_server_conn_id(&self) -> i64 {
+        self.login_server_conn_id
+    }
+
+    pub fn set_login_server_conn_id(&mut self, conn_id: i64) {
+        self.login_server_conn_id = conn_id;
+    }
+}
+
+fn state() -> &'static Mutex<ShardServerState> {
+    static STATE: OnceLock<Mutex<ShardServerState>> = OnceLock::new();
+    STATE.get_or_init(|| Mutex::new(ShardServerState::new()))
+}
 
 fn main() -> Result<()> {
     let polling_interval: Duration = Duration::from_millis(50);
@@ -84,21 +107,16 @@ fn wrong_server(client: &mut FFClient) -> Result<()> {
 }
 
 fn verify_login_server_conn() {
-    let conn_id: i64 = LOGIN_SERVER_CONN_ID.load(Ordering::Relaxed);
+    let conn_id: i64 = state().lock().unwrap().get_login_server_conn_id();
     if conn_id == CONN_ID_DISCONNECTED {
         panic!("Couldn't handshake with login server in time");
     }
 }
 
-fn login_data() -> &'static Mutex<HashMap<i64, LoginData>> {
-    static MAP: OnceLock<Mutex<HashMap<i64, LoginData>>> = OnceLock::new();
-    MAP.get_or_init(|| Mutex::new(HashMap::new()))
-}
-
 fn pc_enter(client: &mut FFClient) -> Result<()> {
     let pkt: &sP_CL2FE_REQ_PC_ENTER = client.get_packet();
     let serial_key: i64 = pkt.iEnterSerialKey;
-    let login_data = login_data().lock().unwrap();
+    let login_data: &HashMap<i64, LoginData> = &state().lock().unwrap().login_data;
     let login_data: &LoginData = login_data.get(&serial_key).unwrap();
 
     let resp = sP_FE2CL_REP_PC_ENTER_SUCC {
@@ -247,7 +265,7 @@ mod login {
         let iv2: i32 = 69;
         server.set_e_key(gen_key(conn_time, iv1, iv2));
 
-        LOGIN_SERVER_CONN_ID.store(conn_id, Ordering::Relaxed);
+        state().lock().unwrap().set_login_server_conn_id(conn_id);
         println!("Connected to login server ({})", server.get_addr());
         Ok(())
     }
@@ -274,7 +292,7 @@ mod login {
         };
 
         let serial_key = resp.iEnterSerialKey;
-        let mut ld = login_data().lock().unwrap();
+        let ld: &mut HashMap<i64, LoginData> = &mut state().lock().unwrap().login_data;
         if ld.contains_key(&serial_key) {
             // this serial key was already registered...
             // extremely unlikely?

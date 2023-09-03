@@ -48,7 +48,7 @@ impl LoginServerState {
     }
 }
 
-fn get_state() -> &'static Mutex<LoginServerState> {
+fn state() -> &'static Mutex<LoginServerState> {
     static STATE: OnceLock<Mutex<LoginServerState>> = OnceLock::new();
     STATE.get_or_init(|| Mutex::new(LoginServerState::new()))
 }
@@ -91,7 +91,7 @@ mod shard {
     use rusty_fusion::net::{ffclient::ClientType, packet::*};
 
     pub fn shard_handshake(server: &mut FFClient) -> Result<()> {
-        let conn_id: i64 = get_state().lock().unwrap().get_next_shard_id();
+        let conn_id: i64 = state().lock().unwrap().get_next_shard_id();
         server.set_client_type(ClientType::ShardServer(conn_id));
         let resp = sP_LS2FE_REP_CONNECT_SUCC {
             uiSvrTime: get_time(),
@@ -201,7 +201,7 @@ mod handlers {
     pub fn save_char_name(client: &mut FFClient) -> Result<()> {
         let pkt: &sP_CL2LS_REQ_SAVE_CHAR_NAME = client.get_packet();
         let resp = sP_LS2CL_REP_SAVE_CHAR_NAME_SUCC {
-            iPC_UID: get_state().lock().unwrap().get_next_pc_uid(),
+            iPC_UID: state().lock().unwrap().get_next_pc_uid(),
             iSlotNum: 0,
             iGender: (rand::random::<bool>() as i8) + 1,
             szFirstName: pkt.szFirstName,
@@ -226,7 +226,7 @@ mod handlers {
         };
 
         let pc_uid: i64 = pkt.PCStyle.iPC_UID;
-        get_state()
+        state()
             .lock()
             .unwrap()
             .pc_styles
@@ -246,7 +246,7 @@ mod handlers {
                 iPC_UID: pc_uid,
                 uiFEKey: client.get_fe_key_uint(),
                 uiSvrTime: get_time(),
-                PCStyle: *get_state().lock().unwrap().pc_styles.get(&pc_uid).unwrap(),
+                PCStyle: *state().lock().unwrap().pc_styles.get(&pc_uid).unwrap(),
             };
 
             let shard_server = clients.values_mut().find(|c| match c.get_client_type() {
