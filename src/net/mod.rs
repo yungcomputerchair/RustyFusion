@@ -1,11 +1,18 @@
-use std::{mem::size_of, slice::from_raw_parts};
+use std::{collections::HashMap, mem::size_of, slice::from_raw_parts};
 
-use self::packet::{sPCStyle, FFPacket};
+use self::{
+    ffclient::FFClient,
+    packet::{sPCStyle, FFPacket, PacketID},
+};
+use crate::Result;
 
 pub mod crypto;
 pub mod ffclient;
 pub mod ffserver;
 pub mod packet;
+
+pub type PacketCallback =
+    &'static dyn Fn(&usize, &mut HashMap<usize, FFClient>, PacketID) -> Result<()>;
 
 #[allow(non_snake_case)]
 pub struct LoginData {

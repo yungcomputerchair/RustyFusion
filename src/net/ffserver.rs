@@ -10,7 +10,7 @@ use std::{
 
 use super::{
     ffclient::{ClientType, FFClient},
-    packet::PacketID,
+    PacketCallback,
 };
 
 const EPOLL_KEY_SELF: usize = 0;
@@ -51,10 +51,7 @@ impl FFServer {
         client
     }
 
-    pub fn poll(
-        &mut self,
-        handler: &dyn Fn(&usize, &mut HashMap<usize, FFClient>, PacketID) -> Result<()>,
-    ) -> Result<()> {
+    pub fn poll(&mut self, handler: PacketCallback) -> Result<()> {
         let mut events: Vec<Event> = Vec::new();
         //println!("Waiting...");
         if let Err(e) = self.poller.wait(&mut events, self.poll_timeout) {
@@ -76,7 +73,7 @@ impl FFServer {
                     continue;
                 };
                 let clients: &mut HashMap<usize, FFClient> = &mut self.clients;
-                let client: &mut FFClient = &mut clients.get_mut(&ev.key).unwrap();
+                let client: &mut FFClient = clients.get_mut(&ev.key).unwrap();
                 match client.read_packet() {
                     Ok(pkt) => {
                         handler(&ev.key, clients, pkt)?;
@@ -111,9 +108,8 @@ impl FFServer {
 
     fn unregister_client(&mut self, key: usize) -> Result<()> {
         let client: &FFClient = self.clients.get(&key).unwrap();
-        match client.get_client_type() {
-            ClientType::LoginServer => panic!("Lost connection to login server"),
-            _ => {}
+        if let ClientType::LoginServer = client.get_client_type() {
+            panic!("Lost connection to login server");
         }
         self.poller.delete(client.get_sock())?;
         self.clients.remove(&key);

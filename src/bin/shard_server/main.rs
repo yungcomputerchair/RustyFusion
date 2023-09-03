@@ -200,7 +200,7 @@ fn pc_enter(client: &mut FFClient) -> Result<()> {
         uiSvrTime: get_time(),
     };
 
-    let iv1: i32 = (resp.iID + 1) as i32;
+    let iv1: i32 = resp.iID + 1;
     let iv2: i32 = resp.PCLoadData2CL.iFusionMatter + 1;
     client.set_e_key(gen_key(resp.uiSvrTime, iv1, iv2));
     client.set_fe_key(login_data.uiFEKey.to_le_bytes());

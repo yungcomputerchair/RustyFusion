@@ -11,7 +11,7 @@ pub enum EncryptionMode {
 fn xor(buf: &mut [u8], key: &[u8], size: usize) {
     for i in 0..size {
         let b: &mut u8 = &mut buf[i];
-        *b = *b ^ key[i % CRYPTO_KEY_SIZE];
+        *b ^= key[i % CRYPTO_KEY_SIZE];
     }
 }
 
@@ -22,10 +22,7 @@ fn byte_swap(er_size: usize, buf: &mut [u8], size: usize) -> usize {
     while num + er_size <= size {
         let num4: usize = num + num3;
         let num5: usize = num + (er_size - 1 - num3);
-
-        let tmp: u8 = buf[num4];
-        buf[num4] = buf[num5];
-        buf[num5] = tmp;
+        buf.swap(num4, num5);
 
         num += er_size;
         num3 += 1;
@@ -83,7 +80,7 @@ mod tests {
         let bytes: &[u8] = unsafe { struct_to_bytes(&pkt) };
         let mut buf: Vec<u8> = bytes.to_vec();
 
-        let key: [u8; CRYPTO_KEY_SIZE] = (4382366871217075016 as u64).to_le_bytes();
+        let key: [u8; CRYPTO_KEY_SIZE] = 4382366871217075016_u64.to_le_bytes();
         encrypt_packet(&mut buf, &key);
         assert_ne!(buf.as_slice(), bytes);
         decrypt_packet(&mut buf, &key);

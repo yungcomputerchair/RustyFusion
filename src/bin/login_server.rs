@@ -249,10 +249,9 @@ mod handlers {
                 PCStyle: *state().lock().unwrap().pc_styles.get(&pc_uid).unwrap(),
             };
 
-            let shard_server = clients.values_mut().find(|c| match c.get_client_type() {
-                ClientType::ShardServer(_) => true,
-                _ => false,
-            });
+            let shard_server = clients
+                .values_mut()
+                .find(|c| matches!(c.get_client_type(), ClientType::ShardServer(_)));
 
             match shard_server {
                 Some(shard) => {
