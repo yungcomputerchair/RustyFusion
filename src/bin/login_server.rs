@@ -1,9 +1,6 @@
 use std::{
     collections::HashMap,
-    sync::{
-        atomic::{AtomicI64, Ordering},
-        Mutex, OnceLock,
-    },
+    sync::{Mutex, OnceLock},
     time::Duration,
 };
 
@@ -23,8 +20,38 @@ use rusty_fusion::{
 
 const LOGIN_LISTEN_ADDR: &str = "127.0.0.1:23000";
 
-static NEXT_PC_UID: AtomicI64 = AtomicI64::new(1);
-static NEXT_SHARD_UID: AtomicI64 = AtomicI64::new(1);
+struct LoginServerState {
+    next_pc_uid: i64,
+    next_shard_id: i64,
+    pub pc_styles: HashMap<i64, sPCStyle>,
+}
+
+impl LoginServerState {
+    pub fn new() -> Self {
+        Self {
+            next_pc_uid: 1,
+            next_shard_id: 1,
+            pc_styles: HashMap::new(),
+        }
+    }
+
+    pub fn get_next_pc_uid(&mut self) -> i64 {
+        let next = self.next_pc_uid;
+        self.next_pc_uid += 1;
+        next
+    }
+
+    pub fn get_next_shard_id(&mut self) -> i64 {
+        let next = self.next_shard_id;
+        self.next_shard_id += 1;
+        next
+    }
+}
+
+fn get_state() -> &'static Mutex<LoginServerState> {
+    static STATE: OnceLock<Mutex<LoginServerState>> = OnceLock::new();
+    STATE.get_or_init(|| Mutex::new(LoginServerState::new()))
+}
 
 fn main() -> Result<()> {
     let polling_interval: Duration = Duration::from_millis(50);
@@ -59,29 +86,12 @@ fn handle_packet(
     }
 }
 
-fn get_next_pc_uid() -> i64 {
-    let next_id: i64 = NEXT_PC_UID.load(Ordering::Acquire);
-    NEXT_PC_UID.store(next_id + 1, Ordering::Release);
-    next_id
-}
-
-fn get_next_shard_uid() -> i64 {
-    let next_id: i64 = NEXT_SHARD_UID.load(Ordering::Acquire);
-    NEXT_SHARD_UID.store(next_id + 1, Ordering::Release);
-    next_id
-}
-
-fn pc_styles() -> &'static Mutex<HashMap<i64, sPCStyle>> {
-    static MAP: OnceLock<Mutex<HashMap<i64, sPCStyle>>> = OnceLock::new();
-    MAP.get_or_init(|| Mutex::new(HashMap::new()))
-}
-
 mod shard {
     use super::*;
     use rusty_fusion::net::{ffclient::ClientType, packet::*};
 
     pub fn shard_handshake(server: &mut FFClient) -> Result<()> {
-        let conn_id: i64 = get_next_shard_uid();
+        let conn_id: i64 = get_state().lock().unwrap().get_next_shard_id();
         server.set_client_type(ClientType::ShardServer(conn_id));
         let resp = sP_LS2FE_REP_CONNECT_SUCC {
             uiSvrTime: get_time(),
@@ -191,7 +201,7 @@ mod handlers {
     pub fn save_char_name(client: &mut FFClient) -> Result<()> {
         let pkt: &sP_CL2LS_REQ_SAVE_CHAR_NAME = client.get_packet();
         let resp = sP_LS2CL_REP_SAVE_CHAR_NAME_SUCC {
-            iPC_UID: get_next_pc_uid(),
+            iPC_UID: get_state().lock().unwrap().get_next_pc_uid(),
             iSlotNum: 0,
             iGender: (rand::random::<bool>() as i8) + 1,
             szFirstName: pkt.szFirstName,
@@ -216,7 +226,11 @@ mod handlers {
         };
 
         let pc_uid: i64 = pkt.PCStyle.iPC_UID;
-        pc_styles().lock().unwrap().insert(pc_uid, pkt.PCStyle);
+        get_state()
+            .lock()
+            .unwrap()
+            .pc_styles
+            .insert(pc_uid, pkt.PCStyle);
 
         client.send_packet(P_LS2CL_REP_CHAR_CREATE_SUCC, &resp)?;
         Ok(())
@@ -232,7 +246,7 @@ mod handlers {
                 iPC_UID: pc_uid,
                 uiFEKey: client.get_fe_key_uint(),
                 uiSvrTime: get_time(),
-                PCStyle: *pc_styles().lock().unwrap().get(&pc_uid).unwrap(),
+                PCStyle: *get_state().lock().unwrap().pc_styles.get(&pc_uid).unwrap(),
             };
 
             let shard_server = clients.values_mut().find(|c| match c.get_client_type() {
