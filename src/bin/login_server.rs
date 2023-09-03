@@ -122,7 +122,9 @@ mod shard {
         let client: &mut FFClient = clients
             .values_mut()
             .find(|c| match c.get_client_type() {
-                ClientType::GameClient(key) => *key == resp.iEnterSerialKey,
+                ClientType::GameClient {
+                    serial_key: key, ..
+                } => *key == resp.iEnterSerialKey,
                 _ => false,
             })
             .unwrap();
@@ -145,7 +147,9 @@ mod shard {
         let client: &mut FFClient = clients
             .values_mut()
             .find(|c| match c.get_client_type() {
-                ClientType::GameClient(key) => *key == serial_key,
+                ClientType::GameClient {
+                    serial_key: key, ..
+                } => *key == serial_key,
                 _ => false,
             })
             .unwrap();
@@ -188,7 +192,10 @@ mod handlers {
         client.set_fe_key(gen_key(fe_base, fe_iv1, fe_iv2));
 
         let serial_key: i64 = random();
-        client.set_client_type(ClientType::GameClient(serial_key));
+        client.set_client_type(ClientType::GameClient {
+            serial_key,
+            pc_uid: None,
+        });
 
         Ok(())
     }
@@ -244,7 +251,7 @@ mod handlers {
 
     pub fn char_select(client_key: &usize, clients: &mut HashMap<usize, FFClient>) -> Result<()> {
         let client: &mut FFClient = clients.get_mut(client_key).unwrap();
-        if let ClientType::GameClient(serial_key) = client.get_client_type() {
+        if let ClientType::GameClient { serial_key, .. } = client.get_client_type() {
             let pkt: &sP_CL2LS_REQ_CHAR_SELECT = client.get_packet();
             let pc_uid: i64 = pkt.iPC_UID;
             let login_info = sP_LS2FE_REQ_UPDATE_LOGIN_INFO {
@@ -274,10 +281,6 @@ mod handlers {
             return Ok(());
         }
 
-        Err(Box::new(BadRequest::new(
-            client.get_addr(),
-            client.get_packet_id(),
-            client.get_client_type().clone(),
-        )))
+        Err(Box::new(BadRequest::new(client)))
     }
 }

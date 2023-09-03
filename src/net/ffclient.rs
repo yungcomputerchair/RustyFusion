@@ -19,7 +19,10 @@ use super::{
 #[derive(Debug, Clone)]
 pub enum ClientType {
     Unknown,
-    GameClient(i64), // iEnterSerialKey
+    GameClient {
+        serial_key: i64,     // iEnterSerialKey
+        pc_uid: Option<i64>, // iPC_UID
+    },
     LoginServer,
     ShardServer(i64), // iConn_UID
 }

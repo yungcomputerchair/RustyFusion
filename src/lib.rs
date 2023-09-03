@@ -27,7 +27,10 @@ pub mod util {
 pub mod error {
     use std::{error::Error, fmt::Display};
 
-    use crate::net::{ffclient::ClientType, packet::PacketID};
+    use crate::net::{
+        ffclient::{ClientType, FFClient},
+        packet::PacketID,
+    };
 
     #[derive(Debug)]
     pub struct BadPacketID {
@@ -52,11 +55,11 @@ pub mod error {
         client_type: ClientType,
     }
     impl BadRequest {
-        pub fn new(addr: String, packet_id: PacketID, client_type: ClientType) -> Self {
+        pub fn new(client: &FFClient) -> Self {
             Self {
-                addr,
-                packet_id,
-                client_type,
+                addr: client.get_addr(),
+                packet_id: client.get_packet_id(),
+                client_type: client.get_client_type().clone(),
             }
         }
     }

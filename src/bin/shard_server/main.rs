@@ -215,6 +215,11 @@ fn pc_enter(client: &mut FFClient) -> Result<()> {
         uiSvrTime: get_time(),
     };
 
+    client.set_client_type(ClientType::GameClient {
+        serial_key: pkt.iEnterSerialKey,
+        pc_uid: Some(login_data.iPC_UID),
+    });
+
     let iv1: i32 = resp.iID + 1;
     let iv2: i32 = resp.PCLoadData2CL.iFusionMatter + 1;
     client.set_e_key(gen_key(resp.uiSvrTime, iv1, iv2));
