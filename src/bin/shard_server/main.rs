@@ -105,8 +105,8 @@ fn handle_packet(
         P_CL2FE_REQ_PC_ENTER => pc_enter(client),
         P_CL2FE_REQ_PC_LOADING_COMPLETE => pc_loading_complete(client),
         P_CL2FE_REQ_PC_MOVE => pc_move(key, clients),
-        //P_CL2FE_REQ_PC_JUMP => pc_jump(key, clients),
-        //P_CL2FE_REQ_PC_STOP => pc_stop(key, clients),
+        P_CL2FE_REQ_PC_JUMP => pc_jump(key, clients),
+        P_CL2FE_REQ_PC_STOP => pc_stop(key, clients),
         P_CL2FE_REQ_PC_GOTO => pc_goto(client),
         P_CL2FE_GM_REQ_PC_SET_VALUE => gm_pc_set_value(client),
         other => {
@@ -291,6 +291,58 @@ fn pc_move(key: &usize, clients: &mut HashMap<usize, FFClient>) -> Result<()> {
             iSvrTime: get_time(),
         };
         send_to_others(P_FE2CL_PC_MOVE, &resp, *pc_uid, clients)?;
+        return Ok(());
+    }
+
+    Err(Box::new(BadRequest::new(client)))
+}
+
+fn pc_jump(key: &usize, clients: &mut HashMap<usize, FFClient>) -> Result<()> {
+    let client = clients.get_mut(key).unwrap();
+    if let ClientType::GameClient {
+        pc_uid: Some(pc_uid),
+        ..
+    } = client.get_client_type()
+    {
+        let pkt: &sP_CL2FE_REQ_PC_JUMP = client.get_packet();
+        let resp = sP_FE2CL_PC_JUMP {
+            iCliTime: pkt.iCliTime,
+            iX: pkt.iX,
+            iY: pkt.iY,
+            iZ: pkt.iZ,
+            iVX: pkt.iVX,
+            iVY: pkt.iVY,
+            iVZ: pkt.iVZ,
+            iAngle: pkt.iAngle,
+            cKeyValue: pkt.cKeyValue,
+            iSpeed: pkt.iSpeed,
+            iID: *pc_uid as i32,
+            iSvrTime: get_time(),
+        };
+        send_to_others(P_FE2CL_PC_JUMP, &resp, *pc_uid, clients)?;
+        return Ok(());
+    }
+
+    Err(Box::new(BadRequest::new(client)))
+}
+
+fn pc_stop(key: &usize, clients: &mut HashMap<usize, FFClient>) -> Result<()> {
+    let client = clients.get_mut(key).unwrap();
+    if let ClientType::GameClient {
+        pc_uid: Some(pc_uid),
+        ..
+    } = client.get_client_type()
+    {
+        let pkt: &sP_CL2FE_REQ_PC_STOP = client.get_packet();
+        let resp = sP_FE2CL_PC_STOP {
+            iCliTime: pkt.iCliTime,
+            iX: pkt.iX,
+            iY: pkt.iY,
+            iZ: pkt.iZ,
+            iID: *pc_uid as i32,
+            iSvrTime: get_time(),
+        };
+        send_to_others(P_FE2CL_PC_STOP, &resp, *pc_uid, clients)?;
         return Ok(());
     }
 
