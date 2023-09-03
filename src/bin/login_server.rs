@@ -235,14 +235,22 @@ mod handlers {
                 PCStyle: *pc_styles().lock().unwrap().get(&pc_uid).unwrap(),
             };
 
-            let shard_server: &mut FFClient = clients
-                .values_mut()
-                .find(|c| match c.get_client_type() {
-                    ClientType::ShardServer(_) => true,
-                    _ => false,
-                })
-                .unwrap();
-            shard_server.send_packet(P_LS2FE_REQ_UPDATE_LOGIN_INFO, &login_info)?;
+            let shard_server = clients.values_mut().find(|c| match c.get_client_type() {
+                ClientType::ShardServer(_) => true,
+                _ => false,
+            });
+
+            match shard_server {
+                Some(shard) => {
+                    shard.send_packet(P_LS2FE_REQ_UPDATE_LOGIN_INFO, &login_info)?;
+                }
+                None => {
+                    // no shards available
+                    let resp = sP_LS2CL_REP_CHAR_SELECT_FAIL { iErrorCode: 1 };
+                    let client: &mut FFClient = clients.get_mut(client_key).unwrap();
+                    client.send_packet(P_LS2CL_REP_CHAR_SELECT_FAIL, &resp)?;
+                }
+            }
 
             return Ok(());
         }
