@@ -58,7 +58,7 @@ fn main() -> Result<()> {
     let mut server: FFServer = FFServer::new(LOGIN_LISTEN_ADDR, Some(polling_interval))?;
     println!("Login server listening on {}", server.get_endpoint());
     loop {
-        server.poll(&handle_packet)?;
+        server.poll(&handle_packet, None)?;
     }
 }
 

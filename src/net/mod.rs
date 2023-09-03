@@ -13,6 +13,7 @@ pub mod packet;
 
 pub type PacketCallback =
     &'static dyn Fn(&usize, &mut HashMap<usize, FFClient>, PacketID) -> Result<()>;
+pub type DisconnectCallback = &'static dyn Fn(FFClient);
 
 #[allow(non_snake_case)]
 pub struct LoginData {

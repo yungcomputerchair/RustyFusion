@@ -1,8 +1,7 @@
 use std::{
     collections::HashMap,
     sync::{Mutex, OnceLock},
-    thread,
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 
 use rusty_fusion::{
@@ -58,15 +57,33 @@ fn main() -> Result<()> {
     let polling_interval: Duration = Duration::from_millis(50);
     let mut server: FFServer = FFServer::new(SHARD_LISTEN_ADDR, Some(polling_interval))?;
 
-    let ls: &mut FFClient = server.connect(LOGIN_SERVER_ADDR, ClientType::LoginServer);
-    login::login_connect_req(ls);
-    thread::sleep(Duration::from_millis(2000));
-    server.poll(&handle_packet)?;
-    verify_login_server_conn();
+    let login_server_conn_interval: Duration = Duration::from_secs(10);
+    let mut login_server_conn_time: SystemTime = SystemTime::UNIX_EPOCH;
 
     println!("Shard server listening on {}", server.get_endpoint());
     loop {
-        server.poll(&handle_packet)?;
+        let time_now = SystemTime::now();
+        if !is_login_server_connected()
+            && time_now.duration_since(login_server_conn_time).unwrap() > login_server_conn_interval
+        {
+            println!("Connecting to login server at {}...", LOGIN_SERVER_ADDR);
+            let conn = server.connect(LOGIN_SERVER_ADDR, ClientType::LoginServer);
+            if let Some(login_server) = conn {
+                login::login_connect_req(login_server);
+            }
+            login_server_conn_time = time_now;
+        }
+        server.poll(&handle_packet, Some(&handle_disconnect))?;
+    }
+}
+
+fn handle_disconnect(client: FFClient) {
+    if matches!(client.get_client_type(), ClientType::LoginServer) {
+        println!("Login server disconnected");
+        state()
+            .lock()
+            .unwrap()
+            .set_login_server_conn_id(CONN_ID_DISCONNECTED);
     }
 }
 
@@ -106,11 +123,9 @@ fn wrong_server(client: &mut FFClient) -> Result<()> {
     Ok(())
 }
 
-fn verify_login_server_conn() {
+fn is_login_server_connected() -> bool {
     let conn_id: i64 = state().lock().unwrap().get_login_server_conn_id();
-    if conn_id == CONN_ID_DISCONNECTED {
-        panic!("Couldn't handshake with login server in time");
-    }
+    conn_id != CONN_ID_DISCONNECTED
 }
 
 fn pc_enter(client: &mut FFClient) -> Result<()> {
@@ -251,9 +266,7 @@ mod login {
 
     pub fn login_connect_req(server: &mut FFClient) {
         let pkt = sP_FE2LS_REQ_CONNECT { iTempValue: 0 };
-        server
-            .send_packet(P_FE2LS_REQ_CONNECT, &pkt)
-            .expect("Couldn't connect to login server");
+        server.send_packet(P_FE2LS_REQ_CONNECT, &pkt).unwrap();
     }
 
     pub fn login_connect_succ(server: &mut FFClient) -> Result<()> {
@@ -272,9 +285,10 @@ mod login {
 
     pub fn login_connect_fail(server: &mut FFClient) -> Result<()> {
         let pkt: &sP_LS2FE_REP_CONNECT_FAIL = server.get_packet();
-        panic!("Login server refused to connect (error {})", {
+        println!("Login server refused to connect (error {})", {
             pkt.iErrorCode
         });
+        Ok(())
     }
 
     pub fn login_update_info(server: &mut FFClient) -> Result<()> {

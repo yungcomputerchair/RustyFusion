@@ -10,7 +10,7 @@ use std::{
 
 use super::{
     ffclient::{ClientType, FFClient},
-    PacketCallback,
+    DisconnectCallback, PacketCallback,
 };
 
 const EPOLL_KEY_SELF: usize = 0;
@@ -39,19 +39,24 @@ impl FFServer {
         Ok(server)
     }
 
-    pub fn connect(&mut self, addr: &str, cltype: ClientType) -> &mut FFClient {
+    pub fn connect(&mut self, addr: &str, cltype: ClientType) -> Option<&mut FFClient> {
         let addr: SocketAddr = addr.parse().expect("Bad address");
-        let stream: TcpStream = TcpStream::connect(addr).expect("Failed to connect");
-        let conn_data: (TcpStream, SocketAddr) = (stream, addr);
-        let key: usize = self
-            .register_client(conn_data)
-            .expect("Couldn't register client");
-        let client: &mut FFClient = self.clients.get_mut(&key).unwrap();
-        client.set_client_type(cltype);
-        client
+        let stream = TcpStream::connect(addr);
+        if let Ok(stream) = stream {
+            let conn_data: (TcpStream, SocketAddr) = (stream, addr);
+            let key: usize = self.register_client(conn_data).unwrap();
+            let client: &mut FFClient = self.clients.get_mut(&key).unwrap();
+            client.set_client_type(cltype);
+            return Some(client);
+        }
+        None
     }
 
-    pub fn poll(&mut self, handler: PacketCallback) -> Result<()> {
+    pub fn poll(
+        &mut self,
+        pkt_handler: PacketCallback,
+        dc_handler: Option<DisconnectCallback>,
+    ) -> Result<()> {
         let mut events: Vec<Event> = Vec::new();
         //println!("Waiting...");
         if let Err(e) = self.poller.wait(&mut events, self.poll_timeout) {
@@ -76,11 +81,15 @@ impl FFServer {
                 let client: &mut FFClient = clients.get_mut(&ev.key).unwrap();
                 match client.read_packet() {
                     Ok(pkt) => {
-                        handler(&ev.key, clients, pkt)?;
+                        pkt_handler(&ev.key, clients, pkt)?;
                     }
                     Err(e) => {
                         println!("err on socket {}: {}", ev.key, e);
-                        self.unregister_client(ev.key)?;
+                        let disconnected_client: FFClient =
+                            self.unregister_client(ev.key)?.unwrap();
+                        if let Some(callback) = dc_handler {
+                            callback(disconnected_client);
+                        }
                     }
                 }
             }
@@ -106,13 +115,9 @@ impl FFServer {
         Ok(key)
     }
 
-    fn unregister_client(&mut self, key: usize) -> Result<()> {
+    fn unregister_client(&mut self, key: usize) -> Result<Option<FFClient>> {
         let client: &FFClient = self.clients.get(&key).unwrap();
-        if let ClientType::LoginServer = client.get_client_type() {
-            panic!("Lost connection to login server");
-        }
         self.poller.delete(client.get_sock())?;
-        self.clients.remove(&key);
-        Ok(())
+        Ok(self.clients.remove(&key))
     }
 }
