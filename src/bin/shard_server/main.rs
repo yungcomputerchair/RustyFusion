@@ -290,7 +290,7 @@ fn pc_move(clients: &mut ClientMap) -> Result<()> {
             iSvrTime: get_time(),
         };
         clients
-            .get_all_but_self()
+            .get_all_gameclient_but_self()
             .try_for_each(|c| c.send_packet(P_FE2CL_PC_MOVE, &resp))?;
         return Ok(());
     }
@@ -321,7 +321,7 @@ fn pc_jump(clients: &mut ClientMap) -> Result<()> {
             iSvrTime: get_time(),
         };
         clients
-            .get_all_but_self()
+            .get_all_gameclient_but_self()
             .try_for_each(|c| c.send_packet(P_FE2CL_PC_JUMP, &resp))?;
         return Ok(());
     }
@@ -346,7 +346,7 @@ fn pc_stop(clients: &mut ClientMap) -> Result<()> {
             iSvrTime: get_time(),
         };
         clients
-            .get_all_but_self()
+            .get_all_gameclient_but_self()
             .try_for_each(|c| c.send_packet(P_FE2CL_PC_STOP, &resp))?;
         return Ok(());
     }
