@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    sync::{Mutex, OnceLock},
-    time::Duration,
-};
+use std::{cell::RefCell, collections::HashMap, time::Duration};
 
 use rusty_fusion::{
     net::{
@@ -20,14 +16,14 @@ use rusty_fusion::{
 
 const LOGIN_LISTEN_ADDR: &str = "127.0.0.1:23000";
 
-struct LoginServerState {
+pub struct LoginServerState {
     next_pc_uid: i64,
     next_shard_id: i64,
     pub pc_styles: HashMap<i64, sPCStyle>,
 }
 
 impl LoginServerState {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
             next_pc_uid: 1,
             next_shard_id: 1,
@@ -48,17 +44,18 @@ impl LoginServerState {
     }
 }
 
-fn state() -> &'static Mutex<LoginServerState> {
-    static STATE: OnceLock<Mutex<LoginServerState>> = OnceLock::new();
-    STATE.get_or_init(|| Mutex::new(LoginServerState::new()))
-}
-
 fn main() -> Result<()> {
     let polling_interval: Duration = Duration::from_millis(50);
     let mut server: FFServer = FFServer::new(LOGIN_LISTEN_ADDR, Some(polling_interval))?;
+
+    let state = RefCell::new(LoginServerState::new());
+    let mut pkt_handler = |key, clients: &mut HashMap<usize, FFClient>, pkt_id| -> Result<()> {
+        handle_packet(key, clients, pkt_id, &mut state.borrow_mut())
+    };
+
     println!("Login server listening on {}", server.get_endpoint());
     loop {
-        server.poll(handle_packet, None)?;
+        server.poll(&mut pkt_handler, None)?;
     }
 }
 
@@ -66,19 +63,20 @@ fn handle_packet(
     key: usize,
     clients: &mut HashMap<usize, FFClient>,
     pkt_id: PacketID,
+    state: &mut LoginServerState,
 ) -> Result<()> {
     let client: &mut FFClient = clients.get_mut(&key).unwrap();
     println!("{} sent {:?}", client.get_addr(), pkt_id);
     match pkt_id {
-        P_FE2LS_REQ_CONNECT => shard::connect(client),
+        P_FE2LS_REQ_CONNECT => shard::connect(client, state),
         P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC => shard::update_login_info_succ(key, clients),
         P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL => shard::update_login_info_fail(key, clients),
         //
         P_CL2LS_REQ_LOGIN => handlers::login(client),
         P_CL2LS_REQ_CHECK_CHAR_NAME => handlers::check_char_name(client),
-        P_CL2LS_REQ_SAVE_CHAR_NAME => handlers::save_char_name(client),
-        P_CL2LS_REQ_CHAR_CREATE => handlers::char_create(client),
-        P_CL2LS_REQ_CHAR_SELECT => handlers::char_select(key, clients),
+        P_CL2LS_REQ_SAVE_CHAR_NAME => handlers::save_char_name(client, state),
+        P_CL2LS_REQ_CHAR_CREATE => handlers::char_create(client, state),
+        P_CL2LS_REQ_CHAR_SELECT => handlers::char_select(key, clients, state),
         other => {
             println!("Unhandled packet: {:?}", other);
             Ok(())
@@ -90,8 +88,8 @@ mod shard {
     use super::*;
     use rusty_fusion::net::{ffclient::ClientType, packet::*};
 
-    pub fn connect(server: &mut FFClient) -> Result<()> {
-        let conn_id: i64 = state().lock().unwrap().get_next_shard_id();
+    pub fn connect(server: &mut FFClient, state: &mut LoginServerState) -> Result<()> {
+        let conn_id: i64 = state.get_next_shard_id();
         server.set_client_type(ClientType::ShardServer(conn_id));
         let resp = sP_LS2FE_REP_CONNECT_SUCC {
             uiSvrTime: get_time(),
@@ -211,10 +209,10 @@ mod handlers {
         Ok(())
     }
 
-    pub fn save_char_name(client: &mut FFClient) -> Result<()> {
+    pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> Result<()> {
         let pkt: &sP_CL2LS_REQ_SAVE_CHAR_NAME = client.get_packet();
         let resp = sP_LS2CL_REP_SAVE_CHAR_NAME_SUCC {
-            iPC_UID: state().lock().unwrap().get_next_pc_uid(),
+            iPC_UID: state.get_next_pc_uid(),
             iSlotNum: 0,
             iGender: (rand::random::<bool>() as i8) + 1,
             szFirstName: pkt.szFirstName,
@@ -225,7 +223,7 @@ mod handlers {
         Ok(())
     }
 
-    pub fn char_create(client: &mut FFClient) -> Result<()> {
+    pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> Result<()> {
         let pkt: &sP_CL2LS_REQ_CHAR_CREATE = client.get_packet();
         let resp = sP_LS2CL_REP_CHAR_CREATE_SUCC {
             iLevel: 1,
@@ -239,17 +237,17 @@ mod handlers {
         };
 
         let pc_uid: i64 = pkt.PCStyle.iPC_UID;
-        state()
-            .lock()
-            .unwrap()
-            .pc_styles
-            .insert(pc_uid, pkt.PCStyle);
+        state.pc_styles.insert(pc_uid, pkt.PCStyle);
 
         client.send_packet(P_LS2CL_REP_CHAR_CREATE_SUCC, &resp)?;
         Ok(())
     }
 
-    pub fn char_select(client_key: usize, clients: &mut HashMap<usize, FFClient>) -> Result<()> {
+    pub fn char_select(
+        client_key: usize,
+        clients: &mut HashMap<usize, FFClient>,
+        state: &mut LoginServerState,
+    ) -> Result<()> {
         let client: &mut FFClient = clients.get_mut(&client_key).unwrap();
         if let ClientType::GameClient { serial_key, .. } = client.get_client_type() {
             let pkt: &sP_CL2LS_REQ_CHAR_SELECT = client.get_packet();
@@ -259,7 +257,7 @@ mod handlers {
                 iPC_UID: pc_uid,
                 uiFEKey: client.get_fe_key_uint(),
                 uiSvrTime: get_time(),
-                PCStyle: *state().lock().unwrap().pc_styles.get(&pc_uid).unwrap(),
+                PCStyle: *state.pc_styles.get(&pc_uid).unwrap(),
             };
 
             let shard_server = clients

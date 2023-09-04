@@ -67,6 +67,8 @@ impl FFServer {
                 }
             }
         }
+
+        let mut dc_handler = dc_handler;
         for ev in events.iter() {
             //dbg!(ev);
             if ev.key == EPOLL_KEY_SELF {
@@ -87,7 +89,7 @@ impl FFServer {
                         println!("err on socket {}: {}", ev.key, e);
                         let disconnected_client: FFClient =
                             self.unregister_client(ev.key)?.unwrap();
-                        if let Some(callback) = dc_handler {
+                        if let Some(callback) = dc_handler.as_mut() {
                             callback(disconnected_client);
                         }
                     }

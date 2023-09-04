@@ -1,6 +1,6 @@
 use std::{
+    cell::RefCell,
     collections::HashMap,
-    sync::{Mutex, OnceLock},
     time::{Duration, SystemTime},
 };
 
@@ -27,13 +27,13 @@ const LOGIN_SERVER_ADDR: &str = "127.0.0.1:23000";
 
 const CONN_ID_DISCONNECTED: i64 = -1;
 
-struct ShardServerState {
+pub struct ShardServerState {
     login_server_conn_id: i64,
     login_data: HashMap<i64, LoginData>,
 }
 
 impl ShardServerState {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
             login_server_conn_id: CONN_ID_DISCONNECTED,
             login_data: HashMap::new(),
@@ -49,11 +49,6 @@ impl ShardServerState {
     }
 }
 
-fn state() -> &'static Mutex<ShardServerState> {
-    static STATE: OnceLock<Mutex<ShardServerState>> = OnceLock::new();
-    STATE.get_or_init(|| Mutex::new(ShardServerState::new()))
-}
-
 fn main() -> Result<()> {
     let polling_interval: Duration = Duration::from_millis(50);
     let mut server: FFServer = FFServer::new(SHARD_LISTEN_ADDR, Some(polling_interval))?;
@@ -61,10 +56,18 @@ fn main() -> Result<()> {
     let login_server_conn_interval: Duration = Duration::from_secs(10);
     let mut login_server_conn_time: SystemTime = SystemTime::UNIX_EPOCH;
 
+    let state = RefCell::new(ShardServerState::new());
+    let mut pkt_handler = |key, clients: &mut HashMap<usize, FFClient>, pkt_id| -> Result<()> {
+        handle_packet(key, clients, pkt_id, &mut state.borrow_mut())
+    };
+    let mut dc_handler = |client: FFClient| {
+        handle_disconnect(client, &mut state.borrow_mut());
+    };
+
     println!("Shard server listening on {}", server.get_endpoint());
     loop {
         let time_now = SystemTime::now();
-        if !is_login_server_connected()
+        if !is_login_server_connected(&state.borrow())
             && time_now.duration_since(login_server_conn_time).unwrap() > login_server_conn_interval
         {
             println!("Connecting to login server at {}...", LOGIN_SERVER_ADDR);
@@ -74,17 +77,13 @@ fn main() -> Result<()> {
             }
             login_server_conn_time = time_now;
         }
-        server.poll(handle_packet, Some(handle_disconnect))?;
+        server.poll(&mut pkt_handler, Some(&mut dc_handler))?;
     }
 }
 
-fn handle_disconnect(client: FFClient) {
+fn handle_disconnect(client: FFClient, state: &mut ShardServerState) {
     if matches!(client.get_client_type(), ClientType::LoginServer) {
-        println!("Login server disconnected");
-        state()
-            .lock()
-            .unwrap()
-            .set_login_server_conn_id(CONN_ID_DISCONNECTED);
+        state.set_login_server_conn_id(CONN_ID_DISCONNECTED);
     }
 }
 
@@ -92,17 +91,18 @@ fn handle_packet(
     key: usize,
     clients: &mut HashMap<usize, FFClient>,
     pkt_id: PacketID,
+    state: &mut ShardServerState,
 ) -> Result<()> {
     let mut clients = ClientMap::new(key, clients);
     println!("{} sent {:?}", clients.get_self().get_addr(), pkt_id);
     match pkt_id {
-        P_LS2FE_REP_CONNECT_SUCC => login::login_connect_succ(clients.get_self()),
+        P_LS2FE_REP_CONNECT_SUCC => login::login_connect_succ(clients.get_self(), state),
         P_LS2FE_REP_CONNECT_FAIL => login::login_connect_fail(clients.get_self()),
-        P_LS2FE_REQ_UPDATE_LOGIN_INFO => login::login_update_info(clients.get_self()),
+        P_LS2FE_REQ_UPDATE_LOGIN_INFO => login::login_update_info(clients.get_self(), state),
         //
         P_CL2LS_REQ_LOGIN => wrong_server(clients.get_self()),
         //
-        P_CL2FE_REQ_PC_ENTER => pc_enter(clients.get_self()),
+        P_CL2FE_REQ_PC_ENTER => pc_enter(clients.get_self(), state),
         P_CL2FE_REQ_PC_LOADING_COMPLETE => pc_loading_complete(clients.get_self()),
         P_CL2FE_REQ_PC_MOVE => pc_move(&mut clients),
         P_CL2FE_REQ_PC_JUMP => pc_jump(&mut clients),
@@ -127,15 +127,14 @@ fn wrong_server(client: &mut FFClient) -> Result<()> {
     Ok(())
 }
 
-fn is_login_server_connected() -> bool {
-    let conn_id: i64 = state().lock().unwrap().get_login_server_conn_id();
-    conn_id != CONN_ID_DISCONNECTED
+fn is_login_server_connected(state: &ShardServerState) -> bool {
+    state.get_login_server_conn_id() != CONN_ID_DISCONNECTED
 }
 
-fn pc_enter(client: &mut FFClient) -> Result<()> {
+fn pc_enter(client: &mut FFClient, state: &mut ShardServerState) -> Result<()> {
     let pkt: &sP_CL2FE_REQ_PC_ENTER = client.get_packet();
     let serial_key: i64 = pkt.iEnterSerialKey;
-    let login_data: &HashMap<i64, LoginData> = &state().lock().unwrap().login_data;
+    let login_data: &HashMap<i64, LoginData> = &state.login_data;
     let login_data: &LoginData = login_data.get(&serial_key).unwrap();
 
     let resp = sP_FE2CL_REP_PC_ENTER_SUCC {
@@ -365,7 +364,7 @@ mod login {
         server.send_packet(P_FE2LS_REQ_CONNECT, &pkt).unwrap();
     }
 
-    pub fn login_connect_succ(server: &mut FFClient) -> Result<()> {
+    pub fn login_connect_succ(server: &mut FFClient, state: &mut ShardServerState) -> Result<()> {
         let pkt: &sP_LS2FE_REP_CONNECT_SUCC = server.get_packet();
         let conn_id: i64 = pkt.iConn_UID;
         let conn_time: u64 = pkt.uiSvrTime;
@@ -374,7 +373,7 @@ mod login {
         let iv2: i32 = 69;
         server.set_e_key(gen_key(conn_time, iv1, iv2));
 
-        state().lock().unwrap().set_login_server_conn_id(conn_id);
+        state.set_login_server_conn_id(conn_id);
         println!("Connected to login server ({})", server.get_addr());
         Ok(())
     }
@@ -387,7 +386,7 @@ mod login {
         Ok(())
     }
 
-    pub fn login_update_info(server: &mut FFClient) -> Result<()> {
+    pub fn login_update_info(server: &mut FFClient, state: &mut ShardServerState) -> Result<()> {
         let public_addr: SocketAddr = SHARD_PUBLIC_ADDR.parse().expect("Bad public address");
         let mut ip_buf: [u8; 16] = [0; 16];
         let ip_str: &str = &public_addr.ip().to_string();
@@ -402,7 +401,7 @@ mod login {
         };
 
         let serial_key = resp.iEnterSerialKey;
-        let ld: &mut HashMap<i64, LoginData> = &mut state().lock().unwrap().login_data;
+        let ld: &mut HashMap<i64, LoginData> = &mut state.login_data;
         if ld.contains_key(&serial_key) {
             // this serial key was already registered...
             // extremely unlikely?
