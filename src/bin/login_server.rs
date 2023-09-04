@@ -63,11 +63,11 @@ fn main() -> Result<()> {
 }
 
 fn handle_packet(
-    key: &usize,
+    key: usize,
     clients: &mut HashMap<usize, FFClient>,
     pkt_id: PacketID,
 ) -> Result<()> {
-    let client: &mut FFClient = clients.get_mut(key).unwrap();
+    let client: &mut FFClient = clients.get_mut(&key).unwrap();
     println!("{} sent {:?}", client.get_addr(), pkt_id);
     match pkt_id {
         P_FE2LS_REQ_CONNECT => shard::connect(client),
@@ -107,10 +107,10 @@ mod shard {
     }
 
     pub fn update_login_info_succ(
-        shard_key: &usize,
+        shard_key: usize,
         clients: &mut HashMap<usize, FFClient>,
     ) -> Result<()> {
-        let server: &mut FFClient = clients.get_mut(shard_key).unwrap();
+        let server: &mut FFClient = clients.get_mut(&shard_key).unwrap();
         let pkt: &sP_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC = server.get_packet();
 
         let resp = sP_LS2CL_REP_SHARD_SELECT_SUCC {
@@ -134,10 +134,10 @@ mod shard {
     }
 
     pub fn update_login_info_fail(
-        shard_key: &usize,
+        shard_key: usize,
         clients: &mut HashMap<usize, FFClient>,
     ) -> Result<()> {
-        let server: &mut FFClient = clients.get_mut(shard_key).unwrap();
+        let server: &mut FFClient = clients.get_mut(&shard_key).unwrap();
         let pkt: &sP_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL = server.get_packet();
         let resp = sP_LS2CL_REP_CHAR_SELECT_FAIL {
             iErrorCode: pkt.iErrorCode,
@@ -249,8 +249,8 @@ mod handlers {
         Ok(())
     }
 
-    pub fn char_select(client_key: &usize, clients: &mut HashMap<usize, FFClient>) -> Result<()> {
-        let client: &mut FFClient = clients.get_mut(client_key).unwrap();
+    pub fn char_select(client_key: usize, clients: &mut HashMap<usize, FFClient>) -> Result<()> {
+        let client: &mut FFClient = clients.get_mut(&client_key).unwrap();
         if let ClientType::GameClient { serial_key, .. } = client.get_client_type() {
             let pkt: &sP_CL2LS_REQ_CHAR_SELECT = client.get_packet();
             let pc_uid: i64 = pkt.iPC_UID;
@@ -273,7 +273,7 @@ mod handlers {
                 None => {
                     // no shards available
                     let resp = sP_LS2CL_REP_CHAR_SELECT_FAIL { iErrorCode: 1 };
-                    let client: &mut FFClient = clients.get_mut(client_key).unwrap();
+                    let client: &mut FFClient = clients.get_mut(&client_key).unwrap();
                     client.send_packet(P_LS2CL_REP_CHAR_SELECT_FAIL, &resp)?;
                 }
             }

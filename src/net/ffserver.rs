@@ -81,7 +81,7 @@ impl FFServer {
                 let client: &mut FFClient = clients.get_mut(&ev.key).unwrap();
                 match client.read_packet() {
                     Ok(pkt) => {
-                        pkt_handler(&ev.key, clients, pkt)?;
+                        pkt_handler(ev.key, clients, pkt)?;
                     }
                     Err(e) => {
                         println!("err on socket {}: {}", ev.key, e);

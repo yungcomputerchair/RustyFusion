@@ -14,7 +14,7 @@ use rusty_fusion::{
             PacketID::{self, *},
             *,
         },
-        send_to_others, LoginData,
+        ClientMap, LoginData,
     },
     util::get_time,
     Result,
@@ -89,26 +89,26 @@ fn handle_disconnect(client: FFClient) {
 }
 
 fn handle_packet(
-    key: &usize,
+    key: usize,
     clients: &mut HashMap<usize, FFClient>,
     pkt_id: PacketID,
 ) -> Result<()> {
-    let client: &mut FFClient = clients.get_mut(key).unwrap();
-    println!("{} sent {:?}", client.get_addr(), pkt_id);
+    let mut clients = ClientMap::new(key, clients);
+    println!("{} sent {:?}", clients.get_self().get_addr(), pkt_id);
     match pkt_id {
-        P_LS2FE_REP_CONNECT_SUCC => login::login_connect_succ(client),
-        P_LS2FE_REP_CONNECT_FAIL => login::login_connect_fail(client),
-        P_LS2FE_REQ_UPDATE_LOGIN_INFO => login::login_update_info(client),
+        P_LS2FE_REP_CONNECT_SUCC => login::login_connect_succ(clients.get_self()),
+        P_LS2FE_REP_CONNECT_FAIL => login::login_connect_fail(clients.get_self()),
+        P_LS2FE_REQ_UPDATE_LOGIN_INFO => login::login_update_info(clients.get_self()),
         //
-        P_CL2LS_REQ_LOGIN => wrong_server(client),
+        P_CL2LS_REQ_LOGIN => wrong_server(clients.get_self()),
         //
-        P_CL2FE_REQ_PC_ENTER => pc_enter(client),
-        P_CL2FE_REQ_PC_LOADING_COMPLETE => pc_loading_complete(client),
-        P_CL2FE_REQ_PC_MOVE => pc_move(key, clients),
-        P_CL2FE_REQ_PC_JUMP => pc_jump(key, clients),
-        P_CL2FE_REQ_PC_STOP => pc_stop(key, clients),
-        P_CL2FE_REQ_PC_GOTO => pc_goto(client),
-        P_CL2FE_GM_REQ_PC_SET_VALUE => gm_pc_set_value(client),
+        P_CL2FE_REQ_PC_ENTER => pc_enter(clients.get_self()),
+        P_CL2FE_REQ_PC_LOADING_COMPLETE => pc_loading_complete(clients.get_self()),
+        P_CL2FE_REQ_PC_MOVE => pc_move(&mut clients),
+        P_CL2FE_REQ_PC_JUMP => pc_jump(&mut clients),
+        P_CL2FE_REQ_PC_STOP => pc_stop(&mut clients),
+        P_CL2FE_REQ_PC_GOTO => pc_goto(clients.get_self()),
+        P_CL2FE_GM_REQ_PC_SET_VALUE => gm_pc_set_value(clients.get_self()),
         other => {
             println!("Unhandled packet: {:?}", other);
             Ok(())
@@ -268,8 +268,8 @@ fn pc_goto(client: &mut FFClient) -> Result<()> {
     Ok(())
 }
 
-fn pc_move(key: &usize, clients: &mut HashMap<usize, FFClient>) -> Result<()> {
-    let client = clients.get_mut(key).unwrap();
+fn pc_move(clients: &mut ClientMap) -> Result<()> {
+    let client = clients.get_self();
     if let ClientType::GameClient {
         pc_uid: Some(pc_uid),
         ..
@@ -290,15 +290,17 @@ fn pc_move(key: &usize, clients: &mut HashMap<usize, FFClient>) -> Result<()> {
             iID: *pc_uid as i32,
             iSvrTime: get_time(),
         };
-        send_to_others(P_FE2CL_PC_MOVE, &resp, *pc_uid, clients)?;
+        clients
+            .get_all_but_self()
+            .try_for_each(|c| c.send_packet(P_FE2CL_PC_MOVE, &resp))?;
         return Ok(());
     }
 
     Err(Box::new(BadRequest::new(client)))
 }
 
-fn pc_jump(key: &usize, clients: &mut HashMap<usize, FFClient>) -> Result<()> {
-    let client = clients.get_mut(key).unwrap();
+fn pc_jump(clients: &mut ClientMap) -> Result<()> {
+    let client = clients.get_self();
     if let ClientType::GameClient {
         pc_uid: Some(pc_uid),
         ..
@@ -319,15 +321,17 @@ fn pc_jump(key: &usize, clients: &mut HashMap<usize, FFClient>) -> Result<()> {
             iID: *pc_uid as i32,
             iSvrTime: get_time(),
         };
-        send_to_others(P_FE2CL_PC_JUMP, &resp, *pc_uid, clients)?;
+        clients
+            .get_all_but_self()
+            .try_for_each(|c| c.send_packet(P_FE2CL_PC_JUMP, &resp))?;
         return Ok(());
     }
 
     Err(Box::new(BadRequest::new(client)))
 }
 
-fn pc_stop(key: &usize, clients: &mut HashMap<usize, FFClient>) -> Result<()> {
-    let client = clients.get_mut(key).unwrap();
+fn pc_stop(clients: &mut ClientMap) -> Result<()> {
+    let client = clients.get_self();
     if let ClientType::GameClient {
         pc_uid: Some(pc_uid),
         ..
@@ -342,7 +346,9 @@ fn pc_stop(key: &usize, clients: &mut HashMap<usize, FFClient>) -> Result<()> {
             iID: *pc_uid as i32,
             iSvrTime: get_time(),
         };
-        send_to_others(P_FE2CL_PC_STOP, &resp, *pc_uid, clients)?;
+        clients
+            .get_all_but_self()
+            .try_for_each(|c| c.send_packet(P_FE2CL_PC_STOP, &resp))?;
         return Ok(());
     }
 

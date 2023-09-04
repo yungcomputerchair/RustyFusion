@@ -1,7 +1,7 @@
 use std::{collections::HashMap, mem::size_of, slice::from_raw_parts};
 
 use self::{
-    ffclient::{ClientType, FFClient},
+    ffclient::FFClient,
     packet::{sPCStyle, FFPacket, PacketID},
 };
 use crate::Result;
@@ -11,7 +11,7 @@ pub mod ffclient;
 pub mod ffserver;
 pub mod packet;
 
-pub type PacketCallback = fn(&usize, &mut HashMap<usize, FFClient>, PacketID) -> Result<()>;
+pub type PacketCallback = fn(usize, &mut HashMap<usize, FFClient>, PacketID) -> Result<()>;
 pub type DisconnectCallback = fn(FFClient);
 
 #[allow(non_snake_case)]
@@ -35,18 +35,26 @@ unsafe fn struct_to_bytes<T: FFPacket>(pkt: &T) -> &[u8] {
     from_raw_parts(buf_ptr, sz)
 }
 
-pub fn send_to_others<T: FFPacket>(
-    pkt_id: PacketID,
-    pkt: &T,
-    our_pc_uid: i64,
-    clients: &mut HashMap<usize, FFClient>,
-) -> Result<()> {
-    clients
-        .values_mut()
-        .filter(|c| {
-            matches!(c.get_client_type(), ClientType::GameClient {
-        pc_uid: Some(other_id), ..
-    } if *other_id != our_pc_uid)
-        })
-        .try_for_each(|co| co.send_packet(pkt_id, pkt))
+pub struct ClientMap<'a> {
+    key: usize,
+    clients: &'a mut HashMap<usize, FFClient>,
+}
+impl<'a> ClientMap<'a> {
+    pub fn new(key: usize, clients: &'a mut HashMap<usize, FFClient>) -> Self {
+        Self { key, clients }
+    }
+
+    pub fn get_self(&mut self) -> &mut FFClient {
+        self.clients.get_mut(&self.key).unwrap()
+    }
+
+    pub fn get_all(&mut self) -> impl Iterator<Item = &mut FFClient> {
+        self.clients.values_mut()
+    }
+
+    pub fn get_all_but_self(&mut self) -> impl Iterator<Item = &mut FFClient> {
+        self.clients
+            .iter_mut()
+            .filter_map(|(key, client)| if *key != self.key { Some(client) } else { None })
+    }
 }
