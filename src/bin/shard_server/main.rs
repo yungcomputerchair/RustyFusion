@@ -74,7 +74,7 @@ fn main() -> Result<()> {
             }
             login_server_conn_time = time_now;
         }
-        server.poll(&handle_packet, Some(&handle_disconnect))?;
+        server.poll(handle_packet, Some(handle_disconnect))?;
     }
 }
 
