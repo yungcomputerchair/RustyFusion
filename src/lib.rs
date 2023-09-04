@@ -7,7 +7,20 @@ use net::packet::{sItemBase, sNano, sRunningQuest};
 
 pub type Result<T> = result::Result<T, Box<dyn Error>>;
 
-pub const CN_PACKET_BUFFER_SIZE: usize = 4096;
+#[macro_export]
+macro_rules! unused {
+    () => {
+        0
+    };
+}
+
+#[macro_export]
+macro_rules! placeholder {
+    ($val:expr) => {{
+        println!("PLACEHOLDER: {} line {}", file!(), line!());
+        $val
+    }};
+}
 
 pub mod error;
 pub mod net;

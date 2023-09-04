@@ -7,7 +7,10 @@ use std::{
 use num_traits::{FromPrimitive, ToPrimitive};
 
 use crate::{
-    error::BadPacketID, net::struct_to_bytes, util::get_time, Result, CN_PACKET_BUFFER_SIZE,
+    error::BadPacketID,
+    net::{struct_to_bytes, CN_PACKET_BUFFER_SIZE},
+    util::get_time,
+    Result,
 };
 
 use super::{
