@@ -8,7 +8,7 @@ use num_traits::{FromPrimitive, ToPrimitive};
 
 use crate::{
     error::BadPacketID,
-    net::{struct_to_bytes, CN_PACKET_BUFFER_SIZE},
+    net::{struct_to_bytes, PACKET_BUFFER_SIZE},
     util::get_time,
     Result,
 };
@@ -33,7 +33,7 @@ pub enum ClientType {
 pub struct FFClient {
     sock: TcpStream,
     addr: SocketAddr,
-    buf: [u8; CN_PACKET_BUFFER_SIZE],
+    buf: [u8; PACKET_BUFFER_SIZE],
     last_pkt_id: PacketID,
     last_pkt_sz: usize,
     e_key: [u8; CRYPTO_KEY_SIZE],
@@ -49,7 +49,7 @@ impl FFClient {
         Self {
             sock: conn_data.0,
             addr: conn_data.1,
-            buf: [0; CN_PACKET_BUFFER_SIZE],
+            buf: [0; PACKET_BUFFER_SIZE],
             last_pkt_id: PacketID::P_NULL,
             last_pkt_sz: 0,
             e_key: default_key,

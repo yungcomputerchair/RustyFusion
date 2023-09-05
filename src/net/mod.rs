@@ -6,7 +6,7 @@ use self::{
 };
 use crate::{player::Player, Result};
 
-const CN_PACKET_BUFFER_SIZE: usize = 4096;
+const PACKET_BUFFER_SIZE: usize = 8192;
 
 pub mod crypto;
 pub mod ffclient;
