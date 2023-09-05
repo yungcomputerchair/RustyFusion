@@ -6,10 +6,11 @@ use rusty_fusion::{
         ffclient::FFClient,
         ffserver::FFServer,
         packet::{
-            sPCStyle, sPCStyle2, sP_LS2FE_REP_CONNECT_SUCC,
+            sP_LS2FE_REP_CONNECT_SUCC,
             PacketID::{self, *},
         },
     },
+    player::Player,
     util::get_time,
     Result,
 };
@@ -19,7 +20,7 @@ const LOGIN_LISTEN_ADDR: &str = "127.0.0.1:23000";
 pub struct LoginServerState {
     next_pc_uid: i64,
     next_shard_id: i64,
-    pub pc_styles: HashMap<i64, sPCStyle>,
+    pub players: HashMap<i64, Player>,
 }
 
 impl LoginServerState {
@@ -27,7 +28,7 @@ impl LoginServerState {
         Self {
             next_pc_uid: 1,
             next_shard_id: 1,
-            pc_styles: HashMap::new(),
+            players: HashMap::new(),
         }
     }
 
@@ -164,6 +165,7 @@ mod handlers {
     use rusty_fusion::{
         error::BadRequest,
         net::{ffclient::ClientType, packet::*},
+        placeholder, Combatant,
     };
 
     pub fn login(client: &mut FFClient) -> Result<()> {
@@ -211,33 +213,38 @@ mod handlers {
 
     pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> Result<()> {
         let pkt: &sP_CL2LS_REQ_SAVE_CHAR_NAME = client.get_packet();
+
+        let pc_uid = state.get_next_pc_uid();
+        let mut player = Player::new(pc_uid);
+        player.set_name(1, pkt.szFirstName, pkt.szLastName);
+        let style = &player.get_style();
+
         let resp = sP_LS2CL_REP_SAVE_CHAR_NAME_SUCC {
-            iPC_UID: state.get_next_pc_uid(),
-            iSlotNum: 0,
-            iGender: (rand::random::<bool>() as i8) + 1,
-            szFirstName: pkt.szFirstName,
-            szLastName: pkt.szLastName,
+            iPC_UID: pc_uid,
+            iSlotNum: placeholder!(0),
+            iGender: style.iGender,
+            szFirstName: style.szFirstName,
+            szLastName: style.szLastName,
         };
         client.send_packet(P_LS2CL_REP_SAVE_CHAR_NAME_SUCC, &resp)?;
+        state.players.insert(pc_uid, player);
 
         Ok(())
     }
 
     pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> Result<()> {
         let pkt: &sP_CL2LS_REQ_CHAR_CREATE = client.get_packet();
-        let resp = sP_LS2CL_REP_CHAR_CREATE_SUCC {
-            iLevel: 1,
-            sPC_Style: pkt.PCStyle,
-            sPC_Style2: sPCStyle2 {
-                iAppearanceFlag: 0,
-                iTutorialFlag: 1,
-                iPayzoneFlag: 0,
-            },
-            sOn_Item: pkt.sOn_Item,
-        };
 
         let pc_uid: i64 = pkt.PCStyle.iPC_UID;
-        state.pc_styles.insert(pc_uid, pkt.PCStyle);
+        let player = state.players.get_mut(&pc_uid).unwrap();
+        player.set_style(pkt.PCStyle);
+
+        let resp = sP_LS2CL_REP_CHAR_CREATE_SUCC {
+            iLevel: player.get_level(),
+            sPC_Style: player.get_style(),
+            sPC_Style2: player.get_style_2(),
+            sOn_Item: pkt.sOn_Item,
+        };
 
         client.send_packet(P_LS2CL_REP_CHAR_CREATE_SUCC, &resp)?;
         Ok(())
@@ -257,7 +264,7 @@ mod handlers {
                 iPC_UID: pc_uid,
                 uiFEKey: client.get_fe_key_uint(),
                 uiSvrTime: get_time(),
-                PCStyle: *state.pc_styles.get(&pc_uid).unwrap(),
+                player: *state.players.get(&pc_uid).unwrap(),
             };
 
             let shard_server = clients

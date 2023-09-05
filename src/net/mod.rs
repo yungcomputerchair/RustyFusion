@@ -2,9 +2,9 @@ use std::{collections::HashMap, mem::size_of, slice::from_raw_parts};
 
 use self::{
     ffclient::{ClientType, FFClient},
-    packet::{sPCStyle, FFPacket, PacketID},
+    packet::{FFPacket, PacketID},
 };
-use crate::Result;
+use crate::{player::Player, Result};
 
 const CN_PACKET_BUFFER_SIZE: usize = 4096;
 
@@ -22,7 +22,7 @@ pub struct LoginData {
     pub iPC_UID: i64,
     pub uiFEKey: u64,
     pub uiSvrTime: u64,
-    pub PCStyle: sPCStyle,
+    pub player: Player,
 }
 
 unsafe fn bytes_to_struct<T: FFPacket>(bytes: &[u8]) -> &T {

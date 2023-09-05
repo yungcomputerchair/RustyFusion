@@ -1,11 +1,12 @@
 use std::fmt::Display;
 
 use crate::{
-    net::packet::{sPCLoadData2CL, sPCStyle, sPCStyle2, sTimeBuff},
+    net::packet::{sPCAppearanceData, sPCLoadData2CL, sPCStyle, sPCStyle2, sTimeBuff},
     util::parse_utf16,
     CombatStats, Combatant, Item, Mission, Nano, Position,
 };
 
+#[derive(Debug, Clone, Copy, Default)]
 struct PlayerStyle {
     gender: i8,
     face_style: i8,
@@ -17,6 +18,7 @@ struct PlayerStyle {
     body: i8,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
 struct PlayerFlags {
     appearance_flag: i8,
     tutorial_flag: i8,
@@ -28,6 +30,7 @@ struct PlayerFlags {
     repeat_mission_flag: [i64; 8],
 }
 
+#[derive(Debug, Clone, Copy, Default)]
 struct PlayerName {
     name_check: i8,
     first_name: [u16; 9],
@@ -44,28 +47,51 @@ impl Display for PlayerName {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default)]
 struct GuideData {
     current_guide: i16,
     total_guides: i16,
 }
 
+#[derive(Debug, Clone, Copy)]
 struct NanoData {
     nano_inventory: [Nano; 37],
     slot_nano_ids: [u16; 3],
     active_slot: i16,
 }
+impl Default for NanoData {
+    fn default() -> Self {
+        Self {
+            nano_inventory: [Nano::default(); 37],
+            slot_nano_ids: Default::default(),
+            active_slot: Default::default(),
+        }
+    }
+}
 
+#[derive(Debug, Clone, Copy, Default)]
 struct MissionData {
     current_missions: [Mission; 9],
     active_mission_id: i32,
 }
 
+#[derive(Debug, Clone, Copy)]
 struct PlayerInventory {
     main: [Item; 50],
     equipped: [Item; 9],
     mission: [Item; 50],
 }
+impl Default for PlayerInventory {
+    fn default() -> Self {
+        Self {
+            main: [Item::default(); 50],
+            equipped: Default::default(),
+            mission: [Item::default(); 50],
+        }
+    }
+}
 
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Player {
     uid: i64,
     perms: i16,
@@ -89,7 +115,28 @@ pub struct Player {
 }
 
 impl Player {
-    fn get_style(&self) -> sPCStyle {
+    pub fn new(uid: i64) -> Self {
+        Self {
+            uid,
+            style: PlayerStyle {
+                gender: (rand::random::<bool>() as i8) + 1,
+                ..Default::default()
+            },
+            combat_stats: CombatStats {
+                _max_hp: placeholder!(100),
+                hp: placeholder!(100),
+                level: 1,
+            },
+            position: Position {
+                x: placeholder!(632032),
+                y: placeholder!(187177),
+                z: placeholder!(-5500),
+            },
+            ..Default::default()
+        }
+    }
+
+    pub fn get_style(&self) -> sPCStyle {
         sPCStyle {
             iPC_UID: self.uid,
             iNameCheck: self.name.name_check,
@@ -103,11 +150,24 @@ impl Player {
             iEyeColor: self.style.eye_color,
             iHeight: self.style.height,
             iBody: self.style.body,
-            iClass: 0,
+            iClass: unused!(),
         }
     }
 
-    fn get_style_2(&self) -> sPCStyle2 {
+    pub fn set_style(&mut self, style: sPCStyle) {
+        self.style = PlayerStyle {
+            gender: style.iGender,
+            face_style: style.iFaceStyle,
+            hair_style: style.iHairStyle,
+            hair_color: style.iHairColor,
+            skin_color: style.iSkinColor,
+            eye_color: style.iEyeColor,
+            height: style.iHeight,
+            body: style.iBody,
+        }
+    }
+
+    pub fn get_style_2(&self) -> sPCStyle2 {
         sPCStyle2 {
             iAppearanceFlag: self.flags.appearance_flag,
             iTutorialFlag: self.flags.tutorial_flag,
@@ -117,6 +177,16 @@ impl Player {
 
     fn get_mapnum(&self) -> i32 {
         self.instance_id as i32
+    }
+
+    fn get_active_nano(&self) -> Option<Nano> {
+        if self.nano_data.active_slot == -1 {
+            return None;
+        }
+        Some(
+            self.nano_data.nano_inventory
+                [self.nano_data.slot_nano_ids[self.nano_data.active_slot as usize] as usize],
+        )
     }
 
     pub fn get_load_data(&self) -> sPCLoadData2CL {
@@ -168,6 +238,34 @@ impl Player {
             aiPCSkill: [unused!(); 33],
         }
     }
+
+    pub fn get_appearance_data(&self) -> sPCAppearanceData {
+        sPCAppearanceData {
+            iID: self.uid as i32,
+            PCStyle: self.get_style(),
+            iConditionBitFlag: self.get_condition_bit_flag(),
+            iPCState: placeholder!(0),
+            iSpecialState: self.special_state,
+            iLv: self.combat_stats.level,
+            iHP: self.combat_stats.hp,
+            iMapNum: self.get_mapnum(),
+            iX: self.position.x,
+            iY: self.position.y,
+            iZ: self.position.z,
+            iAngle: self.rotation,
+            ItemEquip: self.inventory.equipped.map(Item::into),
+            Nano: self.get_active_nano().unwrap_or_default().into(),
+            eRT: unused!(),
+        }
+    }
+
+    pub fn set_name(&mut self, name_check: i8, first_name: [u16; 9], last_name: [u16; 17]) {
+        self.name = PlayerName {
+            name_check,
+            first_name,
+            last_name,
+        }
+    }
 }
 
 impl Combatant for Player {
@@ -175,7 +273,11 @@ impl Combatant for Player {
         0
     }
 
-    fn get_combat_stats(&self) -> CombatStats {
-        self.combat_stats
+    fn get_level(&self) -> i16 {
+        self.combat_stats.level
+    }
+
+    fn get_hp(&self) -> i32 {
+        self.combat_stats.hp
     }
 }

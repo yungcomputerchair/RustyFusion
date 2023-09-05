@@ -2,6 +2,8 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
+use crate::player::Player;
+
 #[repr(u32)]
 #[derive(Debug, FromPrimitive, ToPrimitive, Clone, Copy)]
 pub enum PacketID {
@@ -6531,7 +6533,7 @@ pub struct sP_LS2FE_REQ_UPDATE_LOGIN_INFO {
     pub iPC_UID: i64,
     pub uiFEKey: u64,
     pub uiSvrTime: u64,
-    pub PCStyle: sPCStyle,
+    pub player: Player,
 }
 impl FFPacket for sP_LS2FE_REQ_UPDATE_LOGIN_INFO {}
 

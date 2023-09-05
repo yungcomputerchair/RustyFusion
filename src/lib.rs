@@ -88,14 +88,15 @@ impl From<Mission> for sRunningQuest {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Default)]
 struct CombatStats {
     level: i16,
     _max_hp: i32,
     hp: i32,
 }
 
-trait Combatant {
+pub trait Combatant {
     fn get_condition_bit_flag(&self) -> i32;
-    fn get_combat_stats(&self) -> CombatStats;
+    fn get_level(&self) -> i16;
+    fn get_hp(&self) -> i32;
 }

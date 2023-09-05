@@ -16,6 +16,7 @@ use rusty_fusion::{
         },
         ClientMap, LoginData,
     },
+    player::Player,
     util::get_time,
     Result,
 };
@@ -30,6 +31,7 @@ const CONN_ID_DISCONNECTED: i64 = -1;
 pub struct ShardServerState {
     login_server_conn_id: i64,
     login_data: HashMap<i64, LoginData>,
+    players: HashMap<i64, Player>,
 }
 
 impl ShardServerState {
@@ -37,6 +39,7 @@ impl ShardServerState {
         Self {
             login_server_conn_id: CONN_ID_DISCONNECTED,
             login_data: HashMap::new(),
+            players: HashMap::new(),
         }
     }
 
@@ -134,87 +137,12 @@ fn is_login_server_connected(state: &ShardServerState) -> bool {
 fn pc_enter(client: &mut FFClient, state: &mut ShardServerState) -> Result<()> {
     let pkt: &sP_CL2FE_REQ_PC_ENTER = client.get_packet();
     let serial_key: i64 = pkt.iEnterSerialKey;
-    let login_data: &HashMap<i64, LoginData> = &state.login_data;
-    let login_data: &LoginData = login_data.get(&serial_key).unwrap();
+    let login_data = state.login_data.get(&serial_key).unwrap();
+    let player = &login_data.player;
 
     let resp = sP_FE2CL_REP_PC_ENTER_SUCC {
         iID: login_data.iPC_UID as i32,
-        PCLoadData2CL: sPCLoadData2CL {
-            iUserLevel: 1,
-            PCStyle: login_data.PCStyle,
-            PCStyle2: sPCStyle2 {
-                iAppearanceFlag: 0,
-                iTutorialFlag: 1,
-                iPayzoneFlag: 0,
-            },
-            iLevel: 1,
-            iMentor: 0,
-            iMentorCount: 0,
-            iHP: 9999,
-            iBatteryW: 0,
-            iBatteryN: 0,
-            iCandy: 0,
-            iFusionMatter: 0,
-            iSpecialState: 0,
-            iMapNum: 0,
-            iX: 632032,
-            iY: 187177,
-            iZ: -5500,
-            iAngle: 0,
-            aEquip: [sItemBase {
-                iType: 0,
-                iID: 0,
-                iOpt: 0,
-                iTimeLimit: 0,
-            }; 9],
-            aInven: [sItemBase {
-                iType: 0,
-                iID: 0,
-                iOpt: 0,
-                iTimeLimit: 0,
-            }; 50],
-            aQInven: [sItemBase {
-                iType: 0,
-                iID: 0,
-                iOpt: 0,
-                iTimeLimit: 0,
-            }; 50],
-            aNanoBank: [sNano {
-                iID: 0,
-                iSkillID: 0,
-                iStamina: 0,
-            }; 37],
-            aNanoSlots: [0; 3],
-            iActiveNanoSlotNum: 0,
-            iConditionBitFlag: 0,
-            eCSTB___Add: 0,
-            TimeBuff: sTimeBuff {
-                iTimeLimit: 0,
-                iTimeDuration: 0,
-                iTimeRepeat: 0,
-                iValue: 0,
-                iConfirmNum: 0,
-            },
-            aQuestFlag: [0; 32],
-            aRepeatQuestFlag: [0; 8],
-            aRunningQuest: [sRunningQuest {
-                m_aCurrTaskID: 0,
-                m_aKillNPCID: [0; 3],
-                m_aKillNPCCount: [0; 3],
-                m_aNeededItemID: [0; 3],
-                m_aNeededItemCount: [0; 3],
-            }; 9],
-            iCurrentMissionID: 0,
-            iWarpLocationFlag: 0,
-            aWyvernLocationFlag: [0; 2],
-            iBuddyWarpTime: 0,
-            iFatigue: 0,
-            iFatigue_Level: 0,
-            iFatigueRate: 0,
-            iFirstUseFlag1: 0,
-            iFirstUseFlag2: 0,
-            aiPCSkill: [0; 33],
-        },
+        PCLoadData2CL: player.get_load_data(),
         uiSvrTime: get_time(),
     };
 
@@ -228,6 +156,11 @@ fn pc_enter(client: &mut FFClient, state: &mut ShardServerState) -> Result<()> {
     client.set_e_key(gen_key(resp.uiSvrTime, iv1, iv2));
     client.set_fe_key(login_data.uiFEKey.to_le_bytes());
     client.set_enc_mode(EncryptionMode::FEKey);
+
+    state.players.insert(
+        login_data.iPC_UID,
+        state.login_data.remove(&serial_key).unwrap().player,
+    );
 
     client.send_packet(P_FE2CL_REP_PC_ENTER_SUCC, &resp)?;
     Ok(())
@@ -419,7 +352,7 @@ mod login {
                 uiFEKey: pkt.uiFEKey,
                 uiSvrTime: pkt.uiSvrTime,
                 // this should ideally be fetched from DB
-                PCStyle: pkt.PCStyle,
+                player: pkt.player,
             },
         );
 
