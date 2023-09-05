@@ -22,6 +22,7 @@ macro_rules! placeholder {
     }};
 }
 
+pub mod defines;
 pub mod error;
 pub mod net;
 pub mod player;
