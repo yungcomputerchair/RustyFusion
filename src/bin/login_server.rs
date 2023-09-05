@@ -163,9 +163,10 @@ mod handlers {
     use super::*;
     use rand::random;
     use rusty_fusion::{
+        defines::*,
         error::BadRequest,
         net::{ffclient::ClientType, packet::*},
-        placeholder, Combatant,
+        placeholder, Combatant, Item,
     };
 
     pub fn login(client: &mut FFClient) -> Result<()> {
@@ -238,6 +239,18 @@ mod handlers {
         let pc_uid: i64 = pkt.PCStyle.iPC_UID;
         let player = state.players.get_mut(&pc_uid).unwrap();
         player.set_style(pkt.PCStyle);
+        player.set_item(
+            EQUIP_SLOT_UPPERBODY as usize,
+            Item::new(EQUIP_SLOT_UPPERBODY as i16, pkt.sOn_Item.iEquipUBID),
+        );
+        player.set_item(
+            EQUIP_SLOT_LOWERBODY as usize,
+            Item::new(EQUIP_SLOT_LOWERBODY as i16, pkt.sOn_Item.iEquipLBID),
+        );
+        player.set_item(
+            EQUIP_SLOT_FOOT as usize,
+            Item::new(EQUIP_SLOT_FOOT as i16, pkt.sOn_Item.iEquipFootID),
+        );
 
         let resp = sP_LS2CL_REP_CHAR_CREATE_SUCC {
             iLevel: player.get_level(),
