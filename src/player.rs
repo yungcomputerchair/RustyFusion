@@ -113,7 +113,6 @@ pub struct Player {
     weapon_boosts: i32,
     buddy_warp_time: i32,
 }
-
 impl Player {
     pub fn new(uid: i64) -> Self {
         Self {
@@ -208,9 +207,9 @@ impl Player {
             iY: self.position.y,
             iZ: self.position.z,
             iAngle: self.rotation,
-            aEquip: self.inventory.equipped.map(Item::into),
-            aInven: self.inventory.main.map(Item::into),
-            aQInven: self.inventory.mission.map(Item::into),
+            aEquip: self.inventory.equipped.map(Option::<Item>::into),
+            aInven: self.inventory.main.map(Option::<Item>::into),
+            aQInven: self.inventory.mission.map(Option::<Item>::into),
             aNanoBank: self.nano_data.nano_inventory.map(Nano::into),
             aNanoSlots: self.nano_data.slot_nano_ids,
             iActiveNanoSlotNum: self.nano_data.active_slot,
@@ -253,7 +252,7 @@ impl Player {
             iY: self.position.y,
             iZ: self.position.z,
             iAngle: self.rotation,
-            ItemEquip: self.inventory.equipped.map(Item::into),
+            ItemEquip: self.inventory.equipped.map(Option::<Item>::into),
             Nano: self.get_active_nano().unwrap_or_default().into(),
             eRT: unused!(),
         }

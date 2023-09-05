@@ -36,11 +36,21 @@ struct Position {
 }
 
 #[derive(Debug, Copy, Clone, Default)]
-struct Item {
+pub struct Item {
     ty: i16,
     id: i16,
     options: i32,
     expiry_time: i32,
+}
+impl Item {
+    pub fn new(ty: i16, id: i16) -> Self {
+        Self {
+            ty,
+            id,
+            options: 1,
+            expiry_time: 0,
+        }
+    }
 }
 impl From<Item> for sItemBase {
     fn from(value: Item) -> Self {
@@ -49,6 +59,20 @@ impl From<Item> for sItemBase {
             iID: value.id,
             iOpt: value.options,
             iTimeLimit: value.expiry_time,
+        }
+    }
+}
+impl From<Option<Item>> for sItemBase {
+    fn from(value: Option<Item>) -> Self {
+        if let Some(item) = value {
+            return item.into();
+        }
+
+        Self {
+            iType: 0,
+            iID: 0,
+            iOpt: 0,
+            iTimeLimit: 0,
         }
     }
 }
