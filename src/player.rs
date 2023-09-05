@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use crate::{
+    defines::*,
     net::packet::{sPCAppearanceData, sPCLoadData2CL, sPCStyle, sPCStyle2, sTimeBuff},
     util::parse_utf16,
     CombatStats, Combatant, Item, Mission, Nano, Position,
@@ -25,16 +26,16 @@ struct PlayerFlags {
     payzone_flag: i8,
     tip_flags: [i64; 2],
     scamper_flag: i32,
-    skyway_flags: [i64; 2],
-    mission_flag: [i64; 32],
-    repeat_mission_flag: [i64; 8],
+    skyway_flags: [i64; WYVERN_LOCATION_FLAG_SIZE as usize],
+    mission_flag: [i64; SIZEOF_QUESTFLAG_NUMBER as usize],
+    repeat_mission_flag: [i64; SIZEOF_REPEAT_QUESTFLAG_NUMBER as usize],
 }
 
 #[derive(Debug, Clone, Copy, Default)]
 struct PlayerName {
     name_check: i8,
-    first_name: [u16; 9],
-    last_name: [u16; 17],
+    first_name: [u16; SIZEOF_PC_FIRST_NAME as usize],
+    last_name: [u16; SIZEOF_PC_LAST_NAME as usize],
 }
 impl Display for PlayerName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -55,14 +56,14 @@ struct GuideData {
 
 #[derive(Debug, Clone, Copy)]
 struct NanoData {
-    nano_inventory: [Nano; 37],
-    slot_nano_ids: [u16; 3],
+    nano_inventory: [Nano; SIZEOF_NANO_BANK_SLOT as usize],
+    slot_nano_ids: [u16; SIZEOF_NANO_CARRY_SLOT as usize],
     active_slot: i16,
 }
 impl Default for NanoData {
     fn default() -> Self {
         Self {
-            nano_inventory: [Nano::default(); 37],
+            nano_inventory: [Nano::default(); SIZEOF_NANO_BANK_SLOT as usize],
             slot_nano_ids: Default::default(),
             active_slot: Default::default(),
         }
@@ -71,22 +72,24 @@ impl Default for NanoData {
 
 #[derive(Debug, Clone, Copy, Default)]
 struct MissionData {
-    current_missions: [Mission; 9],
+    current_missions: [Mission; SIZEOF_RQUEST_SLOT as usize],
     active_mission_id: i32,
 }
 
 #[derive(Debug, Clone, Copy)]
 struct PlayerInventory {
-    main: [Item; 50],
-    equipped: [Item; 9],
-    mission: [Item; 50],
+    main: [Option<Item>; SIZEOF_INVEN_SLOT as usize],
+    equipped: [Option<Item>; SIZEOF_EQUIP_SLOT as usize],
+    mission: [Option<Item>; SIZEOF_QINVEN_SLOT as usize],
+    bank: [Option<Item>; SIZEOF_BANK_SLOT as usize],
 }
 impl Default for PlayerInventory {
     fn default() -> Self {
         Self {
-            main: [Item::default(); 50],
+            main: [None; SIZEOF_INVEN_SLOT as usize],
             equipped: Default::default(),
-            mission: [Item::default(); 50],
+            mission: [None; SIZEOF_QINVEN_SLOT as usize],
+            bank: [None; SIZEOF_BANK_SLOT as usize],
         }
     }
 }
