@@ -2,9 +2,13 @@ use std::fmt::Display;
 
 use crate::{
     defines::*,
-    net::packet::{sPCAppearanceData, sPCLoadData2CL, sPCStyle, sPCStyle2, sTimeBuff},
+    net::{
+        ffclient::FFClient,
+        packet::{sPCAppearanceData, sPCLoadData2CL, sPCStyle, sPCStyle2, sTimeBuff},
+        ClientMap,
+    },
     util::parse_utf16,
-    CombatStats, Combatant, Item, Mission, Nano, Position,
+    CombatStats, Combatant, Entity, EntityID, Item, Mission, Nano, Position,
 };
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -97,6 +101,7 @@ impl Default for PlayerInventory {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Player {
     uid: i64,
+    client_id: Option<usize>,
     perms: i16,
     position: Position,
     rotation: i32,
@@ -120,6 +125,7 @@ impl Player {
     pub fn new(uid: i64) -> Self {
         Self {
             uid,
+            client_id: None,
             style: PlayerStyle {
                 gender: (rand::random::<bool>() as i8) + 1,
                 ..Default::default()
@@ -136,6 +142,10 @@ impl Player {
             },
             ..Default::default()
         }
+    }
+
+    pub fn set_client_id(&mut self, client_id: usize) {
+        self.client_id = Some(client_id);
     }
 
     pub fn get_style(&self) -> sPCStyle {
@@ -303,5 +313,17 @@ impl Combatant for Player {
 
     fn get_hp(&self) -> i32 {
         self.combat_stats.hp
+    }
+}
+impl Entity for Player {
+    fn get_client<'a>(&self, client_map: &'a mut ClientMap) -> Option<&'a mut FFClient> {
+        if let Some(client_id) = self.client_id {
+            return Some(client_map.get(client_id));
+        }
+        None
+    }
+
+    fn get_id(&self) -> EntityID {
+        EntityID::Player(self.uid)
     }
 }

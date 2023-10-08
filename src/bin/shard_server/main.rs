@@ -1,10 +1,12 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
+    rc::Rc,
     time::{Duration, SystemTime},
 };
 
 use rusty_fusion::{
+    chunk::EntityMap,
     error::BadRequest,
     net::{
         crypto::{gen_key, EncryptionMode},
@@ -31,7 +33,8 @@ const CONN_ID_DISCONNECTED: i64 = -1;
 pub struct ShardServerState {
     login_server_conn_id: i64,
     login_data: HashMap<i64, LoginData>,
-    players: HashMap<i64, Player>,
+    players: HashMap<i64, Rc<RefCell<Player>>>,
+    entities: EntityMap,
 }
 
 impl ShardServerState {
@@ -40,6 +43,7 @@ impl ShardServerState {
             login_server_conn_id: CONN_ID_DISCONNECTED,
             login_data: HashMap::new(),
             players: HashMap::new(),
+            entities: EntityMap::default(),
         }
     }
 
@@ -105,7 +109,7 @@ fn handle_packet(
         //
         P_CL2LS_REQ_LOGIN => wrong_server(clients.get_self()),
         //
-        P_CL2FE_REQ_PC_ENTER => pc_enter(clients.get_self(), state),
+        P_CL2FE_REQ_PC_ENTER => pc_enter(clients.get_self(), key, state),
         P_CL2FE_REQ_PC_LOADING_COMPLETE => pc_loading_complete(clients.get_self()),
         P_CL2FE_REQ_PC_MOVE => pc_move(&mut clients),
         P_CL2FE_REQ_PC_JUMP => pc_jump(&mut clients),
@@ -134,11 +138,12 @@ fn is_login_server_connected(state: &ShardServerState) -> bool {
     state.get_login_server_conn_id() != CONN_ID_DISCONNECTED
 }
 
-fn pc_enter(client: &mut FFClient, state: &mut ShardServerState) -> Result<()> {
+fn pc_enter(client: &mut FFClient, key: usize, state: &mut ShardServerState) -> Result<()> {
     let pkt: &sP_CL2FE_REQ_PC_ENTER = client.get_packet();
     let serial_key: i64 = pkt.iEnterSerialKey;
-    let login_data = state.login_data.get(&serial_key).unwrap();
-    let player = &login_data.player;
+    let login_data = state.login_data.remove(&serial_key).unwrap();
+    let mut player = login_data.player;
+    player.set_client_id(key);
 
     let resp = sP_FE2CL_REP_PC_ENTER_SUCC {
         iID: login_data.iPC_UID as i32,
@@ -157,10 +162,9 @@ fn pc_enter(client: &mut FFClient, state: &mut ShardServerState) -> Result<()> {
     client.set_fe_key(login_data.uiFEKey.to_le_bytes());
     client.set_enc_mode(EncryptionMode::FEKey);
 
-    state.players.insert(
-        login_data.iPC_UID,
-        state.login_data.remove(&serial_key).unwrap().player,
-    );
+    let player = Rc::new(RefCell::new(player));
+    state.players.insert(login_data.iPC_UID, player.clone());
+    state.entities.update(player.clone(), None);
 
     client.send_packet(P_FE2CL_REP_PC_ENTER_SUCC, &resp)?;
     Ok(())

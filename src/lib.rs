@@ -1,9 +1,13 @@
 #[macro_use]
 extern crate num_derive;
 
-use std::{error::Error, result};
+use std::{error::Error, result, hash::Hash};
 
-use net::packet::{sItemBase, sNano, sRunningQuest};
+use net::{
+    ffclient::FFClient,
+    packet::{sItemBase, sNano, sRunningQuest},
+    ClientMap,
+};
 
 pub type Result<T> = result::Result<T, Box<dyn Error>>;
 
@@ -22,6 +26,7 @@ macro_rules! placeholder {
     }};
 }
 
+pub mod chunk;
 pub mod defines;
 pub mod error;
 pub mod net;
@@ -111,6 +116,17 @@ impl From<Mission> for sRunningQuest {
             m_aNeededItemCount: value.target_item_counts,
         }
     }
+}
+
+#[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
+pub enum EntityID {
+    Player(i64),
+    //NPC(i64),
+}
+
+pub trait Entity {
+    fn get_id(&self) -> EntityID;
+    fn get_client<'a>(&self, client_map: &'a mut ClientMap) -> Option<&'a mut FFClient>;
 }
 
 #[derive(Debug, Copy, Clone, Default)]

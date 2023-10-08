@@ -47,6 +47,10 @@ impl<'a> ClientMap<'a> {
         Self { key, clients }
     }
 
+    pub fn get(&mut self, key: usize) -> &mut FFClient {
+        self.clients.get_mut(&key).unwrap()
+    }
+
     pub fn get_self(&mut self) -> &mut FFClient {
         self.clients.get_mut(&self.key).unwrap()
     }
