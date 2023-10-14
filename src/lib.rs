@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate num_derive;
 
-use std::{error::Error, result, hash::Hash};
+use std::{error::Error, hash::Hash, result};
 
 use net::{
     ffclient::FFClient,
@@ -34,7 +34,7 @@ pub mod player;
 pub mod util;
 
 #[derive(Debug, Copy, Clone, Default)]
-struct Position {
+pub struct Position {
     x: i32,
     y: i32,
     z: i32,

@@ -301,6 +301,10 @@ impl Player {
 
         panic!("Inventory slot number {} out of range", slot_num);
     }
+
+    pub fn set_position(&mut self, x: i32, y: i32, z: i32) {
+        self.position = Position { x, y, z };
+    }
 }
 impl Combatant for Player {
     fn get_condition_bit_flag(&self) -> i32 {
