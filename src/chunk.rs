@@ -27,20 +27,24 @@ impl EntityMap {
         let last_chunk = self.registry.get(&id);
         if let Some((x, y)) = last_chunk {
             let chunk = self.chunks[*x][*y].as_mut().unwrap();
-            chunk.remove(id);
+            chunk.remove(&id);
+        } else {
+            self.unchunked.remove(&id);
         }
 
         // insert
         if let Some((x, y)) = chunk {
-            if self.chunks[x][y].is_none() {
-                self.chunks[x][y] = Some(Chunk::default());
+            if (0..NCHUNKS).contains(&x) && (0..NCHUNKS).contains(&y) {
+                if self.chunks[x][y].is_none() {
+                    self.chunks[x][y] = Some(Chunk::default());
+                }
+                let chunk = self.chunks[x][y].as_mut().unwrap();
+                chunk.insert(entity);
+                self.registry.insert(id, (x, y));
+                return;
             }
-            let chunk = self.chunks[x][y].as_mut().unwrap();
-            chunk.insert(entity);
-            self.registry.insert(id, (x, y));
-        } else {
-            self.unchunked.insert(id, entity);
         }
+        self.unchunked.insert(id, entity);
     }
 }
 impl Default for EntityMap {
@@ -68,8 +72,8 @@ impl Chunk {
         self.tracked.insert(id, entity);
     }
 
-    pub fn remove(&mut self, id: EntityID) {
-        if self.tracked.remove(&id).is_none() {
+    pub fn remove(&mut self, id: &EntityID) {
+        if self.tracked.remove(id).is_none() {
             panic!(
                 "Tried to remove entity {:?} from chunk, but it wasn't there",
                 id
