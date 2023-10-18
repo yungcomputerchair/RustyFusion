@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use crate::{
+    chunk::{EntityMap, MAP_BOUNDS, NCHUNKS},
     defines::*,
     net::{
         ffclient::FFClient,
@@ -301,10 +302,6 @@ impl Player {
 
         panic!("Inventory slot number {} out of range", slot_num);
     }
-
-    pub fn set_position(&mut self, x: i32, y: i32, z: i32) {
-        self.position = Position { x, y, z };
-    }
 }
 impl Combatant for Player {
     fn get_condition_bit_flag(&self) -> i32 {
@@ -329,5 +326,12 @@ impl Entity for Player {
 
     fn get_id(&self) -> EntityID {
         EntityID::Player(self.uid)
+    }
+
+    fn set_position(&mut self, x: i32, y: i32, z: i32, map: &mut EntityMap) {
+        self.position = Position { x, y, z };
+        let chunk_x = (x * NCHUNKS as i32) / MAP_BOUNDS;
+        let chunk_y = (y * NCHUNKS as i32) / MAP_BOUNDS;
+        map.update(self.get_id(), Some((chunk_x, chunk_y)));
     }
 }

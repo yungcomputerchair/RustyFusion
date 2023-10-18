@@ -53,22 +53,20 @@ impl EntityMap {
         } else {
             entity = self.unchunked.remove(&id);
         }
+        let entity = entity.unwrap();
 
         // reinsert
         if let Some((x, y)) = to_chunk {
             if (0..NCHUNKS as i32).contains(&x) && (0..NCHUNKS as i32).contains(&y) {
                 let chunk = &mut self.chunks[x as usize][y as usize];
-                if chunk.is_none() {
-                    // initialize chunk
-                    *chunk = Some(Chunk::default());
-                }
-                chunk.as_mut().unwrap().insert(entity.unwrap());
+                let chunk = chunk.get_or_insert(Chunk::default()); // init chunk
+                chunk.insert(entity);
                 self.registry.insert(id, to_chunk);
                 return;
             }
         }
 
-        self.unchunked.insert(id, entity.unwrap());
+        self.unchunked.insert(id, entity);
         self.registry.insert(id, None);
     }
 }

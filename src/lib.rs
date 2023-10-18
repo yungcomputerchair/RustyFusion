@@ -3,6 +3,7 @@ extern crate num_derive;
 
 use std::{error::Error, hash::Hash, result};
 
+use chunk::EntityMap;
 use net::{
     ffclient::FFClient,
     packet::{sItemBase, sNano, sRunningQuest},
@@ -127,6 +128,7 @@ pub enum EntityID {
 pub trait Entity {
     fn get_id(&self) -> EntityID;
     fn get_client<'a>(&self, client_map: &'a mut ClientMap) -> Option<&'a mut FFClient>;
+    fn set_position(&mut self, x: i32, y: i32, z: i32, map: &mut EntityMap);
 }
 
 #[derive(Debug, Copy, Clone, Default)]
