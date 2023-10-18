@@ -168,7 +168,7 @@ fn pc_enter(client: &mut FFClient, key: usize, state: &mut ShardServerState) -> 
 
     let player = Rc::new(RefCell::new(player));
     state.players.insert(login_data.iPC_UID, player.clone());
-    state.entities.update(player.clone(), None);
+    state.entities.track(player.clone());
 
     client.send_packet(P_FE2CL_REP_PC_ENTER_SUCC, &resp)?;
     Ok(())
