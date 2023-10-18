@@ -123,7 +123,7 @@ mod shard {
             .find(|c| match c.get_client_type() {
                 ClientType::GameClient {
                     serial_key: key, ..
-                } => *key == resp.iEnterSerialKey,
+                } => key == resp.iEnterSerialKey,
                 _ => false,
             })
             .unwrap();
@@ -148,7 +148,7 @@ mod shard {
             .find(|c| match c.get_client_type() {
                 ClientType::GameClient {
                     serial_key: key, ..
-                } => *key == serial_key,
+                } => key == serial_key,
                 _ => false,
             })
             .unwrap();
@@ -273,7 +273,7 @@ mod handlers {
             let pkt: &sP_CL2LS_REQ_CHAR_SELECT = client.get_packet();
             let pc_uid: i64 = pkt.iPC_UID;
             let login_info = sP_LS2FE_REQ_UPDATE_LOGIN_INFO {
-                iEnterSerialKey: *serial_key,
+                iEnterSerialKey: serial_key,
                 iPC_UID: pc_uid,
                 uiFEKey: client.get_fe_key_uint(),
                 uiSvrTime: get_time(),

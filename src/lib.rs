@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate num_derive;
 
-use std::{error::Error, hash::Hash, result};
+use std::{error::Error, hash::Hash, result, any::Any};
 
 use chunk::EntityMap;
 use net::{
@@ -129,6 +129,8 @@ pub trait Entity {
     fn get_id(&self) -> EntityID;
     fn get_client<'a>(&self, client_map: &'a mut ClientMap) -> Option<&'a mut FFClient>;
     fn set_position(&mut self, x: i32, y: i32, z: i32, map: &mut EntityMap);
+
+    fn as_any(&mut self) -> &mut dyn Any;
 }
 
 #[derive(Debug, Copy, Clone, Default)]

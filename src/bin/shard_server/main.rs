@@ -1,7 +1,6 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
-    rc::Rc,
     time::{Duration, SystemTime},
 };
 
@@ -33,7 +32,6 @@ const CONN_ID_DISCONNECTED: i64 = -1;
 pub struct ShardServerState {
     login_server_conn_id: i64,
     login_data: HashMap<i64, LoginData>,
-    players: HashMap<i64, Rc<RefCell<Player>>>,
     entities: EntityMap,
 }
 
@@ -42,7 +40,6 @@ impl ShardServerState {
         Self {
             login_server_conn_id: CONN_ID_DISCONNECTED,
             login_data: HashMap::new(),
-            players: HashMap::new(),
             entities: EntityMap::default(),
         }
     }
@@ -55,11 +52,11 @@ impl ShardServerState {
         self.login_server_conn_id = conn_id;
     }
 
-    pub fn update_player(&mut self, pc_uid: &i64, f: impl FnOnce(&mut Player, &mut Self)) -> Result<()> {
-        let player_ref = self.players.get(pc_uid).unwrap();
-        let mut player = player_ref.take();
+    pub fn update_player(&mut self, pc_uid: i64, f: impl FnOnce(&mut Player, &mut Self)) -> Result<()> {
+        // to avoid a double-borrow, we create a copy of the player and then replace it
+        let mut player = *self.entities.get_player(pc_uid).unwrap();
         f(&mut player, self);
-        self.players.get(pc_uid).unwrap().replace(player);
+        *self.entities.get_player(pc_uid).unwrap() = player;
         Ok(())
     }
 }
@@ -170,9 +167,7 @@ fn pc_enter(client: &mut FFClient, key: usize, state: &mut ShardServerState) -> 
     client.set_fe_key(login_data.uiFEKey.to_le_bytes());
     client.set_enc_mode(EncryptionMode::FEKey);
 
-    let player = Rc::new(RefCell::new(player));
-    state.players.insert(login_data.iPC_UID, player.clone());
-    state.entities.track(player.clone());
+    state.entities.track(Box::new(player));
 
     client.send_packet(P_FE2CL_REP_PC_ENTER_SUCC, &resp)?;
     Ok(())
@@ -239,7 +234,7 @@ fn pc_move(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<()> 
             iAngle: pkt.iAngle,
             cKeyValue: pkt.cKeyValue,
             iSpeed: pkt.iSpeed,
-            iID: *pc_uid as i32,
+            iID: pc_uid as i32,
             iSvrTime: get_time(),
         };
         clients
@@ -273,7 +268,7 @@ fn pc_jump(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<()> 
             iAngle: pkt.iAngle,
             cKeyValue: pkt.cKeyValue,
             iSpeed: pkt.iSpeed,
-            iID: *pc_uid as i32,
+            iID: pc_uid as i32,
             iSvrTime: get_time(),
         };
         clients
@@ -301,7 +296,7 @@ fn pc_stop(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<()> 
             iX: pkt.iX,
             iY: pkt.iY,
             iZ: pkt.iZ,
-            iID: *pc_uid as i32,
+            iID: pc_uid as i32,
             iSvrTime: get_time(),
         };
         clients

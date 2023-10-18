@@ -84,8 +84,8 @@ impl FFClient {
         self.enc_mode = mode;
     }
 
-    pub fn get_client_type(&self) -> &ClientType {
-        &self.client_type
+    pub fn get_client_type(&self) -> ClientType {
+        self.client_type.clone()
     }
 
     pub fn set_client_type(&mut self, cltype: ClientType) {

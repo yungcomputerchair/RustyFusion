@@ -1,80 +1,84 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::collections::{HashMap, HashSet};
 
-use crate::{Entity, EntityID};
+use crate::{Entity, EntityID, player::Player};
 
 pub const NCHUNKS: usize = 16 * 8; // 16 map squares with side lengths of 8 chunks
 pub const MAP_BOUNDS: i32 = 8192 * 100; // top corner of (16, 16)
 
+struct RegistryEntry {
+    entity: Box<dyn Entity>,
+    chunk: Option<(i32, i32)>,
+}
+
 pub struct EntityMap {
-    chunks: [[Option<Chunk>; NCHUNKS]; NCHUNKS],
-    unchunked: HashMap<EntityID, Rc<RefCell<dyn Entity>>>,
-    registry: HashMap<EntityID, Option<(i32, i32)>>,
+    registry: HashMap<EntityID, RegistryEntry>,
+    chunks: [[Chunk; NCHUNKS]; NCHUNKS],
 }
 
 impl EntityMap {
-    pub fn get_all(&mut self) -> Box<dyn Iterator<Item = &mut Rc<RefCell<dyn Entity>>> + '_> {
-        let mut entities: Box<dyn Iterator<Item = &mut Rc<RefCell<dyn Entity>>>> =
-            Box::new(self.unchunked.values_mut());
-        for chunk in self.chunks.iter_mut().flatten().flatten() {
-            entities = Box::new(entities.chain(chunk.get_all()));
-        }
-        entities
+    pub fn get_all(&mut self) -> impl Iterator<Item = &mut Box<dyn Entity>> {
+        self.registry.values_mut().map(|f| &mut f.entity)
     }
 
-    pub fn track(&mut self, entity: Rc<RefCell<dyn Entity>>) {
-        let id = entity.borrow().get_id();
+    pub fn get_player(&mut self, pc_uid: i64) -> Option<&mut Player> {
+        let id = EntityID::Player(pc_uid);
+        self.registry.get_mut(&id).and_then(|entry| {
+            let entity_ref = entry.entity.as_mut().as_any();
+            let player_ref = entity_ref.downcast_mut();
+            player_ref
+        })
+    }
+
+    pub fn track(&mut self, entity: Box<dyn Entity>) {
+        let id = entity.get_id();
         if self.registry.contains_key(&id) {
             panic!("Already tracking entity with id {:?}", id);
         }
-        self.unchunked.insert(id, entity);
-        self.registry.insert(id, None);
+        let entry = RegistryEntry {
+            entity,
+            chunk: None,
+        };
+        self.registry.insert(id, entry);
     }
 
     pub fn update(&mut self, id: EntityID, to_chunk: Option<(i32, i32)>) {
-        if self.registry.get(&id).is_some_and(|current_chunk| *current_chunk == to_chunk) {
+        let entry = self
+            .registry
+            .get_mut(&id)
+            .unwrap_or_else(|| panic!("Entity with id {:?} untracked", id));
+
+        if to_chunk == entry.chunk {
             return;
         }
 
-        if let Some((x, y)) = to_chunk {
-            println!("Moving to ({x}, {y})");
-        }
-
         // remove from last chunk
-        let from_chunk = self
-            .registry
-            .remove(&id)
-            .unwrap_or_else(|| panic!("Entity with id {:?} untracked", id));
-
-        let entity;
-        if let Some((x, y)) = from_chunk {
-            // chunk is guaranteed to exist; see below
-            let chunk = self.chunks[x as usize][y as usize].as_mut().unwrap();
-            entity = chunk.remove(&id);
-        } else {
-            entity = self.unchunked.remove(&id);
+        if let Some((x, y)) = entry.chunk {
+            // chunk is guaranteed to be in bounds; see below
+            let chunk = &mut self.chunks[x as usize][y as usize];
+            if !chunk.remove(id) {
+                panic!("Chunk ({x}, {y}) did not contain entity with ID {:?}", id);
+            }
+            entry.chunk = None;
         }
-        let entity = entity.unwrap();
 
         // reinsert
         if let Some((x, y)) = to_chunk {
             if (0..NCHUNKS as i32).contains(&x) && (0..NCHUNKS as i32).contains(&y) {
                 let chunk = &mut self.chunks[x as usize][y as usize];
-                let chunk = chunk.get_or_insert(Chunk::default()); // init chunk
-                chunk.insert(entity);
-                self.registry.insert(id, to_chunk);
-                return;
+                if !chunk.insert(id) {
+                    panic!("Chunk ({x}, {y}) already contained entity with ID {:?}", id);
+                }
+                entry.chunk = to_chunk;
             }
         }
 
-        self.unchunked.insert(id, entity);
-        self.registry.insert(id, None);
+        println!("Moved to {:?}", entry.chunk);
     }
 }
 impl Default for EntityMap {
     fn default() -> Self {
         Self {
-            chunks: std::array::from_fn(|_| std::array::from_fn(|_| None)),
-            unchunked: HashMap::new(),
+            chunks: std::array::from_fn(|_| std::array::from_fn(|_| Chunk::default())),
             registry: HashMap::new(),
         }
     }
@@ -82,20 +86,23 @@ impl Default for EntityMap {
 
 #[derive(Default)]
 pub struct Chunk {
-    tracked: HashMap<EntityID, Rc<RefCell<dyn Entity>>>,
+    tracked: HashSet<EntityID>,
 }
 
 impl Chunk {
-    pub fn get_all(&mut self) -> impl Iterator<Item = &mut Rc<RefCell<dyn Entity>>> {
-        self.tracked.values_mut()
+    pub fn get_all(&mut self) -> impl Iterator<Item = &EntityID> {
+        self.tracked.iter()
     }
 
-    pub fn insert(&mut self, entity: Rc<RefCell<dyn Entity>>) {
-        let id = entity.borrow().get_id();
-        self.tracked.insert(id, entity);
+    pub fn insert(&mut self, id: EntityID) -> bool {
+        self.tracked.insert(id)
     }
 
-    pub fn remove(&mut self, id: &EntityID) -> Option<Rc<RefCell<dyn Entity>>> {
-        self.tracked.remove(id)
+    pub fn remove(&mut self, id: EntityID) -> bool {
+        self.tracked.remove(&id)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.tracked.is_empty()
     }
 }

@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, any::Any};
 
 use crate::{
     chunk::{EntityMap, MAP_BOUNDS, NCHUNKS},
@@ -333,5 +333,9 @@ impl Entity for Player {
         let chunk_x = (x * NCHUNKS as i32) / MAP_BOUNDS;
         let chunk_y = (y * NCHUNKS as i32) / MAP_BOUNDS;
         map.update(self.get_id(), Some((chunk_x, chunk_y)));
+    }
+
+    fn as_any(&mut self) -> &mut dyn Any {
+        self
     }
 }
