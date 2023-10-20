@@ -1,4 +1,4 @@
-use std::{fmt::Display, any::Any};
+use std::{any::Any, fmt::Display};
 
 use crate::{
     chunk::{EntityMap, MAP_BOUNDS, NCHUNKS},

@@ -19,7 +19,7 @@ use rusty_fusion::{
     },
     player::Player,
     util::get_time,
-    Result, Entity,
+    Entity, Result,
 };
 
 const SHARD_LISTEN_ADDR: &str = "127.0.0.1:23001";
@@ -52,7 +52,11 @@ impl ShardServerState {
         self.login_server_conn_id = conn_id;
     }
 
-    pub fn update_player(&mut self, pc_uid: i64, f: impl FnOnce(&mut Player, &mut Self)) -> Result<()> {
+    pub fn update_player(
+        &mut self,
+        pc_uid: i64,
+        f: impl FnOnce(&mut Player, &mut Self),
+    ) -> Result<()> {
         // to avoid a double-borrow, we create a copy of the player and then replace it
         let mut player = *self.entities.get_player(pc_uid).unwrap();
         f(&mut player, self);

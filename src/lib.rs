@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate num_derive;
 
-use std::{error::Error, hash::Hash, result, any::Any};
+use std::{any::Any, error::Error, hash::Hash, result};
 
 use chunk::EntityMap;
 use net::{
