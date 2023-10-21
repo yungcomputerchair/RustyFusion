@@ -42,37 +42,47 @@ impl EntityMap {
     }
 
     pub fn update(&mut self, id: EntityID, to_chunk: Option<(i32, i32)>) {
-        let entry = self
-            .registry
-            .get_mut(&id)
-            .unwrap_or_else(|| panic!("Entity with id {:?} untracked", id));
-
-        if to_chunk == entry.chunk {
+        let entry = self.registry.get(&id).unwrap_or_else(|| {
+            panic!("Entity with id {:?} untracked", id);
+        });
+        if entry.chunk == to_chunk {
             return;
         }
 
-        // remove from last chunk
+        self.remove_from_chunk(id);
+        self.insert_into_chunk(id, to_chunk);
+        println!("Moved to {:?}", self.registry[&id].chunk);
+    }
+
+    fn remove_from_chunk(&mut self, id: EntityID) {
+        let entry = self.registry.get_mut(&id).unwrap();
         if let Some((x, y)) = entry.chunk {
-            // chunk is guaranteed to be in bounds; see below
             let chunk = &mut self.chunks[x as usize][y as usize];
             if !chunk.remove(id) {
                 panic!("Chunk ({x}, {y}) did not contain entity with ID {:?}", id);
             }
             entry.chunk = None;
         }
+    }
 
-        // reinsert
+    fn insert_into_chunk(&mut self, id: EntityID, to_chunk: Option<(i32, i32)>) {
         if let Some((x, y)) = to_chunk {
-            if (0..NCHUNKS as i32).contains(&x) && (0..NCHUNKS as i32).contains(&y) {
-                let chunk = &mut self.chunks[x as usize][y as usize];
+            if let Some(chunk) = self.get_chunk(x, y) {
                 if !chunk.insert(id) {
                     panic!("Chunk ({x}, {y}) already contained entity with ID {:?}", id);
                 }
+                let entry = self.registry.get_mut(&id).unwrap();
                 entry.chunk = to_chunk;
             }
         }
+    }
 
-        println!("Moved to {:?}", entry.chunk);
+    fn get_chunk(&mut self, x: i32, y: i32) -> Option<&mut Chunk> {
+        if (0..NCHUNKS as i32).contains(&x) && (0..NCHUNKS as i32).contains(&y) {
+            let chunk = &mut self.chunks[x as usize][y as usize];
+            return Some(chunk);
+        }
+        None
     }
 }
 impl Default for EntityMap {
