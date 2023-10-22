@@ -318,21 +318,25 @@ impl Combatant for Player {
 }
 impl Entity for Player {
     fn get_client<'a>(&self, client_map: &'a mut ClientMap) -> Option<&'a mut FFClient> {
-        if let Some(client_id) = self.client_id {
-            return Some(client_map.get(client_id));
-        }
-        None
+        self.client_id.map(|key| client_map.get(key))
     }
 
     fn get_id(&self) -> EntityID {
         EntityID::Player(self.uid)
     }
 
-    fn set_position(&mut self, x: i32, y: i32, z: i32, map: &mut EntityMap) {
+    fn set_position(
+        &mut self,
+        x: i32,
+        y: i32,
+        z: i32,
+        entity_map: &mut EntityMap,
+        client_map: &mut ClientMap,
+    ) {
         self.position = Position { x, y, z };
         let chunk_x = (x * NCHUNKS as i32) / MAP_BOUNDS;
         let chunk_y = (y * NCHUNKS as i32) / MAP_BOUNDS;
-        map.update(self.get_id(), Some((chunk_x, chunk_y)));
+        entity_map.update(self.get_id(), Some((chunk_x, chunk_y)), client_map);
     }
 
     fn as_any(&mut self) -> &mut dyn Any {

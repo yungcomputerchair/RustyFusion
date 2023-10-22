@@ -128,7 +128,14 @@ pub enum EntityID {
 pub trait Entity {
     fn get_id(&self) -> EntityID;
     fn get_client<'a>(&self, client_map: &'a mut ClientMap) -> Option<&'a mut FFClient>;
-    fn set_position(&mut self, x: i32, y: i32, z: i32, map: &mut EntityMap);
+    fn set_position(
+        &mut self,
+        x: i32,
+        y: i32,
+        z: i32,
+        entity_map: &mut EntityMap,
+        client_map: &mut ClientMap,
+    );
 
     fn as_any(&mut self) -> &mut dyn Any;
 }
