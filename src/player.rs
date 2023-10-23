@@ -342,6 +342,10 @@ impl Entity for Player {
         entity_map.update(self.get_id(), Some((chunk_x, chunk_y)), client_map);
     }
 
+    fn set_rotation(&mut self, angle: i32) {
+        self.rotation = angle % 360;
+    }
+
     fn send_enter(&self, client: &mut FFClient) -> Result<()> {
         let pkt = sP_FE2CL_PC_NEW {
             PCAppearanceData: self.get_appearance_data(),

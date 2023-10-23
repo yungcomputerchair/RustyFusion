@@ -61,7 +61,7 @@ pub fn pc_goto(client: &mut FFClient) -> Result<()> {
 pub fn pc_move(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<()> {
     let client = clients.get_self();
     let pkt: &sP_CL2FE_REQ_PC_MOVE = client.get_packet();
-    let (x, y, z) = (pkt.iX, pkt.iY, pkt.iZ);
+    let (x, y, z, angle) = (pkt.iX, pkt.iY, pkt.iZ, pkt.iAngle);
     if let ClientType::GameClient {
         pc_uid: Some(pc_uid),
         ..
@@ -87,6 +87,7 @@ pub fn pc_move(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<
 
         state.update_player(pc_uid, |player, state| {
             player.set_position(x, y, z, &mut state.entities, clients);
+            player.set_rotation(angle);
         });
         return Ok(());
     }
@@ -97,7 +98,7 @@ pub fn pc_move(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<
 pub fn pc_jump(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<()> {
     let client = clients.get_self();
     let pkt: &sP_CL2FE_REQ_PC_JUMP = client.get_packet();
-    let (x, y, z) = (pkt.iX, pkt.iY, pkt.iZ);
+    let (x, y, z, angle) = (pkt.iX, pkt.iY, pkt.iZ, pkt.iAngle);
     if let ClientType::GameClient {
         pc_uid: Some(pc_uid),
         ..
@@ -123,6 +124,7 @@ pub fn pc_jump(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<
 
         state.update_player(pc_uid, |player, state| {
             player.set_position(x, y, z, &mut state.entities, clients);
+            player.set_rotation(angle);
         });
         return Ok(());
     }
@@ -141,9 +143,9 @@ pub fn pc_stop(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<
     {
         let resp = sP_FE2CL_PC_STOP {
             iCliTime: pkt.iCliTime,
-            iX: x,
-            iY: y,
-            iZ: z,
+            iX: pkt.iX,
+            iY: pkt.iY,
+            iZ: pkt.iZ,
             iID: pc_uid as i32,
             iSvrTime: get_time(),
         };

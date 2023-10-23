@@ -136,6 +136,7 @@ pub trait Entity {
         entity_map: &mut EntityMap,
         client_map: &mut ClientMap,
     );
+    fn set_rotation(&mut self, angle: i32);
     fn send_enter(&self, client: &mut FFClient) -> Result<()>;
     fn send_exit(&self, client: &mut FFClient) -> Result<()>;
 
