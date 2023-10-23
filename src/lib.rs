@@ -136,6 +136,8 @@ pub trait Entity {
         entity_map: &mut EntityMap,
         client_map: &mut ClientMap,
     );
+    fn send_enter(&self, client: &mut FFClient) -> Result<()>;
+    fn send_exit(&self, client: &mut FFClient) -> Result<()>;
 
     fn as_any(&mut self) -> &mut dyn Any;
 }

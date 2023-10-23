@@ -5,11 +5,14 @@ use crate::{
     defines::*,
     net::{
         ffclient::FFClient,
-        packet::{sPCAppearanceData, sPCLoadData2CL, sPCStyle, sPCStyle2, sTimeBuff},
+        packet::{
+            sPCAppearanceData, sPCLoadData2CL, sPCStyle, sPCStyle2, sP_FE2CL_PC_EXIT,
+            sP_FE2CL_PC_NEW, sTimeBuff, PacketID,
+        },
         ClientMap,
     },
     util::parse_utf16,
-    CombatStats, Combatant, Entity, EntityID, Item, Mission, Nano, Position,
+    CombatStats, Combatant, Entity, EntityID, Item, Mission, Nano, Position, Result,
 };
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -337,6 +340,23 @@ impl Entity for Player {
         let chunk_x = (x * NCHUNKS as i32) / MAP_BOUNDS;
         let chunk_y = (y * NCHUNKS as i32) / MAP_BOUNDS;
         entity_map.update(self.get_id(), Some((chunk_x, chunk_y)), client_map);
+    }
+
+    fn send_enter(&self, client: &mut FFClient) -> Result<()> {
+        let pkt = sP_FE2CL_PC_NEW {
+            PCAppearanceData: self.get_appearance_data(),
+        };
+        client.send_packet(PacketID::P_FE2CL_PC_NEW, &pkt)?;
+        Ok(())
+    }
+
+    fn send_exit(&self, client: &mut FFClient) -> Result<()> {
+        let pkt = sP_FE2CL_PC_EXIT {
+            iID: self.uid as i32,
+            iExitType: unused!(),
+        };
+        client.send_packet(PacketID::P_FE2CL_PC_EXIT, &pkt)?;
+        Ok(())
     }
 
     fn as_any(&mut self) -> &mut dyn Any {

@@ -52,16 +52,11 @@ impl ShardServerState {
         self.login_server_conn_id = conn_id;
     }
 
-    pub fn update_player(
-        &mut self,
-        pc_uid: i64,
-        f: impl FnOnce(&mut Player, &mut Self),
-    ) -> Result<()> {
+    pub fn update_player(&mut self, pc_uid: i64, f: impl FnOnce(&mut Player, &mut Self)) {
         // to avoid a double-borrow, we create a copy of the player and then replace it
         let mut player = *self.entities.get_player(pc_uid).unwrap();
         f(&mut player, self);
         *self.entities.get_player(pc_uid).unwrap() = player;
-        Ok(())
     }
 }
 

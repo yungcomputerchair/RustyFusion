@@ -87,7 +87,7 @@ pub fn pc_move(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<
 
         state.update_player(pc_uid, |player, state| {
             player.set_position(x, y, z, &mut state.entities, clients);
-        })?;
+        });
         return Ok(());
     }
 
@@ -123,7 +123,7 @@ pub fn pc_jump(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<
 
         state.update_player(pc_uid, |player, state| {
             player.set_position(x, y, z, &mut state.entities, clients);
-        })?;
+        });
         return Ok(());
     }
 
@@ -153,7 +153,7 @@ pub fn pc_stop(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<
 
         state.update_player(pc_uid, |player, state| {
             player.set_position(x, y, z, &mut state.entities, clients);
-        })?;
+        });
         return Ok(());
     }
 
