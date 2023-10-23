@@ -64,9 +64,9 @@ impl EntityMap {
         &mut self,
         id: EntityID,
         to_chunk: Option<(i32, i32)>,
-        _client_map: &mut ClientMap,
+        client_map: &mut ClientMap,
     ) {
-        let entry = self.registry.get(&id).unwrap_or_else(|| {
+        let entry = self.registry.get_mut(&id).unwrap_or_else(|| {
             panic!("Entity with id {:?} untracked", id);
         });
         if entry.chunk == to_chunk {
@@ -78,12 +78,44 @@ impl EntityMap {
 
         let removed = around_from.difference(&around_to);
         for e in removed {
-            println!("Goodbye {:?} {:?}", id, e);
+            // us to them
+            let from = self.get_from_id(id).unwrap();
+            if let Some(from_client) = from.get_client(client_map) {
+                let to = self.get_from_id(*e).unwrap();
+                if to.send_exit(from_client).is_err() {
+                    println!("Couldn't send enter to {:?}", from_client.get_client_type());
+                }
+            }
+
+            // them to us
+            let from = self.get_from_id(*e).unwrap();
+            if let Some(from_client) = from.get_client(client_map) {
+                let to = self.get_from_id(id).unwrap();
+                if to.send_exit(from_client).is_err() {
+                    println!("Couldn't send enter to {:?}", from_client.get_client_type());
+                }
+            }
         }
 
         let added = around_to.difference(&around_from);
         for e in added {
-            println!("Hello {:?} {:?}", id, e);
+            // us to them
+            let from = self.get_from_id(id).unwrap();
+            if let Some(from_client) = from.get_client(client_map) {
+                let to = self.get_from_id(*e).unwrap();
+                if to.send_enter(from_client).is_err() {
+                    println!("Couldn't send enter to {:?}", from_client.get_client_type());
+                }
+            }
+
+            // them to us
+            let from = self.get_from_id(*e).unwrap();
+            if let Some(from_client) = from.get_client(client_map) {
+                let to = self.get_from_id(id).unwrap();
+                if to.send_enter(from_client).is_err() {
+                    println!("Couldn't send enter to {:?}", from_client.get_client_type());
+                }
+            }
         }
 
         println!("Moved to {:?}", self.registry[&id].chunk);
