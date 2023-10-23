@@ -15,7 +15,7 @@ pub mod packet;
 
 pub type PacketCallback<'a> =
     &'a mut dyn FnMut(usize, &mut HashMap<usize, FFClient>, PacketID) -> Result<()>;
-pub type DisconnectCallback<'a> = &'a mut dyn FnMut(FFClient);
+pub type DisconnectCallback<'a> = &'a mut dyn FnMut(usize, &mut HashMap<usize, FFClient>);
 
 #[allow(non_snake_case)]
 pub struct LoginData {

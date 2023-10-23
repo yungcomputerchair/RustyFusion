@@ -60,6 +60,15 @@ impl EntityMap {
         self.registry.insert(id, entry);
     }
 
+    pub fn untrack(&mut self, id: EntityID) -> Box<dyn Entity> {
+        self.registry
+            .remove(&id)
+            .unwrap_or_else(|| {
+                panic!("Entity with id {:?} already untracked", id);
+            })
+            .entity
+    }
+
     pub fn update(
         &mut self,
         id: EntityID,
@@ -82,18 +91,14 @@ impl EntityMap {
             let from = self.get_from_id(id).unwrap();
             if let Some(from_client) = from.get_client(client_map) {
                 let to = self.get_from_id(*e).unwrap();
-                if to.send_exit(from_client).is_err() {
-                    println!("Couldn't send enter to {:?}", from_client.get_client_type());
-                }
+                let _ = to.send_exit(from_client);
             }
 
             // them to us
             let from = self.get_from_id(*e).unwrap();
             if let Some(from_client) = from.get_client(client_map) {
                 let to = self.get_from_id(id).unwrap();
-                if to.send_exit(from_client).is_err() {
-                    println!("Couldn't send enter to {:?}", from_client.get_client_type());
-                }
+                let _ = to.send_exit(from_client);
             }
         }
 
@@ -103,18 +108,14 @@ impl EntityMap {
             let from = self.get_from_id(id).unwrap();
             if let Some(from_client) = from.get_client(client_map) {
                 let to = self.get_from_id(*e).unwrap();
-                if to.send_enter(from_client).is_err() {
-                    println!("Couldn't send enter to {:?}", from_client.get_client_type());
-                }
+                let _ = to.send_enter(from_client);
             }
 
             // them to us
             let from = self.get_from_id(*e).unwrap();
             if let Some(from_client) = from.get_client(client_map) {
                 let to = self.get_from_id(id).unwrap();
-                if to.send_enter(from_client).is_err() {
-                    println!("Couldn't send enter to {:?}", from_client.get_client_type());
-                }
+                let _ = to.send_enter(from_client);
             }
         }
 

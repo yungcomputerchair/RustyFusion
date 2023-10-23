@@ -87,11 +87,10 @@ impl FFServer {
                     }
                     Err(e) => {
                         println!("err on socket {}: {}", ev.key, e);
-                        let disconnected_client: FFClient =
-                            self.unregister_client(ev.key)?.unwrap();
                         if let Some(callback) = dc_handler.as_mut() {
-                            callback(disconnected_client);
-                        }
+                            callback(ev.key, clients);
+                        };
+                        self.unregister_client(ev.key)?.unwrap();
                     }
                 }
             }

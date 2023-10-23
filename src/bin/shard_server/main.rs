@@ -19,7 +19,7 @@ use rusty_fusion::{
     },
     player::Player,
     util::get_time,
-    Entity, Result,
+    Entity, EntityID, Result,
 };
 
 const SHARD_LISTEN_ADDR: &str = "127.0.0.1:23001";
@@ -71,8 +71,8 @@ fn main() -> Result<()> {
     let mut pkt_handler = |key, clients: &mut HashMap<usize, FFClient>, pkt_id| -> Result<()> {
         handle_packet(key, clients, pkt_id, &mut state.borrow_mut())
     };
-    let mut dc_handler = |client: FFClient| {
-        handle_disconnect(client, &mut state.borrow_mut());
+    let mut dc_handler = |key, clients: &mut HashMap<usize, FFClient>| {
+        handle_disconnect(key, clients, &mut state.borrow_mut());
     };
 
     println!("Shard server listening on {}", server.get_endpoint());
@@ -92,9 +92,24 @@ fn main() -> Result<()> {
     }
 }
 
-fn handle_disconnect(client: FFClient, state: &mut ShardServerState) {
-    if matches!(client.get_client_type(), ClientType::LoginServer) {
-        state.set_login_server_conn_id(CONN_ID_DISCONNECTED);
+fn handle_disconnect(
+    key: usize,
+    clients: &mut HashMap<usize, FFClient>,
+    state: &mut ShardServerState,
+) {
+    let mut clients = ClientMap::new(key, clients);
+    let client = clients.get_self();
+    match client.get_client_type() {
+        ClientType::LoginServer => state.set_login_server_conn_id(CONN_ID_DISCONNECTED),
+        ClientType::GameClient {
+            pc_uid: Some(pc_uid),
+            ..
+        } => {
+            let id = EntityID::Player(pc_uid);
+            state.entities.update(id, None, &mut clients);
+            state.entities.untrack(id);
+        }
+        _ => (),
     }
 }
 
