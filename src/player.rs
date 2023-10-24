@@ -308,7 +308,7 @@ impl Player {
 }
 impl Combatant for Player {
     fn get_condition_bit_flag(&self) -> i32 {
-        0
+        placeholder!(0)
     }
 
     fn get_level(&self) -> i16 {

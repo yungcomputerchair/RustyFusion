@@ -27,12 +27,14 @@ macro_rules! placeholder {
     }};
 }
 
-pub mod chunk;
 pub mod defines;
 pub mod error;
 pub mod net;
-pub mod player;
 pub mod util;
+
+pub mod chunk;
+pub mod npc;
+pub mod player;
 
 #[derive(Debug, Copy, Clone, Default)]
 pub struct Position {
@@ -122,7 +124,7 @@ impl From<Mission> for sRunningQuest {
 #[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
 pub enum EntityID {
     Player(i64),
-    //NPC(i64),
+    NPC(i32),
 }
 
 pub trait Entity {
