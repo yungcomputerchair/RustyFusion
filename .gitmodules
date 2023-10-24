@@ -1,0 +1,3 @@
+[submodule "tabledata"]
+	path = tabledata
+	url = git@github.com:OpenFusionProject/tabledata.git
