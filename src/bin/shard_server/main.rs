@@ -78,14 +78,14 @@ fn main() -> Result<()> {
 
     tdata_init();
 
-    let mut state = ShardServerState::new();
+    let state = RefCell::new(ShardServerState::new());
     for npc in tdata_get_npcs() {
+        let mut state = state.borrow_mut();
         let chunk_pos = pos_to_chunk_coords(npc.get_position());
         let id = state.entities.track(Box::new(npc));
         state.entities.update(id, Some(chunk_pos), None);
     }
 
-    let state = RefCell::new(state);
     let mut pkt_handler = |key, clients: &mut HashMap<usize, FFClient>, pkt_id| -> Result<()> {
         handle_packet(key, clients, pkt_id, &mut state.borrow_mut())
     };
