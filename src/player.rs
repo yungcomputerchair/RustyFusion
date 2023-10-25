@@ -1,7 +1,7 @@
 use std::{any::Any, fmt::Display};
 
 use crate::{
-    chunk::{EntityMap, MAP_BOUNDS, NCHUNKS},
+    chunk::{pos_to_chunk_coords, EntityMap},
     defines::*,
     net::{
         ffclient::FFClient,
@@ -328,18 +328,19 @@ impl Entity for Player {
         EntityID::Player(self.uid)
     }
 
+    fn get_position(&self) -> Position {
+        self.position
+    }
+
     fn set_position(
         &mut self,
-        x: i32,
-        y: i32,
-        z: i32,
+        pos: Position,
         entity_map: &mut EntityMap,
         client_map: &mut ClientMap,
     ) {
-        self.position = Position { x, y, z };
-        let chunk_x = (x * NCHUNKS as i32) / MAP_BOUNDS;
-        let chunk_y = (y * NCHUNKS as i32) / MAP_BOUNDS;
-        entity_map.update(self.get_id(), Some((chunk_x, chunk_y)), client_map);
+        self.position = pos;
+        let chunk = pos_to_chunk_coords(self.position);
+        entity_map.update(self.get_id(), Some(chunk), Some(client_map));
     }
 
     fn set_rotation(&mut self, angle: i32) {

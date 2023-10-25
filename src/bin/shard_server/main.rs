@@ -5,7 +5,7 @@ use std::{
 };
 
 use rusty_fusion::{
-    chunk::EntityMap,
+    chunk::{pos_to_chunk_coords, EntityMap},
     error::BadRequest,
     net::{
         crypto::{gen_key, EncryptionMode},
@@ -17,8 +17,9 @@ use rusty_fusion::{
         },
         ClientMap, LoginData,
     },
+    npc::NPC,
     player::Player,
-    tabledata::tdata_init,
+    tabledata::{tdata_get_npcs, tdata_init},
     util::get_time,
     Entity, EntityID, Result,
 };
@@ -59,6 +60,13 @@ impl ShardServerState {
         f(&mut player, self);
         *self.entities.get_player(pc_uid).unwrap() = player;
     }
+
+    pub fn update_npc(&mut self, npc_id: i32, f: impl FnOnce(&mut NPC, &mut Self)) {
+        // same as above
+        let mut npc = *self.entities.get_npc(npc_id).unwrap();
+        f(&mut npc, self);
+        *self.entities.get_npc(npc_id).unwrap() = npc;
+    }
 }
 
 fn main() -> Result<()> {
@@ -69,7 +77,15 @@ fn main() -> Result<()> {
     let mut login_server_conn_time: SystemTime = SystemTime::UNIX_EPOCH;
 
     tdata_init();
-    let state = RefCell::new(ShardServerState::new());
+
+    let mut state = ShardServerState::new();
+    for npc in tdata_get_npcs() {
+        let chunk_pos = pos_to_chunk_coords(npc.get_position());
+        let id = state.entities.track(Box::new(npc));
+        state.entities.update(id, Some(chunk_pos), None);
+    }
+
+    let state = RefCell::new(state);
     let mut pkt_handler = |key, clients: &mut HashMap<usize, FFClient>, pkt_id| -> Result<()> {
         handle_packet(key, clients, pkt_id, &mut state.borrow_mut())
     };
@@ -108,7 +124,7 @@ fn handle_disconnect(
             ..
         } => {
             let id = EntityID::Player(pc_uid);
-            state.entities.update(id, None, &mut clients);
+            state.entities.update(id, None, Some(&mut clients));
             state.entities.untrack(id);
         }
         _ => (),

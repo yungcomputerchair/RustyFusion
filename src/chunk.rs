@@ -1,10 +1,16 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{net::ClientMap, player::Player, Entity, EntityID};
+use crate::{net::ClientMap, npc::NPC, player::Player, Entity, EntityID, Position};
 
 pub const NCHUNKS: usize = 16 * 8; // 16 map squares with side lengths of 8 chunks
 pub const MAP_BOUNDS: i32 = 8192 * 100; // top corner of (16, 16)
 pub const VISIBILITY_RANGE: i32 = 1;
+
+pub const fn pos_to_chunk_coords(pos: Position) -> (i32, i32) {
+    let chunk_x = (pos.x * NCHUNKS as i32) / MAP_BOUNDS;
+    let chunk_y = (pos.y * NCHUNKS as i32) / MAP_BOUNDS;
+    (chunk_x, chunk_y)
+}
 
 struct RegistryEntry {
     entity: Box<dyn Entity>,
@@ -48,7 +54,16 @@ impl EntityMap {
         })
     }
 
-    pub fn track(&mut self, entity: Box<dyn Entity>) {
+    pub fn get_npc(&mut self, npc_id: i32) -> Option<&mut NPC> {
+        let id = EntityID::NPC(npc_id);
+        self.registry.get_mut(&id).and_then(|entry| {
+            let entity_ref = entry.entity.as_mut().as_any();
+            let npc_ref = entity_ref.downcast_mut();
+            npc_ref
+        })
+    }
+
+    pub fn track(&mut self, entity: Box<dyn Entity>) -> EntityID {
         let id = entity.get_id();
         if self.registry.contains_key(&id) {
             panic!("Already tracking entity with id {:?}", id);
@@ -58,6 +73,7 @@ impl EntityMap {
             chunk: None,
         };
         self.registry.insert(id, entry);
+        id
     }
 
     pub fn untrack(&mut self, id: EntityID) -> Box<dyn Entity> {
@@ -73,7 +89,7 @@ impl EntityMap {
         &mut self,
         id: EntityID,
         to_chunk: Option<(i32, i32)>,
-        client_map: &mut ClientMap,
+        client_map: Option<&mut ClientMap>,
     ) {
         let entry = self.registry.get_mut(&id).unwrap_or_else(|| {
             panic!("Entity with id {:?} untracked", id);
@@ -84,6 +100,12 @@ impl EntityMap {
 
         let around_from = self.remove_from_chunk(id);
         let around_to = self.insert_into_chunk(id, to_chunk);
+
+        // if there's no client map, nobody needs to be notified
+        if client_map.is_none() {
+            return;
+        }
+        let client_map = client_map.unwrap();
 
         let removed = around_from.difference(&around_to);
         for e in removed {

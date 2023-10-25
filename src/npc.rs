@@ -1,5 +1,5 @@
 use crate::{
-    chunk::{EntityMap, MAP_BOUNDS, NCHUNKS},
+    chunk::{pos_to_chunk_coords, EntityMap},
     net::{
         ffclient::FFClient,
         packet::{sNPCAppearanceData, sP_FE2CL_NPC_ENTER, sP_FE2CL_NPC_EXIT, PacketID},
@@ -8,6 +8,7 @@ use crate::{
     CombatStats, Combatant, Entity, EntityID, Position, Result,
 };
 
+#[derive(Debug, Clone, Copy, Default)]
 pub struct NPC {
     id: i32,
     npc_type: i32,
@@ -51,29 +52,27 @@ impl NPC {
     }
 }
 impl Entity for NPC {
-    fn get_id(&self) -> crate::EntityID {
+    fn get_id(&self) -> EntityID {
         EntityID::NPC(self.id)
     }
 
-    fn get_client<'a>(
-        &self,
-        _client_map: &'a mut crate::net::ClientMap,
-    ) -> Option<&'a mut crate::net::ffclient::FFClient> {
+    fn get_client<'a>(&self, _client_map: &'a mut ClientMap) -> Option<&'a mut FFClient> {
         None
+    }
+
+    fn get_position(&self) -> Position {
+        self.position
     }
 
     fn set_position(
         &mut self,
-        x: i32,
-        y: i32,
-        z: i32,
+        pos: Position,
         entity_map: &mut EntityMap,
         client_map: &mut ClientMap,
     ) {
-        self.position = Position { x, y, z };
-        let chunk_x = (x * NCHUNKS as i32) / MAP_BOUNDS;
-        let chunk_y = (y * NCHUNKS as i32) / MAP_BOUNDS;
-        entity_map.update(self.get_id(), Some((chunk_x, chunk_y)), client_map);
+        self.position = pos;
+        let chunk = pos_to_chunk_coords(self.position);
+        entity_map.update(self.get_id(), Some(chunk), Some(client_map));
     }
 
     fn set_rotation(&mut self, angle: i32) {

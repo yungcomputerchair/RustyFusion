@@ -1,3 +1,5 @@
+use rusty_fusion::Position;
+
 use super::*;
 
 use crate::ShardServerState;
@@ -61,7 +63,8 @@ pub fn pc_goto(client: &mut FFClient) -> Result<()> {
 pub fn pc_move(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<()> {
     let client = clients.get_self();
     let pkt: &sP_CL2FE_REQ_PC_MOVE = client.get_packet();
-    let (x, y, z, angle) = (pkt.iX, pkt.iY, pkt.iZ, pkt.iAngle);
+    let pos = Position::new(pkt.iX, pkt.iY, pkt.iZ);
+    let angle = pkt.iAngle;
     if let ClientType::GameClient {
         pc_uid: Some(pc_uid),
         ..
@@ -86,7 +89,7 @@ pub fn pc_move(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<
             .try_for_each(|c| c.send_packet(P_FE2CL_PC_MOVE, &resp))?;
 
         state.update_player(pc_uid, |player, state| {
-            player.set_position(x, y, z, &mut state.entities, clients);
+            player.set_position(pos, &mut state.entities, clients);
             player.set_rotation(angle);
         });
         return Ok(());
@@ -98,7 +101,8 @@ pub fn pc_move(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<
 pub fn pc_jump(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<()> {
     let client = clients.get_self();
     let pkt: &sP_CL2FE_REQ_PC_JUMP = client.get_packet();
-    let (x, y, z, angle) = (pkt.iX, pkt.iY, pkt.iZ, pkt.iAngle);
+    let pos = Position::new(pkt.iX, pkt.iY, pkt.iZ);
+    let angle = pkt.iAngle;
     if let ClientType::GameClient {
         pc_uid: Some(pc_uid),
         ..
@@ -123,7 +127,7 @@ pub fn pc_jump(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<
             .try_for_each(|c| c.send_packet(P_FE2CL_PC_JUMP, &resp))?;
 
         state.update_player(pc_uid, |player, state| {
-            player.set_position(x, y, z, &mut state.entities, clients);
+            player.set_position(pos, &mut state.entities, clients);
             player.set_rotation(angle);
         });
         return Ok(());
@@ -135,7 +139,7 @@ pub fn pc_jump(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<
 pub fn pc_stop(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<()> {
     let client = clients.get_self();
     let pkt: &sP_CL2FE_REQ_PC_STOP = client.get_packet();
-    let (x, y, z) = (pkt.iX, pkt.iY, pkt.iZ);
+    let pos = Position::new(pkt.iX, pkt.iY, pkt.iZ);
     if let ClientType::GameClient {
         pc_uid: Some(pc_uid),
         ..
@@ -154,7 +158,7 @@ pub fn pc_stop(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<
             .try_for_each(|c| c.send_packet(P_FE2CL_PC_STOP, &resp))?;
 
         state.update_player(pc_uid, |player, state| {
-            player.set_position(x, y, z, &mut state.entities, clients);
+            player.set_position(pos, &mut state.entities, clients);
         });
         return Ok(());
     }

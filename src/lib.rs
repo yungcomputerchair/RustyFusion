@@ -44,6 +44,11 @@ pub struct Position {
     y: i32,
     z: i32,
 }
+impl Position {
+    pub fn new(x: i32, y: i32, z: i32) -> Self {
+        Self { x, y, z }
+    }
+}
 
 #[derive(Debug, Copy, Clone, Default)]
 pub struct Item {
@@ -132,11 +137,10 @@ pub enum EntityID {
 pub trait Entity {
     fn get_id(&self) -> EntityID;
     fn get_client<'a>(&self, client_map: &'a mut ClientMap) -> Option<&'a mut FFClient>;
+    fn get_position(&self) -> Position;
     fn set_position(
         &mut self,
-        x: i32,
-        y: i32,
-        z: i32,
+        pos: Position,
         entity_map: &mut EntityMap,
         client_map: &mut ClientMap,
     );
