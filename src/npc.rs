@@ -17,6 +17,25 @@ pub struct NPC {
     combat_stats: CombatStats,
 }
 impl NPC {
+    pub fn new(
+        id: i32,
+        npc_type: i32,
+        x: i32,
+        y: i32,
+        z: i32,
+        angle: i32,
+        instance_id: u64,
+    ) -> Self {
+        Self {
+            id,
+            npc_type,
+            position: Position { x, y, z },
+            rotation: angle % 360,
+            _instance_id: instance_id,
+            combat_stats: CombatStats::default(),
+        }
+    }
+
     fn get_appearance_data(&self) -> sNPCAppearanceData {
         sNPCAppearanceData {
             iNPC_ID: self.id,

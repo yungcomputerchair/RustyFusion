@@ -32,6 +32,8 @@ pub mod error;
 pub mod net;
 pub mod util;
 
+pub mod tabledata;
+
 pub mod chunk;
 pub mod npc;
 pub mod player;

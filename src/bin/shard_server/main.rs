@@ -18,6 +18,7 @@ use rusty_fusion::{
         ClientMap, LoginData,
     },
     player::Player,
+    tabledata::tdata_init,
     util::get_time,
     Entity, EntityID, Result,
 };
@@ -67,6 +68,7 @@ fn main() -> Result<()> {
     let login_server_conn_interval: Duration = Duration::from_secs(10);
     let mut login_server_conn_time: SystemTime = SystemTime::UNIX_EPOCH;
 
+    tdata_init();
     let state = RefCell::new(ShardServerState::new());
     let mut pkt_handler = |key, clients: &mut HashMap<usize, FFClient>, pkt_id| -> Result<()> {
         handle_packet(key, clients, pkt_id, &mut state.borrow_mut())
