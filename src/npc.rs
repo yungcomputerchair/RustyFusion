@@ -33,7 +33,11 @@ impl NPC {
             position: Position { x, y, z },
             rotation: angle % 360,
             _instance_id: instance_id,
-            combat_stats: CombatStats::default(),
+            combat_stats: CombatStats {
+                level: unused!(),
+                _max_hp: unused!(),
+                hp: 400,
+            },
         }
     }
 
