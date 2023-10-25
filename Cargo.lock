@@ -171,6 +171,7 @@ dependencies = [
  "num-traits",
  "polling",
  "rand",
+ "serde",
  "serde_json",
 ]
 
