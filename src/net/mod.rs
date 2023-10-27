@@ -55,28 +55,9 @@ impl<'a> ClientMap<'a> {
         self.clients.get_mut(&self.key).unwrap()
     }
 
-    pub fn get_all(&mut self) -> impl Iterator<Item = &mut FFClient> {
-        self.clients.values_mut()
-    }
-
     pub fn get_all_gameclient(&mut self) -> impl Iterator<Item = &mut FFClient> {
-        self.get_all()
-            .filter(|c| matches!(c.get_client_type(), ClientType::GameClient { .. }))
-    }
-
-    pub fn get_all_but_self(&mut self) -> impl Iterator<Item = &mut FFClient> {
         self.clients
-            .iter_mut()
-            .filter_map(|(key, c)| if *key != self.key { Some(c) } else { None })
-    }
-
-    pub fn get_all_gameclient_but_self(&mut self) -> impl Iterator<Item = &mut FFClient> {
-        self.clients.iter_mut().filter_map(|(key, c)| {
-            if *key != self.key && matches!(c.get_client_type(), ClientType::GameClient { .. }) {
-                Some(c)
-            } else {
-                None
-            }
-        })
+            .values_mut()
+            .filter(|c| matches!(c.get_client_type(), ClientType::GameClient { .. }))
     }
 }

@@ -84,9 +84,14 @@ pub fn pc_move(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<
             iID: pc_uid as i32,
             iSvrTime: get_time(),
         };
-        clients
-            .get_all_gameclient_but_self()
-            .try_for_each(|c| c.send_packet(P_FE2CL_PC_MOVE, &resp))?;
+
+        if let Some(iter) = state.entities.get_around_entity(EntityID::Player(pc_uid)) {
+            for e in iter {
+                if let Some(c) = e.get_client(clients) {
+                    let _ = c.send_packet(P_FE2CL_PC_MOVE, &resp);
+                }
+            }
+        }
 
         state.update_player(pc_uid, |player, state| {
             player.set_position(pos, &mut state.entities, clients);
@@ -122,9 +127,14 @@ pub fn pc_jump(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<
             iID: pc_uid as i32,
             iSvrTime: get_time(),
         };
-        clients
-            .get_all_gameclient_but_self()
-            .try_for_each(|c| c.send_packet(P_FE2CL_PC_JUMP, &resp))?;
+
+        if let Some(iter) = state.entities.get_around_entity(EntityID::Player(pc_uid)) {
+            for e in iter {
+                if let Some(c) = e.get_client(clients) {
+                    let _ = c.send_packet(P_FE2CL_PC_JUMP, &resp);
+                }
+            }
+        }
 
         state.update_player(pc_uid, |player, state| {
             player.set_position(pos, &mut state.entities, clients);
@@ -153,9 +163,14 @@ pub fn pc_stop(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<
             iID: pc_uid as i32,
             iSvrTime: get_time(),
         };
-        clients
-            .get_all_gameclient_but_self()
-            .try_for_each(|c| c.send_packet(P_FE2CL_PC_STOP, &resp))?;
+
+        if let Some(iter) = state.entities.get_around_entity(EntityID::Player(pc_uid)) {
+            for e in iter {
+                if let Some(c) = e.get_client(clients) {
+                    let _ = c.send_packet(P_FE2CL_PC_STOP, &resp);
+                }
+            }
+        }
 
         state.update_player(pc_uid, |player, state| {
             player.set_position(pos, &mut state.entities, clients);

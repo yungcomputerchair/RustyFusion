@@ -45,6 +45,18 @@ impl EntityMap {
         })
     }
 
+    pub fn get_around_entity(
+        &mut self,
+        id: EntityID,
+    ) -> Option<impl Iterator<Item = &mut Box<dyn Entity>>> {
+        if let Some((x, y)) = self.registry.get(&id).and_then(|entry| entry.chunk) {
+            let ids = self.get_around(x, y, VISIBILITY_RANGE);
+            Some(self.get_from_ids(&ids))
+        } else {
+            None
+        }
+    }
+
     pub fn get_player(&mut self, pc_uid: i64) -> Option<&mut Player> {
         let id = EntityID::Player(pc_uid);
         self.registry.get_mut(&id).and_then(|entry| {
