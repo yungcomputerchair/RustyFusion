@@ -7,7 +7,7 @@ use std::{
 use num_traits::{FromPrimitive, ToPrimitive};
 
 use crate::{
-    error::BadPacketID,
+    error::{BadPacketID, BadRequest},
     net::{struct_to_bytes, PACKET_BUFFER_SIZE},
     util::get_time,
     Result,
@@ -90,6 +90,18 @@ impl FFClient {
 
     pub fn set_client_type(&mut self, cltype: ClientType) {
         self.client_type = cltype;
+    }
+
+    pub fn get_player_id(&mut self) -> Result<i64> {
+        if let ClientType::GameClient {
+            pc_uid: Some(pc_uid),
+            ..
+        } = self.client_type
+        {
+            Ok(pc_uid)
+        } else {
+            Err(Box::new(BadRequest::new(self)))
+        }
     }
 
     pub fn get_packet_id(&self) -> PacketID {

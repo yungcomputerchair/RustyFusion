@@ -44,139 +44,113 @@ pub fn pc_loading_complete(client: &mut FFClient) -> Result<()> {
 
 pub fn pc_goto(client: &mut FFClient) -> Result<()> {
     let pkt: &sP_CL2FE_REQ_PC_GOTO = client.get_packet();
-    if let ClientType::GameClient {
-        pc_uid: Some(_), ..
-    } = client.get_client_type()
-    {
-        let resp = sP_FE2CL_REP_PC_GOTO_SUCC {
-            iX: pkt.iToX,
-            iY: pkt.iToY,
-            iZ: pkt.iToZ,
-        };
-        client.send_packet(P_FE2CL_REP_PC_GOTO_SUCC, &resp)?;
-        return Ok(());
-    }
 
-    Err(Box::new(BadRequest::new(client)))
+    let resp = sP_FE2CL_REP_PC_GOTO_SUCC {
+        iX: pkt.iToX,
+        iY: pkt.iToY,
+        iZ: pkt.iToZ,
+    };
+    client.send_packet(P_FE2CL_REP_PC_GOTO_SUCC, &resp)?;
+
+    Ok(())
 }
 
 pub fn pc_move(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<()> {
     let client = clients.get_self();
+    let pc_uid = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_MOVE = client.get_packet();
     let pos = Position::new(pkt.iX, pkt.iY, pkt.iZ);
     let angle = pkt.iAngle;
-    if let ClientType::GameClient {
-        pc_uid: Some(pc_uid),
-        ..
-    } = client.get_client_type()
-    {
-        let resp = sP_FE2CL_PC_MOVE {
-            iCliTime: pkt.iCliTime,
-            iX: pkt.iX,
-            iY: pkt.iY,
-            iZ: pkt.iZ,
-            fVX: pkt.fVX,
-            fVY: pkt.fVY,
-            fVZ: pkt.fVZ,
-            iAngle: pkt.iAngle,
-            cKeyValue: pkt.cKeyValue,
-            iSpeed: pkt.iSpeed,
-            iID: pc_uid as i32,
-            iSvrTime: get_time(),
-        };
 
-        if let Some(iter) = state.entities.get_around_entity(EntityID::Player(pc_uid)) {
-            for e in iter {
-                if let Some(c) = e.get_client(clients) {
-                    let _ = c.send_packet(P_FE2CL_PC_MOVE, &resp);
-                }
-            }
-        }
+    let resp = sP_FE2CL_PC_MOVE {
+        iCliTime: pkt.iCliTime,
+        iX: pkt.iX,
+        iY: pkt.iY,
+        iZ: pkt.iZ,
+        fVX: pkt.fVX,
+        fVY: pkt.fVY,
+        fVZ: pkt.fVZ,
+        iAngle: pkt.iAngle,
+        cKeyValue: pkt.cKeyValue,
+        iSpeed: pkt.iSpeed,
+        iID: pc_uid as i32,
+        iSvrTime: get_time(),
+    };
 
-        state.update_player(pc_uid, |player, state| {
-            player.set_position(pos, &mut state.entities, clients);
-            player.set_rotation(angle);
+    state
+        .entities
+        .for_each_around(EntityID::Player(pc_uid), clients, |client| {
+            let _ = client.send_packet(P_FE2CL_PC_MOVE, &resp);
         });
-        return Ok(());
-    }
 
-    Err(Box::new(BadRequest::new(client)))
+    state.update_player(pc_uid, |player, state| {
+        player.set_position(pos, &mut state.entities, clients);
+        player.set_rotation(angle);
+    });
+
+    Ok(())
 }
 
 pub fn pc_jump(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<()> {
     let client = clients.get_self();
+    let pc_uid = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_JUMP = client.get_packet();
     let pos = Position::new(pkt.iX, pkt.iY, pkt.iZ);
     let angle = pkt.iAngle;
-    if let ClientType::GameClient {
-        pc_uid: Some(pc_uid),
-        ..
-    } = client.get_client_type()
-    {
-        let resp = sP_FE2CL_PC_JUMP {
-            iCliTime: pkt.iCliTime,
-            iX: pkt.iX,
-            iY: pkt.iY,
-            iZ: pkt.iZ,
-            iVX: pkt.iVX,
-            iVY: pkt.iVY,
-            iVZ: pkt.iVZ,
-            iAngle: pkt.iAngle,
-            cKeyValue: pkt.cKeyValue,
-            iSpeed: pkt.iSpeed,
-            iID: pc_uid as i32,
-            iSvrTime: get_time(),
-        };
 
-        if let Some(iter) = state.entities.get_around_entity(EntityID::Player(pc_uid)) {
-            for e in iter {
-                if let Some(c) = e.get_client(clients) {
-                    let _ = c.send_packet(P_FE2CL_PC_JUMP, &resp);
-                }
-            }
-        }
+    let resp = sP_FE2CL_PC_JUMP {
+        iCliTime: pkt.iCliTime,
+        iX: pkt.iX,
+        iY: pkt.iY,
+        iZ: pkt.iZ,
+        iVX: pkt.iVX,
+        iVY: pkt.iVY,
+        iVZ: pkt.iVZ,
+        iAngle: pkt.iAngle,
+        cKeyValue: pkt.cKeyValue,
+        iSpeed: pkt.iSpeed,
+        iID: pc_uid as i32,
+        iSvrTime: get_time(),
+    };
 
-        state.update_player(pc_uid, |player, state| {
-            player.set_position(pos, &mut state.entities, clients);
-            player.set_rotation(angle);
+    state
+        .entities
+        .for_each_around(EntityID::Player(pc_uid), clients, |client| {
+            let _ = client.send_packet(P_FE2CL_PC_JUMP, &resp);
         });
-        return Ok(());
-    }
 
-    Err(Box::new(BadRequest::new(client)))
+    state.update_player(pc_uid, |player, state| {
+        player.set_position(pos, &mut state.entities, clients);
+        player.set_rotation(angle);
+    });
+
+    Ok(())
 }
 
 pub fn pc_stop(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<()> {
     let client = clients.get_self();
+    let pc_uid = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_STOP = client.get_packet();
     let pos = Position::new(pkt.iX, pkt.iY, pkt.iZ);
-    if let ClientType::GameClient {
-        pc_uid: Some(pc_uid),
-        ..
-    } = client.get_client_type()
-    {
-        let resp = sP_FE2CL_PC_STOP {
-            iCliTime: pkt.iCliTime,
-            iX: pkt.iX,
-            iY: pkt.iY,
-            iZ: pkt.iZ,
-            iID: pc_uid as i32,
-            iSvrTime: get_time(),
-        };
 
-        if let Some(iter) = state.entities.get_around_entity(EntityID::Player(pc_uid)) {
-            for e in iter {
-                if let Some(c) = e.get_client(clients) {
-                    let _ = c.send_packet(P_FE2CL_PC_STOP, &resp);
-                }
-            }
-        }
+    let resp = sP_FE2CL_PC_STOP {
+        iCliTime: pkt.iCliTime,
+        iX: pkt.iX,
+        iY: pkt.iY,
+        iZ: pkt.iZ,
+        iID: pc_uid as i32,
+        iSvrTime: get_time(),
+    };
 
-        state.update_player(pc_uid, |player, state| {
-            player.set_position(pos, &mut state.entities, clients);
+    state
+        .entities
+        .for_each_around(EntityID::Player(pc_uid), clients, |client| {
+            let _ = client.send_packet(P_FE2CL_PC_STOP, &resp);
         });
-        return Ok(());
-    }
 
-    Err(Box::new(BadRequest::new(client)))
+    state.update_player(pc_uid, |player, state| {
+        player.set_position(pos, &mut state.entities, clients);
+    });
+
+    Ok(())
 }

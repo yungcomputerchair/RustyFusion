@@ -6,7 +6,6 @@ use std::{
 
 use rusty_fusion::{
     chunk::{pos_to_chunk_coords, EntityMap},
-    error::BadRequest,
     net::{
         crypto::{gen_key, EncryptionMode},
         ffclient::{ClientType, FFClient},

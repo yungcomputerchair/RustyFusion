@@ -1,6 +1,11 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{net::ClientMap, npc::NPC, player::Player, Entity, EntityID, Position};
+use crate::{
+    net::{ffclient::FFClient, ClientMap},
+    npc::NPC,
+    player::Player,
+    Entity, EntityID, Position,
+};
 
 pub const NCHUNKS: usize = 16 * 8; // 16 map squares with side lengths of 8 chunks
 pub const MAP_BOUNDS: i32 = 8192 * 100; // top corner of (16, 16)
@@ -154,6 +159,21 @@ impl EntityMap {
         }
 
         println!("Moved to {:?}", self.registry[&id].chunk);
+    }
+
+    pub fn for_each_around(
+        &mut self,
+        id: EntityID,
+        clients: &mut ClientMap,
+        mut f: impl FnMut(&mut FFClient),
+    ) {
+        if let Some(iter) = self.get_around_entity(id) {
+            for e in iter {
+                if let Some(c) = e.get_client(clients) {
+                    f(c);
+                }
+            }
+        }
     }
 
     fn remove_from_chunk(&mut self, id: EntityID) -> HashSet<EntityID> {
