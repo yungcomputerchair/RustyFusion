@@ -310,6 +310,10 @@ impl Player {
         self.special_state ^= flags;
         self.special_state
     }
+
+    pub fn set_tutorial_flag(&mut self, tutorial_flag: i8) {
+        self.flags.tutorial_flag = tutorial_flag;
+    }
 }
 impl Combatant for Player {
     fn get_condition_bit_flag(&self) -> i32 {

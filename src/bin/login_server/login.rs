@@ -103,6 +103,17 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> Resul
     Ok(())
 }
 
+pub fn save_char_tutor(client: &mut FFClient, state: &mut LoginServerState) -> Result<()> {
+    let pkt: &sP_CL2LS_REQ_SAVE_CHAR_TUTOR = client.get_packet();
+    let pc_uid = pkt.iPC_UID;
+    if let Some(player) = state.players.get_mut(&pc_uid) {
+        player.set_tutorial_flag(pkt.iTutorialFlag);
+        Ok(())
+    } else {
+        Err(Box::new(BadRequest::new(client)))
+    }
+}
+
 pub fn char_select(
     client_key: usize,
     clients: &mut HashMap<usize, FFClient>,
@@ -136,8 +147,8 @@ pub fn char_select(
             }
         }
 
-        return Ok(());
+        Ok(())
+    } else {
+        Err(Box::new(BadRequest::new(client)))
     }
-
-    Err(Box::new(BadRequest::new(client)))
 }

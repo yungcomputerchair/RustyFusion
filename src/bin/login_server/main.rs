@@ -79,6 +79,7 @@ fn handle_packet(
         P_CL2LS_REQ_CHECK_CHAR_NAME => login::check_char_name(client),
         P_CL2LS_REQ_SAVE_CHAR_NAME => login::save_char_name(client, state),
         P_CL2LS_REQ_CHAR_CREATE => login::char_create(client, state),
+        P_CL2LS_REQ_SAVE_CHAR_TUTOR => login::save_char_tutor(client, state),
         P_CL2LS_REQ_CHAR_SELECT => login::char_select(key, clients, state),
         other => {
             println!("Unhandled packet: {:?}", other);
