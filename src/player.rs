@@ -305,6 +305,11 @@ impl Player {
 
         panic!("Inventory slot number {} out of range", slot_num);
     }
+
+    pub fn update_special_state(&mut self, flags: i8) -> i8 {
+        self.special_state ^= flags;
+        self.special_state
+    }
 }
 impl Combatant for Player {
     fn get_condition_bit_flag(&self) -> i32 {

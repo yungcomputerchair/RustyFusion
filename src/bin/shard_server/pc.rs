@@ -154,3 +154,24 @@ pub fn pc_stop(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<
 
     Ok(())
 }
+
+pub fn pc_special_state_switch(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+) -> Result<()> {
+    let client = clients.get_self();
+    let pc_uid = client.get_player_id()?;
+    let pkt: &sP_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH = client.get_packet();
+
+    let player = state.get_player_mut(pc_uid);
+    let special_state = player.update_special_state(pkt.iSpecialStateFlag);
+
+    let resp = sP_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC {
+        iPC_ID: pkt.iPC_ID,
+        iReqSpecialStateFlag: pkt.iSpecialStateFlag,
+        iSpecialState: special_state,
+    };
+    client.send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp)?;
+
+    Ok(())
+}

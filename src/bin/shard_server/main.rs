@@ -53,6 +53,10 @@ impl ShardServerState {
         self.login_server_conn_id = conn_id;
     }
 
+    pub fn get_player_mut(&mut self, pc_uid: i64) -> &mut Player {
+        self.entities.get_player(pc_uid).unwrap()
+    }
+
     pub fn update_player(&mut self, pc_uid: i64, f: impl FnOnce(&mut Player, &mut Self)) {
         // to avoid a double-borrow, we create a copy of the player and then replace it
         let mut player = *self.entities.get_player(pc_uid).unwrap();
@@ -154,6 +158,7 @@ fn handle_packet(
         P_CL2FE_REQ_PC_JUMP => pc::pc_jump(&mut clients, state),
         P_CL2FE_REQ_PC_STOP => pc::pc_stop(&mut clients, state),
         P_CL2FE_REQ_PC_GOTO => pc::pc_goto(clients.get_self()),
+        P_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH => pc::pc_special_state_switch(&mut clients, state),
         //
         P_CL2FE_GM_REQ_PC_SET_VALUE => gm::gm_pc_set_value(clients.get_self()),
         //
