@@ -4,10 +4,10 @@ use super::*;
 
 pub fn gm_pc_set_value(client: &mut FFClient, state: &mut ShardServerState) -> Result<()> {
     let pkt: sP_CL2FE_GM_REQ_PC_SET_VALUE = *client.get_packet();
-    let pc_uid = client.get_player_id()?;
-    let player = state.get_player_mut(pc_uid);
+    let pc_uid = pkt.iPC_ID as i64;
     let value = pkt.iSetValue;
     let value_type = pkt.iSetValueType;
+    let player = state.get_player_mut(pc_uid);
 
     match value_type as u32 {
         defines::CN_GM_SET_VALUE_TYPE__HP => player.set_hp(value),
