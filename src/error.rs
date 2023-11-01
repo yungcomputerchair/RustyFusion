@@ -46,3 +46,31 @@ impl Display for BadRequest {
         )
     }
 }
+
+#[derive(Debug)]
+pub struct BadPayload {
+    addr: String,
+    packet_id: PacketID,
+    client_type: ClientType,
+    reason: String,
+}
+impl BadPayload {
+    pub fn new(client: &FFClient, reason: String) -> Self {
+        Self {
+            addr: client.get_addr(),
+            packet_id: client.get_packet_id(),
+            client_type: client.get_client_type(),
+            reason,
+        }
+    }
+}
+impl Error for BadPayload {}
+impl Display for BadPayload {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Bad {:?} payload from {} (client type {:?}): {}",
+            self.packet_id, self.addr, self.client_type, self.reason
+        )
+    }
+}
