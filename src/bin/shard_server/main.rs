@@ -160,7 +160,7 @@ fn handle_packet(
         P_CL2FE_REQ_PC_GOTO => pc::pc_goto(clients.get_self()),
         P_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH => pc::pc_special_state_switch(&mut clients, state),
         //
-        P_CL2FE_GM_REQ_PC_SET_VALUE => gm::gm_pc_set_value(clients.get_self()),
+        P_CL2FE_GM_REQ_PC_SET_VALUE => gm::gm_pc_set_value(clients.get_self(), state),
         //
         other => {
             println!("Unhandled packet: {:?}", other);

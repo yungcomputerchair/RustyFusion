@@ -314,6 +314,26 @@ impl Player {
     pub fn set_tutorial_flag(&mut self, tutorial_flag: i8) {
         self.flags.tutorial_flag = tutorial_flag;
     }
+
+    pub fn set_taros(&mut self, taros: i32) {
+        self.taros = taros;
+    }
+
+    pub fn set_hp(&mut self, hp: i32) {
+        self.combat_stats.hp = hp;
+    }
+
+    pub fn set_fusion_matter(&mut self, fusion_matter: i32) {
+        self.fusion_matter = fusion_matter;
+    }
+
+    pub fn set_weapon_boosts(&mut self, weapon_boosts: i32) {
+        self.weapon_boosts = weapon_boosts;
+    }
+
+    pub fn set_nano_potions(&mut self, nano_potions: i32) {
+        self.nano_potions = nano_potions;
+    }
 }
 impl Combatant for Player {
     fn get_condition_bit_flag(&self) -> i32 {
