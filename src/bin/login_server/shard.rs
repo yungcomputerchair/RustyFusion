@@ -23,7 +23,8 @@ pub fn update_login_info_succ(
     clients: &mut HashMap<usize, FFClient>,
 ) -> Result<()> {
     let server: &mut FFClient = clients.get_mut(&shard_key).unwrap();
-    let pkt: &sP_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC = server.get_packet();
+    let pkt: &sP_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC =
+        server.get_packet(P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC);
 
     let resp = sP_LS2CL_REP_SHARD_SELECT_SUCC {
         g_FE_ServerIP: pkt.g_FE_ServerIP,
@@ -50,7 +51,8 @@ pub fn update_login_info_fail(
     clients: &mut HashMap<usize, FFClient>,
 ) -> Result<()> {
     let server: &mut FFClient = clients.get_mut(&shard_key).unwrap();
-    let pkt: &sP_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL = server.get_packet();
+    let pkt: &sP_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL =
+        server.get_packet(P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL);
     let resp = sP_LS2CL_REP_CHAR_SELECT_FAIL {
         iErrorCode: pkt.iErrorCode,
     };

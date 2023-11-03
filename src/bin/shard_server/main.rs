@@ -170,7 +170,7 @@ fn handle_packet(
 }
 
 fn wrong_server(client: &mut FFClient) -> Result<()> {
-    let pkt: &sP_CL2LS_REQ_LOGIN = client.get_packet();
+    let pkt: &sP_CL2LS_REQ_LOGIN = client.get_packet(P_CL2LS_REQ_LOGIN);
     let resp = sP_LS2CL_REP_LOGIN_FAIL {
         iErrorCode: 4, // "Login error"
         szID: pkt.szID,

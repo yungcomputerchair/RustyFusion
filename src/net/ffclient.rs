@@ -108,7 +108,13 @@ impl FFClient {
         self.last_pkt_id
     }
 
-    pub fn get_packet<T: FFPacket>(&self) -> &T {
+    pub fn get_packet<T: FFPacket>(&self, pkt_id: PacketID) -> &T {
+        assert_eq!(
+            self.last_pkt_id, pkt_id,
+            "Tried to fetch packet {:?} != buffered {:?}",
+            pkt_id, self.last_pkt_id
+        );
+
         let pkt_buf: &[u8] = &self.buf[4..self.last_pkt_sz];
         unsafe { bytes_to_struct(pkt_buf) }
     }

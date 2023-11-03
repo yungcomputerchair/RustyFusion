@@ -3,7 +3,7 @@ use rusty_fusion::{defines, error::BadPayload, placeholder};
 use super::*;
 
 pub fn gm_pc_set_value(client: &mut FFClient, state: &mut ShardServerState) -> Result<()> {
-    let pkt: sP_CL2FE_GM_REQ_PC_SET_VALUE = *client.get_packet();
+    let pkt: sP_CL2FE_GM_REQ_PC_SET_VALUE = *client.get_packet(P_CL2FE_GM_REQ_PC_SET_VALUE);
     let pc_uid = pkt.iPC_ID as i64;
     let value = pkt.iSetValue;
     let value_type = pkt.iSetValueType;

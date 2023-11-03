@@ -10,7 +10,7 @@ use rusty_fusion::{
 };
 
 pub fn login(client: &mut FFClient) -> Result<()> {
-    let pkt: &sP_CL2LS_REQ_LOGIN = client.get_packet();
+    let pkt: &sP_CL2LS_REQ_LOGIN = client.get_packet(P_CL2LS_REQ_LOGIN);
     let resp = sP_LS2CL_REP_LOGIN_SUCC {
         iCharCount: 0,
         iSlotNum: 0,
@@ -42,7 +42,7 @@ pub fn login(client: &mut FFClient) -> Result<()> {
 }
 
 pub fn check_char_name(client: &mut FFClient) -> Result<()> {
-    let pkt: &sP_CL2LS_REQ_CHECK_CHAR_NAME = client.get_packet();
+    let pkt: &sP_CL2LS_REQ_CHECK_CHAR_NAME = client.get_packet(P_CL2LS_REQ_CHECK_CHAR_NAME);
     let resp = sP_LS2CL_REP_CHECK_CHAR_NAME_SUCC {
         szFirstName: pkt.szFirstName,
         szLastName: pkt.szLastName,
@@ -53,7 +53,7 @@ pub fn check_char_name(client: &mut FFClient) -> Result<()> {
 }
 
 pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> Result<()> {
-    let pkt: &sP_CL2LS_REQ_SAVE_CHAR_NAME = client.get_packet();
+    let pkt: &sP_CL2LS_REQ_SAVE_CHAR_NAME = client.get_packet(P_CL2LS_REQ_SAVE_CHAR_NAME);
 
     let pc_uid = state.get_next_pc_uid();
     let mut player = Player::new(pc_uid);
@@ -74,7 +74,7 @@ pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> Re
 }
 
 pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> Result<()> {
-    let pkt: &sP_CL2LS_REQ_CHAR_CREATE = client.get_packet();
+    let pkt: &sP_CL2LS_REQ_CHAR_CREATE = client.get_packet(P_CL2LS_REQ_CHAR_CREATE);
 
     let pc_uid: i64 = pkt.PCStyle.iPC_UID;
     let player = state.players.get_mut(&pc_uid).unwrap();
@@ -104,7 +104,7 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> Resul
 }
 
 pub fn save_char_tutor(client: &mut FFClient, state: &mut LoginServerState) -> Result<()> {
-    let pkt: &sP_CL2LS_REQ_SAVE_CHAR_TUTOR = client.get_packet();
+    let pkt: &sP_CL2LS_REQ_SAVE_CHAR_TUTOR = client.get_packet(P_CL2LS_REQ_SAVE_CHAR_TUTOR);
     let pc_uid = pkt.iPC_UID;
     if let Some(player) = state.players.get_mut(&pc_uid) {
         player.set_tutorial_flag(pkt.iTutorialFlag);
@@ -121,7 +121,7 @@ pub fn char_select(
 ) -> Result<()> {
     let client: &mut FFClient = clients.get_mut(&client_key).unwrap();
     if let ClientType::GameClient { serial_key, .. } = client.get_client_type() {
-        let pkt: &sP_CL2LS_REQ_CHAR_SELECT = client.get_packet();
+        let pkt: &sP_CL2LS_REQ_CHAR_SELECT = client.get_packet(P_CL2LS_REQ_CHAR_SELECT);
         let pc_uid: i64 = pkt.iPC_UID;
         let login_info = sP_LS2FE_REQ_UPDATE_LOGIN_INFO {
             iEnterSerialKey: serial_key,

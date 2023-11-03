@@ -8,7 +8,7 @@ pub fn login_connect_req(server: &mut FFClient) {
 }
 
 pub fn login_connect_succ(server: &mut FFClient, state: &mut ShardServerState) -> Result<()> {
-    let pkt: &sP_LS2FE_REP_CONNECT_SUCC = server.get_packet();
+    let pkt: &sP_LS2FE_REP_CONNECT_SUCC = server.get_packet(P_LS2FE_REP_CONNECT_SUCC);
     let conn_id: i64 = pkt.iConn_UID;
     let conn_time: u64 = pkt.uiSvrTime;
 
@@ -22,7 +22,7 @@ pub fn login_connect_succ(server: &mut FFClient, state: &mut ShardServerState) -
 }
 
 pub fn login_connect_fail(server: &mut FFClient) -> Result<()> {
-    let pkt: &sP_LS2FE_REP_CONNECT_FAIL = server.get_packet();
+    let pkt: &sP_LS2FE_REP_CONNECT_FAIL = server.get_packet(P_LS2FE_REP_CONNECT_FAIL);
     println!("Login server refused to connect (error {})", {
         pkt.iErrorCode
     });
@@ -36,7 +36,7 @@ pub fn login_update_info(server: &mut FFClient, state: &mut ShardServerState) ->
     let ip_bytes: &[u8] = ip_str.as_bytes();
     ip_buf[..ip_bytes.len()].copy_from_slice(ip_bytes);
 
-    let pkt: &sP_LS2FE_REQ_UPDATE_LOGIN_INFO = server.get_packet();
+    let pkt: &sP_LS2FE_REQ_UPDATE_LOGIN_INFO = server.get_packet(P_LS2FE_REQ_UPDATE_LOGIN_INFO);
     let resp = sP_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC {
         iEnterSerialKey: pkt.iEnterSerialKey,
         g_FE_ServerIP: ip_buf,
