@@ -175,3 +175,13 @@ pub fn pc_special_state_switch(
 
     Ok(())
 }
+
+pub fn pc_first_use_flag_set(client: &mut FFClient, state: &mut ShardServerState) -> Result<()> {
+    let pc_uid = client.get_player_id()?;
+    let pkt: &sP_CL2FE_REQ_PC_FIRST_USE_FLAG_SET = client.get_packet();
+
+    let player = state.get_player_mut(pc_uid);
+    player.update_first_use_flag(pkt.iFlagCode);
+
+    Ok(())
+}

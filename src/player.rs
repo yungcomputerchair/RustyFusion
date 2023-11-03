@@ -32,7 +32,7 @@ struct PlayerFlags {
     appearance_flag: i8,
     tutorial_flag: i8,
     payzone_flag: i8,
-    tip_flags: [i64; 2],
+    tip_flag: i128,
     scamper_flag: i32,
     skyway_flags: [i64; WYVERN_LOCATION_FLAG_SIZE as usize],
     mission_flag: [i64; SIZEOF_QUESTFLAG_NUMBER as usize],
@@ -249,8 +249,8 @@ impl Player {
             iFatigue: unused!(),
             iFatigue_Level: unused!(),
             iFatigueRate: unused!(),
-            iFirstUseFlag1: self.flags.tip_flags[0],
-            iFirstUseFlag2: self.flags.tip_flags[1],
+            iFirstUseFlag1: self.flags.tip_flag as i64,
+            iFirstUseFlag2: (self.flags.tip_flag >> 8) as i64,
             aiPCSkill: [unused!(); 33],
         }
     }
@@ -309,6 +309,11 @@ impl Player {
     pub fn update_special_state(&mut self, flags: i8) -> i8 {
         self.special_state ^= flags;
         self.special_state
+    }
+
+    pub fn update_first_use_flag(&mut self, bit_offset: i32) -> i128 {
+        self.flags.tip_flag |= 1_i128 << (bit_offset - 1);
+        self.flags.tip_flag
     }
 
     pub fn set_tutorial_flag(&mut self, tutorial_flag: i8) {
