@@ -5,7 +5,7 @@
 use crate::player::Player;
 
 #[repr(u32)]
-#[derive(Debug, FromPrimitive, ToPrimitive, Clone, Copy)]
+#[derive(Debug, FromPrimitive, ToPrimitive, Clone, Copy, PartialEq)]
 pub enum PacketID {
     P_NULL = 0,
 

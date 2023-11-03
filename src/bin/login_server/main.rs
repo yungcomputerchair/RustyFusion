@@ -69,7 +69,6 @@ fn handle_packet(
     state: &mut LoginServerState,
 ) -> Result<()> {
     let client: &mut FFClient = clients.get_mut(&key).unwrap();
-    println!("{} sent {:?}", client.get_addr(), pkt_id);
     match pkt_id {
         P_FE2LS_REQ_CONNECT => shard::connect(client, state),
         P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC => shard::update_login_info_succ(key, clients),

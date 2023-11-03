@@ -2,11 +2,21 @@ use std::{collections::HashMap, mem::size_of, slice::from_raw_parts};
 
 use self::{
     ffclient::{ClientType, FFClient},
-    packet::{FFPacket, PacketID},
+    packet::{
+        FFPacket,
+        PacketID::{self, *},
+    },
 };
 use crate::{player::Player, Result};
 
 const PACKET_BUFFER_SIZE: usize = 8192;
+const SILENCED_PACKETS: [PacketID; 4] = [
+    P_LS2FE_REP_CONNECT_SUCC,
+    //
+    P_CL2FE_REQ_PC_MOVE,
+    P_CL2FE_REQ_PC_JUMP,
+    P_CL2FE_REQ_PC_STOP,
+];
 
 pub mod crypto;
 pub mod ffclient;

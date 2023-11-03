@@ -158,6 +158,7 @@ impl EntityMap {
             }
         }
 
+        #[cfg(debug_assertions)]
         println!("Moved to {:?}", self.registry[&id].chunk);
     }
 

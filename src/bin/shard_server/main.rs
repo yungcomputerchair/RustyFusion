@@ -144,7 +144,6 @@ fn handle_packet(
     state: &mut ShardServerState,
 ) -> Result<()> {
     let mut clients = ClientMap::new(key, clients);
-    println!("{} sent {:?}", clients.get_self().get_addr(), pkt_id);
     match pkt_id {
         P_LS2FE_REP_CONNECT_SUCC => login::login_connect_succ(clients.get_self(), state),
         P_LS2FE_REP_CONNECT_FAIL => login::login_connect_fail(clients.get_self()),

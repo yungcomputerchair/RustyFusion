@@ -8,7 +8,7 @@ use num_traits::{FromPrimitive, ToPrimitive};
 
 use crate::{
     error::{BadPacketID, BadRequest},
-    net::{struct_to_bytes, PACKET_BUFFER_SIZE},
+    net::{struct_to_bytes, PACKET_BUFFER_SIZE, SILENCED_PACKETS},
     util::get_time,
     Result,
 };
@@ -135,6 +135,11 @@ impl FFClient {
                 return Err(Box::new(BadPacketID::new(id)));
             }
         };
+
+        #[cfg(debug_assertions)]
+        if !SILENCED_PACKETS.contains(&id) {
+            println!("{} sent {:?}", self.get_addr(), id);
+        }
 
         self.last_pkt_id = id;
         self.last_pkt_sz = sz;

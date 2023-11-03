@@ -22,6 +22,7 @@ macro_rules! unused {
 #[macro_export]
 macro_rules! placeholder {
     ($val:expr) => {{
+        #[cfg(debug_assertions)]
         println!("PLACEHOLDER: {} line {}", file!(), line!());
         $val
     }};
