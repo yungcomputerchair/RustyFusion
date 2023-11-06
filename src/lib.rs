@@ -128,6 +128,21 @@ impl From<Mission> for sRunningQuest {
         }
     }
 }
+impl From<Option<Mission>> for sRunningQuest {
+    fn from(value: Option<Mission>) -> Self {
+        if let Some(mission) = value {
+            return mission.into();
+        }
+
+        Self {
+            m_aCurrTaskID: 0,
+            m_aKillNPCID: [0, 0, 0],
+            m_aKillNPCCount: [0, 0, 0],
+            m_aNeededItemID: [0, 0, 0],
+            m_aNeededItemCount: [0, 0, 0],
+        }
+    }
+}
 
 #[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
 pub enum EntityID {

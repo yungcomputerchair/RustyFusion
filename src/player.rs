@@ -80,7 +80,7 @@ impl Default for NanoData {
 
 #[derive(Debug, Clone, Copy, Default)]
 struct MissionData {
-    current_missions: [Mission; SIZEOF_RQUEST_SLOT as usize],
+    current_missions: [Option<Mission>; SIZEOF_RQUEST_SLOT as usize],
     active_mission_id: i32,
 }
 
@@ -241,7 +241,10 @@ impl Player {
             },
             aQuestFlag: self.flags.mission_flag,
             aRepeatQuestFlag: self.flags.repeat_mission_flag,
-            aRunningQuest: self.mission_data.current_missions.map(Mission::into),
+            aRunningQuest: self
+                .mission_data
+                .current_missions
+                .map(Option::<Mission>::into),
             iCurrentMissionID: self.mission_data.active_mission_id,
             iWarpLocationFlag: self.flags.scamper_flag,
             aWyvernLocationFlag: self.flags.skyway_flags,
