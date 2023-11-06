@@ -134,6 +134,7 @@ fn handle_disconnect(
     }
 }
 
+mod chat;
 mod gm;
 mod login;
 mod pc;
@@ -161,6 +162,8 @@ fn handle_packet(
         P_CL2FE_REQ_PC_FIRST_USE_FLAG_SET => pc::pc_first_use_flag_set(clients.get_self(), state),
         //
         P_CL2FE_GM_REQ_PC_SET_VALUE => gm::gm_pc_set_value(clients.get_self(), state),
+        //
+        P_CL2FE_REQ_SEND_FREECHAT_MESSAGE => chat::send_freechat_message(&mut clients, state),
         //
         other => {
             println!("Unhandled packet: {:?}", other);
