@@ -13,7 +13,12 @@ pub fn login(client: &mut FFClient, state: &mut LoginServerState) -> Result<()> 
     let pkt: &sP_CL2LS_REQ_LOGIN = client.get_packet(P_CL2LS_REQ_LOGIN);
 
     let mut players: Vec<Player> = Vec::new();
-    let username = util::parse_utf16(&pkt.szID);
+    let mut username = util::parse_utf16(&pkt.szID);
+    let mut _password = util::parse_utf16(&pkt.szPassword);
+    if username.is_empty() {
+        username = util::parse_utf8(&pkt.szCookie_TEGid);
+        _password = util::parse_utf8(&pkt.szCookie_authid);
+    }
     if username.eq("test") {
         let mut player = Player::new(i64::MAX);
         player.set_name(1, util::encode_utf16("TestF"), util::encode_utf16("TestL"));
