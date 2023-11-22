@@ -2,12 +2,20 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 pub fn parse_utf16(chars: &[u16]) -> String {
     let end_pos: usize = chars.iter().position(|&c| c == 0).unwrap_or(chars.len());
-    String::from_utf16_lossy(&chars[..end_pos])
+    if let Ok(val) = String::from_utf16(&chars[..end_pos]) {
+        val
+    } else {
+        String::new()
+    }
 }
 
 pub fn parse_utf8(chars: &[u8]) -> String {
     let end_pos: usize = chars.iter().position(|&c| c == 0).unwrap_or(chars.len());
-    String::from_utf8_lossy(&chars[..end_pos]).to_string()
+    if let Ok(val) = std::str::from_utf8(&chars[..end_pos]) {
+        val.to_string()
+    } else {
+        String::new()
+    }
 }
 
 pub fn encode_utf16<const SIZE: usize>(chars: &str) -> [u16; SIZE] {

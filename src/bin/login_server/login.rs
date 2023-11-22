@@ -6,7 +6,7 @@ use rusty_fusion::{
     defines::*,
     error::BadRequest,
     net::{ffclient::ClientType, packet::*},
-    placeholder, util, Combatant, Entity, Item,
+    placeholder, unused, util, Combatant, Entity, Item,
 };
 
 pub fn login(client: &mut FFClient, state: &mut LoginServerState) -> Result<()> {
@@ -31,7 +31,7 @@ pub fn login(client: &mut FFClient, state: &mut LoginServerState) -> Result<()> 
         iCharCount: players.len() as i8,
         iSlotNum: placeholder!(1),
         iPaymentFlag: 1,
-        iTempForPacking4: 69,
+        iTempForPacking4: unused!(),
         uiSvrTime: get_time(),
         szID: pkt.szID,
         iOpenBetaFlag: 0,
