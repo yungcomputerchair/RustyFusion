@@ -15,7 +15,7 @@ use crate::{
     CombatStats, Combatant, Entity, EntityID, Item, Mission, Nano, Position, Result,
 };
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 struct PlayerStyle {
     gender: i8,
     face_style: i8,
@@ -26,13 +26,27 @@ struct PlayerStyle {
     height: i8,
     body: i8,
 }
+impl Default for PlayerStyle {
+    fn default() -> Self {
+        Self {
+            gender: 1,
+            face_style: 1,
+            hair_style: 1,
+            hair_color: 1,
+            skin_color: 1,
+            eye_color: 1,
+            height: 1,
+            body: 1,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, Default)]
 struct PlayerFlags {
-    appearance_flag: i8,
-    tutorial_flag: i8,
-    payzone_flag: i8,
-    tip_flag: i128,
+    appearance_flag: bool,
+    tutorial_flag: bool,
+    payzone_flag: bool,
+    tip_flags: i128,
     scamper_flag: i32,
     skyway_flags: [i64; WYVERN_LOCATION_FLAG_SIZE as usize],
     mission_flag: [i64; SIZEOF_QUESTFLAG_NUMBER as usize],
@@ -130,10 +144,6 @@ impl Player {
         Self {
             uid,
             client_id: None,
-            style: PlayerStyle {
-                gender: (rand::random::<bool>() as i8) + 1,
-                ..Default::default()
-            },
             combat_stats: CombatStats {
                 _max_hp: placeholder!(100),
                 hp: placeholder!(100),
@@ -185,9 +195,9 @@ impl Player {
 
     pub fn get_style_2(&self) -> sPCStyle2 {
         sPCStyle2 {
-            iAppearanceFlag: self.flags.appearance_flag,
-            iTutorialFlag: self.flags.tutorial_flag,
-            iPayzoneFlag: self.flags.payzone_flag,
+            iAppearanceFlag: if self.flags.appearance_flag { 1 } else { 0 },
+            iTutorialFlag: if self.flags.tutorial_flag { 1 } else { 0 },
+            iPayzoneFlag: if self.flags.payzone_flag { 1 } else { 0 },
         }
     }
 
@@ -252,8 +262,8 @@ impl Player {
             iFatigue: unused!(),
             iFatigue_Level: unused!(),
             iFatigueRate: unused!(),
-            iFirstUseFlag1: self.flags.tip_flag as i64,
-            iFirstUseFlag2: (self.flags.tip_flag >> 8) as i64,
+            iFirstUseFlag1: self.flags.tip_flags as i64,
+            iFirstUseFlag2: (self.flags.tip_flags >> 8) as i64,
             aiPCSkill: [unused!(); 33],
         }
     }
@@ -309,18 +319,26 @@ impl Player {
         panic!("Inventory slot number {} out of range", slot_num);
     }
 
+    pub fn get_equipped(&self) -> [Option<Item>; 9] {
+        self.inventory.equipped
+    }
+
     pub fn update_special_state(&mut self, flags: i8) -> i8 {
         self.special_state ^= flags;
         self.special_state
     }
 
     pub fn update_first_use_flag(&mut self, bit_offset: i32) -> i128 {
-        self.flags.tip_flag |= 1_i128 << (bit_offset - 1);
-        self.flags.tip_flag
+        self.flags.tip_flags |= 1_i128 << (bit_offset - 1);
+        self.flags.tip_flags
     }
 
-    pub fn set_tutorial_flag(&mut self, tutorial_flag: i8) {
-        self.flags.tutorial_flag = tutorial_flag;
+    pub fn set_appearance_flag(&mut self) {
+        self.flags.appearance_flag = true;
+    }
+
+    pub fn set_tutorial_flag(&mut self) {
+        self.flags.tutorial_flag = true;
     }
 
     pub fn set_taros(&mut self, taros: i32) {

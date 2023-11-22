@@ -74,7 +74,7 @@ fn handle_packet(
         P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC => shard::update_login_info_succ(key, clients),
         P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL => shard::update_login_info_fail(key, clients),
         //
-        P_CL2LS_REQ_LOGIN => login::login(client),
+        P_CL2LS_REQ_LOGIN => login::login(client, state),
         P_CL2LS_REQ_CHECK_CHAR_NAME => login::check_char_name(client),
         P_CL2LS_REQ_SAVE_CHAR_NAME => login::save_char_name(client, state),
         P_CL2LS_REQ_CHAR_CREATE => login::char_create(client, state),
