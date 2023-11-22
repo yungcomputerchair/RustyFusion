@@ -71,9 +71,7 @@ pub fn login(client: &mut FFClient, state: &mut LoginServerState) -> Result<()> 
             };
             state.players.insert(pkt.sPC_Style.iPC_UID, player);
             client.send_packet(P_LS2CL_REP_CHAR_INFO, &pkt)
-        })?;
-
-    Ok(())
+        })
 }
 
 pub fn check_char_name(client: &mut FFClient) -> Result<()> {
@@ -82,9 +80,7 @@ pub fn check_char_name(client: &mut FFClient) -> Result<()> {
         szFirstName: pkt.szFirstName,
         szLastName: pkt.szLastName,
     };
-    client.send_packet(P_LS2CL_REP_CHECK_CHAR_NAME_SUCC, &resp)?;
-
-    Ok(())
+    client.send_packet(P_LS2CL_REP_CHECK_CHAR_NAME_SUCC, &resp)
 }
 
 pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> Result<()> {
@@ -112,30 +108,32 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> Resul
     let pkt: &sP_CL2LS_REQ_CHAR_CREATE = client.get_packet(P_CL2LS_REQ_CHAR_CREATE);
 
     let pc_uid: i64 = pkt.PCStyle.iPC_UID;
-    let player = state.players.get_mut(&pc_uid).unwrap();
-    player.set_style(pkt.PCStyle);
-    player.set_item(
-        EQUIP_SLOT_UPPERBODY as usize,
-        Item::new(EQUIP_SLOT_UPPERBODY as i16, pkt.sOn_Item.iEquipUBID),
-    );
-    player.set_item(
-        EQUIP_SLOT_LOWERBODY as usize,
-        Item::new(EQUIP_SLOT_LOWERBODY as i16, pkt.sOn_Item.iEquipLBID),
-    );
-    player.set_item(
-        EQUIP_SLOT_FOOT as usize,
-        Item::new(EQUIP_SLOT_FOOT as i16, pkt.sOn_Item.iEquipFootID),
-    );
+    if let Some(player) = state.players.get_mut(&pc_uid) {
+        player.set_style(pkt.PCStyle);
+        player.set_item(
+            EQUIP_SLOT_UPPERBODY as usize,
+            Item::new(EQUIP_SLOT_UPPERBODY as i16, pkt.sOn_Item.iEquipUBID),
+        );
+        player.set_item(
+            EQUIP_SLOT_LOWERBODY as usize,
+            Item::new(EQUIP_SLOT_LOWERBODY as i16, pkt.sOn_Item.iEquipLBID),
+        );
+        player.set_item(
+            EQUIP_SLOT_FOOT as usize,
+            Item::new(EQUIP_SLOT_FOOT as i16, pkt.sOn_Item.iEquipFootID),
+        );
 
-    let resp = sP_LS2CL_REP_CHAR_CREATE_SUCC {
-        iLevel: player.get_level(),
-        sPC_Style: player.get_style(),
-        sPC_Style2: player.get_style_2(),
-        sOn_Item: pkt.sOn_Item,
-    };
+        let resp = sP_LS2CL_REP_CHAR_CREATE_SUCC {
+            iLevel: player.get_level(),
+            sPC_Style: player.get_style(),
+            sPC_Style2: player.get_style_2(),
+            sOn_Item: pkt.sOn_Item,
+        };
 
-    client.send_packet(P_LS2CL_REP_CHAR_CREATE_SUCC, &resp)?;
-    Ok(())
+        client.send_packet(P_LS2CL_REP_CHAR_CREATE_SUCC, &resp)
+    } else {
+        Err(Box::new(BadRequest::new(client)))
+    }
 }
 
 pub fn save_char_tutor(client: &mut FFClient, state: &mut LoginServerState) -> Result<()> {
@@ -160,6 +158,10 @@ pub fn char_select(
     if let ClientType::GameClient { serial_key, .. } = client.get_client_type() {
         let pkt: &sP_CL2LS_REQ_CHAR_SELECT = client.get_packet(P_CL2LS_REQ_CHAR_SELECT);
         let pc_uid: i64 = pkt.iPC_UID;
+        if !state.players.contains_key(&pc_uid) {
+            return Err(Box::new(BadRequest::new(client)));
+        }
+
         let login_info = sP_LS2FE_REQ_UPDATE_LOGIN_INFO {
             iEnterSerialKey: serial_key,
             iPC_UID: pc_uid,
@@ -174,17 +176,16 @@ pub fn char_select(
 
         match shard_server {
             Some(shard) => {
-                shard.send_packet(P_LS2FE_REQ_UPDATE_LOGIN_INFO, &login_info)?;
+                let _ = shard.send_packet(P_LS2FE_REQ_UPDATE_LOGIN_INFO, &login_info);
+                Ok(())
             }
             None => {
                 // no shards available
                 let resp = sP_LS2CL_REP_CHAR_SELECT_FAIL { iErrorCode: 1 };
                 let client: &mut FFClient = clients.get_mut(&client_key).unwrap();
-                client.send_packet(P_LS2CL_REP_CHAR_SELECT_FAIL, &resp)?;
+                client.send_packet(P_LS2CL_REP_CHAR_SELECT_FAIL, &resp)
             }
         }
-
-        Ok(())
     } else {
         Err(Box::new(BadRequest::new(client)))
     }
