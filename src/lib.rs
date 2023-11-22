@@ -15,7 +15,7 @@ pub type Result<T> = result::Result<T, Box<dyn Error>>;
 #[macro_export]
 macro_rules! unused {
     () => {
-        0
+        Default::default()
     };
 }
 
