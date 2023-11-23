@@ -6,12 +6,28 @@ use crate::net::{
 };
 
 #[derive(Debug)]
+pub struct SimpleError {
+    msg: String,
+}
+impl SimpleError {
+    pub fn build(msg: String) -> Box<dyn Error> {
+        Box::new(Self { msg })
+    }
+}
+impl Error for SimpleError {}
+impl Display for SimpleError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.msg)
+    }
+}
+
+#[derive(Debug)]
 pub struct BadPacketID {
     packet_id: u32,
 }
 impl BadPacketID {
-    pub fn new(packet_id: u32) -> Self {
-        Self { packet_id }
+    pub fn build(packet_id: u32) -> Box<dyn Error> {
+        Box::new(Self { packet_id })
     }
 }
 impl Error for BadPacketID {}
@@ -28,12 +44,12 @@ pub struct BadRequest {
     client_type: ClientType,
 }
 impl BadRequest {
-    pub fn new(client: &FFClient) -> Self {
-        Self {
+    pub fn build(client: &FFClient) -> Box<dyn Error> {
+        Box::new(Self {
             addr: client.get_addr(),
             packet_id: client.get_packet_id(),
-            client_type: client.get_client_type().clone(),
-        }
+            client_type: client.get_client_type(),
+        })
     }
 }
 impl Error for BadRequest {}
@@ -55,13 +71,13 @@ pub struct BadPayload {
     reason: String,
 }
 impl BadPayload {
-    pub fn new(client: &FFClient, reason: String) -> Self {
-        Self {
+    pub fn build(client: &FFClient, reason: String) -> Box<dyn Error> {
+        Box::new(Self {
             addr: client.get_addr(),
             packet_id: client.get_packet_id(),
             client_type: client.get_client_type(),
             reason,
-        }
+        })
     }
 }
 impl Error for BadPayload {}

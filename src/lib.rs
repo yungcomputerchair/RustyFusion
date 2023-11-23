@@ -68,27 +68,36 @@ impl Item {
         }
     }
 }
-impl From<Item> for sItemBase {
-    fn from(value: Item) -> Self {
-        Self {
-            iType: value.ty,
-            iID: value.id,
-            iOpt: value.options,
-            iTimeLimit: value.expiry_time,
+impl From<sItemBase> for Option<Item> {
+    fn from(value: sItemBase) -> Self {
+        if value.iID == 0 || value.iOpt == 0 {
+            None
+        } else {
+            Some(Item {
+                ty: value.iType,
+                id: value.iID,
+                options: value.iOpt,
+                expiry_time: value.iTimeLimit,
+            })
         }
     }
 }
 impl From<Option<Item>> for sItemBase {
     fn from(value: Option<Item>) -> Self {
-        if let Some(item) = value {
-            return item.into();
-        }
-
-        Self {
-            iType: 0,
-            iID: 0,
-            iOpt: 0,
-            iTimeLimit: 0,
+        if let Some(value) = value {
+            Self {
+                iType: value.ty,
+                iID: value.id,
+                iOpt: value.options,
+                iTimeLimit: value.expiry_time,
+            }
+        } else {
+            Self {
+                iType: 0,
+                iID: 0,
+                iOpt: 0,
+                iTimeLimit: 0,
+            }
         }
     }
 }

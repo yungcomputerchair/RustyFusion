@@ -18,10 +18,10 @@ pub fn gm_pc_set_value(client: &mut FFClient, state: &mut ShardServerState) -> R
         defines::CN_GM_SET_VALUE_TYPE__SPEED => placeholder!(()),
         defines::CN_GM_SET_VALUE_TYPE__JUMP => placeholder!(()),
         _ => {
-            return Err(Box::new(BadPayload::new(
+            return Err(BadPayload::build(
                 client,
                 format!("Bad value type: {value_type}"),
-            )));
+            ));
         }
     };
 
@@ -33,4 +33,23 @@ pub fn gm_pc_set_value(client: &mut FFClient, state: &mut ShardServerState) -> R
     client.send_packet(P_FE2CL_GM_REP_PC_SET_VALUE, &resp)?;
 
     Ok(())
+}
+
+pub fn gm_pc_give_item(client: &mut FFClient, state: &mut ShardServerState) -> Result<()> {
+    let pc_uid = client.get_player_id()?;
+    let pkt: &sP_CL2FE_REQ_PC_GIVE_ITEM = client.get_packet(P_CL2FE_REQ_PC_GIVE_ITEM);
+    let player = state.get_player_mut(pc_uid);
+    let slot_number = pkt.iSlotNum as usize;
+    if let Some(item) = pkt.Item.into() {
+        if let Err(e) = player.set_item(slot_number, item) {
+            return Err(BadPayload::build(client, e.to_string()));
+        }
+    }
+
+    let resp = sP_FE2CL_REP_PC_GIVE_ITEM_SUCC {
+        eIL: pkt.eIL,
+        iSlotNum: pkt.iSlotNum,
+        Item: pkt.Item,
+    };
+    client.send_packet(P_FE2CL_REP_PC_GIVE_ITEM_SUCC, &resp)
 }

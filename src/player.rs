@@ -3,6 +3,7 @@ use std::{any::Any, fmt::Display};
 use crate::{
     chunk::{pos_to_chunk_coords, EntityMap},
     defines::*,
+    error::SimpleError,
     net::{
         ffclient::FFClient,
         packet::{
@@ -296,27 +297,27 @@ impl Player {
         }
     }
 
-    pub fn set_item(&mut self, mut slot_num: usize, item: Item) -> Option<Item> {
+    pub fn set_item(&mut self, mut slot_num: usize, item: Item) -> Result<Option<Item>> {
         if slot_num < SIZEOF_EQUIP_SLOT as usize {
-            return self.inventory.equipped[slot_num].replace(item);
+            return Ok(self.inventory.equipped[slot_num].replace(item));
         }
 
         slot_num -= SIZEOF_EQUIP_SLOT as usize;
         if slot_num < SIZEOF_INVEN_SLOT as usize {
-            return self.inventory.main[slot_num].replace(item);
+            return Ok(self.inventory.main[slot_num].replace(item));
         }
 
         slot_num -= SIZEOF_INVEN_SLOT as usize;
         if slot_num < SIZEOF_QINVEN_SLOT as usize {
-            return self.inventory.mission[slot_num].replace(item);
+            return Ok(self.inventory.mission[slot_num].replace(item));
         }
 
         slot_num -= SIZEOF_QINVEN_SLOT as usize;
         if slot_num < SIZEOF_BANK_SLOT as usize {
-            return self.inventory.bank[slot_num].replace(item);
+            return Ok(self.inventory.bank[slot_num].replace(item));
         }
 
-        panic!("Inventory slot number {} out of range", slot_num);
+        Err(SimpleError::build(format!("Bad slot number: {slot_num}")))
     }
 
     pub fn get_equipped(&self) -> [Option<Item>; 9] {

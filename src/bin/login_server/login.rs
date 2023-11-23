@@ -113,15 +113,15 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> Resul
         player.set_item(
             EQUIP_SLOT_UPPERBODY as usize,
             Item::new(EQUIP_SLOT_UPPERBODY as i16, pkt.sOn_Item.iEquipUBID),
-        );
+        )?;
         player.set_item(
             EQUIP_SLOT_LOWERBODY as usize,
             Item::new(EQUIP_SLOT_LOWERBODY as i16, pkt.sOn_Item.iEquipLBID),
-        );
+        )?;
         player.set_item(
             EQUIP_SLOT_FOOT as usize,
             Item::new(EQUIP_SLOT_FOOT as i16, pkt.sOn_Item.iEquipFootID),
-        );
+        )?;
 
         let resp = sP_LS2CL_REP_CHAR_CREATE_SUCC {
             iLevel: player.get_level(),
@@ -132,7 +132,7 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> Resul
 
         client.send_packet(P_LS2CL_REP_CHAR_CREATE_SUCC, &resp)
     } else {
-        Err(Box::new(BadRequest::new(client)))
+        Err(BadRequest::build(client))
     }
 }
 
@@ -146,7 +146,7 @@ pub fn save_char_tutor(client: &mut FFClient, state: &mut LoginServerState) -> R
         }
     }
 
-    Err(Box::new(BadRequest::new(client)))
+    Err(BadRequest::build(client))
 }
 
 pub fn char_select(
@@ -159,7 +159,7 @@ pub fn char_select(
         let pkt: &sP_CL2LS_REQ_CHAR_SELECT = client.get_packet(P_CL2LS_REQ_CHAR_SELECT);
         let pc_uid: i64 = pkt.iPC_UID;
         if !state.players.contains_key(&pc_uid) {
-            return Err(Box::new(BadRequest::new(client)));
+            return Err(BadRequest::build(client));
         }
 
         let login_info = sP_LS2FE_REQ_UPDATE_LOGIN_INFO {
@@ -187,6 +187,6 @@ pub fn char_select(
             }
         }
     } else {
-        Err(Box::new(BadRequest::new(client)))
+        Err(BadRequest::build(client))
     }
 }

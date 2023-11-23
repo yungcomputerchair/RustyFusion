@@ -100,7 +100,7 @@ impl FFClient {
         {
             Ok(pc_uid)
         } else {
-            Err(Box::new(BadRequest::new(self)))
+            Err(BadRequest::build(self))
         }
     }
 
@@ -138,7 +138,7 @@ impl FFClient {
         let id: PacketID = match PacketID::from_u32(id) {
             Some(id) => id,
             None => {
-                return Err(Box::new(BadPacketID::new(id)));
+                return Err(BadPacketID::build(id));
             }
         };
 
