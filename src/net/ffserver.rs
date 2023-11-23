@@ -81,17 +81,24 @@ impl FFServer {
                 };
                 let clients: &mut HashMap<usize, FFClient> = &mut self.clients;
                 let client: &mut FFClient = clients.get_mut(&ev.key).unwrap();
+                let mut err = None;
                 match client.read_packet() {
                     Ok(pkt) => {
-                        pkt_handler(ev.key, clients, pkt)?;
+                        if let Err(e) = pkt_handler(ev.key, clients, pkt) {
+                            err = Some(e);
+                        }
                     }
                     Err(e) => {
-                        println!("err on socket {}: {}", ev.key, e);
-                        if let Some(callback) = dc_handler.as_mut() {
-                            callback(ev.key, clients);
-                        };
-                        self.unregister_client(ev.key)?.unwrap();
+                        err = Some(e);
                     }
+                }
+
+                if let Some(e) = err {
+                    println!("err on socket {}: {}", ev.key, e);
+                    if let Some(callback) = dc_handler.as_mut() {
+                        callback(ev.key, clients);
+                    };
+                    self.unregister_client(ev.key)?.unwrap();
                 }
             }
         }
