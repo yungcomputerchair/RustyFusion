@@ -1,4 +1,6 @@
-use rusty_fusion::{defines, error::BadPayload, placeholder};
+use rusty_fusion::{defines, enums::eItemLocation, error::BadPayload, placeholder};
+
+use num_traits::ToPrimitive;
 
 use super::*;
 
@@ -40,6 +42,14 @@ pub fn gm_pc_give_item(client: &mut FFClient, state: &mut ShardServerState) -> R
     let pkt: &sP_CL2FE_REQ_PC_GIVE_ITEM = client.get_packet(P_CL2FE_REQ_PC_GIVE_ITEM);
     let player = state.get_player_mut(pc_uid);
     let slot_number = pkt.iSlotNum as usize;
+
+    if pkt.eIL != eItemLocation::eIL_Inven.to_i32().unwrap() {
+        return Err(BadPayload::build(
+            client,
+            format!("Bad /itemN item location: {}", pkt.eIL),
+        ));
+    }
+
     if let Some(item) = pkt.Item.into() {
         if let Err(e) = player.set_item(slot_number, item) {
             return Err(BadPayload::build(client, e.to_string()));
