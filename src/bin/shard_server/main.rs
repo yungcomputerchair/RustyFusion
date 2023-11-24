@@ -136,6 +136,7 @@ fn handle_disconnect(
 
 mod chat;
 mod gm;
+mod item;
 mod login;
 mod pc;
 fn handle_packet(
@@ -167,6 +168,8 @@ fn handle_packet(
         P_CL2FE_REQ_SEND_FREECHAT_MESSAGE => chat::send_freechat_message(&mut clients, state),
         P_CL2FE_REQ_SEND_MENUCHAT_MESSAGE => chat::send_menuchat_message(&mut clients, state),
         P_CL2FE_REQ_PC_AVATAR_EMOTES_CHAT => chat::pc_avatar_emotes_chat(&mut clients, state),
+        //
+        P_CL2FE_REQ_ITEM_MOVE => item::item_move(&mut clients, state),
         //
         other => {
             println!("Unhandled packet: {:?}", other);

@@ -112,15 +112,21 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> Resul
         player.set_style(pkt.PCStyle);
         player.set_item(
             EQUIP_SLOT_UPPERBODY as usize,
-            Item::new(EQUIP_SLOT_UPPERBODY as i16, pkt.sOn_Item.iEquipUBID),
+            Some(Item::new(
+                EQUIP_SLOT_UPPERBODY as i16,
+                pkt.sOn_Item.iEquipUBID,
+            )),
         )?;
         player.set_item(
             EQUIP_SLOT_LOWERBODY as usize,
-            Item::new(EQUIP_SLOT_LOWERBODY as i16, pkt.sOn_Item.iEquipLBID),
+            Some(Item::new(
+                EQUIP_SLOT_LOWERBODY as i16,
+                pkt.sOn_Item.iEquipLBID,
+            )),
         )?;
         player.set_item(
             EQUIP_SLOT_FOOT as usize,
-            Item::new(EQUIP_SLOT_FOOT as i16, pkt.sOn_Item.iEquipFootID),
+            Some(Item::new(EQUIP_SLOT_FOOT as i16, pkt.sOn_Item.iEquipFootID)),
         )?;
 
         let resp = sP_LS2CL_REP_CHAR_CREATE_SUCC {
