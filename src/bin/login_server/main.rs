@@ -1,6 +1,7 @@
-use std::{cell::RefCell, collections::HashMap, time::Duration};
+use std::{cell::RefCell, collections::HashMap, io::Result, time::Duration};
 
 use rusty_fusion::{
+    error::{log, FFError, FFResult, Severity},
     net::{
         crypto::{gen_key, DEFAULT_KEY},
         ffclient::FFClient,
@@ -12,7 +13,6 @@ use rusty_fusion::{
     },
     player::Player,
     util::get_time,
-    Result,
 };
 
 const LOGIN_LISTEN_ADDR: &str = "127.0.0.1:23000";
@@ -50,11 +50,14 @@ fn main() -> Result<()> {
     let mut server: FFServer = FFServer::new(LOGIN_LISTEN_ADDR, Some(polling_interval))?;
 
     let state = RefCell::new(LoginServerState::new());
-    let mut pkt_handler = |key, clients: &mut HashMap<usize, FFClient>, pkt_id| -> Result<()> {
+    let mut pkt_handler = |key, clients: &mut HashMap<usize, FFClient>, pkt_id| -> FFResult<()> {
         handle_packet(key, clients, pkt_id, &mut state.borrow_mut())
     };
 
-    println!("Login server listening on {}", server.get_endpoint());
+    log(
+        Severity::Info,
+        &format!("Login server listening on {}", server.get_endpoint()),
+    );
     loop {
         server.poll(&mut pkt_handler, None)?;
     }
@@ -67,7 +70,7 @@ fn handle_packet(
     clients: &mut HashMap<usize, FFClient>,
     pkt_id: PacketID,
     state: &mut LoginServerState,
-) -> Result<()> {
+) -> FFResult<()> {
     let client: &mut FFClient = clients.get_mut(&key).unwrap();
     match pkt_id {
         P_FE2LS_REQ_CONNECT => shard::connect(client, state),
@@ -80,9 +83,9 @@ fn handle_packet(
         P_CL2LS_REQ_CHAR_CREATE => login::char_create(client, state),
         P_CL2LS_REQ_SAVE_CHAR_TUTOR => login::save_char_tutor(client, state),
         P_CL2LS_REQ_CHAR_SELECT => login::char_select(key, clients, state),
-        other => {
-            println!("Unhandled packet: {:?}", other);
-            Ok(())
-        }
+        other => Err(FFError::new(
+            Severity::Warning,
+            format!("Unhandled packet: {:?}", other),
+        )),
     }
 }

@@ -7,10 +7,9 @@ use std::{
 use num_traits::{FromPrimitive, ToPrimitive};
 
 use crate::{
-    error::{FFError, Severity},
+    error::{log, FFError, FFResult, Severity},
     net::{struct_to_bytes, PACKET_BUFFER_SIZE, SILENCED_PACKETS},
     util::get_time,
-    Result,
 };
 
 use super::{
@@ -92,7 +91,7 @@ impl FFClient {
         self.client_type = cltype;
     }
 
-    pub fn get_player_id(&mut self) -> Result<i64> {
+    pub fn get_player_id(&mut self) -> FFResult<i64> {
         if let ClientType::GameClient {
             pc_uid: Some(pc_uid),
             ..
@@ -100,7 +99,7 @@ impl FFClient {
         {
             Ok(pc_uid)
         } else {
-            Err(FFError::build(
+            Err(FFError::new(
                 Severity::Fatal,
                 "Couldn't get player ID for client".to_string(),
             ))
@@ -122,30 +121,34 @@ impl FFClient {
         unsafe { bytes_to_struct(pkt_buf) }
     }
 
-    pub fn read_packet(&mut self) -> Result<PacketID> {
+    pub fn read_packet(&mut self) -> FFResult<PacketID> {
         self.last_heartbeat = get_time();
 
         // read the size
         let mut sz_buf: [u8; 4] = [0; 4];
-        self.sock.read_exact(&mut sz_buf)?;
+        self.sock
+            .read_exact(&mut sz_buf)
+            .map_err(FFError::from_io_err)?;
         let sz: usize = u32::from_le_bytes(sz_buf) as usize;
 
         // read the packet
         let buf: &mut [u8] = &mut self.buf[..sz];
-        self.sock.read_exact(buf)?;
+        self.sock.read_exact(buf).map_err(FFError::from_io_err)?;
 
         // decrypt the packet (client always encrypts with E key)
         decrypt_packet(buf, &self.e_key);
 
         let id: u32 = u32::from_le_bytes(buf[..4].try_into().unwrap());
-        let id: PacketID = PacketID::from_u32(id).ok_or(FFError::build(
+        let id: PacketID = PacketID::from_u32(id).ok_or(FFError::new(
             Severity::Warning,
             format!("Bad packet ID {id}"),
         ))?;
 
-        #[cfg(debug_assertions)]
         if !SILENCED_PACKETS.contains(&id) {
-            println!("{} sent {:?}", self.get_addr(), id);
+            log(
+                Severity::Debug,
+                &format!("{} sent {:?}", self.get_addr(), id),
+            );
         }
 
         self.last_pkt_id = id;
@@ -153,11 +156,11 @@ impl FFClient {
         Ok(id)
     }
 
-    pub fn send_packet<T: FFPacket>(&mut self, pkt_id: PacketID, pkt: &T) -> Result<()> {
+    pub fn send_packet<T: FFPacket>(&mut self, pkt_id: PacketID, pkt: &T) -> FFResult<()> {
         // send the size
         let sz: usize = 4 + size_of::<T>();
         let mut sz_buf: [u8; 4] = u32::to_le_bytes(sz as u32);
-        self.sock.write_all(&sz_buf)?;
+        self.sock.write_all(&sz_buf).map_err(FFError::from_io_err)?;
 
         // prepare the packet (reuse sz_buf for id)
         sz_buf = PacketID::to_u32(&pkt_id).unwrap().to_le_bytes();
@@ -171,7 +174,9 @@ impl FFClient {
         }
 
         // send the packet
-        self.sock.write_all(&out_buf)?;
+        self.sock
+            .write_all(&out_buf)
+            .map_err(FFError::from_io_err)?;
         Ok(())
     }
 }

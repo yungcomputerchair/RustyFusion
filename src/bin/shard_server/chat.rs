@@ -1,6 +1,9 @@
 use super::*;
 
-pub fn send_freechat_message(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<()> {
+pub fn send_freechat_message(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
     let client = clients.get_self();
     let pc_uid = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_SEND_FREECHAT_MESSAGE =
@@ -20,7 +23,10 @@ pub fn send_freechat_message(clients: &mut ClientMap, state: &mut ShardServerSta
     Ok(())
 }
 
-pub fn send_menuchat_message(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<()> {
+pub fn send_menuchat_message(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
     let client = clients.get_self();
     let pc_uid = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_SEND_MENUCHAT_MESSAGE =
@@ -40,7 +46,10 @@ pub fn send_menuchat_message(clients: &mut ClientMap, state: &mut ShardServerSta
     Ok(())
 }
 
-pub fn pc_avatar_emotes_chat(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<()> {
+pub fn pc_avatar_emotes_chat(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
     let client = clients.get_self();
     let pc_uid = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_AVATAR_EMOTES_CHAT =

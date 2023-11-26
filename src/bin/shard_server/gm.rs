@@ -9,7 +9,7 @@ use num_traits::FromPrimitive;
 
 use super::*;
 
-pub fn gm_pc_set_value(client: &mut FFClient, state: &mut ShardServerState) -> Result<()> {
+pub fn gm_pc_set_value(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
     let pkt: sP_CL2FE_GM_REQ_PC_SET_VALUE = *client.get_packet(P_CL2FE_GM_REQ_PC_SET_VALUE);
     let pc_uid = pkt.iPC_ID as i64;
     let value = pkt.iSetValue;
@@ -25,7 +25,7 @@ pub fn gm_pc_set_value(client: &mut FFClient, state: &mut ShardServerState) -> R
         defines::CN_GM_SET_VALUE_TYPE__SPEED => placeholder!(()),
         defines::CN_GM_SET_VALUE_TYPE__JUMP => placeholder!(()),
         _ => {
-            return Err(FFError::build(
+            return Err(FFError::new(
                 Severity::Warning,
                 format!("Bad value type: {}", value_type),
             ));
@@ -42,18 +42,18 @@ pub fn gm_pc_set_value(client: &mut FFClient, state: &mut ShardServerState) -> R
     Ok(())
 }
 
-pub fn gm_pc_give_item(client: &mut FFClient, state: &mut ShardServerState) -> Result<()> {
+pub fn gm_pc_give_item(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
     let pc_uid = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_GIVE_ITEM = client.get_packet(P_CL2FE_REQ_PC_GIVE_ITEM);
     let player = state.get_player_mut(pc_uid);
     let slot_number = pkt.iSlotNum as usize;
 
-    let location = eItemLocation::from_i32(pkt.eIL).ok_or(FFError::build(
+    let location = eItemLocation::from_i32(pkt.eIL).ok_or(FFError::new(
         Severity::Warning,
         format!("Bad eIL {}", pkt.eIL),
     ))?;
     if location != eItemLocation::eIL_Inven {
-        return Err(FFError::build(
+        return Err(FFError::new(
             Severity::Warning,
             format!("Bad /itemN item location {}", pkt.eIL),
         ));

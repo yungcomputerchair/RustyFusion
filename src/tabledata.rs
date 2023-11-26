@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value::{self, *};
 use std::{collections::HashMap, fs::File, io::BufReader, sync::OnceLock};
 
-use crate::npc::NPC;
+use crate::{
+    error::{log, Severity},
+    npc::NPC,
+};
 
 static TABLE_DATA: OnceLock<TableData> = OnceLock::new();
 
@@ -31,11 +34,11 @@ impl TableData {
 
 pub fn tdata_init() {
     assert!(TABLE_DATA.get().is_none());
-    println!("Loading TableData...");
+    log(Severity::Info, "Loading TableData...");
     if TABLE_DATA.set(TableData::new()).is_err() {
         panic!("Couldn't load TableData");
     }
-    println!("Successfully loaded TableData");
+    log(Severity::Info, "Successfully loaded TableData");
 }
 
 fn load_npc_data() -> HashMap<i32, NPCData> {

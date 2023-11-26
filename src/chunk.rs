@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
+    error::{log, Severity},
     net::{ffclient::FFClient, ClientMap},
     npc::NPC,
     player::Player,
@@ -158,8 +159,10 @@ impl EntityMap {
             }
         }
 
-        #[cfg(debug_assertions)]
-        println!("Moved to {:?}", self.registry[&id].chunk);
+        log(
+            Severity::Debug,
+            &format!("Moved to {:?}", self.registry[&id].chunk),
+        );
     }
 
     pub fn for_each_around(

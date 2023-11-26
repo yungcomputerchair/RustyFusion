@@ -4,7 +4,7 @@ use crate::{
     chunk::{pos_to_chunk_coords, EntityMap},
     defines::*,
     enums::eItemLocation,
-    error::{FFError, Severity},
+    error::{FFError, FFResult, Severity},
     net::{
         ffclient::FFClient,
         packet::{
@@ -14,7 +14,7 @@ use crate::{
         ClientMap,
     },
     util::parse_utf16,
-    CombatStats, Combatant, Entity, EntityID, Item, Mission, Nano, Position, Result,
+    CombatStats, Combatant, Entity, EntityID, Item, Mission, Nano, Position,
 };
 
 use num_traits::ToPrimitive;
@@ -305,7 +305,7 @@ impl Player {
         location: eItemLocation,
         slot_num: usize,
         item: Option<Item>,
-    ) -> Result<Option<Item>> {
+    ) -> FFResult<Option<Item>> {
         let mut slot_from = None;
         match location {
             eItemLocation::eIL_Equip => {
@@ -336,7 +336,7 @@ impl Player {
             *slot_from = item;
             Ok(old_item)
         } else {
-            Err(FFError::build(
+            Err(FFError::new(
                 Severity::Warning,
                 format!(
                     "Bad slot number: {slot_num} (location {})",
@@ -346,7 +346,7 @@ impl Player {
         }
     }
 
-    pub fn set_item(&mut self, mut slot_num: usize, item: Option<Item>) -> Result<Option<Item>> {
+    pub fn set_item(&mut self, mut slot_num: usize, item: Option<Item>) -> FFResult<Option<Item>> {
         if slot_num < SIZEOF_EQUIP_SLOT as usize {
             return self.set_item_with_location(eItemLocation::eIL_Equip, slot_num, item);
         }
@@ -366,7 +366,7 @@ impl Player {
             return self.set_item_with_location(eItemLocation::eIL_Bank, slot_num, item);
         }
 
-        Err(FFError::build(
+        Err(FFError::new(
             Severity::Warning,
             format!("Bad slot number: {slot_num}"),
         ))
@@ -455,21 +455,19 @@ impl Entity for Player {
         self.rotation = angle % 360;
     }
 
-    fn send_enter(&self, client: &mut FFClient) -> Result<()> {
+    fn send_enter(&self, client: &mut FFClient) -> FFResult<()> {
         let pkt = sP_FE2CL_PC_NEW {
             PCAppearanceData: self.get_appearance_data(),
         };
-        client.send_packet(PacketID::P_FE2CL_PC_NEW, &pkt)?;
-        Ok(())
+        client.send_packet(PacketID::P_FE2CL_PC_NEW, &pkt)
     }
 
-    fn send_exit(&self, client: &mut FFClient) -> Result<()> {
+    fn send_exit(&self, client: &mut FFClient) -> FFResult<()> {
         let pkt = sP_FE2CL_PC_EXIT {
             iID: self.uid as i32,
             iExitType: unused!(),
         };
-        client.send_packet(PacketID::P_FE2CL_PC_EXIT, &pkt)?;
-        Ok(())
+        client.send_packet(PacketID::P_FE2CL_PC_EXIT, &pkt)
     }
 
     fn as_any(&mut self) -> &mut dyn Any {

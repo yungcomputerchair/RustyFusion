@@ -1,13 +1,15 @@
+use rusty_fusion::error::{FFError, Severity};
+
 use super::*;
 
 use std::net::SocketAddr;
 
 pub fn login_connect_req(server: &mut FFClient) {
     let pkt = sP_FE2LS_REQ_CONNECT { iTempValue: 0 };
-    server.send_packet(P_FE2LS_REQ_CONNECT, &pkt).unwrap();
+    let _ = server.send_packet(P_FE2LS_REQ_CONNECT, &pkt);
 }
 
-pub fn login_connect_succ(server: &mut FFClient, state: &mut ShardServerState) -> Result<()> {
+pub fn login_connect_succ(server: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
     let pkt: &sP_LS2FE_REP_CONNECT_SUCC = server.get_packet(P_LS2FE_REP_CONNECT_SUCC);
     let conn_id: i64 = pkt.iConn_UID;
     let conn_time: u64 = pkt.uiSvrTime;
@@ -17,19 +19,24 @@ pub fn login_connect_succ(server: &mut FFClient, state: &mut ShardServerState) -
     server.set_e_key(gen_key(conn_time, iv1, iv2));
 
     state.set_login_server_conn_id(conn_id);
-    println!("Connected to login server ({})", server.get_addr());
+    log(
+        Severity::Info,
+        &format!("Connected to login server ({})", server.get_addr()),
+    );
     Ok(())
 }
 
-pub fn login_connect_fail(server: &mut FFClient) -> Result<()> {
+pub fn login_connect_fail(server: &mut FFClient) -> FFResult<()> {
     let pkt: &sP_LS2FE_REP_CONNECT_FAIL = server.get_packet(P_LS2FE_REP_CONNECT_FAIL);
-    println!("Login server refused to connect (error {})", {
-        pkt.iErrorCode
-    });
-    Ok(())
+    Err(FFError::new(
+        Severity::Warning,
+        format!("Login server refused to connect (error {})", {
+            pkt.iErrorCode
+        }),
+    ))
 }
 
-pub fn login_update_info(server: &mut FFClient, state: &mut ShardServerState) -> Result<()> {
+pub fn login_update_info(server: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
     let public_addr: SocketAddr = SHARD_PUBLIC_ADDR.parse().expect("Bad public address");
     let mut ip_buf: [u8; 16] = [0; 16];
     let ip_str: &str = &public_addr.ip().to_string();
@@ -66,6 +73,5 @@ pub fn login_update_info(server: &mut FFClient, state: &mut ShardServerState) ->
         },
     );
 
-    server.send_packet(P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC, &resp)?;
-    Ok(())
+    server.send_packet(P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC, &resp)
 }

@@ -1,11 +1,12 @@
 use crate::{
     chunk::{pos_to_chunk_coords, EntityMap},
+    error::FFResult,
     net::{
         ffclient::FFClient,
         packet::{sNPCAppearanceData, sP_FE2CL_NPC_ENTER, sP_FE2CL_NPC_EXIT, PacketID},
         ClientMap,
     },
-    CombatStats, Combatant, Entity, EntityID, Position, Result,
+    CombatStats, Combatant, Entity, EntityID, Position,
 };
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -83,14 +84,14 @@ impl Entity for NPC {
         self.rotation = angle % 360;
     }
 
-    fn send_enter(&self, client: &mut FFClient) -> Result<()> {
+    fn send_enter(&self, client: &mut FFClient) -> FFResult<()> {
         let pkt = sP_FE2CL_NPC_ENTER {
             NPCAppearanceData: self.get_appearance_data(),
         };
         client.send_packet(PacketID::P_FE2CL_NPC_ENTER, &pkt)
     }
 
-    fn send_exit(&self, client: &mut FFClient) -> Result<()> {
+    fn send_exit(&self, client: &mut FFClient) -> FFResult<()> {
         let pkt = sP_FE2CL_NPC_EXIT { iNPC_ID: self.id };
         client.send_packet(PacketID::P_FE2CL_NPC_EXIT, &pkt)
     }

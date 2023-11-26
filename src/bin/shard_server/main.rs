@@ -1,11 +1,13 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
+    io::Result,
     time::{Duration, SystemTime},
 };
 
 use rusty_fusion::{
     chunk::{pos_to_chunk_coords, EntityMap},
+    error::{log, FFError, FFResult, Severity},
     net::{
         crypto::{gen_key, EncryptionMode},
         ffclient::{ClientType, FFClient},
@@ -20,7 +22,7 @@ use rusty_fusion::{
     player::Player,
     tabledata::{tdata_get_npcs, tdata_init},
     util::get_time,
-    Entity, EntityID, Result,
+    Entity, EntityID,
 };
 
 const SHARD_LISTEN_ADDR: &str = "127.0.0.1:23001";
@@ -89,20 +91,26 @@ fn main() -> Result<()> {
         state.entities.update(id, Some(chunk_pos), None);
     }
 
-    let mut pkt_handler = |key, clients: &mut HashMap<usize, FFClient>, pkt_id| -> Result<()> {
+    let mut pkt_handler = |key, clients: &mut HashMap<usize, FFClient>, pkt_id| -> FFResult<()> {
         handle_packet(key, clients, pkt_id, &mut state.borrow_mut())
     };
     let mut dc_handler = |key, clients: &mut HashMap<usize, FFClient>| {
         handle_disconnect(key, clients, &mut state.borrow_mut());
     };
 
-    println!("Shard server listening on {}", server.get_endpoint());
+    log(
+        Severity::Info,
+        &format!("Shard server listening on {}", server.get_endpoint()),
+    );
     loop {
         let time_now = SystemTime::now();
         if !is_login_server_connected(&state.borrow())
             && time_now.duration_since(login_server_conn_time).unwrap() > login_server_conn_interval
         {
-            println!("Connecting to login server at {}...", LOGIN_SERVER_ADDR);
+            log(
+                Severity::Info,
+                &format!("Connecting to login server at {}...", LOGIN_SERVER_ADDR),
+            );
             let conn = server.connect(LOGIN_SERVER_ADDR, ClientType::LoginServer);
             if let Some(login_server) = conn {
                 login::login_connect_req(login_server);
@@ -144,7 +152,7 @@ fn handle_packet(
     clients: &mut HashMap<usize, FFClient>,
     pkt_id: PacketID,
     state: &mut ShardServerState,
-) -> Result<()> {
+) -> FFResult<()> {
     let mut clients = ClientMap::new(key, clients);
     match pkt_id {
         P_LS2FE_REP_CONNECT_SUCC => login::login_connect_succ(clients.get_self(), state),
@@ -171,14 +179,14 @@ fn handle_packet(
         //
         P_CL2FE_REQ_ITEM_MOVE => item::item_move(&mut clients, state),
         //
-        other => {
-            println!("Unhandled packet: {:?}", other);
-            Ok(())
-        }
+        other => Err(FFError::new(
+            Severity::Warning,
+            format!("Unhandled packet: {:?}", other),
+        )),
     }
 }
 
-fn wrong_server(client: &mut FFClient) -> Result<()> {
+fn wrong_server(client: &mut FFClient) -> FFResult<()> {
     let pkt: &sP_CL2LS_REQ_LOGIN = client.get_packet(P_CL2LS_REQ_LOGIN);
     let resp = sP_LS2CL_REP_LOGIN_FAIL {
         iErrorCode: 4, // "Login error"

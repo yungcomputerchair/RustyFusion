@@ -7,7 +7,7 @@ use self::{
         PacketID::{self, *},
     },
 };
-use crate::{player::Player, Result};
+use crate::{error::FFResult, player::Player};
 
 const PACKET_BUFFER_SIZE: usize = 8192;
 const SILENCED_PACKETS: [PacketID; 4] = [
@@ -24,7 +24,7 @@ pub mod ffserver;
 pub mod packet;
 
 pub type PacketCallback<'a> =
-    &'a mut dyn FnMut(usize, &mut HashMap<usize, FFClient>, PacketID) -> Result<()>;
+    &'a mut dyn FnMut(usize, &mut HashMap<usize, FFClient>, PacketID) -> FFResult<()>;
 pub type DisconnectCallback<'a> = &'a mut dyn FnMut(usize, &mut HashMap<usize, FFClient>);
 
 #[allow(non_snake_case)]

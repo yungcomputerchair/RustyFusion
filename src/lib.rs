@@ -1,16 +1,15 @@
 #[macro_use]
 extern crate num_derive;
 
-use std::{any::Any, error::Error, hash::Hash, result};
+use std::{any::Any, hash::Hash};
 
 use chunk::EntityMap;
+use error::FFResult;
 use net::{
     ffclient::FFClient,
     packet::{sItemBase, sNano, sRunningQuest},
     ClientMap,
 };
-
-pub type Result<T> = result::Result<T, Box<dyn Error>>;
 
 #[macro_export]
 macro_rules! unused {
@@ -171,8 +170,8 @@ pub trait Entity {
         client_map: &mut ClientMap,
     );
     fn set_rotation(&mut self, angle: i32);
-    fn send_enter(&self, client: &mut FFClient) -> Result<()>;
-    fn send_exit(&self, client: &mut FFClient) -> Result<()>;
+    fn send_enter(&self, client: &mut FFClient) -> FFResult<()>;
+    fn send_exit(&self, client: &mut FFClient) -> FFResult<()>;
 
     fn as_any(&mut self) -> &mut dyn Any;
 }

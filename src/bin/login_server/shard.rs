@@ -2,7 +2,7 @@ use super::*;
 
 use rusty_fusion::net::{ffclient::ClientType, packet::*};
 
-pub fn connect(server: &mut FFClient, state: &mut LoginServerState) -> Result<()> {
+pub fn connect(server: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
     let conn_id: i64 = state.get_next_shard_id();
     server.set_client_type(ClientType::ShardServer(conn_id));
     let resp = sP_LS2FE_REP_CONNECT_SUCC {
@@ -21,7 +21,7 @@ pub fn connect(server: &mut FFClient, state: &mut LoginServerState) -> Result<()
 pub fn update_login_info_succ(
     shard_key: usize,
     clients: &mut HashMap<usize, FFClient>,
-) -> Result<()> {
+) -> FFResult<()> {
     let server: &mut FFClient = clients.get_mut(&shard_key).unwrap();
     let pkt: &sP_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC =
         server.get_packet(P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC);
@@ -49,7 +49,7 @@ pub fn update_login_info_succ(
 pub fn update_login_info_fail(
     shard_key: usize,
     clients: &mut HashMap<usize, FFClient>,
-) -> Result<()> {
+) -> FFResult<()> {
     let server: &mut FFClient = clients.get_mut(&shard_key).unwrap();
     let pkt: &sP_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL =
         server.get_packet(P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL);

@@ -1,7 +1,10 @@
-use std::{error::Error, fmt::Display};
+use std::fmt::Display;
 
-#[derive(Debug)]
+pub type FFResult<T> = std::result::Result<T, FFError>;
+
+#[derive(Clone, Copy)]
 pub enum Severity {
+    Debug,
     Info,
     Warning,
     Fatal,
@@ -9,6 +12,7 @@ pub enum Severity {
 impl Display for Severity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
+            Severity::Debug => "DEBUG",
             Severity::Info => "INFO",
             Severity::Warning => "WARN",
             Severity::Fatal => "FATAL",
@@ -17,19 +21,32 @@ impl Display for Severity {
     }
 }
 
-#[derive(Debug)]
 pub struct FFError {
     severity: Severity,
     msg: String,
 }
 impl FFError {
-    pub fn build(severity: Severity, msg: String) -> Box<dyn Error> {
-        Box::new(Self { severity, msg })
+    pub fn new(severity: Severity, msg: String) -> Self {
+        Self { severity, msg }
+    }
+
+    pub fn from_io_err(error: std::io::Error) -> Self {
+        Self {
+            severity: Severity::Fatal,
+            msg: format!("I/O error ({:?})", error),
+        }
+    }
+
+    pub fn get_severity(&self) -> Severity {
+        self.severity
+    }
+
+    pub fn get_msg(&self) -> &str {
+        &self.msg
     }
 }
-impl Error for FFError {}
-impl Display for FFError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{}] {}", self.severity, self.msg)
-    }
+
+pub fn log(severity: Severity, msg: &str) {
+    let s = format!("[{}] {}", severity, msg);
+    println!("{}", s);
 }

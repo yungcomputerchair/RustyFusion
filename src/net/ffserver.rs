@@ -1,12 +1,13 @@
 use polling::{Event, PollMode, Poller};
 
-use crate::Result;
 use std::{
     collections::HashMap,
-    io::ErrorKind,
+    io::{ErrorKind, Result},
     net::{SocketAddr, TcpListener, TcpStream},
     time::Duration,
 };
+
+use crate::error::{log, Severity};
 
 use super::{
     ffclient::{ClientType, FFClient},
@@ -58,22 +59,23 @@ impl FFServer {
         dc_handler: Option<DisconnectCallback>,
     ) -> Result<()> {
         let mut events: Vec<Event> = Vec::new();
-        //println!("Waiting...");
         if let Err(e) = self.poller.wait(&mut events, self.poll_timeout) {
             match e.kind() {
                 ErrorKind::Interrupted => return Ok(()), // this is fine
                 _ => {
-                    return Err(Box::new(e));
+                    return Err(e);
                 }
             }
         }
 
         let mut dc_handler = dc_handler;
         for ev in events.iter() {
-            //dbg!(ev);
             if ev.key == EPOLL_KEY_SELF {
                 let conn_data: (TcpStream, SocketAddr) = self.sock.accept()?;
-                println!("New connection from {}", conn_data.1);
+                log(
+                    Severity::Info,
+                    &format!("New connection from {}", conn_data.1),
+                );
                 self.register_client(conn_data)?;
             } else {
                 if !ev.readable || !ev.writable {
@@ -94,11 +96,16 @@ impl FFServer {
                 }
 
                 if let Some(e) = err {
-                    println!("err on socket {}: {}", ev.key, e);
-                    if let Some(callback) = dc_handler.as_mut() {
-                        callback(ev.key, clients);
-                    };
-                    self.unregister_client(ev.key)?.unwrap();
+                    log(
+                        e.get_severity(),
+                        &format!("{} (socket {})", e.get_msg(), ev.key),
+                    );
+                    if let Severity::Fatal = e.get_severity() {
+                        if let Some(callback) = dc_handler.as_mut() {
+                            callback(ev.key, clients);
+                        };
+                        self.unregister_client(ev.key)?.unwrap();
+                    }
                 }
             }
         }

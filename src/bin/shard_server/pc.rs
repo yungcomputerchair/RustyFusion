@@ -4,7 +4,7 @@ use super::*;
 
 use crate::ShardServerState;
 
-pub fn pc_enter(client: &mut FFClient, key: usize, state: &mut ShardServerState) -> Result<()> {
+pub fn pc_enter(client: &mut FFClient, key: usize, state: &mut ShardServerState) -> FFResult<()> {
     let pkt: &sP_CL2FE_REQ_PC_ENTER = client.get_packet(P_CL2FE_REQ_PC_ENTER);
     let serial_key: i64 = pkt.iEnterSerialKey;
     let login_data = state.login_data.remove(&serial_key).unwrap();
@@ -30,19 +30,16 @@ pub fn pc_enter(client: &mut FFClient, key: usize, state: &mut ShardServerState)
 
     state.entities.track(Box::new(player));
 
-    client.send_packet(P_FE2CL_REP_PC_ENTER_SUCC, &resp)?;
-    Ok(())
+    client.send_packet(P_FE2CL_REP_PC_ENTER_SUCC, &resp)
 }
 
-pub fn pc_loading_complete(client: &mut FFClient) -> Result<()> {
+pub fn pc_loading_complete(client: &mut FFClient) -> FFResult<()> {
     let pkt: &sP_CL2FE_REQ_PC_LOADING_COMPLETE = client.get_packet(P_CL2FE_REQ_PC_LOADING_COMPLETE);
     let resp = sP_FE2CL_REP_PC_LOADING_COMPLETE_SUCC { iPC_ID: pkt.iPC_ID };
-    client.send_packet(P_FE2CL_REP_PC_LOADING_COMPLETE_SUCC, &resp)?;
-
-    Ok(())
+    client.send_packet(P_FE2CL_REP_PC_LOADING_COMPLETE_SUCC, &resp)
 }
 
-pub fn pc_goto(client: &mut FFClient) -> Result<()> {
+pub fn pc_goto(client: &mut FFClient) -> FFResult<()> {
     let pkt: &sP_CL2FE_REQ_PC_GOTO = client.get_packet(P_CL2FE_REQ_PC_GOTO);
 
     let resp = sP_FE2CL_REP_PC_GOTO_SUCC {
@@ -50,12 +47,10 @@ pub fn pc_goto(client: &mut FFClient) -> Result<()> {
         iY: pkt.iToY,
         iZ: pkt.iToZ,
     };
-    client.send_packet(P_FE2CL_REP_PC_GOTO_SUCC, &resp)?;
-
-    Ok(())
+    client.send_packet(P_FE2CL_REP_PC_GOTO_SUCC, &resp)
 }
 
-pub fn pc_move(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<()> {
+pub fn pc_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
     let pc_uid = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_MOVE = client.get_packet(P_CL2FE_REQ_PC_MOVE);
@@ -91,7 +86,7 @@ pub fn pc_move(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<
     Ok(())
 }
 
-pub fn pc_jump(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<()> {
+pub fn pc_jump(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
     let pc_uid = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_JUMP = client.get_packet(P_CL2FE_REQ_PC_JUMP);
@@ -127,7 +122,7 @@ pub fn pc_jump(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<
     Ok(())
 }
 
-pub fn pc_stop(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<()> {
+pub fn pc_stop(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
     let pc_uid = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_STOP = client.get_packet(P_CL2FE_REQ_PC_STOP);
@@ -158,7 +153,7 @@ pub fn pc_stop(clients: &mut ClientMap, state: &mut ShardServerState) -> Result<
 pub fn pc_special_state_switch(
     clients: &mut ClientMap,
     state: &mut ShardServerState,
-) -> Result<()> {
+) -> FFResult<()> {
     let client = clients.get_self();
     let pc_uid = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH =
@@ -177,7 +172,7 @@ pub fn pc_special_state_switch(
     Ok(())
 }
 
-pub fn pc_first_use_flag_set(client: &mut FFClient, state: &mut ShardServerState) -> Result<()> {
+pub fn pc_first_use_flag_set(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
     let pc_uid = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_FIRST_USE_FLAG_SET =
         client.get_packet(P_CL2FE_REQ_PC_FIRST_USE_FLAG_SET);

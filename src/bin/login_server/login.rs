@@ -4,12 +4,12 @@ use rand::random;
 
 use rusty_fusion::{
     defines::*,
-    error::{FFError, Severity},
+    error::{FFError, FFResult, Severity},
     net::{ffclient::ClientType, packet::*},
     placeholder, unused, util, Combatant, Entity, Item,
 };
 
-pub fn login(client: &mut FFClient, state: &mut LoginServerState) -> Result<()> {
+pub fn login(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
     let pkt: &sP_CL2LS_REQ_LOGIN = client.get_packet(P_CL2LS_REQ_LOGIN);
 
     let mut players: Vec<Player> = Vec::new();
@@ -74,7 +74,7 @@ pub fn login(client: &mut FFClient, state: &mut LoginServerState) -> Result<()> 
         })
 }
 
-pub fn check_char_name(client: &mut FFClient) -> Result<()> {
+pub fn check_char_name(client: &mut FFClient) -> FFResult<()> {
     let pkt: &sP_CL2LS_REQ_CHECK_CHAR_NAME = client.get_packet(P_CL2LS_REQ_CHECK_CHAR_NAME);
     let resp = sP_LS2CL_REP_CHECK_CHAR_NAME_SUCC {
         szFirstName: pkt.szFirstName,
@@ -83,7 +83,7 @@ pub fn check_char_name(client: &mut FFClient) -> Result<()> {
     client.send_packet(P_LS2CL_REP_CHECK_CHAR_NAME_SUCC, &resp)
 }
 
-pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> Result<()> {
+pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
     let pkt: &sP_CL2LS_REQ_SAVE_CHAR_NAME = client.get_packet(P_CL2LS_REQ_SAVE_CHAR_NAME);
 
     let pc_uid = state.get_next_pc_uid();
@@ -104,7 +104,7 @@ pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> Re
     Ok(())
 }
 
-pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> Result<()> {
+pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
     let pkt: &sP_CL2LS_REQ_CHAR_CREATE = client.get_packet(P_CL2LS_REQ_CHAR_CREATE);
 
     let pc_uid: i64 = pkt.PCStyle.iPC_UID;
@@ -138,38 +138,43 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> Resul
 
         client.send_packet(P_LS2CL_REP_CHAR_CREATE_SUCC, &resp)
     } else {
-        Err(FFError::build(
+        Err(FFError::new(
             Severity::Warning,
             format!("Couldn't get player {}", pc_uid),
         ))
     }
 }
 
-pub fn save_char_tutor(client: &mut FFClient, state: &mut LoginServerState) -> Result<()> {
+pub fn save_char_tutor(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
     let pkt: &sP_CL2LS_REQ_SAVE_CHAR_TUTOR = client.get_packet(P_CL2LS_REQ_SAVE_CHAR_TUTOR);
     let pc_uid = pkt.iPC_UID;
-    if let Some(player) = state.players.get_mut(&pc_uid) {
-        if pkt.iTutorialFlag == 1 {
-            player.set_tutorial_flag();
-            return Ok(());
-        }
+    let player = state.players.get_mut(&pc_uid).ok_or(FFError::new(
+        Severity::Fatal,
+        format!("Couldn't get player {}", pc_uid),
+    ))?;
+    if pkt.iTutorialFlag == 1 {
+        player.set_tutorial_flag();
+        Ok(())
+    } else {
+        Err(FFError::new(
+            Severity::Warning,
+            format!("Bad iTutorialFlag value {}", pkt.iTutorialFlag),
+        ))
     }
-
-    Err(FFError::build(Severity::Warning, format!("TODO")))
 }
 
 pub fn char_select(
     client_key: usize,
     clients: &mut HashMap<usize, FFClient>,
     state: &mut LoginServerState,
-) -> Result<()> {
+) -> FFResult<()> {
     let client: &mut FFClient = clients.get_mut(&client_key).unwrap();
     if let ClientType::GameClient { serial_key, .. } = client.get_client_type() {
         let pkt: &sP_CL2LS_REQ_CHAR_SELECT = client.get_packet(P_CL2LS_REQ_CHAR_SELECT);
         let pc_uid: i64 = pkt.iPC_UID;
         if !state.players.contains_key(&pc_uid) {
-            return Err(FFError::build(
-                Severity::Warning,
+            return Err(FFError::new(
+                Severity::Fatal,
                 format!("Couldn't get player {}", pc_uid),
             ));
         }
@@ -199,7 +204,7 @@ pub fn char_select(
             }
         }
     } else {
-        Err(FFError::build(
+        Err(FFError::new(
             Severity::Warning,
             format!(
                 "Client is not a game client ({:?})",
