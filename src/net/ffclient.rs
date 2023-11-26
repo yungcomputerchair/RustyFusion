@@ -7,7 +7,7 @@ use std::{
 use num_traits::{FromPrimitive, ToPrimitive};
 
 use crate::{
-    error::{BadPacketID, BadRequest},
+    error::{FFError, Severity},
     net::{struct_to_bytes, PACKET_BUFFER_SIZE, SILENCED_PACKETS},
     util::get_time,
     Result,
@@ -100,7 +100,10 @@ impl FFClient {
         {
             Ok(pc_uid)
         } else {
-            Err(BadRequest::build(self))
+            Err(FFError::build(
+                Severity::Fatal,
+                "Couldn't get player ID for client".to_string(),
+            ))
         }
     }
 
@@ -135,12 +138,10 @@ impl FFClient {
         decrypt_packet(buf, &self.e_key);
 
         let id: u32 = u32::from_le_bytes(buf[..4].try_into().unwrap());
-        let id: PacketID = match PacketID::from_u32(id) {
-            Some(id) => id,
-            None => {
-                return Err(BadPacketID::build(id));
-            }
-        };
+        let id: PacketID = PacketID::from_u32(id).ok_or(FFError::build(
+            Severity::Warning,
+            format!("Bad packet ID {id}"),
+        ))?;
 
         #[cfg(debug_assertions)]
         if !SILENCED_PACKETS.contains(&id) {

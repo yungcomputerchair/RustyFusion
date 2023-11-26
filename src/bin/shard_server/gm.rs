@@ -1,4 +1,9 @@
-use rusty_fusion::{defines, enums::eItemLocation, error::BadPayload, placeholder};
+use rusty_fusion::{
+    defines,
+    enums::eItemLocation,
+    error::{FFError, Severity},
+    placeholder,
+};
 
 use num_traits::FromPrimitive;
 
@@ -20,9 +25,9 @@ pub fn gm_pc_set_value(client: &mut FFClient, state: &mut ShardServerState) -> R
         defines::CN_GM_SET_VALUE_TYPE__SPEED => placeholder!(()),
         defines::CN_GM_SET_VALUE_TYPE__JUMP => placeholder!(()),
         _ => {
-            return Err(BadPayload::build(
-                client,
-                format!("Bad value type: {value_type}"),
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Bad value type: {}", value_type),
             ));
         }
     };
@@ -43,18 +48,18 @@ pub fn gm_pc_give_item(client: &mut FFClient, state: &mut ShardServerState) -> R
     let player = state.get_player_mut(pc_uid);
     let slot_number = pkt.iSlotNum as usize;
 
-    let location = eItemLocation::from_i32(pkt.eIL)
-        .ok_or(BadPayload::build(client, format!("Bad eIL {}", pkt.eIL)))?;
+    let location = eItemLocation::from_i32(pkt.eIL).ok_or(FFError::build(
+        Severity::Warning,
+        format!("Bad eIL {}", pkt.eIL),
+    ))?;
     if location != eItemLocation::eIL_Inven {
-        return Err(BadPayload::build(
-            client,
-            format!("Bad /itemN item location: {}", pkt.eIL),
+        return Err(FFError::build(
+            Severity::Warning,
+            format!("Bad /itemN item location {}", pkt.eIL),
         ));
     }
 
-    if let Err(e) = player.set_item_with_location(location, slot_number, pkt.Item.into()) {
-        return Err(BadPayload::build(client, e.to_string()));
-    }
+    player.set_item_with_location(location, slot_number, pkt.Item.into())?;
 
     let resp = sP_FE2CL_REP_PC_GIVE_ITEM_SUCC {
         eIL: pkt.eIL,

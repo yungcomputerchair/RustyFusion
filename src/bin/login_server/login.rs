@@ -4,7 +4,7 @@ use rand::random;
 
 use rusty_fusion::{
     defines::*,
-    error::BadRequest,
+    error::{FFError, Severity},
     net::{ffclient::ClientType, packet::*},
     placeholder, unused, util, Combatant, Entity, Item,
 };
@@ -138,7 +138,10 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> Resul
 
         client.send_packet(P_LS2CL_REP_CHAR_CREATE_SUCC, &resp)
     } else {
-        Err(BadRequest::build(client))
+        Err(FFError::build(
+            Severity::Warning,
+            format!("Couldn't get player {}", pc_uid),
+        ))
     }
 }
 
@@ -152,7 +155,7 @@ pub fn save_char_tutor(client: &mut FFClient, state: &mut LoginServerState) -> R
         }
     }
 
-    Err(BadRequest::build(client))
+    Err(FFError::build(Severity::Warning, format!("TODO")))
 }
 
 pub fn char_select(
@@ -165,7 +168,10 @@ pub fn char_select(
         let pkt: &sP_CL2LS_REQ_CHAR_SELECT = client.get_packet(P_CL2LS_REQ_CHAR_SELECT);
         let pc_uid: i64 = pkt.iPC_UID;
         if !state.players.contains_key(&pc_uid) {
-            return Err(BadRequest::build(client));
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Couldn't get player {}", pc_uid),
+            ));
         }
 
         let login_info = sP_LS2FE_REQ_UPDATE_LOGIN_INFO {
@@ -193,6 +199,12 @@ pub fn char_select(
             }
         }
     } else {
-        Err(BadRequest::build(client))
+        Err(FFError::build(
+            Severity::Warning,
+            format!(
+                "Client is not a game client ({:?})",
+                client.get_client_type()
+            ),
+        ))
     }
 }

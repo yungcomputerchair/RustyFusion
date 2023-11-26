@@ -4,7 +4,7 @@ use crate::{
     chunk::{pos_to_chunk_coords, EntityMap},
     defines::*,
     enums::eItemLocation,
-    error::SimpleError,
+    error::{FFError, Severity},
     net::{
         ffclient::FFClient,
         packet::{
@@ -336,10 +336,13 @@ impl Player {
             *slot_from = item;
             Ok(old_item)
         } else {
-            Err(SimpleError::build(format!(
-                "Bad slot number: {slot_num} (location {})",
-                location.to_i32().unwrap_or(-1)
-            )))
+            Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Bad slot number: {slot_num} (location {})",
+                    location.to_i32().unwrap_or(-1)
+                ),
+            ))
         }
     }
 
@@ -363,7 +366,10 @@ impl Player {
             return self.set_item_with_location(eItemLocation::eIL_Bank, slot_num, item);
         }
 
-        Err(SimpleError::build(format!("Bad slot number: {slot_num}")))
+        Err(FFError::build(
+            Severity::Warning,
+            format!("Bad slot number: {slot_num}"),
+        ))
     }
 
     pub fn get_equipped(&self) -> [Option<Item>; 9] {
