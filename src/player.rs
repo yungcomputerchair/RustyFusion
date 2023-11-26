@@ -394,12 +394,20 @@ impl Player {
         self.flags.tutorial_flag = true;
     }
 
+    pub fn set_payzone_flag(&mut self) {
+        self.flags.payzone_flag = true;
+    }
+
     pub fn set_taros(&mut self, taros: i32) {
         self.taros = taros;
     }
 
     pub fn set_hp(&mut self, hp: i32) {
         self.combat_stats.hp = hp;
+    }
+
+    pub fn set_level(&mut self, level: i16) {
+        self.combat_stats.level = level;
     }
 
     pub fn set_fusion_matter(&mut self, fusion_matter: i32) {

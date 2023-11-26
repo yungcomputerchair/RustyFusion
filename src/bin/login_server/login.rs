@@ -24,6 +24,9 @@ pub fn login(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()
         player.set_name(1, util::encode_utf16("TestF"), util::encode_utf16("TestL"));
         player.set_appearance_flag();
         player.set_tutorial_flag();
+        player.set_payzone_flag();
+        player.set_level(36);
+        player.set_taros(9999);
         players.push(player);
     }
 
