@@ -200,7 +200,7 @@ pub fn char_select(
                 Ok(())
             }
             None => {
-                // no shards available
+                log(Severity::Warning, "No shard servers available");
                 let resp = sP_LS2CL_REP_CHAR_SELECT_FAIL { iErrorCode: 1 };
                 let client: &mut FFClient = clients.get_mut(&client_key).unwrap();
                 client.send_packet(P_LS2CL_REP_CHAR_SELECT_FAIL, &resp)

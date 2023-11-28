@@ -83,6 +83,7 @@ impl FFServer {
                 };
                 let clients: &mut HashMap<usize, FFClient> = &mut self.clients;
                 let client: &mut FFClient = clients.get_mut(&ev.key).unwrap();
+                let addr = client.get_addr();
                 let mut err = None;
                 match client.read_packet() {
                     Ok(pkt) => {
@@ -96,10 +97,7 @@ impl FFServer {
                 }
 
                 if let Some(e) = err {
-                    log(
-                        e.get_severity(),
-                        &format!("{} (socket {})", e.get_msg(), ev.key),
-                    );
+                    log(e.get_severity(), &format!("{} ({})", e.get_msg(), addr));
                     if e.should_dc_client() {
                         if let Some(callback) = dc_handler.as_mut() {
                             callback(ev.key, clients);

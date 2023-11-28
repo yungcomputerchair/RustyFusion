@@ -4,7 +4,7 @@ use rusty_fusion::{
     error::{log, FFError, FFResult, Severity},
     net::{
         crypto::{gen_key, DEFAULT_KEY},
-        ffclient::FFClient,
+        ffclient::{ClientType, FFClient},
         ffserver::FFServer,
         packet::{
             sP_LS2FE_REP_CONNECT_SUCC,
@@ -53,13 +53,30 @@ fn main() -> Result<()> {
     let mut pkt_handler = |key, clients: &mut HashMap<usize, FFClient>, pkt_id| -> FFResult<()> {
         handle_packet(key, clients, pkt_id, &mut state.borrow_mut())
     };
+    let mut dc_handler = |key, clients: &mut HashMap<usize, FFClient>| {
+        handle_disconnect(key, clients);
+    };
 
     log(
         Severity::Info,
         &format!("Login server listening on {}", server.get_endpoint()),
     );
     loop {
-        server.poll(&mut pkt_handler, None)?;
+        server.poll(&mut pkt_handler, Some(&mut dc_handler))?;
+    }
+}
+
+fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>) {
+    let client = clients.get_mut(&key).unwrap();
+    if let ClientType::ShardServer(shard_id) = client.get_client_type() {
+        log(
+            Severity::Info,
+            &format!(
+                "Shard server #{} ({}) disconnected",
+                shard_id,
+                client.get_addr()
+            ),
+        );
     }
 }
 
@@ -71,7 +88,7 @@ fn handle_packet(
     pkt_id: PacketID,
     state: &mut LoginServerState,
 ) -> FFResult<()> {
-    let client: &mut FFClient = clients.get_mut(&key).unwrap();
+    let client = clients.get_mut(&key).unwrap();
     match pkt_id {
         P_FE2LS_REQ_CONNECT => shard::connect(client, state),
         P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC => shard::update_login_info_succ(key, clients),

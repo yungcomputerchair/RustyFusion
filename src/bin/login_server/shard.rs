@@ -15,6 +15,15 @@ pub fn connect(server: &mut FFClient, state: &mut LoginServerState) -> FFResult<
     let iv2: i32 = 69;
     server.set_e_key(gen_key(resp.uiSvrTime, iv1, iv2));
 
+    log(
+        Severity::Info,
+        &format!(
+            "Connected to shard server #{} ({})",
+            conn_id,
+            server.get_addr()
+        ),
+    );
+
     Ok(())
 }
 

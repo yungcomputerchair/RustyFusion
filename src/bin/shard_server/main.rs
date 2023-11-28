@@ -129,7 +129,13 @@ fn handle_disconnect(
     let mut clients = ClientMap::new(key, clients);
     let client = clients.get_self();
     match client.get_client_type() {
-        ClientType::LoginServer => state.set_login_server_conn_id(CONN_ID_DISCONNECTED),
+        ClientType::LoginServer => {
+            log(
+                Severity::Info,
+                &format!("Login server ({}) disconnected", client.get_addr()),
+            );
+            state.set_login_server_conn_id(CONN_ID_DISCONNECTED);
+        }
         ClientType::GameClient {
             pc_uid: Some(pc_uid),
             ..
