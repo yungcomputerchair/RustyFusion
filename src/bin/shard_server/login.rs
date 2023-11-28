@@ -28,7 +28,7 @@ pub fn login_connect_succ(server: &mut FFClient, state: &mut ShardServerState) -
 
 pub fn login_connect_fail(server: &mut FFClient) -> FFResult<()> {
     let pkt: &sP_LS2FE_REP_CONNECT_FAIL = server.get_packet(P_LS2FE_REP_CONNECT_FAIL);
-    Err(FFError::new(
+    Err(FFError::build(
         Severity::Warning,
         format!("Login server refused to connect (error {})", {
             pkt.iErrorCode

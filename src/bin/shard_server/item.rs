@@ -13,14 +13,14 @@ pub fn item_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFRes
 
     let player = state.get_player_mut(client.get_player_id()?);
 
-    let location_from = eItemLocation::from_i32(pkt.eFrom).ok_or(FFError::new(
+    let location_from = eItemLocation::from_i32(pkt.eFrom).ok_or(FFError::build(
         Severity::Warning,
         format!("Bad eFrom {}", pkt.eFrom),
     ))?;
     let item_from =
         player.set_item_with_location(location_from, pkt.iFromSlotNum as usize, None)?;
 
-    let location_to = eItemLocation::from_i32(pkt.eTo).ok_or(FFError::new(
+    let location_to = eItemLocation::from_i32(pkt.eTo).ok_or(FFError::build(
         Severity::Warning,
         format!("Bad eTo {}", pkt.eTo),
     ))?;

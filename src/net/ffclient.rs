@@ -99,8 +99,8 @@ impl FFClient {
         {
             Ok(pc_uid)
         } else {
-            Err(FFError::new(
-                Severity::Fatal,
+            Err(FFError::build(
+                Severity::Warning,
                 "Couldn't get player ID for client".to_string(),
             ))
         }
@@ -139,7 +139,7 @@ impl FFClient {
         decrypt_packet(buf, &self.e_key);
 
         let id: u32 = u32::from_le_bytes(buf[..4].try_into().unwrap());
-        let id: PacketID = PacketID::from_u32(id).ok_or(FFError::new(
+        let id: PacketID = PacketID::from_u32(id).ok_or(FFError::build(
             Severity::Warning,
             format!("Bad packet ID {id}"),
         ))?;

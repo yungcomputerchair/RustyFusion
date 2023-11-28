@@ -179,7 +179,7 @@ fn handle_packet(
         //
         P_CL2FE_REQ_ITEM_MOVE => item::item_move(&mut clients, state),
         //
-        other => Err(FFError::new(
+        other => Err(FFError::build(
             Severity::Warning,
             format!("Unhandled packet: {:?}", other),
         )),

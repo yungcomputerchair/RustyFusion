@@ -141,7 +141,7 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
 
         client.send_packet(P_LS2CL_REP_CHAR_CREATE_SUCC, &resp)
     } else {
-        Err(FFError::new(
+        Err(FFError::build(
             Severity::Warning,
             format!("Couldn't get player {}", pc_uid),
         ))
@@ -151,15 +151,15 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
 pub fn save_char_tutor(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
     let pkt: &sP_CL2LS_REQ_SAVE_CHAR_TUTOR = client.get_packet(P_CL2LS_REQ_SAVE_CHAR_TUTOR);
     let pc_uid = pkt.iPC_UID;
-    let player = state.players.get_mut(&pc_uid).ok_or(FFError::new(
-        Severity::Fatal,
+    let player = state.players.get_mut(&pc_uid).ok_or(FFError::build(
+        Severity::Warning,
         format!("Couldn't get player {}", pc_uid),
     ))?;
     if pkt.iTutorialFlag == 1 {
         player.set_tutorial_flag();
         Ok(())
     } else {
-        Err(FFError::new(
+        Err(FFError::build(
             Severity::Warning,
             format!("Bad iTutorialFlag value {}", pkt.iTutorialFlag),
         ))
@@ -176,8 +176,8 @@ pub fn char_select(
         let pkt: &sP_CL2LS_REQ_CHAR_SELECT = client.get_packet(P_CL2LS_REQ_CHAR_SELECT);
         let pc_uid: i64 = pkt.iPC_UID;
         if !state.players.contains_key(&pc_uid) {
-            return Err(FFError::new(
-                Severity::Fatal,
+            return Err(FFError::build(
+                Severity::Warning,
                 format!("Couldn't get player {}", pc_uid),
             ));
         }
@@ -207,7 +207,7 @@ pub fn char_select(
             }
         }
     } else {
-        Err(FFError::new(
+        Err(FFError::build(
             Severity::Warning,
             format!(
                 "Client is not a game client ({:?})",

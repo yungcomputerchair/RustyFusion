@@ -336,7 +336,7 @@ impl Player {
             *slot_from = item;
             Ok(old_item)
         } else {
-            Err(FFError::new(
+            Err(FFError::build(
                 Severity::Warning,
                 format!(
                     "Bad slot number: {slot_num} (location {})",
@@ -366,7 +366,7 @@ impl Player {
             return self.set_item_with_location(eItemLocation::eIL_Bank, slot_num, item);
         }
 
-        Err(FFError::new(
+        Err(FFError::build(
             Severity::Warning,
             format!("Bad slot number: {slot_num}"),
         ))

@@ -73,7 +73,7 @@ impl FFServer {
             if ev.key == EPOLL_KEY_SELF {
                 let conn_data: (TcpStream, SocketAddr) = self.sock.accept()?;
                 log(
-                    Severity::Info,
+                    Severity::Debug,
                     &format!("New connection from {}", conn_data.1),
                 );
                 self.register_client(conn_data)?;
@@ -100,7 +100,7 @@ impl FFServer {
                         e.get_severity(),
                         &format!("{} (socket {})", e.get_msg(), ev.key),
                     );
-                    if let Severity::Fatal = e.get_severity() {
+                    if e.should_dc_client() {
                         if let Some(callback) = dc_handler.as_mut() {
                             callback(ev.key, clients);
                         };

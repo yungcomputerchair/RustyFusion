@@ -25,7 +25,7 @@ pub fn gm_pc_set_value(client: &mut FFClient, state: &mut ShardServerState) -> F
         defines::CN_GM_SET_VALUE_TYPE__SPEED => placeholder!(()),
         defines::CN_GM_SET_VALUE_TYPE__JUMP => placeholder!(()),
         _ => {
-            return Err(FFError::new(
+            return Err(FFError::build(
                 Severity::Warning,
                 format!("Bad value type: {}", value_type),
             ));
@@ -48,12 +48,12 @@ pub fn gm_pc_give_item(client: &mut FFClient, state: &mut ShardServerState) -> F
     let player = state.get_player_mut(pc_uid);
     let slot_number = pkt.iSlotNum as usize;
 
-    let location = eItemLocation::from_i32(pkt.eIL).ok_or(FFError::new(
+    let location = eItemLocation::from_i32(pkt.eIL).ok_or(FFError::build(
         Severity::Warning,
         format!("Bad eIL {}", pkt.eIL),
     ))?;
     if location != eItemLocation::eIL_Inven {
-        return Err(FFError::new(
+        return Err(FFError::build(
             Severity::Warning,
             format!("Bad /itemN item location {}", pkt.eIL),
         ));

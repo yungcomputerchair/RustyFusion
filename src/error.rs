@@ -24,16 +24,33 @@ impl Display for Severity {
 pub struct FFError {
     severity: Severity,
     msg: String,
+    should_dc_client: bool,
 }
 impl FFError {
-    pub fn new(severity: Severity, msg: String) -> Self {
-        Self { severity, msg }
+    fn new(severity: Severity, msg: String, should_dc_client: bool) -> Self {
+        Self {
+            severity,
+            msg,
+            should_dc_client,
+        }
+    }
+
+    pub fn build(severity: Severity, msg: String) -> Self {
+        Self::new(severity, msg, false)
+    }
+
+    pub fn build_dc(severity: Severity, msg: String) -> Self {
+        Self::new(severity, msg, true)
     }
 
     pub fn from_io_err(error: std::io::Error) -> Self {
         Self {
-            severity: Severity::Fatal,
-            msg: format!("I/O error ({:?})", error),
+            severity: match error.kind() {
+                std::io::ErrorKind::UnexpectedEof => Severity::Debug,
+                _ => Severity::Warning,
+            },
+            msg: format!("I/O error ({:?})", error.kind()),
+            should_dc_client: true,
         }
     }
 
@@ -43,6 +60,10 @@ impl FFError {
 
     pub fn get_msg(&self) -> &str {
         &self.msg
+    }
+
+    pub fn should_dc_client(&self) -> bool {
+        self.should_dc_client
     }
 }
 
