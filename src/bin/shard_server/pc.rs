@@ -81,9 +81,7 @@ pub fn pc_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResul
     state.update_player(pc_uid, |player, state| {
         player.set_position(pos, state.get_entity_map(), clients);
         player.set_rotation(angle);
-    });
-
-    Ok(())
+    })
 }
 
 pub fn pc_jump(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
@@ -117,9 +115,7 @@ pub fn pc_jump(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResul
     state.update_player(pc_uid, |player, state| {
         player.set_position(pos, state.get_entity_map(), clients);
         player.set_rotation(angle);
-    });
-
-    Ok(())
+    })
 }
 
 pub fn pc_stop(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
@@ -145,9 +141,7 @@ pub fn pc_stop(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResul
 
     state.update_player(pc_uid, |player, state| {
         player.set_position(pos, state.get_entity_map(), clients);
-    });
-
-    Ok(())
+    })
 }
 
 pub fn pc_special_state_switch(
@@ -159,7 +153,7 @@ pub fn pc_special_state_switch(
     let pkt: &sP_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH =
         client.get_packet(P_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH);
 
-    let player = state.get_player_mut(pc_uid);
+    let player = state.get_player_mut(pc_uid)?;
     let special_state = player.update_special_state(pkt.iSpecialStateFlag);
 
     let resp = sP_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC {
@@ -177,7 +171,7 @@ pub fn pc_first_use_flag_set(client: &mut FFClient, state: &mut ShardServerState
     let pkt: &sP_CL2FE_REQ_PC_FIRST_USE_FLAG_SET =
         client.get_packet(P_CL2FE_REQ_PC_FIRST_USE_FLAG_SET);
 
-    let player = state.get_player_mut(pc_uid);
+    let player = state.get_player_mut(pc_uid)?;
     player.update_first_use_flag(pkt.iFlagCode);
 
     Ok(())

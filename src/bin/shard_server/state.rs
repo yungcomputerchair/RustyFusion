@@ -1,6 +1,11 @@
 use std::collections::HashMap;
 
-use rusty_fusion::{chunk::EntityMap, net::LoginData, npc::NPC, player::Player};
+use rusty_fusion::{
+    chunk::EntityMap,
+    error::{FFError, FFResult, Severity},
+    net::LoginData,
+    player::Player,
+};
 
 pub struct ShardServerState {
     login_server_conn_id: i64,
@@ -33,21 +38,22 @@ impl ShardServerState {
         self.login_server_conn_id = conn_id;
     }
 
-    pub fn get_player_mut(&mut self, pc_uid: i64) -> &mut Player {
-        self.entity_map.get_player(pc_uid).unwrap()
+    pub fn get_player_mut(&mut self, pc_uid: i64) -> FFResult<&mut Player> {
+        self.entity_map.get_player(pc_uid).ok_or(FFError::build(
+            Severity::Warning,
+            format!("Player with ID {} doesn't exist", pc_uid),
+        ))
     }
 
-    pub fn update_player(&mut self, pc_uid: i64, f: impl FnOnce(&mut Player, &mut Self)) {
+    pub fn update_player(
+        &mut self,
+        pc_uid: i64,
+        f: impl FnOnce(&mut Player, &mut Self),
+    ) -> FFResult<()> {
         // to avoid a double-borrow, we create a copy of the player and then replace it
-        let mut player = *self.entity_map.get_player(pc_uid).unwrap();
+        let mut player = *self.get_player_mut(pc_uid)?;
         f(&mut player, self);
-        *self.entity_map.get_player(pc_uid).unwrap() = player;
-    }
-
-    pub fn _update_npc(&mut self, npc_id: i32, f: impl FnOnce(&mut NPC, &mut Self)) {
-        // same as above
-        let mut npc = *self.entity_map.get_npc(npc_id).unwrap();
-        f(&mut npc, self);
-        *self.entity_map.get_npc(npc_id).unwrap() = npc;
+        *self.get_player_mut(pc_uid)? = player;
+        Ok(())
     }
 }
