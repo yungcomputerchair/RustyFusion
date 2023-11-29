@@ -1,7 +1,7 @@
 use std::{any::Any, fmt::Display};
 
 use crate::{
-    chunk::{pos_to_chunk_coords, EntityMap},
+    chunk::EntityMap,
     defines::*,
     enums::eItemLocation,
     error::{FFError, FFResult, Severity},
@@ -455,7 +455,7 @@ impl Entity for Player {
         client_map: &mut ClientMap,
     ) {
         self.position = pos;
-        let chunk = pos_to_chunk_coords(self.position);
+        let chunk = self.position.chunk_coords();
         entity_map.update(self.get_id(), Some(chunk), Some(client_map));
     }
 

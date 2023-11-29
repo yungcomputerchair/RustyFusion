@@ -49,13 +49,20 @@ impl Position {
     pub fn new(x: i32, y: i32, z: i32) -> Self {
         Self { x, y, z }
     }
+
+    pub fn chunk_coords(&self) -> (i32, i32) {
+        let chunk_x = (self.x * chunk::NCHUNKS as i32) / chunk::MAP_BOUNDS;
+        let chunk_y = (self.y * chunk::NCHUNKS as i32) / chunk::MAP_BOUNDS;
+        (chunk_x, chunk_y)
+    }
 }
 
 #[derive(Debug, Copy, Clone, Default)]
 pub struct Item {
     ty: i16,
     id: i16,
-    options: i32,
+    appearance_id: Option<i16>,
+    quantity: i16,
     expiry_time: i32,
 }
 impl Item {
@@ -63,7 +70,8 @@ impl Item {
         Self {
             ty,
             id,
-            options: 1,
+            appearance_id: None,
+            quantity: 1,
             expiry_time: 0,
         }
     }
@@ -76,7 +84,15 @@ impl From<sItemBase> for Option<Item> {
             Some(Item {
                 ty: value.iType,
                 id: value.iID,
-                options: value.iOpt,
+                appearance_id: {
+                    let id = (value.iOpt >> 16) as i16;
+                    if id == 0 {
+                        None
+                    } else {
+                        Some(id)
+                    }
+                },
+                quantity: value.iOpt as i16,
                 expiry_time: value.iTimeLimit,
             })
         }
@@ -88,7 +104,7 @@ impl From<Option<Item>> for sItemBase {
             Self {
                 iType: value.ty,
                 iID: value.id,
-                iOpt: value.options,
+                iOpt: (value.quantity as i32) | ((value.appearance_id.unwrap_or(0) as i32) << 16),
                 iTimeLimit: value.expiry_time,
             }
         } else {

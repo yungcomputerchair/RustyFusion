@@ -6,7 +6,6 @@ use std::{
 };
 
 use rusty_fusion::{
-    chunk::pos_to_chunk_coords,
     error::{log, FFError, FFResult, Severity},
     net::{
         crypto::{gen_key, EncryptionMode},
@@ -45,7 +44,7 @@ fn main() -> Result<()> {
     let state = RefCell::new(ShardServerState::new());
     for npc in tdata_get_npcs() {
         let mut state = state.borrow_mut();
-        let chunk_pos = pos_to_chunk_coords(npc.get_position());
+        let chunk_pos = npc.get_position().chunk_coords();
         let entity_map = state.get_entity_map();
         let id = entity_map.track(Box::new(npc));
         entity_map.update(id, Some(chunk_pos), None);

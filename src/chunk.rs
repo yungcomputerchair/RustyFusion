@@ -5,18 +5,12 @@ use crate::{
     net::{ffclient::FFClient, ClientMap},
     npc::NPC,
     player::Player,
-    Entity, EntityID, Position,
+    Entity, EntityID,
 };
 
 pub const NCHUNKS: usize = 16 * 8; // 16 map squares with side lengths of 8 chunks
 pub const MAP_BOUNDS: i32 = 8192 * 100; // top corner of (16, 16)
 pub const VISIBILITY_RANGE: i32 = 1;
-
-pub const fn pos_to_chunk_coords(pos: Position) -> (i32, i32) {
-    let chunk_x = (pos.x * NCHUNKS as i32) / MAP_BOUNDS;
-    let chunk_y = (pos.y * NCHUNKS as i32) / MAP_BOUNDS;
-    (chunk_x, chunk_y)
-}
 
 struct RegistryEntry {
     entity: Box<dyn Entity>,
