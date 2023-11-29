@@ -6,7 +6,7 @@ use std::{
 };
 
 use rusty_fusion::{
-    chunk::{pos_to_chunk_coords, EntityMap},
+    chunk::pos_to_chunk_coords,
     error::{log, FFError, FFResult, Severity},
     net::{
         crypto::{gen_key, EncryptionMode},
@@ -18,12 +18,11 @@ use rusty_fusion::{
         },
         ClientMap, LoginData,
     },
-    npc::NPC,
-    player::Player,
     tabledata::{tdata_get_npcs, tdata_init},
     util::get_time,
     Entity, EntityID,
 };
+use state::ShardServerState;
 
 const SHARD_LISTEN_ADDR: &str = "127.0.0.1:23001";
 const SHARD_PUBLIC_ADDR: &str = SHARD_LISTEN_ADDR;
@@ -32,47 +31,7 @@ const LOGIN_SERVER_ADDR: &str = "127.0.0.1:23000";
 
 const CONN_ID_DISCONNECTED: i64 = -1;
 
-pub struct ShardServerState {
-    login_server_conn_id: i64,
-    login_data: HashMap<i64, LoginData>,
-    entities: EntityMap,
-}
-
-impl ShardServerState {
-    fn new() -> Self {
-        Self {
-            login_server_conn_id: CONN_ID_DISCONNECTED,
-            login_data: HashMap::new(),
-            entities: EntityMap::default(),
-        }
-    }
-
-    pub fn get_login_server_conn_id(&self) -> i64 {
-        self.login_server_conn_id
-    }
-
-    pub fn set_login_server_conn_id(&mut self, conn_id: i64) {
-        self.login_server_conn_id = conn_id;
-    }
-
-    pub fn get_player_mut(&mut self, pc_uid: i64) -> &mut Player {
-        self.entities.get_player(pc_uid).unwrap()
-    }
-
-    pub fn update_player(&mut self, pc_uid: i64, f: impl FnOnce(&mut Player, &mut Self)) {
-        // to avoid a double-borrow, we create a copy of the player and then replace it
-        let mut player = *self.entities.get_player(pc_uid).unwrap();
-        f(&mut player, self);
-        *self.entities.get_player(pc_uid).unwrap() = player;
-    }
-
-    pub fn update_npc(&mut self, npc_id: i32, f: impl FnOnce(&mut NPC, &mut Self)) {
-        // same as above
-        let mut npc = *self.entities.get_npc(npc_id).unwrap();
-        f(&mut npc, self);
-        *self.entities.get_npc(npc_id).unwrap() = npc;
-    }
-}
+mod state;
 
 fn main() -> Result<()> {
     let polling_interval: Duration = Duration::from_millis(50);
@@ -87,8 +46,9 @@ fn main() -> Result<()> {
     for npc in tdata_get_npcs() {
         let mut state = state.borrow_mut();
         let chunk_pos = pos_to_chunk_coords(npc.get_position());
-        let id = state.entities.track(Box::new(npc));
-        state.entities.update(id, Some(chunk_pos), None);
+        let entity_map = state.get_entity_map();
+        let id = entity_map.track(Box::new(npc));
+        entity_map.update(id, Some(chunk_pos), None);
     }
 
     let mut pkt_handler = |key, clients: &mut HashMap<usize, FFClient>, pkt_id| -> FFResult<()> {
@@ -141,8 +101,9 @@ fn handle_disconnect(
             ..
         } => {
             let id = EntityID::Player(pc_uid);
-            state.entities.update(id, None, Some(&mut clients));
-            state.entities.untrack(id);
+            let entity_map = state.get_entity_map();
+            entity_map.update(id, None, Some(&mut clients));
+            entity_map.untrack(id);
         }
         _ => (),
     }

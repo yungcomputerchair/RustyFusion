@@ -7,7 +7,7 @@ use crate::ShardServerState;
 pub fn pc_enter(client: &mut FFClient, key: usize, state: &mut ShardServerState) -> FFResult<()> {
     let pkt: &sP_CL2FE_REQ_PC_ENTER = client.get_packet(P_CL2FE_REQ_PC_ENTER);
     let serial_key: i64 = pkt.iEnterSerialKey;
-    let login_data = state.login_data.remove(&serial_key).unwrap();
+    let login_data = state.get_login_data().remove(&serial_key).unwrap();
     let mut player = login_data.player;
     player.set_client_id(key);
 
@@ -28,7 +28,7 @@ pub fn pc_enter(client: &mut FFClient, key: usize, state: &mut ShardServerState)
     client.set_fe_key(login_data.uiFEKey.to_le_bytes());
     client.set_enc_mode(EncryptionMode::FEKey);
 
-    state.entities.track(Box::new(player));
+    state.get_entity_map().track(Box::new(player));
 
     client.send_packet(P_FE2CL_REP_PC_ENTER_SUCC, &resp)
 }
@@ -73,13 +73,13 @@ pub fn pc_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResul
     };
 
     state
-        .entities
+        .get_entity_map()
         .for_each_around(EntityID::Player(pc_uid), clients, |client| {
             let _ = client.send_packet(P_FE2CL_PC_MOVE, &resp);
         });
 
     state.update_player(pc_uid, |player, state| {
-        player.set_position(pos, &mut state.entities, clients);
+        player.set_position(pos, state.get_entity_map(), clients);
         player.set_rotation(angle);
     });
 
@@ -109,13 +109,13 @@ pub fn pc_jump(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResul
     };
 
     state
-        .entities
+        .get_entity_map()
         .for_each_around(EntityID::Player(pc_uid), clients, |client| {
             let _ = client.send_packet(P_FE2CL_PC_JUMP, &resp);
         });
 
     state.update_player(pc_uid, |player, state| {
-        player.set_position(pos, &mut state.entities, clients);
+        player.set_position(pos, state.get_entity_map(), clients);
         player.set_rotation(angle);
     });
 
@@ -138,13 +138,13 @@ pub fn pc_stop(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResul
     };
 
     state
-        .entities
+        .get_entity_map()
         .for_each_around(EntityID::Player(pc_uid), clients, |client| {
             let _ = client.send_packet(P_FE2CL_PC_STOP, &resp);
         });
 
     state.update_player(pc_uid, |player, state| {
-        player.set_position(pos, &mut state.entities, clients);
+        player.set_position(pos, state.get_entity_map(), clients);
     });
 
     Ok(())

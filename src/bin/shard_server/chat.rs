@@ -15,7 +15,7 @@ pub fn send_freechat_message(
         iEmoteCode: pkt.iEmoteCode,
     };
     state
-        .entities
+        .get_entity_map()
         .for_each_around(EntityID::Player(pc_uid), clients, |client| {
             let _ = client.send_packet(P_FE2CL_REP_SEND_FREECHAT_MESSAGE_SUCC, &resp);
         });
@@ -38,7 +38,7 @@ pub fn send_menuchat_message(
         iEmoteCode: pkt.iEmoteCode,
     };
     state
-        .entities
+        .get_entity_map()
         .for_each_around(EntityID::Player(pc_uid), clients, |client| {
             let _ = client.send_packet(P_FE2CL_REP_SEND_MENUCHAT_MESSAGE_SUCC, &resp);
         });
@@ -60,7 +60,7 @@ pub fn pc_avatar_emotes_chat(
         iEmoteCode: pkt.iEmoteCode,
     };
     state
-        .entities
+        .get_entity_map()
         .for_each_around(EntityID::Player(pc_uid), clients, |client| {
             let _ = client.send_packet(P_FE2CL_REP_PC_AVATAR_EMOTES_CHAT, &resp);
         });
