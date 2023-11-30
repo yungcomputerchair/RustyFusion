@@ -77,15 +77,18 @@ fn main() -> Result<()> {
         &format!("Shard server listening on {}", server.get_endpoint()),
     );
     while running.load(Ordering::SeqCst) {
-        let mut state = state.borrow_mut();
-        let time_now = SystemTime::now();
-        if !is_login_server_connected(&state)
-            && time_now
-                .duration_since(state.get_login_server_conn_time())
-                .unwrap()
-                > login_server_conn_interval
+        // TODO proper timers
         {
-            connect_to_login_server(time_now, &mut server, &mut state);
+            let mut state = state.borrow_mut();
+            let time_now = SystemTime::now();
+            if !is_login_server_connected(&state)
+                && time_now
+                    .duration_since(state.get_login_server_conn_time())
+                    .unwrap()
+                    > login_server_conn_interval
+            {
+                connect_to_login_server(time_now, &mut server, &mut state);
+            }
         }
         server.poll(&mut pkt_handler, Some(&mut dc_handler))?;
     }
