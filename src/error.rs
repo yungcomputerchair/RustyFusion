@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use crate::config::config_get;
+
 pub type FFResult<T> = std::result::Result<T, FFError>;
 
 #[derive(Clone, Copy)]
@@ -7,6 +9,7 @@ pub enum Severity {
     Debug,
     Info,
     Warning,
+    Important,
     Fatal,
 }
 impl Display for Severity {
@@ -15,9 +18,21 @@ impl Display for Severity {
             Severity::Debug => "DEBUG",
             Severity::Info => "INFO",
             Severity::Warning => "WARN",
+            Severity::Important => "IMPORTANT",
             Severity::Fatal => "FATAL",
         };
         write!(f, "{}", s)
+    }
+}
+impl From<Severity> for usize {
+    fn from(value: Severity) -> Self {
+        match value {
+            Severity::Debug => 3,
+            Severity::Info => 2,
+            Severity::Warning => 1,
+            Severity::Important => 0,
+            Severity::Fatal => 0,
+        }
     }
 }
 
@@ -68,6 +83,13 @@ impl FFError {
 }
 
 pub fn log(severity: Severity, msg: &str) {
+    let val: usize = severity.into();
+    let threshold = config_get().general.logging_level.unwrap_or(2);
+
+    if val > threshold {
+        return;
+    }
+
     let s = format!("[{}] {}", severity, msg);
     println!("{}", s);
 }

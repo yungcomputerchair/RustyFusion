@@ -8,6 +8,7 @@ static CONFIG: OnceLock<Config> = OnceLock::new();
 
 #[derive(Deserialize, Clone)]
 pub struct Config {
+    pub general: GeneralConfig,
     pub login: LoginConfig,
     pub shard: ShardConfig,
 }
@@ -26,15 +27,19 @@ impl Config {
 
 pub fn config_init() {
     assert!(CONFIG.get().is_none());
-    log(Severity::Info, "Loading config...");
     if CONFIG.set(Config::new()).is_err() {
         panic!("Couldn't load config");
     }
-    log(Severity::Info, "Successfully loaded config");
+    log(Severity::Info, "Loaded config");
 }
 
 pub fn config_get() -> Config {
     CONFIG.get().expect("Config not initialized").clone()
+}
+
+#[derive(Deserialize, Clone)]
+pub struct GeneralConfig {
+    pub logging_level: Option<usize>,
 }
 
 #[derive(Deserialize, Clone)]

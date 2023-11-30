@@ -63,7 +63,7 @@ fn main() -> Result<()> {
     };
 
     log(
-        Severity::Info,
+        Severity::Important,
         &format!("Login server listening on {}", server.get_endpoint()),
     );
     loop {

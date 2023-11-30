@@ -61,7 +61,7 @@ fn main() -> Result<()> {
     };
 
     log(
-        Severity::Info,
+        Severity::Important,
         &format!("Shard server listening on {}", server.get_endpoint()),
     );
     loop {

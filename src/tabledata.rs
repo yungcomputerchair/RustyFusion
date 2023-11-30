@@ -34,15 +34,13 @@ impl TableData {
 
 pub fn tdata_init() {
     assert!(TABLE_DATA.get().is_none());
-    log(Severity::Info, "Loading TableData...");
     if TABLE_DATA.set(TableData::new()).is_err() {
         panic!("Couldn't load TableData");
     }
-    log(Severity::Info, "Successfully loaded TableData");
+    log(Severity::Info, "Loaded TableData");
 }
 
 fn load_npc_data() -> HashMap<i32, NPCData> {
-    print!("    NPCs.json...");
     let raw: Value =
         serde_json::from_reader(BufReader::new(File::open("tabledata/NPCs.json").unwrap()))
             .unwrap();
@@ -67,8 +65,6 @@ fn load_npc_data() -> HashMap<i32, NPCData> {
     } else {
         panic!("Bad NPC tabledata (root): {raw}");
     }
-
-    println!("done");
     npc_data
 }
 

@@ -1,6 +1,13 @@
 # Config file for RustyFusion.
 # If a setting is omitted, the default value will be used.
 
+[general]
+logging_level = 2 # how verbose logging should be.
+                  # 0 = [FATAL] and [IMPORTANT] only
+                  # 1 = include [WARN]
+                  # 2 = also include [INFO]
+                  # 3 = also include [DEBUG]
+
 [login]
 listen_addr = "127.0.0.1:23000" # address to bind to
 
