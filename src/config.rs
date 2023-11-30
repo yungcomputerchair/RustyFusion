@@ -45,6 +45,8 @@ pub struct LoginConfig {
 #[derive(Deserialize, Clone)]
 pub struct ShardConfig {
     pub listen_addr: Option<String>,
-    pub login_server_addr: Option<String>,
     pub external_addr: Option<String>,
+    pub login_server_addr: Option<String>,
+    pub login_server_conn_interval: Option<u64>,
+    pub visibility_range: Option<usize>,
 }

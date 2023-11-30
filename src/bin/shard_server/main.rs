@@ -38,7 +38,8 @@ fn main() -> Result<()> {
         .unwrap_or("127.0.0.1:23001".to_string());
     let mut server: FFServer = FFServer::new(&listen_addr, Some(polling_interval))?;
 
-    let login_server_conn_interval: Duration = Duration::from_secs(10);
+    let login_server_conn_interval: Duration =
+        Duration::from_secs(config_get().shard.login_server_conn_interval.unwrap_or(10));
     let mut login_server_conn_time: SystemTime = SystemTime::UNIX_EPOCH;
 
     tdata_init();

@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
+    config::config_get,
     error::{log, Severity},
     net::{ffclient::FFClient, ClientMap},
     npc::NPC,
@@ -10,7 +11,9 @@ use crate::{
 
 pub const NCHUNKS: usize = 16 * 8; // 16 map squares with side lengths of 8 chunks
 pub const MAP_BOUNDS: i32 = 8192 * 100; // top corner of (16, 16)
-pub const VISIBILITY_RANGE: i32 = 1;
+fn get_visibility_range() -> usize {
+    config_get().shard.visibility_range.unwrap_or(1)
+}
 
 struct RegistryEntry {
     entity: Box<dyn Entity>,
@@ -50,7 +53,7 @@ impl EntityMap {
         id: EntityID,
     ) -> Option<impl Iterator<Item = &mut Box<dyn Entity>>> {
         if let Some((x, y)) = self.registry.get(&id).and_then(|entry| entry.chunk) {
-            let ids = self.get_around(x, y, VISIBILITY_RANGE);
+            let ids = self.get_around(x, y, get_visibility_range());
             Some(self.get_from_ids(&ids))
         } else {
             None
@@ -183,7 +186,7 @@ impl EntityMap {
                 panic!("Chunk ({x}, {y}) did not contain entity with ID {:?}", id);
             }
             entry.chunk = None;
-            affected.extend(self.get_around(x, y, VISIBILITY_RANGE));
+            affected.extend(self.get_around(x, y, get_visibility_range()));
         }
         affected
     }
@@ -201,7 +204,7 @@ impl EntityMap {
                 }
                 let entry = self.registry.get_mut(&id).unwrap();
                 entry.chunk = to_chunk;
-                affected.extend(self.get_around(x, y, VISIBILITY_RANGE));
+                affected.extend(self.get_around(x, y, get_visibility_range()));
                 affected.remove(&id); // we don't want ourself in this
             }
         }
@@ -216,7 +219,8 @@ impl EntityMap {
         None
     }
 
-    fn get_around(&mut self, x: i32, y: i32, range: i32) -> HashSet<EntityID> {
+    fn get_around(&mut self, x: i32, y: i32, range: usize) -> HashSet<EntityID> {
+        let range = range as i32;
         let mut entities = HashSet::new();
         for x in (x - range)..=(x + range) {
             for y in (y - range)..=(y + range) {

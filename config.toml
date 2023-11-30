@@ -2,9 +2,11 @@
 # If a setting is omitted, the default value will be used.
 
 [login]
-listen_addr = "127.0.0.1:23000"
+listen_addr = "127.0.0.1:23000" # address to bind to
 
 [shard]
-listen_addr = "127.0.0.1:23001"
-login_server_addr = "127.0.0.1:23000"
-external_addr = "127.0.0.1:23001"
+listen_addr = "127.0.0.1:23001" # address to bind to
+external_addr = "127.0.0.1:23001" # address for clients to connect to
+login_server_addr = "127.0.0.1:23000" # address of login server
+login_server_conn_interval = 10 # how long (seconds) to wait before retrying login server connection
+visibility_range = 1 # how far (chunks) game clients can see entities

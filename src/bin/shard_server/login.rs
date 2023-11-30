@@ -1,11 +1,16 @@
-use rusty_fusion::error::{FFError, Severity};
+use rusty_fusion::{
+    error::{FFError, Severity},
+    unused,
+};
 
 use super::*;
 
 use std::net::SocketAddr;
 
 pub fn login_connect_req(server: &mut FFClient) {
-    let pkt = sP_FE2LS_REQ_CONNECT { iTempValue: 0 };
+    let pkt = sP_FE2LS_REQ_CONNECT {
+        iTempValue: unused!(),
+    };
     let _ = server.send_packet(P_FE2LS_REQ_CONNECT, &pkt);
 }
 
