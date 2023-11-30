@@ -6,6 +6,7 @@ use std::{
 };
 
 use rusty_fusion::{
+    config::{config_get, config_init},
     error::{log, FFError, FFResult, Severity},
     net::{
         crypto::{gen_key, EncryptionMode},
@@ -23,18 +24,19 @@ use rusty_fusion::{
 };
 use state::ShardServerState;
 
-const SHARD_LISTEN_ADDR: &str = "127.0.0.1:23001";
-const SHARD_PUBLIC_ADDR: &str = SHARD_LISTEN_ADDR;
-
-const LOGIN_SERVER_ADDR: &str = "127.0.0.1:23000";
-
 const CONN_ID_DISCONNECTED: i64 = -1;
 
 mod state;
 
 fn main() -> Result<()> {
+    config_init();
+
     let polling_interval: Duration = Duration::from_millis(50);
-    let mut server: FFServer = FFServer::new(SHARD_LISTEN_ADDR, Some(polling_interval))?;
+    let listen_addr = config_get()
+        .shard
+        .listen_addr
+        .unwrap_or("127.0.0.1:23001".to_string());
+    let mut server: FFServer = FFServer::new(&listen_addr, Some(polling_interval))?;
 
     let login_server_conn_interval: Duration = Duration::from_secs(10);
     let mut login_server_conn_time: SystemTime = SystemTime::UNIX_EPOCH;
@@ -66,11 +68,15 @@ fn main() -> Result<()> {
         if !is_login_server_connected(&state.borrow())
             && time_now.duration_since(login_server_conn_time).unwrap() > login_server_conn_interval
         {
+            let login_server_addr = config_get()
+                .shard
+                .login_server_addr
+                .unwrap_or("127.0.0.1:23000".to_string());
             log(
                 Severity::Info,
-                &format!("Connecting to login server at {}...", LOGIN_SERVER_ADDR),
+                &format!("Connecting to login server at {}...", login_server_addr),
             );
-            let conn = server.connect(LOGIN_SERVER_ADDR, ClientType::LoginServer);
+            let conn = server.connect(&login_server_addr, ClientType::LoginServer);
             if let Some(login_server) = conn {
                 login::login_connect_req(login_server);
             }

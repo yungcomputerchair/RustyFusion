@@ -33,6 +33,7 @@ pub mod error;
 pub mod net;
 pub mod util;
 
+pub mod config;
 pub mod tabledata;
 
 pub mod chunk;

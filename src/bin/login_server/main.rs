@@ -1,6 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, io::Result, time::Duration};
 
 use rusty_fusion::{
+    config::{config_get, config_init},
     error::{log, FFError, FFResult, Severity},
     net::{
         crypto::{gen_key, DEFAULT_KEY},
@@ -14,8 +15,6 @@ use rusty_fusion::{
     player::Player,
     util::get_time,
 };
-
-const LOGIN_LISTEN_ADDR: &str = "127.0.0.1:23000";
 
 pub struct LoginServerState {
     next_pc_uid: i64,
@@ -46,8 +45,14 @@ impl LoginServerState {
 }
 
 fn main() -> Result<()> {
+    config_init();
+
     let polling_interval: Duration = Duration::from_millis(50);
-    let mut server: FFServer = FFServer::new(LOGIN_LISTEN_ADDR, Some(polling_interval))?;
+    let listen_addr = config_get()
+        .login
+        .listen_addr
+        .unwrap_or("127.0.0.1:23000".to_string());
+    let mut server: FFServer = FFServer::new(&listen_addr, Some(polling_interval))?;
 
     let state = RefCell::new(LoginServerState::new());
     let mut pkt_handler = |key, clients: &mut HashMap<usize, FFClient>, pkt_id| -> FFResult<()> {

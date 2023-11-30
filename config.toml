@@ -1,0 +1,10 @@
+# Config file for RustyFusion.
+# If a setting is omitted, the default value will be used.
+
+[login]
+listen_addr = "127.0.0.1:23000"
+
+[shard]
+listen_addr = "127.0.0.1:23001"
+login_server_addr = "127.0.0.1:23000"
+external_addr = "127.0.0.1:23001"

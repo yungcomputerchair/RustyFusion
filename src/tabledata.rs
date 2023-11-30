@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::Value::{self, *};
 use std::{collections::HashMap, fs::File, io::BufReader, sync::OnceLock};
 
@@ -11,7 +11,7 @@ use crate::{
 
 static TABLE_DATA: OnceLock<TableData> = OnceLock::new();
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 struct NPCData {
     iNPCType: i32,
     iX: i32,
