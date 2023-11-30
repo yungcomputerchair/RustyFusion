@@ -48,7 +48,6 @@ fn main() -> Result<()> {
 
     let login_server_conn_interval =
         Duration::from_secs(config_get().shard.login_server_conn_interval.unwrap_or(10));
-    let mut login_server_conn_time = SystemTime::UNIX_EPOCH;
 
     let state = RefCell::new(ShardServerState::new());
     for npc in tdata_get_npcs() {
@@ -78,23 +77,15 @@ fn main() -> Result<()> {
         &format!("Shard server listening on {}", server.get_endpoint()),
     );
     while running.load(Ordering::SeqCst) {
+        let mut state = state.borrow_mut();
         let time_now = SystemTime::now();
-        if !is_login_server_connected(&state.borrow())
-            && time_now.duration_since(login_server_conn_time).unwrap() > login_server_conn_interval
+        if !is_login_server_connected(&state)
+            && time_now
+                .duration_since(state.get_login_server_conn_time())
+                .unwrap()
+                > login_server_conn_interval
         {
-            let login_server_addr = config_get()
-                .shard
-                .login_server_addr
-                .unwrap_or("127.0.0.1:23000".to_string());
-            log(
-                Severity::Info,
-                &format!("Connecting to login server at {}...", login_server_addr),
-            );
-            let conn = server.connect(&login_server_addr, ClientType::LoginServer);
-            if let Some(login_server) = conn {
-                login::login_connect_req(login_server);
-            }
-            login_server_conn_time = time_now;
+            connect_to_login_server(time_now, &mut server, &mut state);
         }
         server.poll(&mut pkt_handler, Some(&mut dc_handler))?;
     }
@@ -192,6 +183,26 @@ fn wrong_server(client: &mut FFClient) -> FFResult<()> {
     client.send_packet(P_LS2CL_REP_LOGIN_FAIL, &resp)?;
 
     Ok(())
+}
+
+fn connect_to_login_server(
+    time_now: SystemTime,
+    shard_server: &mut FFServer,
+    state: &mut ShardServerState,
+) {
+    let login_server_addr = config_get()
+        .shard
+        .login_server_addr
+        .unwrap_or("127.0.0.1:23000".to_string());
+    log(
+        Severity::Info,
+        &format!("Connecting to login server at {}...", login_server_addr),
+    );
+    let conn = shard_server.connect(&login_server_addr, ClientType::LoginServer);
+    if let Some(login_server) = conn {
+        login::login_connect_req(login_server);
+    }
+    state.set_login_server_conn_time(time_now);
 }
 
 fn is_login_server_connected(state: &ShardServerState) -> bool {

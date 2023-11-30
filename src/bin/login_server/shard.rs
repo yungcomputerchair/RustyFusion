@@ -3,7 +3,7 @@ use super::*;
 use rusty_fusion::net::{ffclient::ClientType, packet::*};
 
 pub fn connect(server: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
-    let conn_id: i64 = state.get_next_shard_id();
+    let conn_id = state.get_next_shard_id();
     server.set_client_type(ClientType::ShardServer(conn_id));
     let resp = sP_LS2FE_REP_CONNECT_SUCC {
         uiSvrTime: get_time(),
@@ -31,7 +31,7 @@ pub fn update_login_info_succ(
     shard_key: usize,
     clients: &mut HashMap<usize, FFClient>,
 ) -> FFResult<()> {
-    let server: &mut FFClient = clients.get_mut(&shard_key).unwrap();
+    let server = clients.get_mut(&shard_key).unwrap();
     let pkt: &sP_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC =
         server.get_packet(P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC);
 
@@ -41,7 +41,7 @@ pub fn update_login_info_succ(
         iEnterSerialKey: pkt.iEnterSerialKey,
     };
 
-    let client: &mut FFClient = clients
+    let client = clients
         .values_mut()
         .find(|c| match c.get_client_type() {
             ClientType::GameClient {
@@ -59,14 +59,14 @@ pub fn update_login_info_fail(
     shard_key: usize,
     clients: &mut HashMap<usize, FFClient>,
 ) -> FFResult<()> {
-    let server: &mut FFClient = clients.get_mut(&shard_key).unwrap();
+    let server = clients.get_mut(&shard_key).unwrap();
     let pkt: &sP_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL =
         server.get_packet(P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL);
     let resp = sP_LS2CL_REP_CHAR_SELECT_FAIL {
         iErrorCode: pkt.iErrorCode,
     };
 
-    let serial_key: i64 = pkt.iEnterSerialKey;
+    let serial_key = pkt.iEnterSerialKey;
     let client: &mut FFClient = clients
         .values_mut()
         .find(|c| match c.get_client_type() {

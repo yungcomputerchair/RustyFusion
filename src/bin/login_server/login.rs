@@ -12,7 +12,7 @@ use rusty_fusion::{
 pub fn login(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
     let pkt: &sP_CL2LS_REQ_LOGIN = client.get_packet(P_CL2LS_REQ_LOGIN);
 
-    let mut players: Vec<Player> = Vec::new();
+    let mut players = Vec::new();
     let mut username = util::parse_utf16(&pkt.szID);
     let mut _password = util::parse_utf16(&pkt.szPassword);
     if username.is_empty() {
@@ -110,7 +110,7 @@ pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> FF
 pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
     let pkt: &sP_CL2LS_REQ_CHAR_CREATE = client.get_packet(P_CL2LS_REQ_CHAR_CREATE);
 
-    let pc_uid: i64 = pkt.PCStyle.iPC_UID;
+    let pc_uid = pkt.PCStyle.iPC_UID;
     if let Some(player) = state.players.get_mut(&pc_uid) {
         player.set_style(pkt.PCStyle);
         player.set_item(
@@ -171,10 +171,10 @@ pub fn char_select(
     clients: &mut HashMap<usize, FFClient>,
     state: &mut LoginServerState,
 ) -> FFResult<()> {
-    let client: &mut FFClient = clients.get_mut(&client_key).unwrap();
+    let client = clients.get_mut(&client_key).unwrap();
     if let ClientType::GameClient { serial_key, .. } = client.get_client_type() {
         let pkt: &sP_CL2LS_REQ_CHAR_SELECT = client.get_packet(P_CL2LS_REQ_CHAR_SELECT);
-        let pc_uid: i64 = pkt.iPC_UID;
+        let pc_uid = pkt.iPC_UID;
         if !state.players.contains_key(&pc_uid) {
             return Err(FFError::build(
                 Severity::Warning,

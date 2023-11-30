@@ -59,9 +59,9 @@ fn main() -> Result<()> {
     let config = config_init().login;
     logger_init(config.log_path.unwrap_or("login.log".to_string()));
 
-    let polling_interval: Duration = Duration::from_millis(50);
+    let polling_interval = Duration::from_millis(50);
     let listen_addr = config.listen_addr.unwrap_or("127.0.0.1:23000".to_string());
-    let mut server: FFServer = FFServer::new(&listen_addr, Some(polling_interval))?;
+    let mut server = FFServer::new(&listen_addr, Some(polling_interval))?;
 
     let state = RefCell::new(LoginServerState::new());
     let mut pkt_handler = |key, clients: &mut HashMap<usize, FFClient>, pkt_id| -> FFResult<()> {
