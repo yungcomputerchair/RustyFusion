@@ -31,16 +31,16 @@ mod state;
 fn main() -> Result<()> {
     config_init();
 
-    let polling_interval: Duration = Duration::from_millis(50);
+    let polling_interval = Duration::from_millis(50);
     let listen_addr = config_get()
         .shard
         .listen_addr
         .unwrap_or("127.0.0.1:23001".to_string());
-    let mut server: FFServer = FFServer::new(&listen_addr, Some(polling_interval))?;
+    let mut server = FFServer::new(&listen_addr, Some(polling_interval))?;
 
-    let login_server_conn_interval: Duration =
+    let login_server_conn_interval =
         Duration::from_secs(config_get().shard.login_server_conn_interval.unwrap_or(10));
-    let mut login_server_conn_time: SystemTime = SystemTime::UNIX_EPOCH;
+    let mut login_server_conn_time = SystemTime::UNIX_EPOCH;
 
     tdata_init();
 
