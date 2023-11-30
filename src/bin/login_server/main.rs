@@ -10,8 +10,8 @@ use std::{
 };
 
 use rusty_fusion::{
-    config::{config_get, config_init},
-    error::{log, FFError, FFResult, Severity},
+    config::config_init,
+    error::{log, logger_init, logger_shutdown, FFError, FFResult, Severity},
     net::{
         crypto::{gen_key, DEFAULT_KEY},
         ffclient::{ClientType, FFClient},
@@ -54,13 +54,13 @@ impl LoginServerState {
 }
 
 fn main() -> Result<()> {
-    config_init();
+    let _cleanup = Cleanup {};
+
+    let config = config_init().login;
+    logger_init(config.log_path.unwrap_or("login.log".to_string()));
 
     let polling_interval: Duration = Duration::from_millis(50);
-    let listen_addr = config_get()
-        .login
-        .listen_addr
-        .unwrap_or("127.0.0.1:23000".to_string());
+    let listen_addr = config.listen_addr.unwrap_or("127.0.0.1:23000".to_string());
     let mut server: FFServer = FFServer::new(&listen_addr, Some(polling_interval))?;
 
     let state = RefCell::new(LoginServerState::new());
@@ -79,13 +79,23 @@ fn main() -> Result<()> {
     .expect("Couldn't set signal handler");
 
     log(
-        Severity::Important,
+        Severity::Info,
         &format!("Login server listening on {}", server.get_endpoint()),
     );
     while running.load(Ordering::SeqCst) {
         server.poll(&mut pkt_handler, Some(&mut dc_handler))?;
     }
+
+    log(Severity::Info, "Login server shutting down...");
     Ok(())
+}
+
+struct Cleanup {}
+impl Drop for Cleanup {
+    fn drop(&mut self) {
+        println!("Cleaning up...");
+        logger_shutdown().expect("Errors shutting down logging");
+    }
 }
 
 fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>) {

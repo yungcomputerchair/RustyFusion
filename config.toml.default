@@ -9,9 +9,11 @@ logging_level = 2 # how verbose logging should be.
                   # 3 = also include [DEBUG]
 
 [login]
+log_path = "login.log" # path to log file, or blank for console logging only
 listen_addr = "127.0.0.1:23000" # address to bind to
 
 [shard]
+log_path = "shard.log" # path to log file, or blank for console logging only
 listen_addr = "127.0.0.1:23001" # address to bind to
 external_addr = "127.0.0.1:23001" # address for clients to connect to
 login_server_addr = "127.0.0.1:23000" # address of login server

@@ -1,4 +1,9 @@
-use std::fmt::Display;
+use std::{
+    fmt::Display,
+    fs::File,
+    io::{BufWriter, Write},
+    sync::{Mutex, OnceLock},
+};
 
 use crate::config::config_get;
 
@@ -9,7 +14,6 @@ pub enum Severity {
     Debug,
     Info,
     Warning,
-    Important,
     Fatal,
 }
 impl Display for Severity {
@@ -18,7 +22,6 @@ impl Display for Severity {
             Severity::Debug => "DEBUG",
             Severity::Info => "INFO",
             Severity::Warning => "WARN",
-            Severity::Important => "IMPORTANT",
             Severity::Fatal => "FATAL",
         };
         write!(f, "{}", s)
@@ -30,7 +33,6 @@ impl From<Severity> for usize {
             Severity::Debug => 3,
             Severity::Info => 2,
             Severity::Warning => 1,
-            Severity::Important => 0,
             Severity::Fatal => 0,
         }
     }
@@ -82,6 +84,38 @@ impl FFError {
     }
 }
 
+static LOGGER: OnceLock<Mutex<BufWriter<File>>> = OnceLock::new();
+
+pub fn logger_init(log_path: String) {
+    assert!(LOGGER.get().is_none());
+    if log_path.is_empty() {
+        return;
+    }
+
+    let log_create = File::create(log_path.clone());
+    match log_create {
+        Ok(log_file) => {
+            let logger = BufWriter::new(log_file);
+            LOGGER.set(Mutex::new(logger)).unwrap();
+        }
+        Err(e) => {
+            log(
+                Severity::Warning,
+                &format!("Couldn't create log file {}: {}", log_path, e),
+            );
+        }
+    }
+}
+
+pub fn logger_shutdown() -> std::io::Result<()> {
+    if let Some(logger) = LOGGER.get() {
+        let mut logger = logger.lock().unwrap();
+        logger.flush()
+    } else {
+        Ok(())
+    }
+}
+
 pub fn log(severity: Severity, msg: &str) {
     let val: usize = severity.into();
     let threshold = config_get().general.logging_level.unwrap_or(2);
@@ -92,4 +126,9 @@ pub fn log(severity: Severity, msg: &str) {
 
     let s = format!("[{}] {}", severity, msg);
     println!("{}", s);
+    if let Some(logger) = LOGGER.get() {
+        if writeln!(logger.lock().unwrap(), "{}", s).is_err() {
+            println!("Couldn't write to log file!");
+        }
+    }
 }

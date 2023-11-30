@@ -11,7 +11,7 @@ use std::{
 
 use rusty_fusion::{
     config::{config_get, config_init},
-    error::{log, FFError, FFResult, Severity},
+    error::{log, logger_init, logger_shutdown, FFError, FFResult, Severity},
     net::{
         crypto::{gen_key, EncryptionMode},
         ffclient::{ClientType, FFClient},
@@ -33,7 +33,11 @@ const CONN_ID_DISCONNECTED: i64 = -1;
 mod state;
 
 fn main() -> Result<()> {
-    config_init();
+    let _cleanup = Cleanup {};
+
+    let config = config_init().shard;
+    logger_init(config.log_path.unwrap_or("shard.log".to_string()));
+    tdata_init();
 
     let polling_interval = Duration::from_millis(50);
     let listen_addr = config_get()
@@ -45,8 +49,6 @@ fn main() -> Result<()> {
     let login_server_conn_interval =
         Duration::from_secs(config_get().shard.login_server_conn_interval.unwrap_or(10));
     let mut login_server_conn_time = SystemTime::UNIX_EPOCH;
-
-    tdata_init();
 
     let state = RefCell::new(ShardServerState::new());
     for npc in tdata_get_npcs() {
@@ -72,7 +74,7 @@ fn main() -> Result<()> {
     .expect("Couldn't set signal handler");
 
     log(
-        Severity::Important,
+        Severity::Info,
         &format!("Shard server listening on {}", server.get_endpoint()),
     );
     while running.load(Ordering::SeqCst) {
@@ -96,7 +98,17 @@ fn main() -> Result<()> {
         }
         server.poll(&mut pkt_handler, Some(&mut dc_handler))?;
     }
+
+    log(Severity::Info, "Shard server shutting down...");
     Ok(())
+}
+
+struct Cleanup {}
+impl Drop for Cleanup {
+    fn drop(&mut self) {
+        println!("Cleaning up...");
+        logger_shutdown().expect("Errors shutting down logging");
+    }
 }
 
 fn handle_disconnect(

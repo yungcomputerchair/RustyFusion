@@ -33,12 +33,13 @@ impl Config {
     }
 }
 
-pub fn config_init() {
+pub fn config_init() -> Config {
     assert!(CONFIG.get().is_none());
     if CONFIG.set(Config::new()).is_err() {
         panic!("Couldn't load config");
     }
     log(Severity::Info, "Loaded config");
+    config_get()
 }
 
 pub fn config_get() -> Config {
@@ -57,11 +58,13 @@ pub struct GeneralConfig {
 
 #[derive(Deserialize, Clone, Default)]
 pub struct LoginConfig {
+    pub log_path: Option<String>,
     pub listen_addr: Option<String>,
 }
 
 #[derive(Deserialize, Clone, Default)]
 pub struct ShardConfig {
+    pub log_path: Option<String>,
     pub listen_addr: Option<String>,
     pub external_addr: Option<String>,
     pub login_server_addr: Option<String>,
