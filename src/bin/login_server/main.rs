@@ -1,4 +1,13 @@
-use std::{cell::RefCell, collections::HashMap, io::Result, time::Duration};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    io::Result,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
 use rusty_fusion::{
     config::{config_get, config_init},
@@ -62,13 +71,21 @@ fn main() -> Result<()> {
         handle_disconnect(key, clients);
     };
 
+    let running = Arc::new(AtomicBool::new(true));
+    let r = running.clone();
+    ctrlc::set_handler(move || {
+        r.store(false, Ordering::SeqCst);
+    })
+    .expect("Couldn't set signal handler");
+
     log(
         Severity::Important,
         &format!("Login server listening on {}", server.get_endpoint()),
     );
-    loop {
+    while running.load(Ordering::SeqCst) {
         server.poll(&mut pkt_handler, Some(&mut dc_handler))?;
     }
+    Ok(())
 }
 
 fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>) {

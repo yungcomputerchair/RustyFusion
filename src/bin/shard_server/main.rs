@@ -2,6 +2,10 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     io::Result,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::{Duration, SystemTime},
 };
 
@@ -60,11 +64,18 @@ fn main() -> Result<()> {
         handle_disconnect(key, clients, &mut state.borrow_mut());
     };
 
+    let running = Arc::new(AtomicBool::new(true));
+    let r = running.clone();
+    ctrlc::set_handler(move || {
+        r.store(false, Ordering::SeqCst);
+    })
+    .expect("Couldn't set signal handler");
+
     log(
         Severity::Important,
         &format!("Shard server listening on {}", server.get_endpoint()),
     );
-    loop {
+    while running.load(Ordering::SeqCst) {
         let time_now = SystemTime::now();
         if !is_login_server_connected(&state.borrow())
             && time_now.duration_since(login_server_conn_time).unwrap() > login_server_conn_interval
@@ -85,6 +96,7 @@ fn main() -> Result<()> {
         }
         server.poll(&mut pkt_handler, Some(&mut dc_handler))?;
     }
+    Ok(())
 }
 
 fn handle_disconnect(

@@ -14,3 +14,4 @@ rand = "0.8.4"
 serde_json = "1.0.107"
 serde = { version = "1.0.189", features = ['derive'] }
 toml = "0.8.8"
+ctrlc = { version = "3.4.1", features = ['termination'] }
