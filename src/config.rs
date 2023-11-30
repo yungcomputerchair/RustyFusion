@@ -6,7 +6,7 @@ use crate::error::*;
 
 static CONFIG: OnceLock<Config> = OnceLock::new();
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Default)]
 pub struct Config {
     pub general: GeneralConfig,
     pub login: LoginConfig,
@@ -14,11 +14,19 @@ pub struct Config {
 }
 impl Config {
     fn new() -> Self {
-        toml::from_str(&std::fs::read_to_string("config.toml").unwrap_or_else(|e| {
-            log(Severity::Fatal, &format!("Can't open config.toml: {}", e));
-            panic!();
-        }))
-        .unwrap_or_else(|e| {
+        let file_read = std::fs::read_to_string("config.toml");
+        if let Err(e) = file_read {
+            if let std::io::ErrorKind::NotFound = e.kind() {
+                log(Severity::Warning, "No config.toml, using default config");
+                return Self::default();
+            } else {
+                log(Severity::Fatal, &format!("Can't open config.toml: {}", e));
+                panic!();
+            }
+        }
+
+        let file_contents = file_read.unwrap();
+        toml::from_str(&file_contents).unwrap_or_else(|e| {
             log(Severity::Fatal, &format!("Malformed config.toml: {}", e));
             panic!();
         })
@@ -34,20 +42,25 @@ pub fn config_init() {
 }
 
 pub fn config_get() -> Config {
-    CONFIG.get().expect("Config not initialized").clone()
+    // really, the only time the config should be accessed
+    // before it's ready is while it's loading, by log()
+    match CONFIG.get() {
+        Some(c) => c.clone(),
+        None => Config::default(),
+    }
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Default)]
 pub struct GeneralConfig {
     pub logging_level: Option<usize>,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Default)]
 pub struct LoginConfig {
     pub listen_addr: Option<String>,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Default)]
 pub struct ShardConfig {
     pub listen_addr: Option<String>,
     pub external_addr: Option<String>,
