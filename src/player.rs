@@ -19,6 +19,8 @@ use crate::{
 
 use num_traits::{clamp, clamp_min, ToPrimitive};
 
+pub const TEST_ACC_UID_START: i64 = i64::MAX - 3;
+
 #[derive(Debug, Clone, Copy)]
 struct PlayerStyle {
     gender: i8,

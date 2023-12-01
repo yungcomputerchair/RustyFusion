@@ -1,6 +1,8 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use rand::random;
+use rand::{thread_rng, Rng};
+
+use crate::player::TEST_ACC_UID_START;
 
 pub fn parse_utf16(chars: &[u16]) -> String {
     let end_pos: usize = chars.iter().position(|&c| c == 0).unwrap_or(chars.len());
@@ -37,6 +39,6 @@ pub fn get_time() -> u64 {
 }
 
 pub fn get_uid() -> i64 {
-    let uid: i64 = random();
+    let uid: i64 = thread_rng().gen_range(i64::MIN..TEST_ACC_UID_START);
     uid
 }

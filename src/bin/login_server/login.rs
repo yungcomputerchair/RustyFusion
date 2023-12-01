@@ -6,7 +6,7 @@ use rusty_fusion::{
     defines::*,
     error::{FFError, FFResult, Severity},
     net::{ffclient::ClientType, packet::*},
-    placeholder, unused, util, Combatant, Entity, Item,
+    placeholder, unused, util, Combatant, Entity, Item, player::TEST_ACC_UID_START,
 };
 
 pub fn login(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
@@ -20,12 +20,12 @@ pub fn login(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()
         _password = util::parse_utf8(&pkt.szCookie_authid);
     }
     if username.eq("test") {
-        let mut player = Player::new(i64::MAX - 3);
+        let mut player = Player::new(TEST_ACC_UID_START);
         player.set_name(1, util::encode_utf16("TestF"), util::encode_utf16("TestL"));
         player.set_god_mode(true);
         players.push(player);
 
-        let mut player = Player::new(i64::MAX - 2);
+        let mut player = Player::new(TEST_ACC_UID_START + 1);
         player.set_name(1, util::encode_utf16("TestF"), util::encode_utf16("TestL"));
         players.push(player);
     }
