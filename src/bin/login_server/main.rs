@@ -30,13 +30,10 @@ fn main() -> Result<()> {
     let _cleanup = Cleanup {};
 
     let config = config_init();
-    logger_init(config.login.log_path.unwrap_or("login.log".to_string()));
+    logger_init(config.login.log_path.get());
 
     let polling_interval = Duration::from_millis(50);
-    let listen_addr = config
-        .login
-        .listen_addr
-        .unwrap_or("127.0.0.1:23000".to_string());
+    let listen_addr = config.login.listen_addr.get();
     let mut server = FFServer::new(&listen_addr, Some(polling_interval))?;
 
     let mut state = ServerState::new_login();
@@ -51,7 +48,7 @@ fn main() -> Result<()> {
     let mut timers = TimerMap::default();
     timers.register_timer(
         logger_flush_scheduled,
-        Duration::from_secs(config.general.log_write_interval.unwrap_or(60)),
+        Duration::from_secs(config.general.log_write_interval.get()),
         false,
     );
 

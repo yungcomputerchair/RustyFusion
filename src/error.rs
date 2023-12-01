@@ -127,7 +127,7 @@ pub fn logger_flush_scheduled(
 
 pub fn log(severity: Severity, msg: &str) {
     let val: usize = severity.into();
-    let threshold = config_get().general.logging_level.unwrap_or(2);
+    let threshold = config_get().general.logging_level.get();
 
     if val > threshold {
         return;

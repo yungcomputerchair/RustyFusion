@@ -32,14 +32,11 @@ fn main() -> Result<()> {
     let _cleanup = Cleanup {};
 
     let config = config_init();
-    logger_init(config.shard.log_path.unwrap_or("shard.log".to_string()));
+    logger_init(config.shard.log_path.get());
     tdata_init();
 
     let polling_interval = Duration::from_millis(50);
-    let listen_addr = config_get()
-        .shard
-        .listen_addr
-        .unwrap_or("127.0.0.1:23001".to_string());
+    let listen_addr = config_get().shard.listen_addr.get();
     let mut server = FFServer::new(&listen_addr, Some(polling_interval))?;
 
     let mut state = ServerState::new_shard();
@@ -47,12 +44,12 @@ fn main() -> Result<()> {
     let mut timers = TimerMap::default();
     timers.register_timer(
         logger_flush_scheduled,
-        Duration::from_secs(config.general.log_write_interval.unwrap_or(60)),
+        Duration::from_secs(config.general.log_write_interval.get()),
         false,
     );
     timers.register_timer(
         connect_to_login_server,
-        Duration::from_secs(config.shard.login_server_conn_interval.unwrap_or(10)),
+        Duration::from_secs(config.shard.login_server_conn_interval.get()),
         true,
     );
 
@@ -182,10 +179,7 @@ fn connect_to_login_server(
         return Ok(());
     }
 
-    let login_server_addr = config_get()
-        .shard
-        .login_server_addr
-        .unwrap_or("127.0.0.1:23000".to_string());
+    let login_server_addr = config_get().shard.login_server_addr.get();
     log(
         Severity::Info,
         &format!("Connecting to login server at {}...", login_server_addr),

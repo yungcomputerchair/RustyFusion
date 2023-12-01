@@ -12,7 +12,7 @@ use crate::{
 pub const NCHUNKS: usize = 16 * 8; // 16 map squares with side lengths of 8 chunks
 pub const MAP_BOUNDS: i32 = 8192 * 100; // top corner of (16, 16)
 fn get_visibility_range() -> usize {
-    config_get().shard.visibility_range.unwrap_or(1)
+    config_get().shard.visibility_range.get()
 }
 
 struct RegistryEntry {

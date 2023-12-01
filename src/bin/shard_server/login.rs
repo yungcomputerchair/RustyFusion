@@ -45,7 +45,7 @@ pub fn login_update_info(server: &mut FFClient, state: &mut ShardServerState) ->
     let public_addr: SocketAddr = config_get()
         .shard
         .external_addr
-        .unwrap_or("127.0.0.1:23001".to_string())
+        .get()
         .parse()
         .expect("Bad public address");
     let mut ip_buf: [u8; 16] = [0; 16];
