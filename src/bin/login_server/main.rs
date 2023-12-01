@@ -22,36 +22,9 @@ use rusty_fusion::{
         },
     },
     player::Player,
+    state::login::LoginServerState,
     util::get_time,
 };
-
-pub struct LoginServerState {
-    next_pc_uid: i64,
-    next_shard_id: i64,
-    pub players: HashMap<i64, Player>,
-}
-
-impl LoginServerState {
-    fn new() -> Self {
-        Self {
-            next_pc_uid: 1,
-            next_shard_id: 1,
-            players: HashMap::new(),
-        }
-    }
-
-    pub fn get_next_pc_uid(&mut self) -> i64 {
-        let next = self.next_pc_uid;
-        self.next_pc_uid += 1;
-        next
-    }
-
-    pub fn get_next_shard_id(&mut self) -> i64 {
-        let next = self.next_shard_id;
-        self.next_shard_id += 1;
-        next
-    }
-}
 
 fn main() -> Result<()> {
     let _cleanup = Cleanup {};
@@ -63,7 +36,7 @@ fn main() -> Result<()> {
     let listen_addr = config.listen_addr.unwrap_or("127.0.0.1:23000".to_string());
     let mut server = FFServer::new(&listen_addr, Some(polling_interval))?;
 
-    let state = RefCell::new(LoginServerState::new());
+    let state = RefCell::new(LoginServerState::default());
     let mut pkt_handler = |key, clients: &mut HashMap<usize, FFClient>, pkt_id| -> FFResult<()> {
         handle_packet(key, clients, pkt_id, &mut state.borrow_mut())
     };

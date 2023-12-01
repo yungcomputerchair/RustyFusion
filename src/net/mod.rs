@@ -9,6 +9,7 @@ use self::{
 };
 use crate::{error::FFResult, player::Player};
 
+pub const CONN_ID_DISCONNECTED: i64 = -1;
 const PACKET_BUFFER_SIZE: usize = 8192;
 const SILENCED_PACKETS: [PacketID; 4] = [
     P_LS2FE_REP_CONNECT_SUCC,

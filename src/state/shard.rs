@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use rusty_fusion::{
+use crate::{
     chunk::EntityMap,
     error::{FFError, FFResult, Severity},
-    net::LoginData,
+    net::{LoginData, CONN_ID_DISCONNECTED},
     player::Player,
 };
 
@@ -13,15 +13,16 @@ pub struct ShardServerState {
     entity_map: EntityMap,
 }
 
-impl ShardServerState {
-    pub fn new() -> Self {
+impl Default for ShardServerState {
+    fn default() -> Self {
         Self {
-            login_server_conn_id: super::CONN_ID_DISCONNECTED,
+            login_server_conn_id: CONN_ID_DISCONNECTED,
             login_data: HashMap::new(),
             entity_map: EntityMap::default(),
         }
     }
-
+}
+impl ShardServerState {
     pub fn get_login_server_conn_id(&self) -> i64 {
         self.login_server_conn_id
     }

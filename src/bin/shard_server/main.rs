@@ -20,18 +20,14 @@ use rusty_fusion::{
             PacketID::{self, *},
             *,
         },
-        ClientMap, LoginData,
+        ClientMap, LoginData, CONN_ID_DISCONNECTED,
     },
+    state::shard::ShardServerState,
     tabledata::{tdata_get_npcs, tdata_init},
     timer::TimerMap,
     util::get_time,
     Entity, EntityID,
 };
-use state::ShardServerState;
-
-const CONN_ID_DISCONNECTED: i64 = -1;
-
-mod state;
 
 fn main() -> Result<()> {
     let _cleanup = Cleanup {};
@@ -47,7 +43,7 @@ fn main() -> Result<()> {
         .unwrap_or("127.0.0.1:23001".to_string());
     let server = RefCell::new(FFServer::new(&listen_addr, Some(polling_interval))?);
 
-    let state = RefCell::new(ShardServerState::new());
+    let state = RefCell::new(ShardServerState::default());
     for npc in tdata_get_npcs() {
         let mut state = state.borrow_mut();
         let chunk_pos = npc.get_position().chunk_coords();
