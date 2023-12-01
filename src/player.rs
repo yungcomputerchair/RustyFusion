@@ -51,10 +51,10 @@ struct PlayerFlags {
     tutorial_flag: bool,
     payzone_flag: bool,
     tip_flags: i128,
-    scamper_flag: i32,
+    scamper_flags: i32,
     skyway_flags: [i64; WYVERN_LOCATION_FLAG_SIZE as usize],
-    mission_flag: [i64; SIZEOF_QUESTFLAG_NUMBER as usize],
-    repeat_mission_flag: [i64; SIZEOF_REPEAT_QUESTFLAG_NUMBER as usize],
+    mission_flags: [i64; SIZEOF_QUESTFLAG_NUMBER as usize],
+    repeat_mission_flags: [i64; SIZEOF_REPEAT_QUESTFLAG_NUMBER as usize],
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -263,14 +263,14 @@ impl Player {
                 iValue: placeholder!(0),
                 iConfirmNum: placeholder!(0),
             },
-            aQuestFlag: self.flags.mission_flag,
-            aRepeatQuestFlag: self.flags.repeat_mission_flag,
+            aQuestFlag: self.flags.mission_flags,
+            aRepeatQuestFlag: self.flags.repeat_mission_flags,
             aRunningQuest: self
                 .mission_data
                 .current_missions
                 .map(Option::<Mission>::into),
             iCurrentMissionID: self.mission_data.active_mission_id,
-            iWarpLocationFlag: self.flags.scamper_flag,
+            iWarpLocationFlag: self.flags.scamper_flags,
             aWyvernLocationFlag: self.flags.skyway_flags,
             iBuddyWarpTime: self.buddy_warp_time,
             iFatigue: unused!(),
@@ -421,7 +421,7 @@ impl Player {
     }
 
     pub fn set_fusion_matter(&mut self, fusion_matter: i32) {
-        self.fusion_matter = clamp_min(fusion_matter, 0);
+        self.fusion_matter = clamp(fusion_matter as u32, 0, PC_FUSIONMATTER_MAX) as i32;
     }
 
     pub fn set_weapon_boosts(&mut self, weapon_boosts: i32) {
@@ -430,6 +430,21 @@ impl Player {
 
     pub fn set_nano_potions(&mut self, nano_potions: i32) {
         self.nano_potions = clamp(nano_potions as u32, 0, PC_BATTERY_MAX) as i32;
+    }
+
+    pub fn set_god_mode(&mut self, god_mode: bool) {
+        if god_mode {
+            self.set_fusion_matter(PC_FUSIONMATTER_MAX as i32);
+            self.set_hp(i32::MAX);
+            self.set_level(PC_LEVEL_MAX as i16);
+            self.set_taros(PC_CANDY_MAX as i32);
+            self.set_appearance_flag();
+            self.set_tutorial_flag();
+            self.set_payzone_flag();
+            self.flags.scamper_flags = -1;
+            self.flags.tip_flags = -1;
+            self.flags.skyway_flags = [-1; WYVERN_LOCATION_FLAG_SIZE as usize];
+        } // TODO GM special state
     }
 }
 impl Combatant for Player {

@@ -20,13 +20,13 @@ pub fn login(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()
         _password = util::parse_utf8(&pkt.szCookie_authid);
     }
     if username.eq("test") {
-        let mut player = Player::new(i64::MAX);
+        let mut player = Player::new(i64::MAX - 3);
         player.set_name(1, util::encode_utf16("TestF"), util::encode_utf16("TestL"));
-        player.set_appearance_flag();
-        player.set_tutorial_flag();
-        player.set_payzone_flag();
-        player.set_level(36);
-        player.set_taros(9999);
+        player.set_god_mode(true);
+        players.push(player);
+
+        let mut player = Player::new(i64::MAX - 2);
+        player.set_name(1, util::encode_utf16("TestF"), util::encode_utf16("TestL"));
         players.push(player);
     }
 
