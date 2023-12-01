@@ -8,18 +8,20 @@ pub fn pc_enter(client: &mut FFClient, key: usize, state: &mut ShardServerState)
     let pkt: &sP_CL2FE_REQ_PC_ENTER = client.get_packet(P_CL2FE_REQ_PC_ENTER);
     let serial_key: i64 = pkt.iEnterSerialKey;
     let login_data = state.get_login_data().remove(&serial_key).unwrap();
+    let pc_id = state.gen_next_pc_id();
     let mut player = login_data.player;
+    player.set_player_id(pc_id);
     player.set_client_id(key);
 
     let resp = sP_FE2CL_REP_PC_ENTER_SUCC {
-        iID: login_data.iPC_UID as i32,
+        iID: pc_id,
         PCLoadData2CL: player.get_load_data(),
         uiSvrTime: get_time(),
     };
 
     client.set_client_type(ClientType::GameClient {
         serial_key: pkt.iEnterSerialKey,
-        pc_uid: Some(login_data.iPC_UID),
+        pc_id: Some(pc_id),
     });
 
     let iv1: i32 = resp.iID + 1;
@@ -52,7 +54,7 @@ pub fn pc_goto(client: &mut FFClient) -> FFResult<()> {
 
 pub fn pc_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
-    let pc_uid = client.get_player_id()?;
+    let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_MOVE = client.get_packet(P_CL2FE_REQ_PC_MOVE);
     let pos = Position::new(pkt.iX, pkt.iY, pkt.iZ);
     let angle = pkt.iAngle;
@@ -68,17 +70,17 @@ pub fn pc_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResul
         iAngle: pkt.iAngle,
         cKeyValue: pkt.cKeyValue,
         iSpeed: pkt.iSpeed,
-        iID: pc_uid as i32,
+        iID: pc_id,
         iSvrTime: get_time(),
     };
 
     state
         .get_entity_map()
-        .for_each_around(EntityID::Player(pc_uid), clients, |client| {
+        .for_each_around(EntityID::Player(pc_id), clients, |client| {
             let _ = client.send_packet(P_FE2CL_PC_MOVE, &resp);
         });
 
-    state.update_player(pc_uid, |player, state| {
+    state.update_player(pc_id, |player, state| {
         player.set_position(pos, state.get_entity_map(), clients);
         player.set_rotation(angle);
     })
@@ -86,7 +88,7 @@ pub fn pc_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResul
 
 pub fn pc_jump(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
-    let pc_uid = client.get_player_id()?;
+    let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_JUMP = client.get_packet(P_CL2FE_REQ_PC_JUMP);
     let pos = Position::new(pkt.iX, pkt.iY, pkt.iZ);
     let angle = pkt.iAngle;
@@ -102,17 +104,17 @@ pub fn pc_jump(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResul
         iAngle: pkt.iAngle,
         cKeyValue: pkt.cKeyValue,
         iSpeed: pkt.iSpeed,
-        iID: pc_uid as i32,
+        iID: pc_id,
         iSvrTime: get_time(),
     };
 
     state
         .get_entity_map()
-        .for_each_around(EntityID::Player(pc_uid), clients, |client| {
+        .for_each_around(EntityID::Player(pc_id), clients, |client| {
             let _ = client.send_packet(P_FE2CL_PC_JUMP, &resp);
         });
 
-    state.update_player(pc_uid, |player, state| {
+    state.update_player(pc_id, |player, state| {
         player.set_position(pos, state.get_entity_map(), clients);
         player.set_rotation(angle);
     })
@@ -120,7 +122,7 @@ pub fn pc_jump(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResul
 
 pub fn pc_stop(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
-    let pc_uid = client.get_player_id()?;
+    let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_STOP = client.get_packet(P_CL2FE_REQ_PC_STOP);
     let pos = Position::new(pkt.iX, pkt.iY, pkt.iZ);
 
@@ -129,17 +131,17 @@ pub fn pc_stop(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResul
         iX: pkt.iX,
         iY: pkt.iY,
         iZ: pkt.iZ,
-        iID: pc_uid as i32,
+        iID: pc_id,
         iSvrTime: get_time(),
     };
 
     state
         .get_entity_map()
-        .for_each_around(EntityID::Player(pc_uid), clients, |client| {
+        .for_each_around(EntityID::Player(pc_id), clients, |client| {
             let _ = client.send_packet(P_FE2CL_PC_STOP, &resp);
         });
 
-    state.update_player(pc_uid, |player, state| {
+    state.update_player(pc_id, |player, state| {
         player.set_position(pos, state.get_entity_map(), clients);
     })
 }
@@ -149,11 +151,11 @@ pub fn pc_special_state_switch(
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let client = clients.get_self();
-    let pc_uid = client.get_player_id()?;
+    let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH =
         client.get_packet(P_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH);
 
-    let player = state.get_player_mut(pc_uid)?;
+    let player = state.get_player_mut(pc_id)?;
     let special_state = player.update_special_state(pkt.iSpecialStateFlag);
 
     let resp = sP_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC {
@@ -167,11 +169,11 @@ pub fn pc_special_state_switch(
 }
 
 pub fn pc_first_use_flag_set(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
-    let pc_uid = client.get_player_id()?;
+    let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_FIRST_USE_FLAG_SET =
         client.get_packet(P_CL2FE_REQ_PC_FIRST_USE_FLAG_SET);
 
-    let player = state.get_player_mut(pc_uid)?;
+    let player = state.get_player_mut(pc_id)?;
     player.update_first_use_flag(pkt.iFlagCode);
 
     Ok(())

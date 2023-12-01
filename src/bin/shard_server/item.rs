@@ -11,7 +11,8 @@ pub fn item_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFRes
     let client = clients.get_self();
     let pkt: sP_CL2FE_REQ_ITEM_MOVE = *client.get_packet(P_CL2FE_REQ_ITEM_MOVE);
 
-    let player = state.get_player_mut(client.get_player_id()?)?;
+    let pc_id = client.get_player_id()?;
+    let player = state.get_player_mut(pc_id)?;
 
     let location_from = eItemLocation::from_i32(pkt.eFrom).ok_or(FFError::build(
         Severity::Warning,

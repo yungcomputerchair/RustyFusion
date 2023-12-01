@@ -54,7 +54,7 @@ pub fn login(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()
     let serial_key: i64 = random();
     client.set_client_type(ClientType::GameClient {
         serial_key,
-        pc_uid: None,
+        pc_id: None,
     });
 
     players

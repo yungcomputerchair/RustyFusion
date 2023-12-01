@@ -174,7 +174,7 @@ impl From<Option<Mission>> for sRunningQuest {
 
 #[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
 pub enum EntityID {
-    Player(i64),
+    Player(i32),
     NPC(i32),
 }
 

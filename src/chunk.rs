@@ -60,8 +60,8 @@ impl EntityMap {
         }
     }
 
-    pub fn get_player(&mut self, pc_uid: i64) -> Option<&mut Player> {
-        let id = EntityID::Player(pc_uid);
+    pub fn get_player(&mut self, pc_id: i32) -> Option<&mut Player> {
+        let id = EntityID::Player(pc_id);
         self.registry.get_mut(&id).and_then(|entry| {
             let entity_ref = entry.entity.as_mut().as_any();
             let player_ref = entity_ref.downcast_mut();

@@ -100,10 +100,9 @@ fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>, state: 
             state.set_login_server_conn_id(CONN_ID_DISCONNECTED);
         }
         ClientType::GameClient {
-            pc_uid: Some(pc_uid),
-            ..
+            pc_id: Some(pc_id), ..
         } => {
-            let id = EntityID::Player(pc_uid);
+            let id = EntityID::Player(pc_id);
             let entity_map = state.get_entity_map();
             entity_map.update(id, None, Some(&mut clients));
             entity_map.untrack(id);

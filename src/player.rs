@@ -122,6 +122,7 @@ impl Default for PlayerInventory {
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Player {
+    id: Option<i32>,
     uid: i64,
     client_id: Option<usize>,
     perms: i16,
@@ -160,6 +161,15 @@ impl Player {
             },
             ..Default::default()
         }
+    }
+
+    pub fn get_player_id(&self) -> i32 {
+        self.id
+            .unwrap_or_else(|| panic!("Player with UID {} has no ID", self.uid))
+    }
+
+    pub fn set_player_id(&mut self, pc_id: i32) {
+        self.id = Some(pc_id);
     }
 
     pub fn set_client_id(&mut self, client_id: usize) {
@@ -274,7 +284,7 @@ impl Player {
 
     pub fn get_appearance_data(&self) -> sPCAppearanceData {
         sPCAppearanceData {
-            iID: self.uid as i32,
+            iID: self.id.unwrap_or_default(),
             PCStyle: self.get_style(),
             iConditionBitFlag: self.get_condition_bit_flag(),
             iPCState: placeholder!(0),
@@ -441,7 +451,7 @@ impl Entity for Player {
     }
 
     fn get_id(&self) -> EntityID {
-        EntityID::Player(self.uid)
+        EntityID::Player(self.get_player_id())
     }
 
     fn get_position(&self) -> Position {
@@ -472,7 +482,7 @@ impl Entity for Player {
 
     fn send_exit(&self, client: &mut FFClient) -> FFResult<()> {
         let pkt = sP_FE2CL_PC_EXIT {
-            iID: self.uid as i32,
+            iID: self.get_player_id(),
             iExitType: unused!(),
         };
         client.send_packet(PacketID::P_FE2CL_PC_EXIT, &pkt)

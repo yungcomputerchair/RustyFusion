@@ -22,8 +22,8 @@ use super::{
 pub enum ClientType {
     Unknown,
     GameClient {
-        serial_key: i64,     // iEnterSerialKey
-        pc_uid: Option<i64>, // iPC_UID
+        serial_key: i64,    // iEnterSerialKey
+        pc_id: Option<i32>, // iPC_ID
     },
     LoginServer,
     ShardServer(i64), // iConn_UID
@@ -91,13 +91,12 @@ impl FFClient {
         self.client_type = cltype;
     }
 
-    pub fn get_player_id(&mut self) -> FFResult<i64> {
+    pub fn get_player_id(&mut self) -> FFResult<i32> {
         if let ClientType::GameClient {
-            pc_uid: Some(pc_uid),
-            ..
+            pc_id: Some(pc_id), ..
         } = self.client_type
         {
-            Ok(pc_uid)
+            Ok(pc_id)
         } else {
             Err(FFError::build(
                 Severity::Warning,
