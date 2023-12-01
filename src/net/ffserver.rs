@@ -7,7 +7,10 @@ use std::{
     time::Duration,
 };
 
-use crate::error::{log, Severity};
+use crate::{
+    error::{log, Severity},
+    state::ServerState,
+};
 
 use super::{
     ffclient::{ClientType, FFClient},
@@ -57,6 +60,7 @@ impl FFServer {
         &mut self,
         pkt_handler: PacketCallback,
         dc_handler: Option<DisconnectCallback>,
+        state: &mut ServerState,
     ) -> Result<()> {
         let mut events: Vec<Event> = Vec::new();
         if let Err(e) = self.poller.wait(&mut events, self.poll_timeout) {
@@ -86,13 +90,13 @@ impl FFServer {
                 let addr = client.get_addr();
                 let res = client
                     .read_packet()
-                    .and_then(|pkt_id| pkt_handler(ev.key, clients, pkt_id));
+                    .and_then(|pkt_id| pkt_handler(ev.key, clients, pkt_id, state));
 
                 if let Err(e) = res {
                     log(e.get_severity(), &format!("{} ({})", e.get_msg(), addr));
                     if e.should_dc_client() {
                         if let Some(callback) = dc_handler.as_mut() {
-                            callback(ev.key, clients);
+                            callback(ev.key, clients, state);
                         };
                         self.unregister_client(ev.key)?.unwrap();
                     }

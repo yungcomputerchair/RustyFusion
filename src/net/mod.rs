@@ -7,7 +7,7 @@ use self::{
         PacketID::{self, *},
     },
 };
-use crate::{error::FFResult, player::Player};
+use crate::{error::FFResult, player::Player, state::ServerState};
 
 pub const CONN_ID_DISCONNECTED: i64 = -1;
 const PACKET_BUFFER_SIZE: usize = 8192;
@@ -24,9 +24,9 @@ pub mod ffclient;
 pub mod ffserver;
 pub mod packet;
 
-pub type PacketCallback<'a> =
-    &'a mut dyn FnMut(usize, &mut HashMap<usize, FFClient>, PacketID) -> FFResult<()>;
-pub type DisconnectCallback<'a> = &'a mut dyn FnMut(usize, &mut HashMap<usize, FFClient>);
+pub type PacketCallback =
+    fn(usize, &mut HashMap<usize, FFClient>, PacketID, &mut ServerState) -> FFResult<()>;
+pub type DisconnectCallback = fn(usize, &mut HashMap<usize, FFClient>, &mut ServerState);
 
 #[allow(non_snake_case)]
 pub struct LoginData {

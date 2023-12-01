@@ -1,5 +1,4 @@
 use std::{
-    cell::RefCell,
     collections::HashMap,
     io::Result,
     sync::{
@@ -22,7 +21,7 @@ use rusty_fusion::{
         },
     },
     player::Player,
-    state::login::LoginServerState,
+    state::{login::LoginServerState, ServerState},
     util::get_time,
 };
 
@@ -36,13 +35,7 @@ fn main() -> Result<()> {
     let listen_addr = config.listen_addr.unwrap_or("127.0.0.1:23000".to_string());
     let mut server = FFServer::new(&listen_addr, Some(polling_interval))?;
 
-    let state = RefCell::new(LoginServerState::default());
-    let mut pkt_handler = |key, clients: &mut HashMap<usize, FFClient>, pkt_id| -> FFResult<()> {
-        handle_packet(key, clients, pkt_id, &mut state.borrow_mut())
-    };
-    let mut dc_handler = |key, clients: &mut HashMap<usize, FFClient>| {
-        handle_disconnect(key, clients);
-    };
+    let mut state = ServerState::new_login();
 
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
@@ -56,7 +49,7 @@ fn main() -> Result<()> {
         &format!("Login server listening on {}", server.get_endpoint()),
     );
     while running.load(Ordering::SeqCst) {
-        server.poll(&mut pkt_handler, Some(&mut dc_handler))?;
+        server.poll(handle_packet, Some(handle_disconnect), &mut state)?;
     }
 
     log(Severity::Info, "Login server shutting down...");
@@ -71,7 +64,8 @@ impl Drop for Cleanup {
     }
 }
 
-fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>) {
+fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>, state: &mut ServerState) {
+    let _state = state.as_login();
     let client = clients.get_mut(&key).unwrap();
     if let ClientType::ShardServer(shard_id) = client.get_client_type() {
         log(
@@ -91,8 +85,9 @@ fn handle_packet(
     key: usize,
     clients: &mut HashMap<usize, FFClient>,
     pkt_id: PacketID,
-    state: &mut LoginServerState,
+    state: &mut ServerState,
 ) -> FFResult<()> {
+    let state = state.as_login();
     let client = clients.get_mut(&key).unwrap();
     match pkt_id {
         P_FE2LS_REQ_CONNECT => shard::connect(client, state),

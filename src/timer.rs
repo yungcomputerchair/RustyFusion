@@ -3,21 +3,21 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use crate::error::{FFError, FFResult};
+use crate::{
+    error::{FFError, FFResult},
+    net::ffserver::FFServer,
+    state::ServerState,
+};
 
-struct Timer<F>
-where
-    F: FnMut(SystemTime) -> FFResult<()>,
-{
-    callback: F,
+type TimerCallback = fn(SystemTime, &mut FFServer, &mut ServerState) -> FFResult<()>;
+
+struct Timer {
+    callback: TimerCallback,
     interval: Duration,
     last_fire: SystemTime,
 }
-impl<F> Timer<F>
-where
-    F: FnMut(SystemTime) -> FFResult<()>,
-{
-    fn new(callback: F, interval: Duration, prime: bool) -> Self {
+impl Timer {
+    fn new(callback: TimerCallback, interval: Duration, prime: bool) -> Self {
         let last_fire = if prime {
             SystemTime::UNIX_EPOCH
         } else {
@@ -30,10 +30,15 @@ where
         }
     }
 
-    fn check(&mut self, time_now: SystemTime) -> Option<FFResult<()>> {
+    fn check(
+        &mut self,
+        time_now: SystemTime,
+        server: &mut FFServer,
+        state: &mut ServerState,
+    ) -> Option<FFResult<()>> {
         if time_now.duration_since(self.last_fire).unwrap_or_default() >= self.interval {
             self.last_fire = time_now;
-            Some((self.callback)(time_now))
+            Some((self.callback)(time_now, server, state))
         } else {
             None
         }
@@ -44,17 +49,11 @@ where
     }
 }
 
-pub struct TimerMap<F>
-where
-    F: FnMut(SystemTime) -> FFResult<()>,
-{
-    timers: HashMap<usize, Timer<F>>,
+pub struct TimerMap {
+    timers: HashMap<usize, Timer>,
     next_timer_id: usize,
 }
-impl<F> Default for TimerMap<F>
-where
-    F: FnMut(SystemTime) -> FFResult<()>,
-{
+impl Default for TimerMap {
     fn default() -> Self {
         Self {
             timers: HashMap::new(),
@@ -63,11 +62,13 @@ where
     }
 }
 
-impl<F> TimerMap<F>
-where
-    F: FnMut(SystemTime) -> FFResult<()>,
-{
-    pub fn register_timer(&mut self, callback: F, interval: Duration, prime: bool) -> usize {
+impl TimerMap {
+    pub fn register_timer(
+        &mut self,
+        callback: TimerCallback,
+        interval: Duration,
+        prime: bool,
+    ) -> usize {
         let key = self.next_timer_id;
         self.next_timer_id += 1;
         self.timers
@@ -75,10 +76,10 @@ where
         key
     }
 
-    pub fn check_all(&mut self) -> FFResult<()> {
+    pub fn check_all(&mut self, server: &mut FFServer, state: &mut ServerState) -> FFResult<()> {
         let time_now = SystemTime::now();
         self.timers.iter_mut().try_for_each(|(key, timer)| {
-            if let Some(res) = timer.check(time_now) {
+            if let Some(res) = timer.check(time_now, server, state) {
                 res.map_err(|e| {
                     FFError::build(e.get_severity(), format!("Timer #{}: {}", key, e.get_msg()))
                 })

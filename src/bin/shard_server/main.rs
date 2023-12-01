@@ -1,12 +1,11 @@
 use std::{
-    cell::RefCell,
     collections::HashMap,
     io::Result,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 
 use rusty_fusion::{
@@ -22,8 +21,8 @@ use rusty_fusion::{
         },
         ClientMap, LoginData, CONN_ID_DISCONNECTED,
     },
-    state::shard::ShardServerState,
-    tabledata::{tdata_get_npcs, tdata_init},
+    state::{shard::ShardServerState, ServerState},
+    tabledata::tdata_init,
     timer::TimerMap,
     util::get_time,
     Entity, EntityID,
@@ -41,30 +40,13 @@ fn main() -> Result<()> {
         .shard
         .listen_addr
         .unwrap_or("127.0.0.1:23001".to_string());
-    let server = RefCell::new(FFServer::new(&listen_addr, Some(polling_interval))?);
+    let mut server = FFServer::new(&listen_addr, Some(polling_interval))?;
 
-    let state = RefCell::new(ShardServerState::default());
-    for npc in tdata_get_npcs() {
-        let mut state = state.borrow_mut();
-        let chunk_pos = npc.get_position().chunk_coords();
-        let entity_map = state.get_entity_map();
-        let id = entity_map.track(Box::new(npc));
-        entity_map.update(id, Some(chunk_pos), None);
-    }
-
-    let mut pkt_handler = |key, clients: &mut HashMap<usize, FFClient>, pkt_id| -> FFResult<()> {
-        handle_packet(key, clients, pkt_id, &mut state.borrow_mut())
-    };
-    let mut dc_handler = |key, clients: &mut HashMap<usize, FFClient>| {
-        handle_disconnect(key, clients, &mut state.borrow_mut());
-    };
+    let mut state = ServerState::new_shard();
 
     let mut timers = TimerMap::default();
     timers.register_timer(
-        |_| {
-            connect_to_login_server(&mut server.borrow_mut(), &mut state.borrow_mut());
-            Ok(())
-        },
+        connect_to_login_server,
         Duration::from_secs(config_get().shard.login_server_conn_interval.unwrap_or(10)),
         true,
     );
@@ -78,22 +60,19 @@ fn main() -> Result<()> {
 
     log(
         Severity::Info,
-        &format!(
-            "Shard server listening on {}",
-            server.borrow_mut().get_endpoint()
-        ),
+        &format!("Shard server listening on {}", server.get_endpoint()),
     );
     while running.load(Ordering::SeqCst) {
-        timers.check_all().unwrap_or_else(|e| {
-            let severity = e.get_severity();
-            log(severity, e.get_msg());
-            if let Severity::Fatal = severity {
-                panic!()
-            }
-        });
-        server
-            .borrow_mut()
-            .poll(&mut pkt_handler, Some(&mut dc_handler))?;
+        timers
+            .check_all(&mut server, &mut state)
+            .unwrap_or_else(|e| {
+                let severity = e.get_severity();
+                log(severity, e.get_msg());
+                if let Severity::Fatal = severity {
+                    panic!()
+                }
+            });
+        server.poll(handle_packet, Some(handle_disconnect), &mut state)?;
     }
 
     log(Severity::Info, "Shard server shutting down...");
@@ -108,11 +87,8 @@ impl Drop for Cleanup {
     }
 }
 
-fn handle_disconnect(
-    key: usize,
-    clients: &mut HashMap<usize, FFClient>,
-    state: &mut ShardServerState,
-) {
+fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>, state: &mut ServerState) {
+    let state = state.as_shard();
     let mut clients = ClientMap::new(key, clients);
     let client = clients.get_self();
     match client.get_client_type() {
@@ -145,8 +121,9 @@ fn handle_packet(
     key: usize,
     clients: &mut HashMap<usize, FFClient>,
     pkt_id: PacketID,
-    state: &mut ShardServerState,
+    state: &mut ServerState,
 ) -> FFResult<()> {
+    let state = state.as_shard();
     let mut clients = ClientMap::new(key, clients);
     match pkt_id {
         P_LS2FE_REP_CONNECT_SUCC => login::login_connect_succ(clients.get_self(), state),
@@ -191,9 +168,14 @@ fn wrong_server(client: &mut FFClient) -> FFResult<()> {
     Ok(())
 }
 
-fn connect_to_login_server(shard_server: &mut FFServer, state: &mut ShardServerState) {
+fn connect_to_login_server(
+    _time: SystemTime,
+    shard_server: &mut FFServer,
+    state: &mut ServerState,
+) -> FFResult<()> {
+    let state = state.as_shard();
     if is_login_server_connected(state) {
-        return;
+        return Ok(());
     }
 
     let login_server_addr = config_get()
@@ -208,6 +190,8 @@ fn connect_to_login_server(shard_server: &mut FFServer, state: &mut ShardServerS
     if let Some(login_server) = conn {
         login::login_connect_req(login_server);
     }
+
+    Ok(())
 }
 
 fn is_login_server_connected(state: &ShardServerState) -> bool {

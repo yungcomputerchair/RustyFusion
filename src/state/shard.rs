@@ -5,6 +5,8 @@ use crate::{
     error::{FFError, FFResult, Severity},
     net::{LoginData, CONN_ID_DISCONNECTED},
     player::Player,
+    tabledata::tdata_get_npcs,
+    Entity,
 };
 
 pub struct ShardServerState {
@@ -15,11 +17,18 @@ pub struct ShardServerState {
 
 impl Default for ShardServerState {
     fn default() -> Self {
-        Self {
+        let mut state = Self {
             login_server_conn_id: CONN_ID_DISCONNECTED,
             login_data: HashMap::new(),
             entity_map: EntityMap::default(),
+        };
+        for npc in tdata_get_npcs() {
+            let chunk_pos = npc.get_position().chunk_coords();
+            let entity_map = state.get_entity_map();
+            let id = entity_map.track(Box::new(npc));
+            entity_map.update(id, Some(chunk_pos), None);
         }
+        state
     }
 }
 impl ShardServerState {
