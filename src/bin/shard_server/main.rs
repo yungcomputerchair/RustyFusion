@@ -6,7 +6,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    time::{Duration, SystemTime},
+    time::Duration,
 };
 
 use rusty_fusion::{
@@ -23,6 +23,7 @@ use rusty_fusion::{
         ClientMap, LoginData,
     },
     tabledata::{tdata_get_npcs, tdata_init},
+    timer::TimerMap,
     util::get_time,
     Entity, EntityID,
 };
@@ -44,10 +45,7 @@ fn main() -> Result<()> {
         .shard
         .listen_addr
         .unwrap_or("127.0.0.1:23001".to_string());
-    let mut server = FFServer::new(&listen_addr, Some(polling_interval))?;
-
-    let login_server_conn_interval =
-        Duration::from_secs(config_get().shard.login_server_conn_interval.unwrap_or(10));
+    let server = RefCell::new(FFServer::new(&listen_addr, Some(polling_interval))?);
 
     let state = RefCell::new(ShardServerState::new());
     for npc in tdata_get_npcs() {
@@ -65,6 +63,16 @@ fn main() -> Result<()> {
         handle_disconnect(key, clients, &mut state.borrow_mut());
     };
 
+    let mut timers = TimerMap::default();
+    timers.register_timer(
+        |_| {
+            connect_to_login_server(&mut server.borrow_mut(), &mut state.borrow_mut());
+            Ok(())
+        },
+        Duration::from_secs(config_get().shard.login_server_conn_interval.unwrap_or(10)),
+        true,
+    );
+
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
     ctrlc::set_handler(move || {
@@ -74,23 +82,22 @@ fn main() -> Result<()> {
 
     log(
         Severity::Info,
-        &format!("Shard server listening on {}", server.get_endpoint()),
+        &format!(
+            "Shard server listening on {}",
+            server.borrow_mut().get_endpoint()
+        ),
     );
     while running.load(Ordering::SeqCst) {
-        // TODO proper timers
-        {
-            let mut state = state.borrow_mut();
-            let time_now = SystemTime::now();
-            if !is_login_server_connected(&state)
-                && time_now
-                    .duration_since(state.get_login_server_conn_time())
-                    .unwrap()
-                    > login_server_conn_interval
-            {
-                connect_to_login_server(time_now, &mut server, &mut state);
+        timers.check_all().unwrap_or_else(|e| {
+            let severity = e.get_severity();
+            log(severity, e.get_msg());
+            if let Severity::Fatal = severity {
+                panic!()
             }
-        }
-        server.poll(&mut pkt_handler, Some(&mut dc_handler))?;
+        });
+        server
+            .borrow_mut()
+            .poll(&mut pkt_handler, Some(&mut dc_handler))?;
     }
 
     log(Severity::Info, "Shard server shutting down...");
@@ -188,11 +195,11 @@ fn wrong_server(client: &mut FFClient) -> FFResult<()> {
     Ok(())
 }
 
-fn connect_to_login_server(
-    time_now: SystemTime,
-    shard_server: &mut FFServer,
-    state: &mut ShardServerState,
-) {
+fn connect_to_login_server(shard_server: &mut FFServer, state: &mut ShardServerState) {
+    if is_login_server_connected(state) {
+        return;
+    }
+
     let login_server_addr = config_get()
         .shard
         .login_server_addr
@@ -205,7 +212,6 @@ fn connect_to_login_server(
     if let Some(login_server) = conn {
         login::login_connect_req(login_server);
     }
-    state.set_login_server_conn_time(time_now);
 }
 
 fn is_login_server_connected(state: &ShardServerState) -> bool {

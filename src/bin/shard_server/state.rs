@@ -1,4 +1,4 @@
-use std::{collections::HashMap, time::SystemTime};
+use std::collections::HashMap;
 
 use rusty_fusion::{
     chunk::EntityMap,
@@ -9,7 +9,6 @@ use rusty_fusion::{
 
 pub struct ShardServerState {
     login_server_conn_id: i64,
-    login_server_conn_time: SystemTime,
     login_data: HashMap<i64, LoginData>,
     entity_map: EntityMap,
 }
@@ -18,7 +17,6 @@ impl ShardServerState {
     pub fn new() -> Self {
         Self {
             login_server_conn_id: super::CONN_ID_DISCONNECTED,
-            login_server_conn_time: SystemTime::UNIX_EPOCH,
             login_data: HashMap::new(),
             entity_map: EntityMap::default(),
         }
@@ -26,10 +24,6 @@ impl ShardServerState {
 
     pub fn get_login_server_conn_id(&self) -> i64 {
         self.login_server_conn_id
-    }
-
-    pub fn get_login_server_conn_time(&self) -> SystemTime {
-        self.login_server_conn_time
     }
 
     pub fn get_login_data(&mut self) -> &mut HashMap<i64, LoginData> {
@@ -42,10 +36,6 @@ impl ShardServerState {
 
     pub fn set_login_server_conn_id(&mut self, conn_id: i64) {
         self.login_server_conn_id = conn_id;
-    }
-
-    pub fn set_login_server_conn_time(&mut self, conn_time: SystemTime) {
-        self.login_server_conn_time = conn_time;
     }
 
     pub fn get_player_mut(&mut self, pc_uid: i64) -> FFResult<&mut Player> {
