@@ -17,7 +17,7 @@ use crate::{
     CombatStats, Combatant, Entity, EntityID, Item, Mission, Nano, Position,
 };
 
-use num_traits::ToPrimitive;
+use num_traits::{clamp, clamp_min, ToPrimitive};
 
 #[derive(Debug, Clone, Copy)]
 struct PlayerStyle {
@@ -409,27 +409,27 @@ impl Player {
     }
 
     pub fn set_taros(&mut self, taros: i32) {
-        self.taros = taros;
+        self.taros = clamp(taros as u32, 0, PC_CANDY_MAX) as i32;
     }
 
     pub fn set_hp(&mut self, hp: i32) {
-        self.combat_stats.hp = hp;
+        self.combat_stats.hp = clamp_min(hp, 0);
     }
 
     pub fn set_level(&mut self, level: i16) {
-        self.combat_stats.level = level;
+        self.combat_stats.level = clamp(level as u32, 1, PC_LEVEL_MAX) as i16;
     }
 
     pub fn set_fusion_matter(&mut self, fusion_matter: i32) {
-        self.fusion_matter = fusion_matter;
+        self.fusion_matter = clamp_min(fusion_matter, 0);
     }
 
     pub fn set_weapon_boosts(&mut self, weapon_boosts: i32) {
-        self.weapon_boosts = weapon_boosts;
+        self.weapon_boosts = clamp(weapon_boosts as u32, 0, PC_BATTERY_MAX) as i32;
     }
 
     pub fn set_nano_potions(&mut self, nano_potions: i32) {
-        self.nano_potions = nano_potions;
+        self.nano_potions = clamp(nano_potions as u32, 0, PC_BATTERY_MAX) as i32;
     }
 }
 impl Combatant for Player {
