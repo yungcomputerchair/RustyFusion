@@ -89,7 +89,9 @@ pub fn check_char_name(client: &mut FFClient) -> FFResult<()> {
 pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
     let pkt: &sP_CL2LS_REQ_SAVE_CHAR_NAME = client.get_packet(P_CL2LS_REQ_SAVE_CHAR_NAME);
 
-    let pc_uid = state.get_next_pc_uid();
+    let pc_uid = util::get_uid();
+    // TODO check with DB if UID is in use and reroll
+
     let mut player = Player::new(pc_uid);
     player.set_name(1, pkt.szFirstName, pkt.szLastName);
     let style = &player.get_style();
