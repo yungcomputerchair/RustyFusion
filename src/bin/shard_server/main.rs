@@ -10,7 +10,7 @@ use std::{
 
 use rusty_fusion::{
     config::{config_get, config_init},
-    error::{log, logger_init, logger_shutdown, FFError, FFResult, Severity},
+    error::{log, logger_flush, logger_flush_scheduled, logger_init, FFError, FFResult, Severity},
     net::{
         crypto::{gen_key, EncryptionMode},
         ffclient::{ClientType, FFClient},
@@ -31,8 +31,8 @@ use rusty_fusion::{
 fn main() -> Result<()> {
     let _cleanup = Cleanup {};
 
-    let config = config_init().shard;
-    logger_init(config.log_path.unwrap_or("shard.log".to_string()));
+    let config = config_init();
+    logger_init(config.shard.log_path.unwrap_or("shard.log".to_string()));
     tdata_init();
 
     let polling_interval = Duration::from_millis(50);
@@ -46,8 +46,13 @@ fn main() -> Result<()> {
 
     let mut timers = TimerMap::default();
     timers.register_timer(
+        logger_flush_scheduled,
+        Duration::from_secs(config.general.log_write_interval.unwrap_or(60)),
+        false,
+    );
+    timers.register_timer(
         connect_to_login_server,
-        Duration::from_secs(config_get().shard.login_server_conn_interval.unwrap_or(10)),
+        Duration::from_secs(config.shard.login_server_conn_interval.unwrap_or(10)),
         true,
     );
 
@@ -83,7 +88,7 @@ struct Cleanup {}
 impl Drop for Cleanup {
     fn drop(&mut self) {
         println!("Cleaning up...");
-        logger_shutdown().expect("Errors shutting down logging");
+        logger_flush().expect("Errors writing final log");
     }
 }
 

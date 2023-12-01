@@ -54,6 +54,7 @@ pub fn config_get() -> Config {
 #[derive(Deserialize, Clone, Default)]
 pub struct GeneralConfig {
     pub logging_level: Option<usize>,
+    pub log_write_interval: Option<u64>,
 }
 
 #[derive(Deserialize, Clone, Default)]

@@ -7,6 +7,7 @@ logging_level = 2 # how verbose logging should be.
                   # 1 = include [WARN]
                   # 2 = also include [INFO]
                   # 3 = also include [DEBUG]
+log_write_interval = 60 # how long (seconds) between log file writes
 
 [login]
 log_path = "login.log" # path to log file, or blank for console logging only

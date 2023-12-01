@@ -10,7 +10,7 @@ use std::{
 
 use rusty_fusion::{
     config::config_init,
-    error::{log, logger_init, logger_shutdown, FFError, FFResult, Severity},
+    error::{log, logger_flush, logger_flush_scheduled, logger_init, FFError, FFResult, Severity},
     net::{
         crypto::{gen_key, DEFAULT_KEY},
         ffclient::{ClientType, FFClient},
@@ -22,17 +22,21 @@ use rusty_fusion::{
     },
     player::Player,
     state::{login::LoginServerState, ServerState},
+    timer::TimerMap,
     util::get_time,
 };
 
 fn main() -> Result<()> {
     let _cleanup = Cleanup {};
 
-    let config = config_init().login;
-    logger_init(config.log_path.unwrap_or("login.log".to_string()));
+    let config = config_init();
+    logger_init(config.login.log_path.unwrap_or("login.log".to_string()));
 
     let polling_interval = Duration::from_millis(50);
-    let listen_addr = config.listen_addr.unwrap_or("127.0.0.1:23000".to_string());
+    let listen_addr = config
+        .login
+        .listen_addr
+        .unwrap_or("127.0.0.1:23000".to_string());
     let mut server = FFServer::new(&listen_addr, Some(polling_interval))?;
 
     let mut state = ServerState::new_login();
@@ -43,6 +47,13 @@ fn main() -> Result<()> {
         r.store(false, Ordering::SeqCst);
     })
     .expect("Couldn't set signal handler");
+
+    let mut timers = TimerMap::default();
+    timers.register_timer(
+        logger_flush_scheduled,
+        Duration::from_secs(config.general.log_write_interval.unwrap_or(60)),
+        false,
+    );
 
     log(
         Severity::Info,
@@ -60,7 +71,7 @@ struct Cleanup {}
 impl Drop for Cleanup {
     fn drop(&mut self) {
         println!("Cleaning up...");
-        logger_shutdown().expect("Errors shutting down logging");
+        logger_flush().expect("Errors writing final log");
     }
 }
 

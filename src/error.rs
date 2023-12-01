@@ -3,9 +3,10 @@ use std::{
     fs::File,
     io::{BufWriter, Write},
     sync::{Mutex, OnceLock},
+    time::SystemTime,
 };
 
-use crate::config::config_get;
+use crate::{config::config_get, net::ffserver::FFServer, state::ServerState};
 
 pub type FFResult<T> = std::result::Result<T, FFError>;
 
@@ -107,13 +108,21 @@ pub fn logger_init(log_path: String) {
     }
 }
 
-pub fn logger_shutdown() -> std::io::Result<()> {
+pub fn logger_flush() -> std::io::Result<()> {
     if let Some(logger) = LOGGER.get() {
         let mut logger = logger.lock().unwrap();
         logger.flush()
     } else {
         Ok(())
     }
+}
+
+pub fn logger_flush_scheduled(
+    _: SystemTime,
+    _: &mut FFServer,
+    _: &mut ServerState,
+) -> FFResult<()> {
+    logger_flush().map_err(FFError::from_io_err)
 }
 
 pub fn log(severity: Severity, msg: &str) {

@@ -6,7 +6,9 @@ use rusty_fusion::{
     defines::*,
     error::{FFError, FFResult, Severity},
     net::{ffclient::ClientType, packet::*},
-    placeholder, unused, util, Combatant, Entity, Item, player::TEST_ACC_UID_START,
+    placeholder,
+    player::TEST_ACC_UID_START,
+    unused, util, Combatant, Entity, Item,
 };
 
 pub fn login(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
