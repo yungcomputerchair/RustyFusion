@@ -36,5 +36,34 @@ pub fn item_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFRes
         ToSlotItem: item_to.into(),
     };
 
-    client.send_packet(P_FE2CL_PC_ITEM_MOVE_SUCC, &resp)
+    client.send_packet(P_FE2CL_PC_ITEM_MOVE_SUCC, &resp)?;
+
+    let entity_id = player.get_id();
+    if location_from == eItemLocation::eIL_Equip {
+        state
+            .get_entity_map()
+            .for_each_around(entity_id, clients, |c| {
+                let pkt = sP_FE2CL_PC_EQUIP_CHANGE {
+                    iPC_ID: pc_id,
+                    iEquipSlotNum: pkt.iFromSlotNum,
+                    EquipSlotItem: item_to.into(),
+                };
+                let _ = c.send_packet(P_FE2CL_PC_EQUIP_CHANGE, &pkt);
+            });
+    }
+
+    if location_to == eItemLocation::eIL_Equip {
+        state
+            .get_entity_map()
+            .for_each_around(entity_id, clients, |c| {
+                let pkt = sP_FE2CL_PC_EQUIP_CHANGE {
+                    iPC_ID: pc_id,
+                    iEquipSlotNum: pkt.iToSlotNum,
+                    EquipSlotItem: item_from.into(),
+                };
+                let _ = c.send_packet(P_FE2CL_PC_EQUIP_CHANGE, &pkt);
+            });
+    }
+
+    Ok(())
 }
