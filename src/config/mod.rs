@@ -58,7 +58,7 @@ pub fn config_init() -> &'static Config {
     assert!(CONFIG.get().is_none());
     if let Some(loaded_config) = Config::load() {
         if CONFIG.set(loaded_config).is_err() {
-            panic!("Couldn't load config");
+            panic!("Couldn't initialize config");
         }
         log(Severity::Info, "Loaded config");
     }

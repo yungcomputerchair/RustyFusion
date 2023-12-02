@@ -1,6 +1,8 @@
 use rusty_fusion::{
     enums::eItemLocation,
     error::{FFError, Severity},
+    tabledata::tdata_get,
+    unused,
 };
 
 use num_traits::FromPrimitive;
@@ -66,4 +68,34 @@ pub fn item_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFRes
     }
 
     Ok(())
+}
+
+pub fn vendor_start(client: &mut FFClient) -> FFResult<()> {
+    let pkt: &sP_CL2FE_REQ_PC_VENDOR_START = client.get_packet(P_CL2FE_REQ_PC_VENDOR_START);
+    let resp = sP_FE2CL_REP_PC_VENDOR_START_SUCC {
+        iNPC_ID: pkt.iNPC_ID,
+        iVendorID: pkt.iVendorID,
+    };
+    client.send_packet(P_FE2CL_REP_PC_VENDOR_START_SUCC, &resp)?;
+    Ok(())
+}
+
+pub fn vendor_table_update(client: &mut FFClient) -> FFResult<()> {
+    let pkt: &sP_CL2FE_REQ_PC_VENDOR_TABLE_UPDATE =
+        client.get_packet(P_CL2FE_REQ_PC_VENDOR_TABLE_UPDATE);
+    let vendor_data = tdata_get().get_vendor_data(pkt.iVendorID);
+    match vendor_data {
+        Ok(vendor_data) => {
+            let resp = sP_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_SUCC { item: vendor_data };
+            client.send_packet(P_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_SUCC, &resp)?;
+            Ok(())
+        }
+        Err(e) => {
+            let resp = sP_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_FAIL {
+                iErrorCode: unused!(),
+            };
+            client.send_packet(P_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_FAIL, &resp)?;
+            Err(e)
+        }
+    }
 }

@@ -1,3 +1,5 @@
+#![allow(clippy::derivable_impls)]
+
 #[macro_use]
 extern crate num_derive;
 
@@ -79,6 +81,16 @@ impl Item {
         }
     }
 }
+impl Default for sItemBase {
+    fn default() -> Self {
+        Self {
+            iType: 0,
+            iID: 0,
+            iOpt: 0,
+            iTimeLimit: 0,
+        }
+    }
+}
 impl From<sItemBase> for Option<Item> {
     fn from(value: sItemBase) -> Self {
         if value.iID == 0 || value.iOpt == 0 {
@@ -111,12 +123,7 @@ impl From<Option<Item>> for sItemBase {
                 iTimeLimit: value.expiry_time,
             }
         } else {
-            Self {
-                iType: 0,
-                iID: 0,
-                iOpt: 0,
-                iTimeLimit: 0,
-            }
+            Self::default()
         }
     }
 }
