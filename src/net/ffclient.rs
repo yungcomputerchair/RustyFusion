@@ -35,10 +35,10 @@ pub struct FFClient {
     buf: [u8; PACKET_BUFFER_SIZE],
     last_pkt_id: PacketID,
     last_pkt_sz: usize,
-    e_key: [u8; CRYPTO_KEY_SIZE],
-    fe_key: [u8; CRYPTO_KEY_SIZE],
-    enc_mode: EncryptionMode,
-    client_type: ClientType,
+    pub e_key: [u8; CRYPTO_KEY_SIZE],
+    pub fe_key: [u8; CRYPTO_KEY_SIZE],
+    pub enc_mode: EncryptionMode,
+    pub client_type: ClientType,
     last_heartbeat: u64,
 }
 
@@ -69,26 +69,6 @@ impl FFClient {
 
     pub fn get_fe_key_uint(&self) -> u64 {
         u64::from_le_bytes(self.fe_key)
-    }
-
-    pub fn set_e_key(&mut self, key: [u8; CRYPTO_KEY_SIZE]) {
-        self.e_key = key;
-    }
-
-    pub fn set_fe_key(&mut self, key: [u8; CRYPTO_KEY_SIZE]) {
-        self.fe_key = key;
-    }
-
-    pub fn set_enc_mode(&mut self, mode: EncryptionMode) {
-        self.enc_mode = mode;
-    }
-
-    pub fn get_client_type(&self) -> ClientType {
-        self.client_type.clone()
-    }
-
-    pub fn set_client_type(&mut self, cltype: ClientType) {
-        self.client_type = cltype;
     }
 
     pub fn get_player_id(&mut self) -> FFResult<i32> {

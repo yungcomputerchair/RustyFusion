@@ -50,7 +50,7 @@ impl FFServer {
             let conn_data: (TcpStream, SocketAddr) = (stream, addr);
             let key: usize = self.register_client(conn_data).unwrap();
             let client: &mut FFClient = self.clients.get_mut(&key).unwrap();
-            client.set_client_type(cltype);
+            client.client_type = cltype;
             return Some(client);
         }
         None

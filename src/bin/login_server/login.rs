@@ -50,14 +50,14 @@ pub fn login(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()
 
     client.send_packet(P_LS2CL_REP_LOGIN_SUCC, &resp)?;
 
-    client.set_e_key(gen_key(e_base, e_iv1, e_iv2));
-    client.set_fe_key(gen_key(fe_base, fe_iv1, fe_iv2));
+    client.e_key = gen_key(e_base, e_iv1, e_iv2);
+    client.fe_key = gen_key(fe_base, fe_iv1, fe_iv2);
 
     let serial_key: i64 = random();
-    client.set_client_type(ClientType::GameClient {
+    client.client_type = ClientType::GameClient {
         serial_key,
         pc_id: None,
-    });
+    };
 
     players
         .into_iter()
@@ -176,7 +176,7 @@ pub fn char_select(
     state: &mut LoginServerState,
 ) -> FFResult<()> {
     let client = clients.get_mut(&client_key).unwrap();
-    if let ClientType::GameClient { serial_key, .. } = client.get_client_type() {
+    if let ClientType::GameClient { serial_key, .. } = client.client_type {
         let pkt: &sP_CL2LS_REQ_CHAR_SELECT = client.get_packet(P_CL2LS_REQ_CHAR_SELECT);
         let pc_uid = pkt.iPC_UID;
         if !state.players.contains_key(&pc_uid) {
@@ -196,7 +196,7 @@ pub fn char_select(
 
         let shard_server = clients
             .values_mut()
-            .find(|c| matches!(c.get_client_type(), ClientType::ShardServer(_)));
+            .find(|c| matches!(c.client_type, ClientType::ShardServer(_)));
 
         match shard_server {
             Some(shard) => {
@@ -213,10 +213,7 @@ pub fn char_select(
     } else {
         Err(FFError::build(
             Severity::Warning,
-            format!(
-                "Client is not a game client ({:?})",
-                client.get_client_type()
-            ),
+            format!("Client is not a game client ({:?})", client.client_type),
         ))
     }
 }

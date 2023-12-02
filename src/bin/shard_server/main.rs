@@ -93,7 +93,7 @@ fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>, state: 
     let state = state.as_shard();
     let mut clients = ClientMap::new(key, clients);
     let client = clients.get_self();
-    match client.get_client_type() {
+    match client.client_type {
         ClientType::LoginServer => {
             log(
                 Severity::Info,

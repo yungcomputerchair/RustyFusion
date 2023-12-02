@@ -21,7 +21,7 @@ pub fn login_connect_succ(server: &mut FFClient, state: &mut ShardServerState) -
 
     let iv1: i32 = (conn_id + 1) as i32;
     let iv2: i32 = 69;
-    server.set_e_key(gen_key(conn_time, iv1, iv2));
+    server.e_key = gen_key(conn_time, iv1, iv2);
 
     state.set_login_server_conn_id(conn_id);
     log(

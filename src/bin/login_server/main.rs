@@ -75,7 +75,7 @@ impl Drop for Cleanup {
 fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>, state: &mut ServerState) {
     let _state = state.as_login();
     let client = clients.get_mut(&key).unwrap();
-    if let ClientType::ShardServer(shard_id) = client.get_client_type() {
+    if let ClientType::ShardServer(shard_id) = client.client_type {
         log(
             Severity::Info,
             &format!(

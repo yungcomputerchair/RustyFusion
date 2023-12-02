@@ -69,6 +69,6 @@ impl<'a> ClientMap<'a> {
     pub fn get_all_gameclient(&mut self) -> impl Iterator<Item = &mut FFClient> {
         self.clients
             .values_mut()
-            .filter(|c| matches!(c.get_client_type(), ClientType::GameClient { .. }))
+            .filter(|c| matches!(c.client_type, ClientType::GameClient { .. }))
     }
 }

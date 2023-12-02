@@ -19,16 +19,16 @@ pub fn pc_enter(client: &mut FFClient, key: usize, state: &mut ShardServerState)
         uiSvrTime: get_time(),
     };
 
-    client.set_client_type(ClientType::GameClient {
+    client.client_type = ClientType::GameClient {
         serial_key: pkt.iEnterSerialKey,
         pc_id: Some(pc_id),
-    });
+    };
 
     let iv1: i32 = resp.iID + 1;
     let iv2: i32 = resp.PCLoadData2CL.iFusionMatter + 1;
-    client.set_e_key(gen_key(resp.uiSvrTime, iv1, iv2));
-    client.set_fe_key(login_data.uiFEKey.to_le_bytes());
-    client.set_enc_mode(EncryptionMode::FEKey);
+    client.e_key = gen_key(resp.uiSvrTime, iv1, iv2);
+    client.fe_key = login_data.uiFEKey.to_le_bytes();
+    client.enc_mode = EncryptionMode::FEKey;
 
     state.get_entity_map().track(Box::new(player));
 
