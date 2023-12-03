@@ -5,24 +5,14 @@ use serde_json::{Map, Value};
 use std::{collections::HashMap, sync::OnceLock};
 
 use crate::{
-    defines::SIZEOF_VENDOR_TABLE_SLOT,
     error::{log, FFError, FFResult, Severity},
-    net::packet::{sItemBase, sItemVendor},
-    npc::NPC,
+    npc::NPC, VendorData, VendorItem,
 };
 
 static TABLE_DATA: OnceLock<TableData> = OnceLock::new();
 
-#[derive(Clone)]
-struct VendorData {
-    sort_number: i32,
-    ty: i16,
-    id: i16,
-    price: i32,
-}
-
 struct XDTData {
-    vendor_data: HashMap<i32, Vec<VendorData>>,
+    vendor_data: HashMap<i32, VendorData>,
 }
 impl XDTData {
     fn load() -> Result<Self, String> {
@@ -70,39 +60,15 @@ impl TableData {
     pub fn get_vendor_data(
         &self,
         vendor_id: i32,
-    ) -> FFResult<[sItemVendor; SIZEOF_VENDOR_TABLE_SLOT as usize]> {
-        let vendor_items = self
+    ) -> FFResult<&VendorData> {
+        self
             .xdt_data
             .vendor_data
             .get(&vendor_id)
             .ok_or(FFError::build(
                 Severity::Warning,
                 format!("Vendor with ID {} doesn't exist", vendor_id),
-            ))?;
-        let mut vendor_item_structs = Vec::new();
-        for item in vendor_items {
-            vendor_item_structs.push(sItemVendor {
-                iVendorID: vendor_id,
-                fBuyCost: item.price as f32,
-                item: sItemBase {
-                    iType: item.ty,
-                    iID: item.id,
-                    iOpt: 1,
-                    iTimeLimit: 0,
-                },
-                iSortNum: item.sort_number,
-            });
-        }
-        vendor_item_structs.resize(
-            SIZEOF_VENDOR_TABLE_SLOT as usize,
-            sItemVendor {
-                iVendorID: 0,
-                fBuyCost: 0.0,
-                item: sItemBase::default(),
-                iSortNum: 0,
-            },
-        );
-        Ok(vendor_item_structs.try_into().unwrap())
+            ))
     }
 
     pub fn get_npcs(&self) -> impl Iterator<Item = NPC> + '_ {
@@ -144,12 +110,12 @@ fn load_json(path: &str) -> Result<Value, String> {
 
 fn load_vendor_data(
     root: &Map<std::string::String, Value>,
-) -> Result<HashMap<i32, Vec<VendorData>>, String> {
+) -> Result<HashMap<i32, VendorData>, String> {
     const VENDOR_TABLE_KEY: &str = "m_pVendorTable";
     const VENDOR_TABLE_ITEM_DATA_KEY: &str = "m_pItemData";
 
     #[derive(Deserialize)]
-    struct VendorDataRaw {
+    struct VendorDataEntry {
         m_iNpcNumber: i32,
         m_iSortNumber: i32,
         m_iItemType: i16,
@@ -167,10 +133,10 @@ fn load_vendor_data(
         if let Value::Array(item_data) = item_data {
             let mut vendor_data = HashMap::new();
             for v in item_data {
-                let vendor_data_entry: VendorDataRaw = serde_json::from_value(v.clone())
+                let vendor_data_entry: VendorDataEntry = serde_json::from_value(v.clone())
                     .map_err(|e| format!("Malformed vendor data entry: {}", e))?;
                 let key = vendor_data_entry.m_iNpcNumber;
-                let vendor_data_entry = VendorData {
+                let vendor_data_entry = VendorItem {
                     sort_number: vendor_data_entry.m_iSortNumber,
                     ty: vendor_data_entry.m_iItemType,
                     id: vendor_data_entry.m_iitemID,
@@ -179,8 +145,8 @@ fn load_vendor_data(
 
                 vendor_data
                     .entry(key)
-                    .or_insert_with(Vec::new)
-                    .push(vendor_data_entry);
+                    .or_insert_with(|| VendorData::new(key))
+                    .insert(vendor_data_entry);
             }
             Ok(vendor_data)
         } else {

@@ -6,10 +6,11 @@ extern crate num_derive;
 use std::{any::Any, hash::Hash};
 
 use chunk::EntityMap;
+use defines::SIZEOF_VENDOR_TABLE_SLOT;
 use error::FFResult;
 use net::{
     ffclient::FFClient,
-    packet::{sItemBase, sNano, sRunningQuest},
+    packet::{sItemBase, sNano, sRunningQuest, sItemVendor},
     ClientMap,
 };
 
@@ -125,6 +126,61 @@ impl From<Option<Item>> for sItemBase {
         } else {
             Self::default()
         }
+    }
+}
+
+pub struct VendorItem {
+    sort_number: i32,
+    ty: i16,
+    id: i16,
+    price: i32,
+}
+
+pub struct VendorData {
+    vendor_id: i32,
+    items: Vec<VendorItem>,
+}
+impl VendorData {
+    fn new(vendor_id: i32) -> Self {
+        Self {
+            vendor_id,
+            items: Vec::new(),
+        }
+    }
+
+    fn insert(&mut self, item: VendorItem) {
+        self.items.push(item);
+    }
+
+    pub fn as_arr(&self) -> [sItemVendor; SIZEOF_VENDOR_TABLE_SLOT as usize] {
+        let mut vendor_item_structs = Vec::new();
+        for item in &self.items {
+            vendor_item_structs.push(sItemVendor {
+                iVendorID: self.vendor_id,
+                fBuyCost: item.price as f32,
+                item: sItemBase {
+                    iType: item.ty,
+                    iID: item.id,
+                    iOpt: 1,
+                    iTimeLimit: 0,
+                },
+                iSortNum: item.sort_number,
+            });
+        }
+        vendor_item_structs.resize(
+            SIZEOF_VENDOR_TABLE_SLOT as usize,
+            sItemVendor {
+                iVendorID: 0,
+                fBuyCost: 0.0,
+                item: sItemBase::default(),
+                iSortNum: 0,
+            },
+        );
+        vendor_item_structs.try_into().unwrap()
+    }
+
+    pub fn get_item(&self, item_id: i16, item_type: i16) -> Option<&VendorItem> {
+        self.items.iter().find(|&item| item.id == item_id && item.ty == item_type)
     }
 }
 

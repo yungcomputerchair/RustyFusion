@@ -86,7 +86,7 @@ pub fn vendor_table_update(client: &mut FFClient) -> FFResult<()> {
     let vendor_data = tdata_get().get_vendor_data(pkt.iVendorID);
     match vendor_data {
         Ok(vendor_data) => {
-            let resp = sP_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_SUCC { item: vendor_data };
+            let resp = sP_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_SUCC { item: vendor_data.as_arr() };
             client.send_packet(P_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_SUCC, &resp)?;
             Ok(())
         }
