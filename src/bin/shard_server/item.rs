@@ -20,6 +20,7 @@ pub fn item_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFRes
 
     let location_to = pkt.eTo.try_into()?;
     let item_to = player.set_item_with_location(location_to, pkt.iToSlotNum as usize, item_from)?;
+    player.set_item_with_location(location_from, pkt.iFromSlotNum as usize, item_to)?;
 
     let resp = sP_FE2CL_PC_ITEM_MOVE_SUCC {
         eFrom: pkt.eTo,
@@ -120,7 +121,7 @@ pub fn vendor_item_buy(client: &mut FFClient, state: &mut ShardServerState) -> F
             ),
         ));
     }
-    player.set_item(pkt.iInvenSlotNum as usize, item)?;
+    player.set_item_with_location(ItemLocation::Inven, pkt.iInvenSlotNum as usize, item)?;
     player.set_taros(player.get_taros() - vendor_item.get_price());
 
     let resp = sP_FE2CL_REP_PC_VENDOR_ITEM_BUY_SUCC {
