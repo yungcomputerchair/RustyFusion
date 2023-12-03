@@ -6,7 +6,8 @@ use std::{collections::HashMap, sync::OnceLock};
 
 use crate::{
     error::{log, FFError, FFResult, Severity},
-    npc::NPC, VendorData, VendorItem,
+    npc::NPC,
+    VendorData, VendorItem,
 };
 
 static TABLE_DATA: OnceLock<TableData> = OnceLock::new();
@@ -57,12 +58,8 @@ impl TableData {
         })
     }
 
-    pub fn get_vendor_data(
-        &self,
-        vendor_id: i32,
-    ) -> FFResult<&VendorData> {
-        self
-            .xdt_data
+    pub fn get_vendor_data(&self, vendor_id: i32) -> FFResult<&VendorData> {
+        self.xdt_data
             .vendor_data
             .get(&vendor_id)
             .ok_or(FFError::build(

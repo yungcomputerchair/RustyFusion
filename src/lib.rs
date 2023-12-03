@@ -7,10 +7,10 @@ use std::{any::Any, hash::Hash};
 
 use chunk::EntityMap;
 use defines::SIZEOF_VENDOR_TABLE_SLOT;
-use error::FFResult;
+use error::{FFError, FFResult};
 use net::{
     ffclient::FFClient,
-    packet::{sItemBase, sNano, sRunningQuest, sItemVendor},
+    packet::{sItemBase, sItemVendor, sNano, sRunningQuest},
     ClientMap,
 };
 
@@ -135,6 +135,11 @@ pub struct VendorItem {
     id: i16,
     price: i32,
 }
+impl VendorItem {
+    pub fn get_price(&self) -> i32 {
+        self.price
+    }
+}
 
 pub struct VendorData {
     vendor_id: i32,
@@ -179,8 +184,17 @@ impl VendorData {
         vendor_item_structs.try_into().unwrap()
     }
 
-    pub fn get_item(&self, item_id: i16, item_type: i16) -> Option<&VendorItem> {
-        self.items.iter().find(|&item| item.id == item_id && item.ty == item_type)
+    pub fn get_item(&self, item_id: i16, item_type: i16) -> FFResult<&VendorItem> {
+        self.items
+            .iter()
+            .find(|&item| item.id == item_id && item.ty == item_type)
+            .ok_or(FFError::build(
+                error::Severity::Warning,
+                format!(
+                    "Vendor {} doesn't sell item ({}, {})",
+                    self.vendor_id, item_id, item_type
+                ),
+            ))
     }
 }
 

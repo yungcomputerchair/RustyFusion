@@ -9,6 +9,12 @@ use std::{
 use crate::{config::config_get, net::ffserver::FFServer, state::ServerState};
 
 pub type FFResult<T> = std::result::Result<T, FFError>;
+pub fn catch_fail<T>(result: FFResult<T>, mut op: impl FnMut() -> FFResult<()>) -> FFResult<T> {
+    if result.is_err() {
+        op()?;
+    }
+    result
+}
 
 #[derive(Clone, Copy)]
 pub enum Severity {

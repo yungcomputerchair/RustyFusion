@@ -388,6 +388,10 @@ impl Player {
         self.inventory.equipped
     }
 
+    pub fn get_taros(&self) -> i32 {
+        self.taros
+    }
+
     pub fn update_special_state(&mut self, flags: i8) -> i8 {
         self.special_state ^= flags;
         self.special_state
