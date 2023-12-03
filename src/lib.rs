@@ -7,6 +7,7 @@ use std::{any::Any, hash::Hash};
 
 use chunk::EntityMap;
 use defines::SIZEOF_VENDOR_TABLE_SLOT;
+use enums::ItemType;
 use error::{FFError, FFResult};
 use net::{
     ffclient::FFClient,
@@ -63,16 +64,16 @@ impl Position {
     }
 }
 
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone)]
 pub struct Item {
-    ty: i16,
+    ty: ItemType,
     id: i16,
     appearance_id: Option<i16>,
     quantity: i16,
     expiry_time: i32,
 }
 impl Item {
-    pub fn new(ty: i16, id: i16) -> Self {
+    pub fn new(ty: ItemType, id: i16) -> Self {
         Self {
             ty,
             id,
@@ -92,13 +93,14 @@ impl Default for sItemBase {
         }
     }
 }
-impl From<sItemBase> for Option<Item> {
-    fn from(value: sItemBase) -> Self {
+impl TryFrom<sItemBase> for Option<Item> {
+    type Error = FFError;
+    fn try_from(value: sItemBase) -> FFResult<Self> {
         if value.iID == 0 || value.iOpt == 0 {
-            None
+            Ok(None)
         } else {
-            Some(Item {
-                ty: value.iType,
+            Ok(Some(Item {
+                ty: value.iType.try_into()?,
                 id: value.iID,
                 appearance_id: {
                     let id = (value.iOpt >> 16) as i16;
@@ -110,7 +112,7 @@ impl From<sItemBase> for Option<Item> {
                 },
                 quantity: value.iOpt as i16,
                 expiry_time: value.iTimeLimit,
-            })
+            }))
         }
     }
 }
@@ -118,7 +120,7 @@ impl From<Option<Item>> for sItemBase {
     fn from(value: Option<Item>) -> Self {
         if let Some(value) = value {
             Self {
-                iType: value.ty,
+                iType: value.ty as i16,
                 iID: value.id,
                 iOpt: (value.quantity as i32) | ((value.appearance_id.unwrap_or(0) as i32) << 16),
                 iTimeLimit: value.expiry_time,

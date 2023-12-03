@@ -3,7 +3,7 @@ use std::{any::Any, fmt::Display};
 use crate::{
     chunk::EntityMap,
     defines::*,
-    enums::eItemLocation,
+    enums::ItemLocation,
     error::{FFError, FFResult, Severity},
     net::{
         ffclient::FFClient,
@@ -17,7 +17,7 @@ use crate::{
     CombatStats, Combatant, Entity, EntityID, Item, Mission, Nano, Position,
 };
 
-use num_traits::{clamp, clamp_min, ToPrimitive};
+use num_traits::{clamp, clamp_min};
 
 pub const TEST_ACC_UID_START: i64 = i64::MAX - 3;
 
@@ -314,33 +314,32 @@ impl Player {
 
     pub fn set_item_with_location(
         &mut self,
-        location: eItemLocation,
+        location: ItemLocation,
         slot_num: usize,
         item: Option<Item>,
     ) -> FFResult<Option<Item>> {
         let mut slot_from = None;
         match location {
-            eItemLocation::eIL_Equip => {
+            ItemLocation::Equip => {
                 if slot_num < SIZEOF_EQUIP_SLOT as usize {
                     slot_from = Some(&mut self.inventory.equipped[slot_num]);
                 }
             }
-            eItemLocation::eIL_Inven => {
+            ItemLocation::Inven => {
                 if slot_num < SIZEOF_INVEN_SLOT as usize {
                     slot_from = Some(&mut self.inventory.main[slot_num]);
                 }
             }
-            eItemLocation::eIL_QInven => {
+            ItemLocation::QInven => {
                 if slot_num < SIZEOF_QINVEN_SLOT as usize {
                     slot_from = Some(&mut self.inventory.mission[slot_num]);
                 }
             }
-            eItemLocation::eIL_Bank => {
+            ItemLocation::Bank => {
                 if slot_num < SIZEOF_BANK_SLOT as usize {
                     slot_from = Some(&mut self.inventory.bank[slot_num]);
                 }
             }
-            eItemLocation::eIL__End => {}
         }
 
         if let Some(slot_from) = slot_from {
@@ -350,32 +349,29 @@ impl Player {
         } else {
             Err(FFError::build(
                 Severity::Warning,
-                format!(
-                    "Bad slot number: {slot_num} (location {})",
-                    location.to_i32().unwrap_or(-1)
-                ),
+                format!("Bad slot number: {slot_num} (location {:?})", location),
             ))
         }
     }
 
     pub fn set_item(&mut self, mut slot_num: usize, item: Option<Item>) -> FFResult<Option<Item>> {
         if slot_num < SIZEOF_EQUIP_SLOT as usize {
-            return self.set_item_with_location(eItemLocation::eIL_Equip, slot_num, item);
+            return self.set_item_with_location(ItemLocation::Equip, slot_num, item);
         }
 
         slot_num -= SIZEOF_EQUIP_SLOT as usize;
         if slot_num < SIZEOF_INVEN_SLOT as usize {
-            return self.set_item_with_location(eItemLocation::eIL_Inven, slot_num, item);
+            return self.set_item_with_location(ItemLocation::Inven, slot_num, item);
         }
 
         slot_num -= SIZEOF_INVEN_SLOT as usize;
         if slot_num < SIZEOF_QINVEN_SLOT as usize {
-            return self.set_item_with_location(eItemLocation::eIL_QInven, slot_num, item);
+            return self.set_item_with_location(ItemLocation::QInven, slot_num, item);
         }
 
         slot_num -= SIZEOF_QINVEN_SLOT as usize;
         if slot_num < SIZEOF_BANK_SLOT as usize {
-            return self.set_item_with_location(eItemLocation::eIL_Bank, slot_num, item);
+            return self.set_item_with_location(ItemLocation::Bank, slot_num, item);
         }
 
         Err(FFError::build(

@@ -4,6 +4,7 @@ use rand::random;
 
 use rusty_fusion::{
     defines::*,
+    enums::ItemType,
     error::{FFError, FFResult, Severity},
     net::{ffclient::ClientType, packet::*},
     placeholder,
@@ -119,21 +120,15 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
         player.set_style(pkt.PCStyle);
         player.set_item(
             EQUIP_SLOT_UPPERBODY as usize,
-            Some(Item::new(
-                EQUIP_SLOT_UPPERBODY as i16,
-                pkt.sOn_Item.iEquipUBID,
-            )),
+            Some(Item::new(ItemType::UpperBody, pkt.sOn_Item.iEquipUBID)),
         )?;
         player.set_item(
             EQUIP_SLOT_LOWERBODY as usize,
-            Some(Item::new(
-                EQUIP_SLOT_LOWERBODY as i16,
-                pkt.sOn_Item.iEquipLBID,
-            )),
+            Some(Item::new(ItemType::LowerBody, pkt.sOn_Item.iEquipLBID)),
         )?;
         player.set_item(
             EQUIP_SLOT_FOOT as usize,
-            Some(Item::new(EQUIP_SLOT_FOOT as i16, pkt.sOn_Item.iEquipFootID)),
+            Some(Item::new(ItemType::Foot, pkt.sOn_Item.iEquipFootID)),
         )?;
 
         let resp = sP_LS2CL_REP_CHAR_CREATE_SUCC {
