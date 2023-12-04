@@ -63,6 +63,19 @@ pub fn item_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFRes
     Ok(())
 }
 
+pub fn item_delete(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+    let pc_id = client.get_player_id()?;
+    let pkt: &sP_CL2FE_REQ_PC_ITEM_DELETE = client.get_packet(P_CL2FE_REQ_PC_ITEM_DELETE);
+    let player = state.get_player_mut(pc_id)?;
+    player.set_item(pkt.eIL.try_into()?, pkt.iSlotNum as usize, None)?;
+    let resp = sP_FE2CL_REP_PC_ITEM_DELETE_SUCC {
+        eIL: pkt.eIL,
+        iSlotNum: pkt.iSlotNum,
+    };
+    client.send_packet(P_FE2CL_REP_PC_ITEM_DELETE_SUCC, &resp)?;
+    Ok(())
+}
+
 pub fn vendor_start(client: &mut FFClient) -> FFResult<()> {
     let pkt: &sP_CL2FE_REQ_PC_VENDOR_START = client.get_packet(P_CL2FE_REQ_PC_VENDOR_START);
     let resp = sP_FE2CL_REP_PC_VENDOR_START_SUCC {
