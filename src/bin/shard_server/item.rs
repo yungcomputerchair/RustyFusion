@@ -1,8 +1,7 @@
 use rusty_fusion::{
     enums::ItemLocation,
-    error::{catch_fail, FFError, Severity},
+    error::{FFError, Severity},
     tabledata::tdata_get,
-    unused,
 };
 
 use super::*;
@@ -74,71 +73,45 @@ pub fn vendor_start(client: &mut FFClient) -> FFResult<()> {
 }
 
 pub fn vendor_table_update(client: &mut FFClient) -> FFResult<()> {
-    let mut err_code = 0;
-    catch_fail(
-        (|| {
-            let pkt: &sP_CL2FE_REQ_PC_VENDOR_TABLE_UPDATE =
-                client.get_packet(P_CL2FE_REQ_PC_VENDOR_TABLE_UPDATE);
-            let vendor_data = tdata_get().get_vendor_data(pkt.iVendorID)?;
-            let resp = sP_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_SUCC {
-                item: vendor_data.as_arr(),
-            };
-            err_code = 3;
-            client.send_packet(P_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_SUCC, &resp)?;
-            Ok(())
-        })(),
-        || {
-            let resp = sP_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_FAIL {
-                iErrorCode: err_code,
-            };
-            client.send_packet(P_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_FAIL, &resp)
-        },
-    )
+    let pkt: &sP_CL2FE_REQ_PC_VENDOR_TABLE_UPDATE =
+        client.get_packet(P_CL2FE_REQ_PC_VENDOR_TABLE_UPDATE);
+    let vendor_data = tdata_get().get_vendor_data(pkt.iVendorID)?;
+    let resp = sP_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_SUCC {
+        item: vendor_data.as_arr(),
+    };
+    client.send_packet(P_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_SUCC, &resp)?;
+    Ok(())
 }
 
 pub fn vendor_item_buy(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
-    catch_fail(
-        (|| {
-            let pkt: sP_CL2FE_REQ_PC_VENDOR_ITEM_BUY =
-                *client.get_packet(P_CL2FE_REQ_PC_VENDOR_ITEM_BUY);
-            let vendor_data = tdata_get().get_vendor_data(pkt.iVendorID)?;
-            let vendor_item = vendor_data.get_item(pkt.Item.iID, pkt.Item.iType)?;
+    let pkt: sP_CL2FE_REQ_PC_VENDOR_ITEM_BUY = *client.get_packet(P_CL2FE_REQ_PC_VENDOR_ITEM_BUY);
+    let vendor_data = tdata_get().get_vendor_data(pkt.iVendorID)?;
+    let vendor_item = vendor_data.get_item(pkt.Item.iID, pkt.Item.iType)?;
 
-            // sanitize the item
-            let item = pkt.Item.try_into()?;
+    // sanitize the item
+    let item = pkt.Item.try_into()?;
+    // TODO vehicles, stack pricing, etc
 
-            let player = state.get_player_mut(client.get_player_id()?)?;
-            if player.get_taros() < vendor_item.get_price() {
-                Err(FFError::build(
-                    Severity::Warning,
-                    format!(
-                        "Not enough taros to buy item ({} < {})",
-                        player.get_taros(),
-                        vendor_item.get_price()
-                    ),
-                ))
-            } else {
-                player.set_item_with_location(
-                    ItemLocation::Inven,
-                    pkt.iInvenSlotNum as usize,
-                    item,
-                )?;
-                player.set_taros(player.get_taros() - vendor_item.get_price());
+    let player = state.get_player_mut(client.get_player_id()?)?;
+    if player.get_taros() < vendor_item.get_price() {
+        Err(FFError::build(
+            Severity::Warning,
+            format!(
+                "Not enough taros to buy item ({} < {})",
+                player.get_taros(),
+                vendor_item.get_price()
+            ),
+        ))
+    } else {
+        player.set_item_with_location(ItemLocation::Inven, pkt.iInvenSlotNum as usize, item)?;
+        player.set_taros(player.get_taros() - vendor_item.get_price());
 
-                let resp = sP_FE2CL_REP_PC_VENDOR_ITEM_BUY_SUCC {
-                    iCandy: player.get_taros(),
-                    iInvenSlotNum: pkt.iInvenSlotNum,
-                    Item: item.into(),
-                };
-                client.send_packet(P_FE2CL_REP_PC_VENDOR_ITEM_BUY_SUCC, &resp)?;
-                Ok(())
-            }
-        })(),
-        || {
-            let resp = sP_FE2CL_REP_PC_VENDOR_ITEM_BUY_FAIL {
-                iErrorCode: unused!(),
-            };
-            client.send_packet(P_FE2CL_REP_PC_VENDOR_ITEM_BUY_FAIL, &resp)
-        },
-    )
+        let resp = sP_FE2CL_REP_PC_VENDOR_ITEM_BUY_SUCC {
+            iCandy: player.get_taros(),
+            iInvenSlotNum: pkt.iInvenSlotNum,
+            Item: item.into(),
+        };
+        client.send_packet(P_FE2CL_REP_PC_VENDOR_ITEM_BUY_SUCC, &resp)?;
+        Ok(())
+    }
 }

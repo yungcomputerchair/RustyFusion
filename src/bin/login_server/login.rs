@@ -13,6 +13,7 @@ use rusty_fusion::{
 };
 
 pub fn login(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
+    // TODO failure
     let pkt: &sP_CL2LS_REQ_LOGIN = client.get_packet(P_CL2LS_REQ_LOGIN);
 
     let mut players = Vec::new();
@@ -81,6 +82,7 @@ pub fn login(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()
 }
 
 pub fn check_char_name(client: &mut FFClient) -> FFResult<()> {
+    // TODO failure
     let pkt: &sP_CL2LS_REQ_CHECK_CHAR_NAME = client.get_packet(P_CL2LS_REQ_CHECK_CHAR_NAME);
     let resp = sP_LS2CL_REP_CHECK_CHAR_NAME_SUCC {
         szFirstName: pkt.szFirstName,
@@ -90,6 +92,7 @@ pub fn check_char_name(client: &mut FFClient) -> FFResult<()> {
 }
 
 pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
+    // TODO failure
     let pkt: &sP_CL2LS_REQ_SAVE_CHAR_NAME = client.get_packet(P_CL2LS_REQ_SAVE_CHAR_NAME);
 
     let pc_uid = util::get_uid();
