@@ -141,7 +141,7 @@ fn load_item_data(
             m_iItemPrice: i32,
             m_iItemSellPrice: i32,
             m_iSellAble: i32,
-            m_iStackNumber: i32,
+            m_iStackNumber: u16,
             m_iIcon: i32,
             m_fStyleMod_TrumpMonster: f32,
             m_fStyleMod_Trumped: f32,
@@ -222,7 +222,7 @@ fn load_item_data(
                         sell_price: data.m_iItemSellPrice,
                         sellable: data.m_iSellAble != 0,
                         tradeable: data.m_iTradeAble != 0,
-                        max_stack_size: data.m_iStackNumber as usize,
+                        max_stack_size: data.m_iStackNumber,
                         required_level: data.m_iMinReqLev as i16,
                     };
                     map.insert(key, data);

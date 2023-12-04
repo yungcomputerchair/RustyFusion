@@ -3,7 +3,7 @@
 #[macro_use]
 extern crate num_derive;
 
-use std::{any::Any, hash::Hash};
+use std::{any::Any, cmp::min, hash::Hash};
 
 use chunk::EntityMap;
 use defines::SIZEOF_VENDOR_TABLE_SLOT;
@@ -87,6 +87,33 @@ impl Item {
     pub fn get_stats(&self) -> FFResult<&ItemStats> {
         tdata_get().get_item_stats(self.id, self.ty)
     }
+
+    pub fn transfer_items(from: &mut Option<Item>, to: &mut Option<Item>) -> FFResult<()> {
+        if from.is_none() {
+            return Ok(());
+        }
+
+        if to.is_none() {
+            *to = *from;
+            *from = None;
+            return Ok(());
+        }
+
+        let (from_stack, to_stack) = (from.as_mut().unwrap(), to.as_mut().unwrap());
+        if from_stack.id != to_stack.id || from_stack.ty != to_stack.ty {
+            std::mem::swap(from, to);
+            return Ok(());
+        }
+
+        let max_stack_size = to_stack.get_stats()?.max_stack_size;
+        let num_to_move = min(max_stack_size - to_stack.quantity, from_stack.quantity);
+        to_stack.quantity += num_to_move;
+        from_stack.quantity -= num_to_move;
+        if from_stack.quantity == 0 {
+            *from = None;
+        }
+        Ok(())
+    }
 }
 impl Default for sItemBase {
     fn default() -> Self {
@@ -140,7 +167,7 @@ pub struct ItemStats {
     sell_price: i32,
     sellable: bool,
     tradeable: bool,
-    max_stack_size: usize,
+    max_stack_size: u16,
     required_level: i16,
 }
 impl ItemStats {
@@ -156,7 +183,7 @@ impl ItemStats {
         self.tradeable
     }
 
-    pub fn get_max_stack_size(&self) -> usize {
+    pub fn get_max_stack_size(&self) -> u16 {
         self.max_stack_size
     }
 

@@ -3,7 +3,7 @@ use rusty_fusion::{
     error::{catch_fail, FFError, Severity},
     placeholder,
     tabledata::tdata_get,
-    unused,
+    unused, Item,
 };
 
 use super::*;
@@ -16,21 +16,23 @@ pub fn item_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFRes
     let player = state.get_player_mut(pc_id)?;
 
     let location_from = pkt.eFrom.try_into()?;
-    let item_from = player.set_item(location_from, pkt.iFromSlotNum as usize, None)?;
+    let mut item_from = player.set_item(location_from, pkt.iFromSlotNum as usize, None)?;
 
     let location_to = pkt.eTo.try_into()?;
-    let item_to = player.set_item(location_to, pkt.iToSlotNum as usize, item_from)?;
-    player.set_item(location_from, pkt.iFromSlotNum as usize, item_to)?;
+    let mut item_to = player.set_item(location_to, pkt.iToSlotNum as usize, None)?;
+
+    Item::transfer_items(&mut item_from, &mut item_to)?;
+    player.set_item(location_from, pkt.iFromSlotNum as usize, item_from)?;
+    player.set_item(location_to, pkt.iToSlotNum as usize, item_to)?;
 
     let resp = sP_FE2CL_PC_ITEM_MOVE_SUCC {
-        eFrom: pkt.eTo,
-        iFromSlotNum: pkt.iToSlotNum,
+        eFrom: pkt.eFrom,
+        iFromSlotNum: pkt.iFromSlotNum,
         FromSlotItem: item_from.into(),
-        eTo: pkt.eFrom,
-        iToSlotNum: pkt.iFromSlotNum,
+        eTo: pkt.eTo,
+        iToSlotNum: pkt.iToSlotNum,
         ToSlotItem: item_to.into(),
     };
-
     client.send_packet(P_FE2CL_PC_ITEM_MOVE_SUCC, &resp)?;
 
     let entity_id = player.get_id();
