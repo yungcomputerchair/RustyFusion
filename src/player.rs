@@ -312,7 +312,44 @@ impl Player {
         }
     }
 
-    pub fn set_item_with_location(
+    pub fn get_item(&self, location: ItemLocation, slot_num: usize) -> FFResult<&Option<Item>> {
+        let err = Err(FFError::build(
+            Severity::Warning,
+            format!("Bad slot number: {slot_num} (location {:?})", location),
+        ));
+        match location {
+            ItemLocation::Equip => {
+                if slot_num < SIZEOF_EQUIP_SLOT as usize {
+                    Ok(&self.inventory.equipped[slot_num])
+                } else {
+                    err
+                }
+            }
+            ItemLocation::Inven => {
+                if slot_num < SIZEOF_INVEN_SLOT as usize {
+                    Ok(&self.inventory.main[slot_num])
+                } else {
+                    err
+                }
+            }
+            ItemLocation::QInven => {
+                if slot_num < SIZEOF_QINVEN_SLOT as usize {
+                    Ok(&self.inventory.mission[slot_num])
+                } else {
+                    err
+                }
+            }
+            ItemLocation::Bank => {
+                if slot_num < SIZEOF_BANK_SLOT as usize {
+                    Ok(&self.inventory.bank[slot_num])
+                } else {
+                    err
+                }
+            }
+        }
+    }
+
+    pub fn set_item(
         &mut self,
         location: ItemLocation,
         slot_num: usize,
@@ -352,32 +389,6 @@ impl Player {
                 format!("Bad slot number: {slot_num} (location {:?})", location),
             ))
         }
-    }
-
-    pub fn set_item(&mut self, mut slot_num: usize, item: Option<Item>) -> FFResult<Option<Item>> {
-        if slot_num < SIZEOF_EQUIP_SLOT as usize {
-            return self.set_item_with_location(ItemLocation::Equip, slot_num, item);
-        }
-
-        slot_num -= SIZEOF_EQUIP_SLOT as usize;
-        if slot_num < SIZEOF_INVEN_SLOT as usize {
-            return self.set_item_with_location(ItemLocation::Inven, slot_num, item);
-        }
-
-        slot_num -= SIZEOF_INVEN_SLOT as usize;
-        if slot_num < SIZEOF_QINVEN_SLOT as usize {
-            return self.set_item_with_location(ItemLocation::QInven, slot_num, item);
-        }
-
-        slot_num -= SIZEOF_QINVEN_SLOT as usize;
-        if slot_num < SIZEOF_BANK_SLOT as usize {
-            return self.set_item_with_location(ItemLocation::Bank, slot_num, item);
-        }
-
-        Err(FFError::build(
-            Severity::Warning,
-            format!("Bad slot number: {slot_num}"),
-        ))
     }
 
     pub fn get_equipped(&self) -> [Option<Item>; 9] {

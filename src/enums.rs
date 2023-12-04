@@ -4,7 +4,7 @@ use crate::error::{FFError, FFResult, Severity};
 use num_traits::FromPrimitive;
 
 #[repr(i32)]
-#[derive(PartialEq, FromPrimitive, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, Hash, FromPrimitive, Clone, Copy, Debug)]
 pub enum ItemLocation {
     Equip,
     Inven,
@@ -22,7 +22,7 @@ impl TryFrom<i32> for ItemLocation {
 }
 
 #[repr(i16)]
-#[derive(PartialEq, FromPrimitive, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, Hash, FromPrimitive, Clone, Copy, Debug)]
 pub enum ItemType {
     Hand = 0,
     UpperBody = 1,

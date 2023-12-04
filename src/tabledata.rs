@@ -1,19 +1,22 @@
 #![allow(non_snake_case)]
+#![allow(dead_code)]
 
 use serde::Deserialize;
 use serde_json::{Map, Value};
 use std::{collections::HashMap, sync::OnceLock};
 
 use crate::{
+    enums::ItemType,
     error::{log, FFError, FFResult, Severity},
     npc::NPC,
-    VendorData, VendorItem,
+    ItemStats, VendorData, VendorItem,
 };
 
 static TABLE_DATA: OnceLock<TableData> = OnceLock::new();
 
 struct XDTData {
     vendor_data: HashMap<i32, VendorData>,
+    item_data: HashMap<(i16, ItemType), ItemStats>,
 }
 impl XDTData {
     fn load() -> Result<Self, String> {
@@ -21,6 +24,7 @@ impl XDTData {
         if let Value::Object(root) = raw {
             Ok(Self {
                 vendor_data: load_vendor_data(&root)?,
+                item_data: load_item_data(&root)?,
             })
         } else {
             Err(format!("Bad XDT tabledata (root): {}", raw))
@@ -56,6 +60,19 @@ impl TableData {
             xdt_data: XDTData::load()?,
             npc_data: load_npc_data()?,
         })
+    }
+
+    pub fn get_item_stats(&self, item_id: i16, item_type: ItemType) -> FFResult<&ItemStats> {
+        self.xdt_data
+            .item_data
+            .get(&(item_id, item_type))
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Item with ID {} and type {:?} doesn't exist",
+                    item_id, item_type
+                ),
+            ))
     }
 
     pub fn get_vendor_data(&self, vendor_id: i32) -> FFResult<&VendorData> {
@@ -105,6 +122,135 @@ fn load_json(path: &str) -> Result<Value, String> {
     // TODO patching
 }
 
+fn load_item_data(
+    root: &Map<std::string::String, Value>,
+) -> Result<HashMap<(i16, ItemType), ItemStats>, String> {
+    const ITEM_TABLE_ITEM_DATA_KEY: &str = "m_pItemData";
+
+    fn load_item_data_for_type(
+        root: &Map<std::string::String, Value>,
+        map: &mut HashMap<(i16, ItemType), ItemStats>,
+        item_type: ItemType,
+    ) -> Result<(), String> {
+        #[derive(Deserialize)]
+        struct ItemDataEntry {
+            m_iItemNumber: i32,
+            m_iItemName: i32,
+            m_iComment: i32,
+            m_iTradeAble: i32,
+            m_iItemPrice: i32,
+            m_iItemSellPrice: i32,
+            m_iSellAble: i32,
+            m_iStackNumber: i32,
+            m_iIcon: i32,
+            m_fStyleMod_TrumpMonster: f32,
+            m_fStyleMod_Trumped: f32,
+            m_iEquipLoc: i32,
+            m_iEquipType: i32,
+            m_ibattery: i32,
+            m_iBatteryDrain: i32,
+            m_iMinReqLev: i32,
+            m_iMentor: i32,
+            m_iAtkRange: i32,
+            m_iAtkAngle: i32,
+            m_iAtkRate: i32,
+            m_iEffectArea: i32,
+            m_iTargetMode: i32,
+            m_iTargetNumber: i32,
+            m_iInitalTime: i32,
+            m_iDeliverTime: i32,
+            m_iDelayTime: i32,
+            m_iDurationTime: i32,
+            m_iUp_power: i32,
+            m_iUp_accuracy: i32,
+            m_iUp_protection: i32,
+            m_iUp_dodge: i32,
+            m_iUp_runSpeed: i32,
+            m_iUp_swimSpeed: i32,
+            m_iUp_jumpHeight: i32,
+            m_iUp_jumpDistance: i32,
+            m_iUp_atkRate: i32,
+            m_iUp_effectArea: i32,
+            m_iUp_addFusionMatter: i32,
+            m_iUp_addCandy: i32,
+            m_iUp_addItemfind: i32,
+            m_iMesh: i32,
+            m_iTexture: i32,
+            m_iTexture2: i32,
+            m_iEffect1: i32,
+            m_iSound1: i32,
+            m_iReqSex: i32,
+            m_iRarity: i32,
+            m_iPointRat: i32,
+            m_iGroupRat: i32,
+            m_iDefenseRat: i32,
+            m_iEffect2: i32,
+            m_iSound2: i32,
+            m_iCashAble: i32,
+        }
+
+        let table_key = match item_type {
+            ItemType::Hand => "m_pWeaponItemTable",
+            ItemType::UpperBody => "m_pShirtsItemTable",
+            ItemType::LowerBody => "m_pPantsItemTable",
+            ItemType::Foot => "m_pShoesItemTable",
+            ItemType::Head => "m_pHeadItemTable",
+            ItemType::Face => "m_pGlassItemTable",
+            ItemType::Back => "m_pBackItemTable",
+            ItemType::General => "m_pGeneralItemTable",
+            ItemType::Quest => "m_pQuestItemTable",
+            ItemType::Chest => "m_pChestItemTable",
+            ItemType::Vehicle => "m_pVehicleItemTable",
+            _ => unimplemented!(),
+        };
+
+        let item_table = root
+            .get(table_key)
+            .ok_or(format!("Key missing: {}", table_key))?;
+        if let Value::Object(item_table) = item_table {
+            let item_data = item_table.get(ITEM_TABLE_ITEM_DATA_KEY).ok_or(format!(
+                "Key missing: {}.{}",
+                table_key, ITEM_TABLE_ITEM_DATA_KEY
+            ))?;
+            if let Value::Array(item_data) = item_data {
+                for i in item_data {
+                    let data: ItemDataEntry = serde_json::from_value(i.clone()).map_err(|e| {
+                        format!("Malformed item data entry ({:?}): {} {}", item_type, e, i)
+                    })?;
+                    let key = (data.m_iItemNumber as i16, item_type);
+                    let data = ItemStats {
+                        sell_price: data.m_iItemSellPrice,
+                        sellable: data.m_iSellAble != 0,
+                        tradeable: data.m_iTradeAble != 0,
+                        max_stack_size: data.m_iStackNumber as usize,
+                        required_level: data.m_iMinReqLev as i16,
+                    };
+                    map.insert(key, data);
+                }
+                Ok(())
+            } else {
+                Err(format!(
+                    "Array missing: {}.{}",
+                    table_key, ITEM_TABLE_ITEM_DATA_KEY
+                ))
+            }
+        } else {
+            Err(format!("Object missing: {}", table_key))
+        }
+    }
+
+    let mut map = HashMap::new();
+    load_item_data_for_type(root, &mut map, ItemType::Hand)?;
+    load_item_data_for_type(root, &mut map, ItemType::UpperBody)?;
+    load_item_data_for_type(root, &mut map, ItemType::LowerBody)?;
+    load_item_data_for_type(root, &mut map, ItemType::Foot)?;
+    load_item_data_for_type(root, &mut map, ItemType::Head)?;
+    load_item_data_for_type(root, &mut map, ItemType::Face)?;
+    load_item_data_for_type(root, &mut map, ItemType::Back)?;
+    load_item_data_for_type(root, &mut map, ItemType::Vehicle)?;
+    Ok(map)
+}
+
 fn load_vendor_data(
     root: &Map<std::string::String, Value>,
 ) -> Result<HashMap<i32, VendorData>, String> {
@@ -124,14 +270,15 @@ fn load_vendor_data(
         .get(VENDOR_TABLE_KEY)
         .ok_or(format!("Key missing: {}", VENDOR_TABLE_KEY))?;
     if let Value::Object(vendor_table) = vendor_table {
-        let item_data = vendor_table
-            .get(VENDOR_TABLE_ITEM_DATA_KEY)
-            .ok_or(format!("Key missing: {}", VENDOR_TABLE_ITEM_DATA_KEY))?;
+        let item_data = vendor_table.get(VENDOR_TABLE_ITEM_DATA_KEY).ok_or(format!(
+            "Key missing: {}.{}",
+            VENDOR_TABLE_KEY, VENDOR_TABLE_ITEM_DATA_KEY
+        ))?;
         if let Value::Array(item_data) = item_data {
             let mut vendor_data = HashMap::new();
             for v in item_data {
                 let vendor_data_entry: VendorDataEntry = serde_json::from_value(v.clone())
-                    .map_err(|e| format!("Malformed vendor data entry: {}", e))?;
+                    .map_err(|e| format!("Malformed vendor data entry: {} {}", e, v))?;
                 let key = vendor_data_entry.m_iNpcNumber;
                 let vendor_data_entry = VendorItem {
                     sort_number: vendor_data_entry.m_iSortNumber,
@@ -153,7 +300,7 @@ fn load_vendor_data(
             ))
         }
     } else {
-        Err(format!("Object missing: {}", VENDOR_TABLE_KEY,))
+        Err(format!("Object missing: {}", VENDOR_TABLE_KEY))
     }
 }
 

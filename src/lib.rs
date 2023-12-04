@@ -14,6 +14,7 @@ use net::{
     packet::{sItemBase, sItemVendor, sNano, sRunningQuest},
     ClientMap,
 };
+use tabledata::tdata_get;
 
 #[macro_export]
 macro_rules! unused {
@@ -82,6 +83,10 @@ impl Item {
             expiry_time: 0,
         }
     }
+
+    pub fn get_stats(&self) -> FFResult<&ItemStats> {
+        tdata_get().get_item_stats(self.id, self.ty)
+    }
 }
 impl Default for sItemBase {
     fn default() -> Self {
@@ -128,6 +133,35 @@ impl From<Option<Item>> for sItemBase {
         } else {
             Self::default()
         }
+    }
+}
+
+pub struct ItemStats {
+    sell_price: i32,
+    sellable: bool,
+    tradeable: bool,
+    max_stack_size: usize,
+    required_level: i16,
+}
+impl ItemStats {
+    pub fn is_sellable(&self) -> bool {
+        self.sellable
+    }
+
+    pub fn get_sell_price(&self) -> i32 {
+        self.sell_price
+    }
+
+    pub fn is_tradeable(&self) -> bool {
+        self.tradeable
+    }
+
+    pub fn get_max_stack_size(&self) -> usize {
+        self.max_stack_size
+    }
+
+    pub fn get_required_level(&self) -> i16 {
+        self.required_level
     }
 }
 

@@ -48,7 +48,7 @@ pub fn gm_pc_give_item(client: &mut FFClient, state: &mut ShardServerState) -> F
     let location = pkt.eIL.try_into()?;
     let item: Option<Item> = pkt.Item.try_into()?;
 
-    player.set_item_with_location(location, slot_number, item)?;
+    player.set_item(location, slot_number, item)?;
 
     let resp = sP_FE2CL_REP_PC_GIVE_ITEM_SUCC {
         eIL: pkt.eIL,

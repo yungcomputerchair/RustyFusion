@@ -1,7 +1,9 @@
 use rusty_fusion::{
     enums::ItemLocation,
-    error::{FFError, Severity},
+    error::{catch_fail, FFError, Severity},
+    placeholder,
     tabledata::tdata_get,
+    unused,
 };
 
 use super::*;
@@ -14,12 +16,11 @@ pub fn item_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFRes
     let player = state.get_player_mut(pc_id)?;
 
     let location_from = pkt.eFrom.try_into()?;
-    let item_from =
-        player.set_item_with_location(location_from, pkt.iFromSlotNum as usize, None)?;
+    let item_from = player.set_item(location_from, pkt.iFromSlotNum as usize, None)?;
 
     let location_to = pkt.eTo.try_into()?;
-    let item_to = player.set_item_with_location(location_to, pkt.iToSlotNum as usize, item_from)?;
-    player.set_item_with_location(location_from, pkt.iFromSlotNum as usize, item_to)?;
+    let item_to = player.set_item(location_to, pkt.iToSlotNum as usize, item_from)?;
+    player.set_item(location_from, pkt.iFromSlotNum as usize, item_to)?;
 
     let resp = sP_FE2CL_PC_ITEM_MOVE_SUCC {
         eFrom: pkt.eTo,
@@ -103,7 +104,7 @@ pub fn vendor_item_buy(client: &mut FFClient, state: &mut ShardServerState) -> F
             ),
         ))
     } else {
-        player.set_item_with_location(ItemLocation::Inven, pkt.iInvenSlotNum as usize, item)?;
+        player.set_item(ItemLocation::Inven, pkt.iInvenSlotNum as usize, item)?;
         player.set_taros(player.get_taros() - vendor_item.get_price());
 
         let resp = sP_FE2CL_REP_PC_VENDOR_ITEM_BUY_SUCC {
@@ -114,4 +115,49 @@ pub fn vendor_item_buy(client: &mut FFClient, state: &mut ShardServerState) -> F
         client.send_packet(P_FE2CL_REP_PC_VENDOR_ITEM_BUY_SUCC, &resp)?;
         Ok(())
     }
+}
+
+pub fn vendor_item_sell(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+    catch_fail(
+        (|| {
+            let pkt: sP_CL2FE_REQ_PC_VENDOR_ITEM_SELL =
+                *client.get_packet(P_CL2FE_REQ_PC_VENDOR_ITEM_SELL);
+            let player = state.get_player_mut(client.get_player_id()?)?;
+            let item = player
+                .get_item(ItemLocation::Inven, pkt.iInvenSlotNum as usize)?
+                .as_ref()
+                .ok_or(FFError::build(
+                    Severity::Warning,
+                    format!("Tried to sell what's in empty slot {}", pkt.iInvenSlotNum),
+                ))?;
+            let stats = item.get_stats()?;
+
+            if !stats.is_sellable() {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!("Item not sellable: {:?}", item),
+                ));
+            }
+
+            let sell_price = stats.get_sell_price();
+            let item = player.set_item(ItemLocation::Inven, pkt.iInvenSlotNum as usize, None)?;
+            player.set_taros(player.get_taros() + sell_price);
+
+            let resp = sP_FE2CL_REP_PC_VENDOR_ITEM_SELL_SUCC {
+                iCandy: player.get_taros(),
+                iInvenSlotNum: pkt.iInvenSlotNum,
+                Item: item.into(),
+                ItemStay: placeholder!(None).into(),
+            };
+            client.send_packet(P_FE2CL_REP_PC_VENDOR_ITEM_SELL_SUCC, &resp)?;
+            Ok(())
+        })(),
+        || {
+            let resp = sP_FE2CL_REP_PC_VENDOR_ITEM_SELL_FAIL {
+                iErrorCode: unused!(),
+            };
+            client.send_packet(P_FE2CL_REP_PC_VENDOR_ITEM_SELL_FAIL, &resp)?;
+            Ok(())
+        },
+    )
 }

@@ -4,7 +4,7 @@ use rand::random;
 
 use rusty_fusion::{
     defines::*,
-    enums::ItemType,
+    enums::{ItemLocation, ItemType},
     error::{FFError, FFResult, Severity},
     net::{ffclient::ClientType, packet::*},
     placeholder,
@@ -122,14 +122,17 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
     if let Some(player) = state.players.get_mut(&pc_uid) {
         player.set_style(pkt.PCStyle);
         player.set_item(
+            ItemLocation::Equip,
             EQUIP_SLOT_UPPERBODY as usize,
             Some(Item::new(ItemType::UpperBody, pkt.sOn_Item.iEquipUBID)),
         )?;
         player.set_item(
+            ItemLocation::Equip,
             EQUIP_SLOT_LOWERBODY as usize,
             Some(Item::new(ItemType::LowerBody, pkt.sOn_Item.iEquipLBID)),
         )?;
         player.set_item(
+            ItemLocation::Equip,
             EQUIP_SLOT_FOOT as usize,
             Some(Item::new(ItemType::Foot, pkt.sOn_Item.iEquipFootID)),
         )?;

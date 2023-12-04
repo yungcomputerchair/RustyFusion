@@ -153,6 +153,7 @@ fn handle_packet(
         P_CL2FE_REQ_PC_VENDOR_START => item::vendor_start(clients.get_self()),
         P_CL2FE_REQ_PC_VENDOR_TABLE_UPDATE => item::vendor_table_update(clients.get_self()),
         P_CL2FE_REQ_PC_VENDOR_ITEM_BUY => item::vendor_item_buy(clients.get_self(), state),
+        P_CL2FE_REQ_PC_VENDOR_ITEM_SELL => item::vendor_item_sell(clients.get_self(), state),
         //
         other => Err(FFError::build(
             Severity::Warning,
