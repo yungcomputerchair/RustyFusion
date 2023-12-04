@@ -312,7 +312,7 @@ impl Player {
         }
     }
 
-    pub fn get_item(&self, location: ItemLocation, slot_num: usize) -> FFResult<&Option<Item>> {
+    fn get_slot(&self, location: ItemLocation, slot_num: usize) -> FFResult<Option<&Item>> {
         let err = Err(FFError::build(
             Severity::Warning,
             format!("Bad slot number: {slot_num} (location {:?})", location),
@@ -320,33 +320,78 @@ impl Player {
         match location {
             ItemLocation::Equip => {
                 if slot_num < SIZEOF_EQUIP_SLOT as usize {
-                    Ok(&self.inventory.equipped[slot_num])
+                    Ok(self.inventory.equipped[slot_num].as_ref())
                 } else {
                     err
                 }
             }
             ItemLocation::Inven => {
                 if slot_num < SIZEOF_INVEN_SLOT as usize {
-                    Ok(&self.inventory.main[slot_num])
+                    Ok(self.inventory.main[slot_num].as_ref())
                 } else {
                     err
                 }
             }
             ItemLocation::QInven => {
                 if slot_num < SIZEOF_QINVEN_SLOT as usize {
-                    Ok(&self.inventory.mission[slot_num])
+                    Ok(self.inventory.mission[slot_num].as_ref())
                 } else {
                     err
                 }
             }
             ItemLocation::Bank => {
                 if slot_num < SIZEOF_BANK_SLOT as usize {
-                    Ok(&self.inventory.bank[slot_num])
+                    Ok(self.inventory.bank[slot_num].as_ref())
                 } else {
                     err
                 }
             }
         }
+    }
+
+    fn get_slot_mut(
+        &mut self,
+        location: ItemLocation,
+        slot_num: usize,
+    ) -> FFResult<&mut Option<Item>> {
+        let err = Err(FFError::build(
+            Severity::Warning,
+            format!("Bad slot number: {slot_num} (location {:?})", location),
+        ));
+        match location {
+            ItemLocation::Equip => {
+                if slot_num < SIZEOF_EQUIP_SLOT as usize {
+                    Ok(&mut self.inventory.equipped[slot_num])
+                } else {
+                    err
+                }
+            }
+            ItemLocation::Inven => {
+                if slot_num < SIZEOF_INVEN_SLOT as usize {
+                    Ok(&mut self.inventory.main[slot_num])
+                } else {
+                    err
+                }
+            }
+            ItemLocation::QInven => {
+                if slot_num < SIZEOF_QINVEN_SLOT as usize {
+                    Ok(&mut self.inventory.mission[slot_num])
+                } else {
+                    err
+                }
+            }
+            ItemLocation::Bank => {
+                if slot_num < SIZEOF_BANK_SLOT as usize {
+                    Ok(&mut self.inventory.bank[slot_num])
+                } else {
+                    err
+                }
+            }
+        }
+    }
+
+    pub fn get_item(&self, location: ItemLocation, slot_num: usize) -> FFResult<Option<&Item>> {
+        self.get_slot(location, slot_num)
     }
 
     pub fn set_item(
@@ -355,40 +400,10 @@ impl Player {
         slot_num: usize,
         item: Option<Item>,
     ) -> FFResult<Option<Item>> {
-        let mut slot_from = None;
-        match location {
-            ItemLocation::Equip => {
-                if slot_num < SIZEOF_EQUIP_SLOT as usize {
-                    slot_from = Some(&mut self.inventory.equipped[slot_num]);
-                }
-            }
-            ItemLocation::Inven => {
-                if slot_num < SIZEOF_INVEN_SLOT as usize {
-                    slot_from = Some(&mut self.inventory.main[slot_num]);
-                }
-            }
-            ItemLocation::QInven => {
-                if slot_num < SIZEOF_QINVEN_SLOT as usize {
-                    slot_from = Some(&mut self.inventory.mission[slot_num]);
-                }
-            }
-            ItemLocation::Bank => {
-                if slot_num < SIZEOF_BANK_SLOT as usize {
-                    slot_from = Some(&mut self.inventory.bank[slot_num]);
-                }
-            }
-        }
-
-        if let Some(slot_from) = slot_from {
-            let old_item = slot_from.take();
-            *slot_from = item;
-            Ok(old_item)
-        } else {
-            Err(FFError::build(
-                Severity::Warning,
-                format!("Bad slot number: {slot_num} (location {:?})", location),
-            ))
-        }
+        let slot_from = self.get_slot_mut(location, slot_num)?;
+        let old_item = slot_from.take();
+        *slot_from = item;
+        Ok(old_item)
     }
 
     pub fn get_equipped(&self) -> [Option<Item>; 9] {

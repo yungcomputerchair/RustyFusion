@@ -70,7 +70,7 @@ pub struct Item {
     ty: ItemType,
     id: i16,
     appearance_id: Option<i16>,
-    quantity: i16,
+    quantity: u16,
     expiry_time: i32,
 }
 impl Item {
@@ -115,7 +115,7 @@ impl TryFrom<sItemBase> for Option<Item> {
                         Some(id)
                     }
                 },
-                quantity: value.iOpt as i16,
+                quantity: value.iOpt as u16,
                 expiry_time: value.iTimeLimit,
             }))
         }

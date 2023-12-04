@@ -138,7 +138,6 @@ pub fn vendor_item_sell(client: &mut FFClient, state: &mut ShardServerState) -> 
             let player = state.get_player_mut(client.get_player_id()?)?;
             let item = player
                 .get_item(ItemLocation::Inven, pkt.iInvenSlotNum as usize)?
-                .as_ref()
                 .ok_or(FFError::build(
                     Severity::Warning,
                     format!("Tried to sell what's in empty slot {}", pkt.iInvenSlotNum),
