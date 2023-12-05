@@ -34,7 +34,12 @@ fn main() -> Result<()> {
 
     let polling_interval = Duration::from_millis(50);
     let listen_addr = config.login.listen_addr.get();
-    let mut server = FFServer::new(&listen_addr, Some(polling_interval))?;
+    let mut server = FFServer::new(
+        &listen_addr,
+        handle_packet,
+        Some(handle_disconnect),
+        Some(polling_interval),
+    )?;
 
     let mut state = ServerState::new_login();
 
@@ -57,7 +62,7 @@ fn main() -> Result<()> {
         &format!("Login server listening on {}", server.get_endpoint()),
     );
     while running.load(Ordering::SeqCst) {
-        server.poll(handle_packet, Some(handle_disconnect), &mut state)?;
+        server.poll(&mut state)?;
     }
 
     log(Severity::Info, "Login server shutting down...");

@@ -24,16 +24,25 @@ pub struct FFServer {
     sock: TcpListener,
     poller: Poller,
     next_epoll_key: usize,
+    pkt_handler: PacketCallback,
+    dc_handler: Option<DisconnectCallback>,
     clients: HashMap<usize, FFClient>,
 }
 
 impl FFServer {
-    pub fn new(addr: &str, poll_timeout: Option<Duration>) -> Result<Self> {
+    pub fn new(
+        addr: &str,
+        pkt_handler: PacketCallback,
+        dc_handler: Option<DisconnectCallback>,
+        poll_timeout: Option<Duration>,
+    ) -> Result<Self> {
         let server: Self = Self {
             poll_timeout,
             sock: TcpListener::bind(addr)?,
             poller: Poller::new()?,
             next_epoll_key: EPOLL_KEY_SELF + 1,
+            pkt_handler,
+            dc_handler,
             clients: HashMap::new(),
         };
         server.sock.set_nonblocking(true)?;
@@ -56,12 +65,7 @@ impl FFServer {
         None
     }
 
-    pub fn poll(
-        &mut self,
-        pkt_handler: PacketCallback,
-        dc_handler: Option<DisconnectCallback>,
-        state: &mut ServerState,
-    ) -> Result<()> {
+    pub fn poll(&mut self, state: &mut ServerState) -> Result<()> {
         let mut events: Vec<Event> = Vec::new();
         if let Err(e) = self.poller.wait(&mut events, self.poll_timeout) {
             match e.kind() {
@@ -72,7 +76,6 @@ impl FFServer {
             }
         }
 
-        let mut dc_handler = dc_handler;
         for ev in events.iter() {
             if ev.key == EPOLL_KEY_SELF {
                 let conn_data: (TcpStream, SocketAddr) = self.sock.accept()?;
@@ -90,15 +93,12 @@ impl FFServer {
                 let addr = client.get_addr();
                 let res = client
                     .read_packet()
-                    .and_then(|pkt_id| pkt_handler(ev.key, clients, pkt_id, state));
+                    .and_then(|pkt_id| (self.pkt_handler)(ev.key, clients, pkt_id, state));
 
                 if let Err(e) = res {
                     log(e.get_severity(), &format!("{} ({})", e.get_msg(), addr));
                     if e.should_dc_client() {
-                        if let Some(callback) = dc_handler.as_mut() {
-                            callback(ev.key, clients, state);
-                        };
-                        self.unregister_client(ev.key)?.unwrap();
+                        self.disconnect_client(ev.key, state)?;
                     }
                 }
             }
@@ -108,6 +108,17 @@ impl FFServer {
 
     pub fn get_endpoint(&self) -> String {
         self.sock.local_addr().unwrap().to_string()
+    }
+
+    pub fn disconnect_client(
+        &mut self,
+        client_key: usize,
+        state: &mut ServerState,
+    ) -> Result<FFClient> {
+        if let Some(callback) = self.dc_handler {
+            callback(client_key, &mut self.clients, state);
+        };
+        self.unregister_client(client_key)
     }
 
     fn get_next_epoll_key(&mut self) -> usize {
@@ -124,9 +135,9 @@ impl FFServer {
         Ok(key)
     }
 
-    fn unregister_client(&mut self, key: usize) -> Result<Option<FFClient>> {
+    fn unregister_client(&mut self, key: usize) -> Result<FFClient> {
         let client: &FFClient = self.clients.get(&key).unwrap();
         self.poller.delete(client.get_sock())?;
-        Ok(self.clients.remove(&key))
+        Ok(self.clients.remove(&key).unwrap())
     }
 }

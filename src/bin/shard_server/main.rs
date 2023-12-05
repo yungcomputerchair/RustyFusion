@@ -37,7 +37,12 @@ fn main() -> Result<()> {
 
     let polling_interval = Duration::from_millis(50);
     let listen_addr = config_get().shard.listen_addr.get();
-    let mut server = FFServer::new(&listen_addr, Some(polling_interval))?;
+    let mut server = FFServer::new(
+        &listen_addr,
+        handle_packet,
+        Some(handle_disconnect),
+        Some(polling_interval),
+    )?;
 
     let mut state = ServerState::new_shard();
 
@@ -74,7 +79,7 @@ fn main() -> Result<()> {
                     panic!()
                 }
             });
-        server.poll(handle_packet, Some(handle_disconnect), &mut state)?;
+        server.poll(&mut state)?;
     }
 
     log(Severity::Info, "Shard server shutting down...");
