@@ -5,7 +5,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 
 use rusty_fusion::{
@@ -112,21 +112,22 @@ fn handle_packet(
     clients: &mut HashMap<usize, FFClient>,
     pkt_id: PacketID,
     state: &mut ServerState,
+    time: SystemTime,
 ) -> FFResult<()> {
     let state = state.as_login();
     let client = clients.get_mut(&key).unwrap();
     match pkt_id {
-        P_FE2LS_REQ_CONNECT => shard::connect(client, state),
+        P_FE2LS_REQ_CONNECT => shard::connect(client, state, time),
         P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC => shard::update_login_info_succ(key, clients),
         P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL => shard::update_login_info_fail(key, clients),
         P_FE2LS_REP_LIVE_CHECK => Ok(()),
         //
-        P_CL2LS_REQ_LOGIN => login::login(client, state),
+        P_CL2LS_REQ_LOGIN => login::login(client, state, time),
         P_CL2LS_REQ_CHECK_CHAR_NAME => login::check_char_name(client),
         P_CL2LS_REQ_SAVE_CHAR_NAME => login::save_char_name(client, state),
         P_CL2LS_REQ_CHAR_CREATE => login::char_create(client, state),
         P_CL2LS_REQ_SAVE_CHAR_TUTOR => login::save_char_tutor(client, state),
-        P_CL2LS_REQ_CHAR_SELECT => login::char_select(key, clients, state),
+        P_CL2LS_REQ_CHAR_SELECT => login::char_select(key, clients, state, time),
         P_CL2LS_REP_LIVE_CHECK => Ok(()),
         //
         other => Err(FFError::build(

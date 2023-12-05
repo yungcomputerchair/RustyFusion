@@ -1,4 +1,4 @@
-use std::{collections::HashMap, mem::size_of, slice::from_raw_parts};
+use std::{collections::HashMap, mem::size_of, slice::from_raw_parts, time::SystemTime};
 
 use self::{
     ffclient::{ClientType, FFClient},
@@ -24,8 +24,13 @@ pub mod ffclient;
 pub mod ffserver;
 pub mod packet;
 
-pub type PacketCallback =
-    fn(usize, &mut HashMap<usize, FFClient>, PacketID, &mut ServerState) -> FFResult<()>;
+pub type PacketCallback = fn(
+    usize,
+    &mut HashMap<usize, FFClient>,
+    PacketID,
+    &mut ServerState,
+    SystemTime,
+) -> FFResult<()>;
 pub type DisconnectCallback = fn(usize, &mut HashMap<usize, FFClient>, &mut ServerState);
 
 #[allow(non_snake_case)]

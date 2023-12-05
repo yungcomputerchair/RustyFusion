@@ -14,7 +14,11 @@ use rusty_fusion::{
     unused, util, Combatant, Entity, Item,
 };
 
-pub fn login(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
+pub fn login(
+    client: &mut FFClient,
+    state: &mut LoginServerState,
+    time: SystemTime,
+) -> FFResult<()> {
     // TODO failure
     let pkt: &sP_CL2LS_REQ_LOGIN = client.get_packet(P_CL2LS_REQ_LOGIN);
 
@@ -41,7 +45,7 @@ pub fn login(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()
         iSlotNum: placeholder!(1),
         iPaymentFlag: 1,
         iTempForPacking4: unused!(),
-        uiSvrTime: util::get_timestamp(SystemTime::now()),
+        uiSvrTime: util::get_timestamp(time),
         szID: pkt.szID,
         iOpenBetaFlag: 0,
     };
@@ -177,6 +181,7 @@ pub fn char_select(
     client_key: usize,
     clients: &mut HashMap<usize, FFClient>,
     state: &mut LoginServerState,
+    time: SystemTime,
 ) -> FFResult<()> {
     let client = clients.get_mut(&client_key).unwrap();
     if let ClientType::GameClient { serial_key, .. } = client.client_type {
@@ -193,7 +198,7 @@ pub fn char_select(
             iEnterSerialKey: serial_key,
             iPC_UID: pc_uid,
             uiFEKey: client.get_fe_key_uint(),
-            uiSvrTime: util::get_timestamp(SystemTime::now()),
+            uiSvrTime: util::get_timestamp(time),
             player: state.players.remove(&pc_uid).unwrap(),
         };
 

@@ -67,6 +67,7 @@ impl FFServer {
     }
 
     pub fn poll(&mut self, state: &mut ServerState) -> Result<()> {
+        let time_now = SystemTime::now();
         let mut events: Vec<Event> = Vec::new();
         if let Err(e) = self.poller.wait(&mut events, self.poll_timeout) {
             match e.kind() {
@@ -92,9 +93,9 @@ impl FFServer {
                 let clients: &mut HashMap<usize, FFClient> = &mut self.clients;
                 let client: &mut FFClient = clients.get_mut(&ev.key).unwrap();
                 let addr = client.get_addr();
-                let res = client
-                    .read_packet()
-                    .and_then(|pkt_id| (self.pkt_handler)(ev.key, clients, pkt_id, state));
+                let res = client.read_packet().and_then(|pkt_id| {
+                    (self.pkt_handler)(ev.key, clients, pkt_id, state, time_now)
+                });
 
                 if let Err(e) = res {
                     log(e.get_severity(), &format!("{} ({})", e.get_msg(), addr));

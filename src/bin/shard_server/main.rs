@@ -132,6 +132,7 @@ fn handle_packet(
     clients: &mut HashMap<usize, FFClient>,
     pkt_id: PacketID,
     state: &mut ServerState,
+    time: SystemTime,
 ) -> FFResult<()> {
     let state = state.as_shard();
     let mut clients = ClientMap::new(key, clients);
@@ -143,11 +144,11 @@ fn handle_packet(
         //
         P_CL2LS_REQ_LOGIN => wrong_server(clients.get_self()),
         //
-        P_CL2FE_REQ_PC_ENTER => pc::pc_enter(clients.get_self(), key, state),
+        P_CL2FE_REQ_PC_ENTER => pc::pc_enter(clients.get_self(), key, state, time),
         P_CL2FE_REQ_PC_LOADING_COMPLETE => pc::pc_loading_complete(clients.get_self()),
-        P_CL2FE_REQ_PC_MOVE => pc::pc_move(&mut clients, state),
-        P_CL2FE_REQ_PC_JUMP => pc::pc_jump(&mut clients, state),
-        P_CL2FE_REQ_PC_STOP => pc::pc_stop(&mut clients, state),
+        P_CL2FE_REQ_PC_MOVE => pc::pc_move(&mut clients, state, time),
+        P_CL2FE_REQ_PC_JUMP => pc::pc_jump(&mut clients, state, time),
+        P_CL2FE_REQ_PC_STOP => pc::pc_stop(&mut clients, state, time),
         P_CL2FE_REQ_PC_GOTO => pc::pc_goto(clients.get_self()),
         P_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH => pc::pc_special_state_switch(&mut clients, state),
         P_CL2FE_REQ_PC_FIRST_USE_FLAG_SET => pc::pc_first_use_flag_set(clients.get_self(), state),

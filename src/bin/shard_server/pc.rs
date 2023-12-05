@@ -4,7 +4,12 @@ use super::*;
 
 use crate::ShardServerState;
 
-pub fn pc_enter(client: &mut FFClient, key: usize, state: &mut ShardServerState) -> FFResult<()> {
+pub fn pc_enter(
+    client: &mut FFClient,
+    key: usize,
+    state: &mut ShardServerState,
+    time: SystemTime,
+) -> FFResult<()> {
     let pkt: &sP_CL2FE_REQ_PC_ENTER = client.get_packet(P_CL2FE_REQ_PC_ENTER);
     let serial_key: i64 = pkt.iEnterSerialKey;
     let login_data = state.get_login_data().remove(&serial_key).unwrap();
@@ -16,7 +21,7 @@ pub fn pc_enter(client: &mut FFClient, key: usize, state: &mut ShardServerState)
     let resp = sP_FE2CL_REP_PC_ENTER_SUCC {
         iID: pc_id,
         PCLoadData2CL: player.get_load_data(),
-        uiSvrTime: util::get_timestamp(SystemTime::now()),
+        uiSvrTime: util::get_timestamp(time),
     };
 
     client.client_type = ClientType::GameClient {
@@ -52,7 +57,11 @@ pub fn pc_goto(client: &mut FFClient) -> FFResult<()> {
     client.send_packet(P_FE2CL_REP_PC_GOTO_SUCC, &resp)
 }
 
-pub fn pc_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+pub fn pc_move(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+    time: SystemTime,
+) -> FFResult<()> {
     let client = clients.get_self();
     let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_MOVE = client.get_packet(P_CL2FE_REQ_PC_MOVE);
@@ -71,7 +80,7 @@ pub fn pc_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResul
         cKeyValue: pkt.cKeyValue,
         iSpeed: pkt.iSpeed,
         iID: pc_id,
-        iSvrTime: util::get_timestamp(SystemTime::now()),
+        iSvrTime: util::get_timestamp(time),
     };
 
     state
@@ -86,7 +95,11 @@ pub fn pc_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResul
     })
 }
 
-pub fn pc_jump(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+pub fn pc_jump(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+    time: SystemTime,
+) -> FFResult<()> {
     let client = clients.get_self();
     let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_JUMP = client.get_packet(P_CL2FE_REQ_PC_JUMP);
@@ -105,7 +118,7 @@ pub fn pc_jump(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResul
         cKeyValue: pkt.cKeyValue,
         iSpeed: pkt.iSpeed,
         iID: pc_id,
-        iSvrTime: util::get_timestamp(SystemTime::now()),
+        iSvrTime: util::get_timestamp(time),
     };
 
     state
@@ -120,7 +133,11 @@ pub fn pc_jump(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResul
     })
 }
 
-pub fn pc_stop(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+pub fn pc_stop(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+    time: SystemTime,
+) -> FFResult<()> {
     let client = clients.get_self();
     let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_STOP = client.get_packet(P_CL2FE_REQ_PC_STOP);
@@ -132,7 +149,7 @@ pub fn pc_stop(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResul
         iY: pkt.iY,
         iZ: pkt.iZ,
         iID: pc_id,
-        iSvrTime: util::get_timestamp(SystemTime::now()),
+        iSvrTime: util::get_timestamp(time),
     };
 
     state
