@@ -1,5 +1,5 @@
 use rusty_fusion::{
-    enums::ItemLocation,
+    enums::{ItemLocation, ItemType},
     error::{FFError, Severity},
     placeholder,
     tabledata::tdata_get,
@@ -99,18 +99,27 @@ pub fn vendor_table_update(client: &mut FFClient) -> FFResult<()> {
     Ok(())
 }
 
-pub fn vendor_item_buy(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+pub fn vendor_item_buy(
+    client: &mut FFClient,
+    state: &mut ShardServerState,
+    time: SystemTime,
+) -> FFResult<()> {
     let pkt: sP_CL2FE_REQ_PC_VENDOR_ITEM_BUY = *client.get_packet(P_CL2FE_REQ_PC_VENDOR_ITEM_BUY);
     let vendor_data = tdata_get().get_vendor_data(pkt.iVendorID)?;
     let vendor_item = vendor_data.get_item(pkt.Item.iID, pkt.Item.iType)?;
 
     // sanitize the item
     let item: Option<Item> = pkt.Item.try_into()?;
-    let item = item.ok_or(FFError::build(
+    let mut item = item.ok_or(FFError::build(
         Severity::Warning,
         "Tried to buy nothing".to_string(),
     ))?;
-    // TODO vehicles
+    if item.get_type() == ItemType::Vehicle {
+        // set expiration date
+        let duration = Duration::from_secs(config_get().shard.vehicle_duration.get());
+        let expires = time + duration;
+        item.set_expiry_time(expires);
+    }
 
     let price = vendor_item.get_price() * item.get_quantity() as u32;
     let player = state.get_player_mut(client.get_player_id()?)?;

@@ -21,7 +21,7 @@ pub fn pc_enter(
     let resp = sP_FE2CL_REP_PC_ENTER_SUCC {
         iID: pc_id,
         PCLoadData2CL: player.get_load_data(),
-        uiSvrTime: util::get_timestamp(time),
+        uiSvrTime: util::get_timestamp_ms(time),
     };
 
     client.client_type = ClientType::GameClient {
@@ -80,7 +80,7 @@ pub fn pc_move(
         cKeyValue: pkt.cKeyValue,
         iSpeed: pkt.iSpeed,
         iID: pc_id,
-        iSvrTime: util::get_timestamp(time),
+        iSvrTime: util::get_timestamp_ms(time),
     };
 
     state
@@ -118,7 +118,7 @@ pub fn pc_jump(
         cKeyValue: pkt.cKeyValue,
         iSpeed: pkt.iSpeed,
         iID: pc_id,
-        iSvrTime: util::get_timestamp(time),
+        iSvrTime: util::get_timestamp_ms(time),
     };
 
     state
@@ -149,7 +149,7 @@ pub fn pc_stop(
         iY: pkt.iY,
         iZ: pkt.iZ,
         iID: pc_id,
-        iSvrTime: util::get_timestamp(time),
+        iSvrTime: util::get_timestamp_ms(time),
     };
 
     state

@@ -54,7 +54,7 @@ pub fn login(
         iSlotNum: placeholder!(1),
         iPaymentFlag: 1,
         iTempForPacking4: unused!(),
-        uiSvrTime: util::get_timestamp(time),
+        uiSvrTime: util::get_timestamp_ms(time),
         szID: pkt.szID,
         iOpenBetaFlag: 0,
     };
@@ -207,7 +207,7 @@ pub fn char_select(
             iEnterSerialKey: serial_key,
             iPC_UID: pc_uid,
             uiFEKey: client.get_fe_key_uint(),
-            uiSvrTime: util::get_timestamp(time),
+            uiSvrTime: util::get_timestamp_ms(time),
             player: state.players.remove(&pc_uid).unwrap(),
         };
 

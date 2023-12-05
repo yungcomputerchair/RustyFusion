@@ -75,7 +75,7 @@ mod tests {
             iSlotNum: 2,
             iPaymentFlag: 3,
             iTempForPacking4: 4,
-            uiSvrTime: util::get_timestamp(SystemTime::now()),
+            uiSvrTime: util::get_timestamp_ms(SystemTime::now()),
             szID: [6; 33],
             iOpenBetaFlag: 7,
         };

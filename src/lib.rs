@@ -3,7 +3,7 @@
 #[macro_use]
 extern crate num_derive;
 
-use std::{any::Any, cmp::min, hash::Hash};
+use std::{any::Any, cmp::min, hash::Hash, time::SystemTime};
 
 use chunk::EntityMap;
 use defines::SIZEOF_VENDOR_TABLE_SLOT;
@@ -72,7 +72,7 @@ pub struct Item {
     id: i16,
     appearance_id: Option<i16>,
     quantity: u16,
-    expiry_time: i32,
+    expiry_time: Option<SystemTime>,
 }
 impl Item {
     pub fn new(ty: ItemType, id: i16) -> Self {
@@ -81,8 +81,12 @@ impl Item {
             id,
             appearance_id: None,
             quantity: 1,
-            expiry_time: 0,
+            expiry_time: None,
         }
+    }
+
+    pub fn get_type(&self) -> ItemType {
+        self.ty
     }
 
     pub fn get_quantity(&self) -> u16 {
@@ -91,6 +95,10 @@ impl Item {
 
     pub fn get_stats(&self) -> FFResult<&ItemStats> {
         tdata_get().get_item_stats(self.id, self.ty)
+    }
+
+    pub fn set_expiry_time(&mut self, time: SystemTime) {
+        self.expiry_time = Some(time);
     }
 
     pub fn transfer_items(from: &mut Option<Item>, to: &mut Option<Item>) -> FFResult<()> {
@@ -148,7 +156,11 @@ impl TryFrom<sItemBase> for Option<Item> {
                     }
                 },
                 quantity: value.iOpt as u16,
-                expiry_time: value.iTimeLimit,
+                expiry_time: if value.iTimeLimit == 0 {
+                    None
+                } else {
+                    Some(util::get_systime_from_sec(value.iTimeLimit as u64))
+                },
             }))
         }
     }
@@ -160,7 +172,10 @@ impl From<Option<Item>> for sItemBase {
                 iType: value.ty as i16,
                 iID: value.id,
                 iOpt: (value.quantity as i32) | ((value.appearance_id.unwrap_or(0) as i32) << 16),
-                iTimeLimit: value.expiry_time,
+                iTimeLimit: match value.expiry_time {
+                    Some(time) => util::get_timestamp_sec(time) as i32,
+                    None => 0,
+                },
             }
         } else {
             Self::default()

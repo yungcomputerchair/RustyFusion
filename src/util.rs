@@ -37,9 +37,24 @@ pub fn encode_utf16<const SIZE: usize>(chars: &str) -> [u16; SIZE] {
     str_vec.try_into().unwrap()
 }
 
-pub fn get_timestamp(time: SystemTime) -> u64 {
-    let diff: Duration = time.duration_since(UNIX_EPOCH).unwrap();
+pub fn get_timestamp_ms(time: SystemTime) -> u64 {
+    let diff = time.duration_since(UNIX_EPOCH).unwrap();
     diff.as_millis() as u64
+}
+
+pub fn get_timestamp_sec(time: SystemTime) -> u32 {
+    let diff = time.duration_since(UNIX_EPOCH).unwrap();
+    diff.as_secs() as u32
+}
+
+pub fn get_systime_from_ms(timestamp_ms: u64) -> SystemTime {
+    let diff = Duration::from_millis(timestamp_ms);
+    SystemTime::UNIX_EPOCH + diff
+}
+
+pub fn get_systime_from_sec(timestamp_sec: u64) -> SystemTime {
+    let diff = Duration::from_secs(timestamp_sec);
+    SystemTime::UNIX_EPOCH + diff
 }
 
 pub fn get_uid() -> i64 {

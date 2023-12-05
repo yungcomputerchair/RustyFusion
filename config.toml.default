@@ -21,3 +21,5 @@ external_addr = "127.0.0.1:23001" # address for clients to connect to
 login_server_addr = "127.0.0.1:23000" # address of login server
 login_server_conn_interval = 10 # how long (seconds) to wait before retrying login server connection
 visibility_range = 1 # how far (chunks) game clients can see entities
+vehicle_duration = 604,800 # how long (seconds) after a vehicle is bought before it expires
+                           # defaults to one week

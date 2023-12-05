@@ -164,7 +164,7 @@ fn handle_packet(
         P_CL2FE_REQ_PC_ITEM_DELETE => item::item_delete(clients.get_self(), state),
         P_CL2FE_REQ_PC_VENDOR_START => item::vendor_start(clients.get_self()),
         P_CL2FE_REQ_PC_VENDOR_TABLE_UPDATE => item::vendor_table_update(clients.get_self()),
-        P_CL2FE_REQ_PC_VENDOR_ITEM_BUY => item::vendor_item_buy(clients.get_self(), state),
+        P_CL2FE_REQ_PC_VENDOR_ITEM_BUY => item::vendor_item_buy(clients.get_self(), state, time),
         P_CL2FE_REQ_PC_VENDOR_ITEM_SELL => item::vendor_item_sell(clients.get_self(), state),
         P_CL2FE_REQ_PC_VENDOR_ITEM_RESTORE_BUY => {
             item::vendor_item_restore_buy(clients.get_self(), state)

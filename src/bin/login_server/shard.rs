@@ -15,7 +15,7 @@ pub fn connect(
     let conn_id = state.get_next_shard_id();
     server.client_type = ClientType::ShardServer(conn_id);
     let resp = sP_LS2FE_REP_CONNECT_SUCC {
-        uiSvrTime: util::get_timestamp(time),
+        uiSvrTime: util::get_timestamp_ms(time),
         iConn_UID: conn_id,
     };
     server.send_packet(P_LS2FE_REP_CONNECT_SUCC, &resp)?;
