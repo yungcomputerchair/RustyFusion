@@ -68,6 +68,14 @@ fn main() -> Result<()> {
         &format!("Login server listening on {}", server.get_endpoint()),
     );
     while running.load(Ordering::SeqCst) {
+        timers
+            .check_all(&mut server, &mut state)
+            .unwrap_or_else(|e| {
+                log(e.get_severity(), e.get_msg());
+                if e.should_dc() {
+                    panic!()
+                }
+            });
         server.poll(&mut state)?;
     }
 
@@ -119,6 +127,7 @@ fn handle_packet(
         P_CL2LS_REQ_CHAR_CREATE => login::char_create(client, state),
         P_CL2LS_REQ_SAVE_CHAR_TUTOR => login::save_char_tutor(client, state),
         P_CL2LS_REQ_CHAR_SELECT => login::char_select(key, clients, state),
+        //
         other => Err(FFError::build(
             Severity::Warning,
             format!("Unhandled packet: {:?}", other),
