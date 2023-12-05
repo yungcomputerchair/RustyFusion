@@ -169,6 +169,8 @@ fn handle_packet(
             item::vendor_item_restore_buy(clients.get_self(), state)
         }
         //
+        P_CL2FE_REP_LIVE_CHECK => Ok(()),
+        //
         other => Err(FFError::build(
             Severity::Warning,
             format!("Unhandled packet: {:?}", other),

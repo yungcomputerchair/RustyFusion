@@ -128,6 +128,8 @@ fn handle_packet(
         P_CL2LS_REQ_SAVE_CHAR_TUTOR => login::save_char_tutor(client, state),
         P_CL2LS_REQ_CHAR_SELECT => login::char_select(key, clients, state),
         //
+        P_CL2LS_REP_LIVE_CHECK => Ok(()),
+        //
         other => Err(FFError::build(
             Severity::Warning,
             format!("Unhandled packet: {:?}", other),
