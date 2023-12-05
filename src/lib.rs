@@ -85,6 +85,10 @@ impl Item {
         }
     }
 
+    pub fn get_quantity(&self) -> u16 {
+        self.quantity
+    }
+
     pub fn get_stats(&self) -> FFResult<&ItemStats> {
         tdata_get().get_item_stats(self.id, self.ty)
     }
@@ -165,7 +169,7 @@ impl From<Option<Item>> for sItemBase {
 }
 
 pub struct ItemStats {
-    sell_price: i32,
+    sell_price: u32,
     sellable: bool,
     tradeable: bool,
     max_stack_size: u16,
@@ -176,7 +180,7 @@ impl ItemStats {
         self.sellable
     }
 
-    pub fn get_sell_price(&self) -> i32 {
+    pub fn get_sell_price(&self) -> u32 {
         self.sell_price
     }
 
@@ -197,10 +201,10 @@ pub struct VendorItem {
     sort_number: i32,
     ty: i16,
     id: i16,
-    price: i32,
+    price: u32,
 }
 impl VendorItem {
-    pub fn get_price(&self) -> i32 {
+    pub fn get_price(&self) -> u32 {
         self.price
     }
 }

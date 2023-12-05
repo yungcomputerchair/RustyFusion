@@ -18,7 +18,7 @@ pub fn gm_pc_set_value(client: &mut FFClient, state: &mut ShardServerState) -> F
         defines::CN_GM_SET_VALUE_TYPE__WEAPON_BATTERY => player.set_weapon_boosts(value),
         defines::CN_GM_SET_VALUE_TYPE__NANO_BATTERY => player.set_nano_potions(value),
         defines::CN_GM_SET_VALUE_TYPE__FUSION_MATTER => player.set_fusion_matter(value),
-        defines::CN_GM_SET_VALUE_TYPE__CANDY => player.set_taros(value),
+        defines::CN_GM_SET_VALUE_TYPE__CANDY => player.set_taros(value as u32) as i32,
         defines::CN_GM_SET_VALUE_TYPE__SPEED => placeholder!(value),
         defines::CN_GM_SET_VALUE_TYPE__JUMP => placeholder!(value),
         _ => {

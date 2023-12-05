@@ -105,27 +105,32 @@ pub fn vendor_item_buy(client: &mut FFClient, state: &mut ShardServerState) -> F
     let vendor_item = vendor_data.get_item(pkt.Item.iID, pkt.Item.iType)?;
 
     // sanitize the item
-    let item = pkt.Item.try_into()?;
-    // TODO vehicles, stack pricing, etc
+    let item: Option<Item> = pkt.Item.try_into()?;
+    let item = item.ok_or(FFError::build(
+        Severity::Warning,
+        "Tried to buy nothing".to_string(),
+    ))?;
+    // TODO vehicles
 
+    let price = vendor_item.get_price() * item.get_quantity() as u32;
     let player = state.get_player_mut(client.get_player_id()?)?;
-    if player.get_taros() < vendor_item.get_price() {
+    if player.get_taros() < price {
         Err(FFError::build(
             Severity::Warning,
             format!(
                 "Not enough taros to buy item ({} < {})",
                 player.get_taros(),
-                vendor_item.get_price()
+                price
             ),
         ))
     } else {
-        player.set_item(ItemLocation::Inven, pkt.iInvenSlotNum as usize, item)?;
-        player.set_taros(player.get_taros() - vendor_item.get_price());
+        player.set_item(ItemLocation::Inven, pkt.iInvenSlotNum as usize, Some(item))?;
+        player.set_taros(player.get_taros() - price);
 
         let resp = sP_FE2CL_REP_PC_VENDOR_ITEM_BUY_SUCC {
-            iCandy: player.get_taros(),
+            iCandy: player.get_taros() as i32,
             iInvenSlotNum: pkt.iInvenSlotNum,
-            Item: item.into(),
+            Item: Some(item).into(),
         };
         client.send_packet(P_FE2CL_REP_PC_VENDOR_ITEM_BUY_SUCC, &resp)?;
         Ok(())
@@ -158,7 +163,7 @@ pub fn vendor_item_sell(client: &mut FFClient, state: &mut ShardServerState) -> 
     buyback_list.push(item.unwrap());
 
     let resp = sP_FE2CL_REP_PC_VENDOR_ITEM_SELL_SUCC {
-        iCandy: new_taros,
+        iCandy: new_taros as i32,
         iInvenSlotNum: pkt.iInvenSlotNum,
         Item: item.into(),
         ItemStay: placeholder!(None).into(),
@@ -220,7 +225,7 @@ pub fn vendor_item_restore_buy(
         let new_taros = player.set_taros(player.get_taros() - cost);
 
         let resp = sP_FE2CL_REP_PC_VENDOR_ITEM_RESTORE_BUY_SUCC {
-            iCandy: new_taros,
+            iCandy: new_taros as i32,
             iInvenSlotNum: pkt.iInvenSlotNum,
             Item: Some(item).into(),
         };

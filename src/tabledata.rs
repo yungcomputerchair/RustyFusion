@@ -219,7 +219,7 @@ fn load_item_data(
                     })?;
                     let key = (data.m_iItemNumber as i16, item_type);
                     let data = ItemStats {
-                        sell_price: data.m_iItemSellPrice,
+                        sell_price: data.m_iItemSellPrice as u32,
                         sellable: data.m_iSellAble != 0,
                         tradeable: data.m_iTradeAble != 0,
                         max_stack_size: data.m_iStackNumber,
@@ -284,7 +284,7 @@ fn load_vendor_data(
                     sort_number: vendor_data_entry.m_iSortNumber,
                     ty: vendor_data_entry.m_iItemType,
                     id: vendor_data_entry.m_iitemID,
-                    price: vendor_data_entry.m_iSellCost,
+                    price: vendor_data_entry.m_iSellCost as u32,
                 };
 
                 vendor_data

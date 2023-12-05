@@ -141,7 +141,7 @@ pub struct Player {
     nano_data: NanoData,
     mission_data: MissionData,
     inventory: PlayerInventory,
-    taros: i32,
+    taros: u32,
     fusion_matter: i32,
     nano_potions: i32,
     weapon_boosts: i32,
@@ -243,7 +243,7 @@ impl Player {
             iHP: self.combat_stats.hp,
             iBatteryW: self.weapon_boosts,
             iBatteryN: self.nano_potions,
-            iCandy: self.taros,
+            iCandy: self.taros as i32,
             iFusionMatter: self.fusion_matter,
             iSpecialState: self.special_state,
             iMapNum: self.get_mapnum(),
@@ -407,7 +407,7 @@ impl Player {
         self.inventory.equipped
     }
 
-    pub fn get_taros(&self) -> i32 {
+    pub fn get_taros(&self) -> u32 {
         self.taros
     }
 
@@ -433,8 +433,8 @@ impl Player {
         self.flags.payzone_flag = true;
     }
 
-    pub fn set_taros(&mut self, taros: i32) -> i32 {
-        self.taros = clamp(taros as u32, 0, PC_CANDY_MAX) as i32;
+    pub fn set_taros(&mut self, taros: u32) -> u32 {
+        self.taros = clamp(taros, 0, PC_CANDY_MAX);
         self.taros
     }
 
@@ -468,7 +468,7 @@ impl Player {
             self.set_fusion_matter(PC_FUSIONMATTER_MAX as i32);
             self.set_hp(i32::MAX);
             self.set_level(PC_LEVEL_MAX as i16);
-            self.set_taros(PC_CANDY_MAX as i32);
+            self.set_taros(PC_CANDY_MAX);
             self.set_appearance_flag();
             self.set_tutorial_flag();
             self.set_payzone_flag();
