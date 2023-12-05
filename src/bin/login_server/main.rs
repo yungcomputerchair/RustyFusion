@@ -16,11 +16,10 @@ use rusty_fusion::{
         ffclient::{ClientType, FFClient},
         ffserver::FFServer,
         packet::{
-            sP_LS2CL_REQ_LIVE_CHECK, sP_LS2FE_REP_CONNECT_SUCC,
+            sP_LS2CL_REQ_LIVE_CHECK, sP_LS2FE_REP_CONNECT_SUCC, sP_LS2FE_REQ_LIVE_CHECK,
             PacketID::{self, *},
         },
     },
-    placeholder,
     player::Player,
     state::{login::LoginServerState, ServerState},
     timer::TimerMap,
@@ -120,6 +119,7 @@ fn handle_packet(
         P_FE2LS_REQ_CONNECT => shard::connect(client, state),
         P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC => shard::update_login_info_succ(key, clients),
         P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL => shard::update_login_info_fail(key, clients),
+        P_FE2LS_REP_LIVE_CHECK => Ok(()),
         //
         P_CL2LS_REQ_LOGIN => login::login(client, state),
         P_CL2LS_REQ_CHECK_CHAR_NAME => login::check_char_name(client),
@@ -127,7 +127,6 @@ fn handle_packet(
         P_CL2LS_REQ_CHAR_CREATE => login::char_create(client, state),
         P_CL2LS_REQ_SAVE_CHAR_TUTOR => login::save_char_tutor(client, state),
         P_CL2LS_REQ_CHAR_SELECT => login::char_select(key, clients, state),
-        //
         P_CL2LS_REP_LIVE_CHECK => Ok(()),
         //
         other => Err(FFError::build(
@@ -148,7 +147,12 @@ fn send_live_check(client: &mut FFClient) -> FFResult<()> {
             };
             client.send_packet(P_LS2CL_REQ_LIVE_CHECK, &pkt)
         }
-        ClientType::ShardServer(_) => placeholder!(Ok(())),
+        ClientType::ShardServer(_) => {
+            let pkt = sP_LS2FE_REQ_LIVE_CHECK {
+                iTempValue: unused!(),
+            };
+            client.send_packet(P_LS2FE_REQ_LIVE_CHECK, &pkt)
+        }
         _ => Ok(()),
     }
 }

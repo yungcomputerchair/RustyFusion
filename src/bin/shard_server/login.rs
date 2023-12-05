@@ -85,3 +85,11 @@ pub fn login_update_info(server: &mut FFClient, state: &mut ShardServerState) ->
 
     server.send_packet(P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC, &resp)
 }
+
+pub fn login_live_check(client: &mut FFClient) -> FFResult<()> {
+    let resp = sP_FE2LS_REP_LIVE_CHECK {
+        iTempValue: unused!(),
+    };
+    client.send_packet(P_FE2LS_REP_LIVE_CHECK, &resp)?;
+    Ok(())
+}

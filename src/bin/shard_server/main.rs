@@ -21,7 +21,6 @@ use rusty_fusion::{
         },
         ClientMap, LoginData, CONN_ID_DISCONNECTED,
     },
-    placeholder,
     state::{shard::ShardServerState, ServerState},
     tabledata::tdata_init,
     timer::TimerMap,
@@ -140,6 +139,7 @@ fn handle_packet(
         P_LS2FE_REP_CONNECT_SUCC => login::login_connect_succ(clients.get_self(), state),
         P_LS2FE_REP_CONNECT_FAIL => login::login_connect_fail(clients.get_self()),
         P_LS2FE_REQ_UPDATE_LOGIN_INFO => login::login_update_info(clients.get_self(), state),
+        P_LS2FE_REQ_LIVE_CHECK => login::login_live_check(clients.get_self()),
         //
         P_CL2LS_REQ_LOGIN => wrong_server(clients.get_self()),
         //
@@ -227,6 +227,6 @@ fn send_live_check(client: &mut FFClient) -> FFResult<()> {
             };
             client.send_packet(P_FE2CL_REQ_LIVE_CHECK, &pkt)
         }
-        _ => placeholder!(Ok(())),
+        _ => Ok(()),
     }
 }
