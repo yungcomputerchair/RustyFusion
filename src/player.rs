@@ -507,12 +507,14 @@ impl Entity for Player {
     fn set_position(
         &mut self,
         pos: Position,
-        entity_map: &mut EntityMap,
-        client_map: &mut ClientMap,
+        entity_map: Option<&mut EntityMap>,
+        client_map: Option<&mut ClientMap>,
     ) {
         self.position = pos;
-        let chunk = self.position.chunk_coords();
-        entity_map.update(self.get_id(), Some(chunk), Some(client_map));
+        if let Some(entity_map) = entity_map {
+            let chunk = self.position.chunk_coords();
+            entity_map.update(self.get_id(), Some(chunk), client_map);
+        }
     }
 
     fn set_rotation(&mut self, angle: i32) {

@@ -90,7 +90,7 @@ pub fn pc_move(
         });
 
     state.update_player(pc_id, |player, state| {
-        player.set_position(pos, state.get_entity_map(), clients);
+        player.set_position(pos, Some(state.get_entity_map()), Some(clients));
         player.set_rotation(angle);
     })
 }
@@ -128,7 +128,7 @@ pub fn pc_jump(
         });
 
     state.update_player(pc_id, |player, state| {
-        player.set_position(pos, state.get_entity_map(), clients);
+        player.set_position(pos, Some(state.get_entity_map()), Some(clients));
         player.set_rotation(angle);
     })
 }
@@ -159,7 +159,7 @@ pub fn pc_stop(
         });
 
     state.update_player(pc_id, |player, state| {
-        player.set_position(pos, state.get_entity_map(), clients);
+        player.set_position(pos, Some(state.get_entity_map()), Some(clients));
     })
 }
 

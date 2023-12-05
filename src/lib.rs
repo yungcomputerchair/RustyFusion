@@ -330,8 +330,8 @@ pub trait Entity {
     fn set_position(
         &mut self,
         pos: Position,
-        entity_map: &mut EntityMap,
-        client_map: &mut ClientMap,
+        entity_map: Option<&mut EntityMap>,
+        client_map: Option<&mut ClientMap>,
     );
     fn set_rotation(&mut self, angle: i32);
     fn send_enter(&self, client: &mut FFClient) -> FFResult<()>;
