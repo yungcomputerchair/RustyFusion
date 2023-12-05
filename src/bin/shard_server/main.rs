@@ -72,9 +72,8 @@ fn main() -> Result<()> {
         timers
             .check_all(&mut server, &mut state)
             .unwrap_or_else(|e| {
-                let severity = e.get_severity();
-                log(severity, e.get_msg());
-                if let Severity::Fatal = severity {
+                log(e.get_severity(), e.get_msg());
+                if e.should_dc() {
                     panic!()
                 }
             });

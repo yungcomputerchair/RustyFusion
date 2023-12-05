@@ -51,14 +51,14 @@ impl From<Severity> for usize {
 pub struct FFError {
     severity: Severity,
     msg: String,
-    should_dc_client: bool,
+    should_dc: bool,
 }
 impl FFError {
-    fn new(severity: Severity, msg: String, should_dc_client: bool) -> Self {
+    fn new(severity: Severity, msg: String, should_dc: bool) -> Self {
         Self {
             severity,
             msg,
-            should_dc_client,
+            should_dc,
         }
     }
 
@@ -77,7 +77,7 @@ impl FFError {
                 _ => Severity::Warning,
             },
             msg: format!("I/O error ({:?})", error.kind()),
-            should_dc_client: true,
+            should_dc: true,
         }
     }
 
@@ -89,8 +89,8 @@ impl FFError {
         &self.msg
     }
 
-    pub fn should_dc_client(&self) -> bool {
-        self.should_dc_client
+    pub fn should_dc(&self) -> bool {
+        self.should_dc
     }
 }
 

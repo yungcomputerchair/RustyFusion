@@ -97,7 +97,7 @@ impl FFServer {
 
                 if let Err(e) = res {
                     log(e.get_severity(), &format!("{} ({})", e.get_msg(), addr));
-                    if e.should_dc_client() {
+                    if e.should_dc() {
                         self.disconnect_client(ev.key, state)?;
                     }
                 }
