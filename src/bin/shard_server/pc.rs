@@ -1,4 +1,4 @@
-use rusty_fusion::{Position, util};
+use rusty_fusion::{util, Position};
 
 use super::*;
 

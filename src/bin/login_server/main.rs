@@ -16,13 +16,15 @@ use rusty_fusion::{
         ffclient::{ClientType, FFClient},
         ffserver::FFServer,
         packet::{
-            sP_LS2FE_REP_CONNECT_SUCC,
+            sP_LS2CL_REQ_LIVE_CHECK, sP_LS2FE_REP_CONNECT_SUCC,
             PacketID::{self, *},
         },
     },
+    placeholder,
     player::Player,
     state::{login::LoginServerState, ServerState},
     timer::TimerMap,
+    unused,
 };
 
 fn main() -> Result<()> {
@@ -53,6 +55,11 @@ fn main() -> Result<()> {
     timers.register_timer(
         logger_flush_scheduled,
         Duration::from_secs(config.general.log_write_interval.get()),
+        false,
+    );
+    timers.register_timer(
+        |t, srv, st| FFServer::do_live_checks(t, srv, st, send_live_check),
+        Duration::from_secs(config.general.live_check_interval.get()),
         false,
     );
 
@@ -116,5 +123,21 @@ fn handle_packet(
             Severity::Warning,
             format!("Unhandled packet: {:?}", other),
         )),
+    }
+}
+
+fn send_live_check(client: &mut FFClient) -> FFResult<()> {
+    match client.client_type {
+        ClientType::GameClient {
+            serial_key: _,
+            pc_id: _,
+        } => {
+            let pkt = sP_LS2CL_REQ_LIVE_CHECK {
+                iTempValue: unused!(),
+            };
+            client.send_packet(P_LS2CL_REQ_LIVE_CHECK, &pkt)
+        }
+        ClientType::ShardServer(_) => placeholder!(Ok(())),
+        _ => Ok(()),
     }
 }

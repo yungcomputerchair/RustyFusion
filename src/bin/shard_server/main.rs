@@ -21,10 +21,11 @@ use rusty_fusion::{
         },
         ClientMap, LoginData, CONN_ID_DISCONNECTED,
     },
+    placeholder,
     state::{shard::ShardServerState, ServerState},
     tabledata::tdata_init,
     timer::TimerMap,
-    Entity, EntityID,
+    unused, Entity, EntityID,
 };
 
 fn main() -> Result<()> {
@@ -55,6 +56,11 @@ fn main() -> Result<()> {
         connect_to_login_server,
         Duration::from_secs(config.shard.login_server_conn_interval.get()),
         true,
+    );
+    timers.register_timer(
+        |t, srv, st| FFServer::do_live_checks(t, srv, st, send_live_check),
+        Duration::from_secs(config.general.live_check_interval.get()),
+        false,
     );
 
     let running = Arc::new(AtomicBool::new(true));
@@ -206,4 +212,19 @@ fn connect_to_login_server(
 
 fn is_login_server_connected(state: &ShardServerState) -> bool {
     state.get_login_server_conn_id() != CONN_ID_DISCONNECTED
+}
+
+fn send_live_check(client: &mut FFClient) -> FFResult<()> {
+    match client.client_type {
+        ClientType::GameClient {
+            serial_key: _,
+            pc_id: _,
+        } => {
+            let pkt = sP_FE2CL_REQ_LIVE_CHECK {
+                iTempValue: unused!(),
+            };
+            client.send_packet(P_FE2CL_REQ_LIVE_CHECK, &pkt)
+        }
+        _ => placeholder!(Ok(())),
+    }
 }

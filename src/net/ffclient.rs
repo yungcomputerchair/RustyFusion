@@ -1,7 +1,8 @@
 use std::{
     io::{Read, Write},
     mem::size_of,
-    net::{SocketAddr, TcpStream}, time::SystemTime,
+    net::{SocketAddr, TcpStream},
+    time::SystemTime,
 };
 
 use num_traits::{FromPrimitive, ToPrimitive};
@@ -97,6 +98,10 @@ impl FFClient {
 
         let pkt_buf: &[u8] = &self.buf[4..self.last_pkt_sz];
         unsafe { bytes_to_struct(pkt_buf) }
+    }
+
+    pub fn get_last_heartbeat(&self) -> SystemTime {
+        self.last_heartbeat
     }
 
     pub fn read_packet(&mut self) -> FFResult<PacketID> {

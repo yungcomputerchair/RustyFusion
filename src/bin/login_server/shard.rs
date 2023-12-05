@@ -2,7 +2,10 @@ use std::time::SystemTime;
 
 use super::*;
 
-use rusty_fusion::{net::{ffclient::ClientType, packet::*}, util};
+use rusty_fusion::{
+    net::{ffclient::ClientType, packet::*},
+    util,
+};
 
 pub fn connect(server: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
     let conn_id = state.get_next_shard_id();

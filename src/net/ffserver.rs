@@ -4,11 +4,12 @@ use std::{
     collections::HashMap,
     io::{ErrorKind, Result},
     net::{SocketAddr, TcpListener, TcpStream},
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 
 use crate::{
-    error::{log, Severity},
+    config::config_get,
+    error::{log, FFError, FFResult, Severity},
     state::ServerState,
 };
 
@@ -110,6 +111,10 @@ impl FFServer {
         self.sock.local_addr().unwrap().to_string()
     }
 
+    pub fn get_clients(&mut self) -> impl Iterator<Item = (&usize, &mut FFClient)> + '_ {
+        self.clients.iter_mut()
+    }
+
     pub fn disconnect_client(
         &mut self,
         client_key: usize,
@@ -139,5 +144,37 @@ impl FFServer {
         let client: &FFClient = self.clients.get(&key).unwrap();
         self.poller.delete(client.get_sock())?;
         Ok(self.clients.remove(&key).unwrap())
+    }
+
+    pub fn do_live_checks(
+        time: SystemTime,
+        server: &mut FFServer,
+        state: &mut ServerState,
+        mut live_check_handler: impl FnMut(&mut FFClient) -> FFResult<()>,
+    ) -> FFResult<()> {
+        let live_check_interval =
+            Duration::from_secs(config_get().general.live_check_interval.get());
+        let timeout = live_check_interval * 2;
+        assert!(timeout > live_check_interval);
+
+        let mut dc_keys = Vec::new();
+        for (key, client) in server.get_clients() {
+            let last_heartbeat = client.get_last_heartbeat();
+            let since = time.duration_since(last_heartbeat).unwrap_or_default();
+            if since > timeout {
+                dc_keys.push(*key);
+                continue;
+            }
+            if since > live_check_interval {
+                let _ = live_check_handler(client);
+            }
+        }
+
+        for key in dc_keys {
+            server
+                .disconnect_client(key, state)
+                .map_err(FFError::from_io_err)?;
+        }
+        Ok(())
     }
 }
