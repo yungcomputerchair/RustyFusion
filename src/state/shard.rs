@@ -6,7 +6,7 @@ use crate::{
     net::{LoginData, CONN_ID_DISCONNECTED},
     player::Player,
     tabledata::tdata_get,
-    Entity,
+    Entity, Item,
 };
 
 pub struct ShardServerState {
@@ -14,6 +14,7 @@ pub struct ShardServerState {
     next_pc_id: i32,
     login_data: HashMap<i64, LoginData>,
     entity_map: EntityMap,
+    buyback_lists: HashMap<i32, Vec<Item>>,
 }
 
 impl Default for ShardServerState {
@@ -23,6 +24,7 @@ impl Default for ShardServerState {
             next_pc_id: 1,
             login_data: HashMap::new(),
             entity_map: EntityMap::default(),
+            buyback_lists: HashMap::new(),
         };
         for npc in tdata_get().get_npcs() {
             let chunk_pos = npc.get_position().chunk_coords();
@@ -50,6 +52,10 @@ impl ShardServerState {
 
     pub fn get_entity_map(&mut self) -> &mut EntityMap {
         &mut self.entity_map
+    }
+
+    pub fn get_buyback_lists(&mut self) -> &mut HashMap<i32, Vec<Item>> {
+        &mut self.buyback_lists
     }
 
     pub fn set_login_server_conn_id(&mut self, conn_id: i64) {

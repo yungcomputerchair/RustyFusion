@@ -432,28 +432,34 @@ impl Player {
         self.flags.payzone_flag = true;
     }
 
-    pub fn set_taros(&mut self, taros: i32) {
+    pub fn set_taros(&mut self, taros: i32) -> i32 {
         self.taros = clamp(taros as u32, 0, PC_CANDY_MAX) as i32;
+        self.taros
     }
 
-    pub fn set_hp(&mut self, hp: i32) {
+    pub fn set_hp(&mut self, hp: i32) -> i32 {
         self.combat_stats.hp = clamp_min(hp, 0);
+        self.combat_stats.hp
     }
 
-    pub fn set_level(&mut self, level: i16) {
+    pub fn set_level(&mut self, level: i16) -> i16 {
         self.combat_stats.level = clamp(level, 1, PC_LEVEL_MAX as i16);
+        self.combat_stats.level
     }
 
-    pub fn set_fusion_matter(&mut self, fusion_matter: i32) {
+    pub fn set_fusion_matter(&mut self, fusion_matter: i32) -> i32 {
         self.fusion_matter = clamp(fusion_matter, 0, PC_FUSIONMATTER_MAX as i32);
+        self.fusion_matter
     }
 
-    pub fn set_weapon_boosts(&mut self, weapon_boosts: i32) {
+    pub fn set_weapon_boosts(&mut self, weapon_boosts: i32) -> i32 {
         self.weapon_boosts = clamp(weapon_boosts, 0, PC_BATTERY_MAX as i32);
+        self.weapon_boosts
     }
 
-    pub fn set_nano_potions(&mut self, nano_potions: i32) {
+    pub fn set_nano_potions(&mut self, nano_potions: i32) -> i32 {
         self.nano_potions = clamp(nano_potions, 0, PC_BATTERY_MAX as i32);
+        self.nano_potions
     }
 
     pub fn set_god_mode(&mut self, god_mode: bool) {

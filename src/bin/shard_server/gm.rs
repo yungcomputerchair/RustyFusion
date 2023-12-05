@@ -13,14 +13,14 @@ pub fn gm_pc_set_value(client: &mut FFClient, state: &mut ShardServerState) -> F
     let value_type = pkt.iSetValueType;
     let player = state.get_player_mut(pc_id)?;
 
-    match value_type as u32 {
+    let value = match value_type as u32 {
         defines::CN_GM_SET_VALUE_TYPE__HP => player.set_hp(value),
         defines::CN_GM_SET_VALUE_TYPE__WEAPON_BATTERY => player.set_weapon_boosts(value),
         defines::CN_GM_SET_VALUE_TYPE__NANO_BATTERY => player.set_nano_potions(value),
         defines::CN_GM_SET_VALUE_TYPE__FUSION_MATTER => player.set_fusion_matter(value),
         defines::CN_GM_SET_VALUE_TYPE__CANDY => player.set_taros(value),
-        defines::CN_GM_SET_VALUE_TYPE__SPEED => placeholder!(()),
-        defines::CN_GM_SET_VALUE_TYPE__JUMP => placeholder!(()),
+        defines::CN_GM_SET_VALUE_TYPE__SPEED => placeholder!(value),
+        defines::CN_GM_SET_VALUE_TYPE__JUMP => placeholder!(value),
         _ => {
             return Err(FFError::build(
                 Severity::Warning,
