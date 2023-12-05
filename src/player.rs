@@ -13,6 +13,7 @@ use crate::{
         },
         ClientMap,
     },
+    state::shard::ShardServerState,
     util::parse_utf16,
     CombatStats, Combatant, Entity, EntityID, Item, Mission, Nano, Position,
 };
@@ -531,6 +532,13 @@ impl Entity for Player {
             iExitType: unused!(),
         };
         client.send_packet(PacketID::P_FE2CL_PC_EXIT, &pkt)
+    }
+
+    fn cleanup(&mut self, state: &mut ShardServerState) {
+        let pc_id = self.get_player_id();
+        if state.get_buyback_lists().contains_key(&pc_id) {
+            state.get_buyback_lists().remove(&pc_id);
+        }
     }
 
     fn as_any(&mut self) -> &mut dyn Any {

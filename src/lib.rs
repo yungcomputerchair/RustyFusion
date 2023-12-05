@@ -14,6 +14,7 @@ use net::{
     packet::{sItemBase, sItemVendor, sNano, sRunningQuest},
     ClientMap,
 };
+use state::shard::ShardServerState;
 use tabledata::tdata_get;
 
 #[macro_export]
@@ -331,6 +332,8 @@ pub trait Entity {
     fn set_rotation(&mut self, angle: i32);
     fn send_enter(&self, client: &mut FFClient) -> FFResult<()>;
     fn send_exit(&self, client: &mut FFClient) -> FFResult<()>;
+
+    fn cleanup(&mut self, state: &mut ShardServerState);
 
     fn as_any(&mut self) -> &mut dyn Any;
 }

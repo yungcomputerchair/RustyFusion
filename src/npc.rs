@@ -6,6 +6,7 @@ use crate::{
         packet::{sNPCAppearanceData, sP_FE2CL_NPC_ENTER, sP_FE2CL_NPC_EXIT, PacketID},
         ClientMap,
     },
+    state::shard::ShardServerState,
     CombatStats, Combatant, Entity, EntityID, Position,
 };
 
@@ -95,6 +96,8 @@ impl Entity for NPC {
         let pkt = sP_FE2CL_NPC_EXIT { iNPC_ID: self.id };
         client.send_packet(PacketID::P_FE2CL_NPC_EXIT, &pkt)
     }
+
+    fn cleanup(&mut self, _state: &mut ShardServerState) {}
 
     fn as_any(&mut self) -> &mut dyn std::any::Any {
         self
