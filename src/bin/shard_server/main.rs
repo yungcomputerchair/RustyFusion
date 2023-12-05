@@ -24,7 +24,6 @@ use rusty_fusion::{
     state::{shard::ShardServerState, ServerState},
     tabledata::tdata_init,
     timer::TimerMap,
-    util::get_time,
     Entity, EntityID,
 };
 

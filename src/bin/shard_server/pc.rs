@@ -1,4 +1,4 @@
-use rusty_fusion::Position;
+use rusty_fusion::{Position, util};
 
 use super::*;
 
@@ -16,7 +16,7 @@ pub fn pc_enter(client: &mut FFClient, key: usize, state: &mut ShardServerState)
     let resp = sP_FE2CL_REP_PC_ENTER_SUCC {
         iID: pc_id,
         PCLoadData2CL: player.get_load_data(),
-        uiSvrTime: get_time(),
+        uiSvrTime: util::get_timestamp(SystemTime::now()),
     };
 
     client.client_type = ClientType::GameClient {
@@ -71,7 +71,7 @@ pub fn pc_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResul
         cKeyValue: pkt.cKeyValue,
         iSpeed: pkt.iSpeed,
         iID: pc_id,
-        iSvrTime: get_time(),
+        iSvrTime: util::get_timestamp(SystemTime::now()),
     };
 
     state
@@ -105,7 +105,7 @@ pub fn pc_jump(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResul
         cKeyValue: pkt.cKeyValue,
         iSpeed: pkt.iSpeed,
         iID: pc_id,
-        iSvrTime: get_time(),
+        iSvrTime: util::get_timestamp(SystemTime::now()),
     };
 
     state
@@ -132,7 +132,7 @@ pub fn pc_stop(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResul
         iY: pkt.iY,
         iZ: pkt.iZ,
         iID: pc_id,
-        iSvrTime: get_time(),
+        iSvrTime: util::get_timestamp(SystemTime::now()),
     };
 
     state

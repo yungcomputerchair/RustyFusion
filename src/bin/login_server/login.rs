@@ -1,3 +1,5 @@
+use std::time::SystemTime;
+
 use super::*;
 
 use rand::random;
@@ -39,7 +41,7 @@ pub fn login(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()
         iSlotNum: placeholder!(1),
         iPaymentFlag: 1,
         iTempForPacking4: unused!(),
-        uiSvrTime: get_time(),
+        uiSvrTime: util::get_timestamp(SystemTime::now()),
         szID: pkt.szID,
         iOpenBetaFlag: 0,
     };
@@ -191,7 +193,7 @@ pub fn char_select(
             iEnterSerialKey: serial_key,
             iPC_UID: pc_uid,
             uiFEKey: client.get_fe_key_uint(),
-            uiSvrTime: get_time(),
+            uiSvrTime: util::get_timestamp(SystemTime::now()),
             player: state.players.remove(&pc_uid).unwrap(),
         };
 

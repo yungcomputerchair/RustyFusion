@@ -23,7 +23,6 @@ use rusty_fusion::{
     player::Player,
     state::{login::LoginServerState, ServerState},
     timer::TimerMap,
-    util::get_time,
 };
 
 fn main() -> Result<()> {

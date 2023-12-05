@@ -1,7 +1,7 @@
 use std::{
     io::{Read, Write},
     mem::size_of,
-    net::{SocketAddr, TcpStream},
+    net::{SocketAddr, TcpStream}, time::SystemTime,
 };
 
 use num_traits::{FromPrimitive, ToPrimitive};
@@ -9,7 +9,6 @@ use num_traits::{FromPrimitive, ToPrimitive};
 use crate::{
     error::{log, FFError, FFResult, Severity},
     net::{struct_to_bytes, PACKET_BUFFER_SIZE, SILENCED_PACKETS},
-    util::get_time,
 };
 
 use super::{
@@ -39,7 +38,7 @@ pub struct FFClient {
     pub fe_key: [u8; CRYPTO_KEY_SIZE],
     pub enc_mode: EncryptionMode,
     pub client_type: ClientType,
-    last_heartbeat: u64,
+    last_heartbeat: SystemTime,
 }
 
 impl FFClient {
@@ -55,7 +54,7 @@ impl FFClient {
             fe_key: default_key,
             enc_mode: EncryptionMode::EKey,
             client_type: ClientType::Unknown,
-            last_heartbeat: get_time(),
+            last_heartbeat: SystemTime::now(),
         }
     }
 
@@ -101,7 +100,7 @@ impl FFClient {
     }
 
     pub fn read_packet(&mut self) -> FFResult<PacketID> {
-        self.last_heartbeat = get_time();
+        self.last_heartbeat = SystemTime::now();
 
         // read the size
         let mut sz_buf: [u8; 4] = [0; 4];

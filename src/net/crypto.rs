@@ -59,10 +59,12 @@ pub fn gen_key(time: u64, iv1: i32, iv2: i32) -> [u8; CRYPTO_KEY_SIZE] {
 
 #[cfg(test)]
 mod tests {
+    use std::time::SystemTime;
+
     use crate::net::bytes_to_struct;
     use crate::net::packet::*;
     use crate::net::struct_to_bytes;
-    use crate::util::get_time;
+    use crate::util;
 
     use super::{decrypt_packet, encrypt_packet, CRYPTO_KEY_SIZE};
 
@@ -73,7 +75,7 @@ mod tests {
             iSlotNum: 2,
             iPaymentFlag: 3,
             iTempForPacking4: 4,
-            uiSvrTime: get_time(),
+            uiSvrTime: util::get_timestamp(SystemTime::now()),
             szID: [6; 33],
             iOpenBetaFlag: 7,
         };

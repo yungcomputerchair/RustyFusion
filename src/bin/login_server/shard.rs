@@ -1,12 +1,14 @@
+use std::time::SystemTime;
+
 use super::*;
 
-use rusty_fusion::net::{ffclient::ClientType, packet::*};
+use rusty_fusion::{net::{ffclient::ClientType, packet::*}, util};
 
 pub fn connect(server: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
     let conn_id = state.get_next_shard_id();
     server.client_type = ClientType::ShardServer(conn_id);
     let resp = sP_LS2FE_REP_CONNECT_SUCC {
-        uiSvrTime: get_time(),
+        uiSvrTime: util::get_timestamp(SystemTime::now()),
         iConn_UID: conn_id,
     };
     server.send_packet(P_LS2FE_REP_CONNECT_SUCC, &resp)?;

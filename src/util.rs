@@ -37,9 +37,8 @@ pub fn encode_utf16<const SIZE: usize>(chars: &str) -> [u16; SIZE] {
     str_vec.try_into().unwrap()
 }
 
-pub fn get_time() -> u64 {
-    let now: SystemTime = SystemTime::now();
-    let diff: Duration = now.duration_since(UNIX_EPOCH).unwrap();
+pub fn get_timestamp(time: SystemTime) -> u64 {
+    let diff: Duration = time.duration_since(UNIX_EPOCH).unwrap();
     diff.as_millis() as u64
 }
 
