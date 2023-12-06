@@ -105,6 +105,24 @@ impl Item {
         self.expiry_time = Some(time);
     }
 
+    pub fn split_items(from: &mut Option<Item>, mut quantity: u16) -> Option<Item> {
+        if from.is_none() || quantity == 0 {
+            return None;
+        }
+
+        let from_stack = from.as_mut().unwrap();
+        quantity = min(quantity, from_stack.quantity);
+        from_stack.quantity -= quantity;
+
+        let mut result_stack = *from_stack;
+        result_stack.quantity = quantity;
+
+        if from_stack.quantity == 0 {
+            *from = None;
+        }
+        Some(result_stack)
+    }
+
     pub fn transfer_items(from: &mut Option<Item>, to: &mut Option<Item>) -> FFResult<()> {
         if from.is_none() {
             return Ok(());

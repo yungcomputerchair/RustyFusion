@@ -19,7 +19,7 @@ pub fn catch_fail<T>(
     result
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Severity {
     Debug,
     Info,
@@ -48,6 +48,7 @@ impl From<Severity> for usize {
     }
 }
 
+#[derive(Debug)]
 pub struct FFError {
     severity: Severity,
     msg: String,

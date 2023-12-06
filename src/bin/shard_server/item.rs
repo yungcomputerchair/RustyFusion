@@ -1,7 +1,6 @@
 use rusty_fusion::{
     enums::{ItemLocation, ItemType},
     error::{FFError, Severity},
-    placeholder,
     tabledata::tdata_get,
     Item,
 };
@@ -162,6 +161,7 @@ pub fn vendor_item_sell(client: &mut FFClient, state: &mut ShardServerState) -> 
     let pkt: sP_CL2FE_REQ_PC_VENDOR_ITEM_SELL = *client.get_packet(P_CL2FE_REQ_PC_VENDOR_ITEM_SELL);
     let pc_id = client.get_player_id()?;
     let player = state.get_player_mut(pc_id)?;
+
     let item = player
         .get_item(ItemLocation::Inven, pkt.iInvenSlotNum as usize)?
         .ok_or(FFError::build(
@@ -177,8 +177,19 @@ pub fn vendor_item_sell(client: &mut FFClient, state: &mut ShardServerState) -> 
         ));
     }
 
-    let sell_price = stats.sell_price;
-    let item = player.set_item(ItemLocation::Inven, pkt.iInvenSlotNum as usize, None)?;
+    let mut remaining_item =
+        player.set_item(ItemLocation::Inven, pkt.iInvenSlotNum as usize, None)?;
+    let quantity = pkt.iItemCnt as u16;
+    let item = Item::split_items(&mut remaining_item, quantity);
+    player
+        .set_item(
+            ItemLocation::Inven,
+            pkt.iInvenSlotNum as usize,
+            remaining_item,
+        )
+        .unwrap();
+
+    let sell_price = stats.sell_price * quantity as u32;
     let new_taros = player.set_taros(player.get_taros() + sell_price);
     let buyback_list = state.get_buyback_lists().entry(pc_id).or_default();
     buyback_list.push(item.unwrap());
@@ -187,7 +198,7 @@ pub fn vendor_item_sell(client: &mut FFClient, state: &mut ShardServerState) -> 
         iCandy: new_taros as i32,
         iInvenSlotNum: pkt.iInvenSlotNum,
         Item: item.into(),
-        ItemStay: placeholder!(None).into(),
+        ItemStay: remaining_item.into(),
     };
     client.send_packet(P_FE2CL_REP_PC_VENDOR_ITEM_SELL_SUCC, &resp)?;
     Ok(())
@@ -229,7 +240,7 @@ pub fn vendor_item_restore_buy(
     ))?;
 
     let item = buyback_list.remove(found_idx);
-    let cost = item.get_stats()?.sell_price; // sell price is cost for buyback
+    let cost = item.get_stats()?.sell_price * item.get_quantity() as u32; // sell price is cost for buyback
     let player = state.get_player_mut(pc_id)?;
 
     if player.get_taros() < cost {
