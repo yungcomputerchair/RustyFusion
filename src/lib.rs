@@ -85,6 +85,10 @@ impl Item {
         }
     }
 
+    pub fn get_id(&self) -> i16 {
+        self.id
+    }
+
     pub fn get_type(&self) -> ItemType {
         self.ty
     }
@@ -184,44 +188,18 @@ impl From<Option<Item>> for sItemBase {
 }
 
 pub struct ItemStats {
-    sell_price: u32,
-    sellable: bool,
-    tradeable: bool,
-    max_stack_size: u16,
-    required_level: i16,
-}
-impl ItemStats {
-    pub fn is_sellable(&self) -> bool {
-        self.sellable
-    }
-
-    pub fn get_sell_price(&self) -> u32 {
-        self.sell_price
-    }
-
-    pub fn is_tradeable(&self) -> bool {
-        self.tradeable
-    }
-
-    pub fn get_max_stack_size(&self) -> u16 {
-        self.max_stack_size
-    }
-
-    pub fn get_required_level(&self) -> i16 {
-        self.required_level
-    }
+    pub buy_price: u32,
+    pub sell_price: u32,
+    pub sellable: bool,
+    pub tradeable: bool,
+    pub max_stack_size: u16,
+    pub required_level: i16,
 }
 
 pub struct VendorItem {
     sort_number: i32,
-    ty: i16,
+    ty: ItemType,
     id: i16,
-    price: u32,
-}
-impl VendorItem {
-    pub fn get_price(&self) -> u32 {
-        self.price
-    }
 }
 
 pub struct VendorData {
@@ -240,14 +218,14 @@ impl VendorData {
         self.items.push(item);
     }
 
-    pub fn as_arr(&self) -> [sItemVendor; SIZEOF_VENDOR_TABLE_SLOT as usize] {
+    pub fn as_arr(&self) -> FFResult<[sItemVendor; SIZEOF_VENDOR_TABLE_SLOT as usize]> {
         let mut vendor_item_structs = Vec::new();
         for item in &self.items {
             vendor_item_structs.push(sItemVendor {
                 iVendorID: self.vendor_id,
-                fBuyCost: item.price as f32,
+                fBuyCost: tdata_get().get_item_stats(item.id, item.ty)?.buy_price as f32,
                 item: sItemBase {
-                    iType: item.ty,
+                    iType: item.ty as i16,
                     iID: item.id,
                     iOpt: 1,
                     iTimeLimit: 0,
@@ -264,20 +242,13 @@ impl VendorData {
                 iSortNum: 0,
             },
         );
-        vendor_item_structs.try_into().unwrap()
+        Ok(vendor_item_structs.try_into().unwrap())
     }
 
-    pub fn get_item(&self, item_id: i16, item_type: i16) -> FFResult<&VendorItem> {
+    pub fn has_item(&self, item_id: i16, item_type: ItemType) -> bool {
         self.items
             .iter()
-            .find(|&item| item.id == item_id && item.ty == item_type)
-            .ok_or(FFError::build(
-                error::Severity::Warning,
-                format!(
-                    "Vendor {} doesn't sell item ({}, {})",
-                    self.vendor_id, item_id, item_type
-                ),
-            ))
+            .any(|item| item_id == item.id && item_type == item.ty)
     }
 }
 

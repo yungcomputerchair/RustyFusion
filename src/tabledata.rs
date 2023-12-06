@@ -219,6 +219,7 @@ fn load_item_data(
                     })?;
                     let key = (data.m_iItemNumber as i16, item_type);
                     let data = ItemStats {
+                        buy_price: data.m_iItemPrice as u32,
                         sell_price: data.m_iItemSellPrice as u32,
                         sellable: data.m_iSellAble != 0,
                         tradeable: data.m_iTradeAble != 0,
@@ -284,9 +285,11 @@ fn load_vendor_data(
                 let key = vendor_data_entry.m_iNpcNumber;
                 let vendor_data_entry = VendorItem {
                     sort_number: vendor_data_entry.m_iSortNumber,
-                    ty: vendor_data_entry.m_iItemType,
+                    ty: vendor_data_entry
+                        .m_iItemType
+                        .try_into()
+                        .map_err(|e: FFError| e.get_msg().to_string())?,
                     id: vendor_data_entry.m_iitemID,
-                    price: vendor_data_entry.m_iSellCost as u32,
                 };
 
                 vendor_data

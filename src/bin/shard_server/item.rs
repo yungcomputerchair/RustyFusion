@@ -93,7 +93,7 @@ pub fn vendor_table_update(client: &mut FFClient) -> FFResult<()> {
         client.get_packet(P_CL2FE_REQ_PC_VENDOR_TABLE_UPDATE);
     let vendor_data = tdata_get().get_vendor_data(pkt.iVendorID)?;
     let resp = sP_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_SUCC {
-        item: vendor_data.as_arr(),
+        item: vendor_data.as_arr()?,
     };
     client.send_packet(P_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_SUCC, &resp)?;
     Ok(())
@@ -105,8 +105,6 @@ pub fn vendor_item_buy(
     time: SystemTime,
 ) -> FFResult<()> {
     let pkt: sP_CL2FE_REQ_PC_VENDOR_ITEM_BUY = *client.get_packet(P_CL2FE_REQ_PC_VENDOR_ITEM_BUY);
-    let vendor_data = tdata_get().get_vendor_data(pkt.iVendorID)?;
-    let vendor_item = vendor_data.get_item(pkt.Item.iID, pkt.Item.iType)?;
 
     // sanitize the item
     let item: Option<Item> = pkt.Item.try_into()?;
@@ -121,7 +119,21 @@ pub fn vendor_item_buy(
         item.set_expiry_time(expires);
     }
 
-    let price = vendor_item.get_price() * item.get_quantity() as u32;
+    let vendor_data = tdata_get().get_vendor_data(pkt.iVendorID)?;
+    if !vendor_data.has_item(item.get_id(), item.get_type()) {
+        return Err(FFError::build(
+            Severity::Warning,
+            format!(
+                "Vendor {} doesn't sell item ({}, {:?})",
+                pkt.iVendorID,
+                item.get_id(),
+                item.get_type()
+            ),
+        ));
+    }
+
+    let stats = item.get_stats()?;
+    let price = stats.buy_price * item.get_quantity() as u32;
     let player = state.get_player_mut(client.get_player_id()?)?;
     if player.get_taros() < price {
         Err(FFError::build(
@@ -158,14 +170,14 @@ pub fn vendor_item_sell(client: &mut FFClient, state: &mut ShardServerState) -> 
         ))?;
     let stats = item.get_stats()?;
 
-    if !stats.is_sellable() {
+    if !stats.sellable {
         return Err(FFError::build(
             Severity::Warning,
             format!("Item not sellable: {:?}", item),
         ));
     }
 
-    let sell_price = stats.get_sell_price();
+    let sell_price = stats.sell_price;
     let item = player.set_item(ItemLocation::Inven, pkt.iInvenSlotNum as usize, None)?;
     let new_taros = player.set_taros(player.get_taros() + sell_price);
     let buyback_list = state.get_buyback_lists().entry(pc_id).or_default();
@@ -217,7 +229,7 @@ pub fn vendor_item_restore_buy(
     ))?;
 
     let item = buyback_list.remove(found_idx);
-    let cost = item.get_stats()?.get_sell_price(); // sell price is cost for buyback
+    let cost = item.get_stats()?.sell_price; // sell price is cost for buyback
     let player = state.get_player_mut(pc_id)?;
 
     if player.get_taros() < cost {
