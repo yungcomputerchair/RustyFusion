@@ -15,8 +15,10 @@ pub fn gm_pc_set_value(client: &mut FFClient, state: &mut ShardServerState) -> F
 
     let value = match value_type as u32 {
         defines::CN_GM_SET_VALUE_TYPE__HP => player.set_hp(value),
-        defines::CN_GM_SET_VALUE_TYPE__WEAPON_BATTERY => player.set_weapon_boosts(value),
-        defines::CN_GM_SET_VALUE_TYPE__NANO_BATTERY => player.set_nano_potions(value),
+        defines::CN_GM_SET_VALUE_TYPE__WEAPON_BATTERY => {
+            player.set_weapon_boosts(value as u32) as i32
+        }
+        defines::CN_GM_SET_VALUE_TYPE__NANO_BATTERY => player.set_nano_potions(value as u32) as i32,
         defines::CN_GM_SET_VALUE_TYPE__FUSION_MATTER => player.set_fusion_matter(value),
         defines::CN_GM_SET_VALUE_TYPE__CANDY => player.set_taros(value as u32) as i32,
         defines::CN_GM_SET_VALUE_TYPE__SPEED => placeholder!(value),

@@ -143,8 +143,8 @@ pub struct Player {
     inventory: PlayerInventory,
     taros: u32,
     fusion_matter: i32,
-    nano_potions: i32,
-    weapon_boosts: i32,
+    nano_potions: u32,
+    weapon_boosts: u32,
     buddy_warp_time: i32,
 }
 impl Player {
@@ -241,8 +241,8 @@ impl Player {
             iMentor: self.guide_data.current_guide,
             iMentorCount: self.guide_data.total_guides,
             iHP: self.combat_stats.hp,
-            iBatteryW: self.weapon_boosts,
-            iBatteryN: self.nano_potions,
+            iBatteryW: self.weapon_boosts as i32,
+            iBatteryN: self.nano_potions as i32,
             iCandy: self.taros as i32,
             iFusionMatter: self.fusion_matter,
             iSpecialState: self.special_state,
@@ -453,13 +453,21 @@ impl Player {
         self.fusion_matter
     }
 
-    pub fn set_weapon_boosts(&mut self, weapon_boosts: i32) -> i32 {
-        self.weapon_boosts = clamp(weapon_boosts, 0, PC_BATTERY_MAX as i32);
+    pub fn get_weapon_boosts(&self) -> u32 {
         self.weapon_boosts
     }
 
-    pub fn set_nano_potions(&mut self, nano_potions: i32) -> i32 {
-        self.nano_potions = clamp(nano_potions, 0, PC_BATTERY_MAX as i32);
+    pub fn get_nano_potions(&self) -> u32 {
+        self.nano_potions
+    }
+
+    pub fn set_weapon_boosts(&mut self, weapon_boosts: u32) -> u32 {
+        self.weapon_boosts = clamp(weapon_boosts, 0, PC_BATTERY_MAX);
+        self.weapon_boosts
+    }
+
+    pub fn set_nano_potions(&mut self, nano_potions: u32) -> u32 {
+        self.nano_potions = clamp(nano_potions, 0, PC_BATTERY_MAX);
         self.nano_potions
     }
 

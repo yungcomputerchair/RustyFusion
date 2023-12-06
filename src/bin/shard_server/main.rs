@@ -169,6 +169,7 @@ fn handle_packet(
         P_CL2FE_REQ_PC_VENDOR_ITEM_RESTORE_BUY => {
             item::vendor_item_restore_buy(clients.get_self(), state)
         }
+        P_CL2FE_REQ_PC_VENDOR_BATTERY_BUY => item::vendor_battery_buy(clients.get_self(), state),
         //
         P_CL2FE_REP_LIVE_CHECK => Ok(()),
         //

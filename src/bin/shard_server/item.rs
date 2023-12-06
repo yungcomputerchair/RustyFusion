@@ -1,4 +1,7 @@
+use std::cmp::min;
+
 use rusty_fusion::{
+    defines::PC_BATTERY_MAX,
     enums::{ItemLocation, ItemType},
     error::{catch_fail, FFError, Severity},
     tabledata::tdata_get,
@@ -298,6 +301,79 @@ pub fn vendor_item_restore_buy(
                 iErrorCode: unused!(),
             };
             client.send_packet(P_FE2CL_REP_PC_VENDOR_ITEM_RESTORE_BUY_FAIL, &resp)
+        },
+    )
+}
+
+pub fn vendor_battery_buy(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+    const BATTERY_TYPE_BOOST: i16 = 3;
+    const BATTERY_TYPE_POTION: i16 = 4;
+
+    catch_fail(
+        (|| {
+            let pkt: &sP_CL2FE_REQ_PC_VENDOR_BATTERY_BUY =
+                client.get_packet(P_CL2FE_REQ_PC_VENDOR_BATTERY_BUY);
+            let battery_type = pkt.Item.iID;
+            let mut quantity = pkt.Item.iOpt as u32 * 100;
+
+            let player = state.get_player_mut(client.get_player_id()?)?;
+            match battery_type {
+                BATTERY_TYPE_BOOST => {
+                    quantity = min(player.get_weapon_boosts() + quantity, PC_BATTERY_MAX)
+                        - player.get_weapon_boosts();
+                }
+                BATTERY_TYPE_POTION => {
+                    quantity = min(player.get_nano_potions() + quantity, PC_BATTERY_MAX)
+                        - player.get_nano_potions();
+                }
+                other => {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!("Bad battery type: {}", other),
+                    ));
+                }
+            }
+
+            let cost = quantity;
+            if player.get_taros() < cost {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!(
+                        "Not enough taros to buyback item ({} < {})",
+                        player.get_taros(),
+                        cost
+                    ),
+                ));
+            }
+
+            match battery_type {
+                BATTERY_TYPE_BOOST => {
+                    player.set_weapon_boosts(player.get_weapon_boosts() + quantity);
+                }
+                BATTERY_TYPE_POTION => {
+                    player.set_nano_potions(player.get_nano_potions() + quantity);
+                }
+                other => {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!("Bad battery type: {}", other),
+                    ));
+                }
+            }
+            let taros_new = player.set_taros(player.get_taros() - cost);
+
+            let resp = sP_FE2CL_REP_PC_VENDOR_BATTERY_BUY_SUCC {
+                iCandy: taros_new as i32,
+                iBatteryW: player.get_weapon_boosts() as i32,
+                iBatteryN: player.get_nano_potions() as i32,
+            };
+            client.send_packet(P_FE2CL_REP_PC_VENDOR_BATTERY_BUY_SUCC, &resp)
+        })(),
+        || {
+            let resp = sP_FE2CL_REP_PC_VENDOR_BATTERY_BUY_FAIL {
+                iErrorCode: unused!(),
+            };
+            client.send_packet(P_FE2CL_REP_PC_VENDOR_BATTERY_BUY_FAIL, &resp)
         },
     )
 }
