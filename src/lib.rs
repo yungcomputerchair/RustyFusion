@@ -212,6 +212,7 @@ pub struct ItemStats {
     pub tradeable: bool,
     pub max_stack_size: u16,
     pub required_level: i16,
+    pub rarity: Option<usize>,
 }
 
 pub struct VendorItem {
@@ -268,6 +269,13 @@ impl VendorData {
             .iter()
             .any(|item| item_id == item.id && item_type == item.ty)
     }
+}
+
+pub struct CrocPotOdds {
+    base_chance: f32,
+    rarity_diff_multipliers: [f32; 4],
+    price_multiplier_looks: u32,
+    price_multiplier_stats: u32,
 }
 
 #[derive(Debug, Copy, Clone, Default)]

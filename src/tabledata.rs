@@ -9,7 +9,7 @@ use crate::{
     enums::ItemType,
     error::{log, FFError, FFResult, Severity},
     npc::NPC,
-    ItemStats, VendorData, VendorItem,
+    CrocPotOdds, ItemStats, VendorData, VendorItem,
 };
 
 static TABLE_DATA: OnceLock<TableData> = OnceLock::new();
@@ -17,6 +17,7 @@ static TABLE_DATA: OnceLock<TableData> = OnceLock::new();
 struct XDTData {
     vendor_data: HashMap<i32, VendorData>,
     item_data: HashMap<(i16, ItemType), ItemStats>,
+    crocpot_data: HashMap<i16, CrocPotOdds>,
 }
 impl XDTData {
     fn load() -> Result<Self, String> {
@@ -25,6 +26,7 @@ impl XDTData {
             Ok(Self {
                 vendor_data: load_vendor_data(&root)?,
                 item_data: load_item_data(&root)?,
+                crocpot_data: load_crocpot_data(&root)?,
             })
         } else {
             Err(format!("Bad XDT tabledata (root): {}", raw))
@@ -82,6 +84,16 @@ impl TableData {
             .ok_or(FFError::build(
                 Severity::Warning,
                 format!("Vendor with ID {} doesn't exist", vendor_id),
+            ))
+    }
+
+    pub fn get_crocpot_data(&self, level_gap: i16) -> FFResult<&CrocPotOdds> {
+        self.xdt_data
+            .crocpot_data
+            .get(&level_gap)
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("CrocPotOdds for level gap {} don't exist", level_gap),
             ))
     }
 
@@ -225,6 +237,7 @@ fn load_item_data(
                         tradeable: data.m_iTradeAble != 0,
                         max_stack_size: data.m_iStackNumber as u16,
                         required_level: data.m_iMinReqLev.unwrap_or(0) as i16,
+                        rarity: data.m_iRarity.map(|v| v as usize),
                     };
                     map.insert(key, data);
                 }
@@ -306,6 +319,65 @@ fn load_vendor_data(
         }
     } else {
         Err(format!("Object missing: {}", VENDOR_TABLE_KEY))
+    }
+}
+
+fn load_crocpot_data(
+    root: &Map<std::string::String, Value>,
+) -> Result<HashMap<i16, CrocPotOdds>, String> {
+    const CROCPOT_TABLE_KEY: &str = "m_pCombiningTable";
+    const CROCPOT_TABLE_CROCPOT_DATA_KEY: &str = "m_pCombiningData";
+
+    #[derive(Deserialize)]
+    struct CrocPotDataEntry {
+        m_iLevelGap: i32,
+        m_fSameGrade: f32,
+        m_fOneGrade: f32,
+        m_fTwoGrade: f32,
+        m_fThreeGrade: f32,
+        m_fLevelGapStandard: f32,
+        m_iLookConstant: i32,
+        m_iStatConstant: i32,
+    }
+
+    let crocpot_table = root
+        .get(CROCPOT_TABLE_KEY)
+        .ok_or(format!("Key missing: {}", CROCPOT_TABLE_KEY))?;
+    if let Value::Object(crocpot_table) = crocpot_table {
+        let crocpot_data = crocpot_table
+            .get(CROCPOT_TABLE_CROCPOT_DATA_KEY)
+            .ok_or(format!(
+                "Key missing: {}.{}",
+                CROCPOT_TABLE_KEY, CROCPOT_TABLE_CROCPOT_DATA_KEY
+            ))?;
+        if let Value::Array(crocpot_data) = crocpot_data {
+            let mut crocpot_table = HashMap::new();
+            for v in crocpot_data {
+                let crocpot_data_entry: CrocPotDataEntry = serde_json::from_value(v.clone())
+                    .map_err(|e| format!("Malformed crocpot data entry: {} {}", e, v))?;
+                let key = crocpot_data_entry.m_iLevelGap as i16;
+                let crocpot_odds = CrocPotOdds {
+                    base_chance: crocpot_data_entry.m_fLevelGapStandard,
+                    rarity_diff_multipliers: [
+                        crocpot_data_entry.m_fSameGrade,
+                        crocpot_data_entry.m_fOneGrade,
+                        crocpot_data_entry.m_fTwoGrade,
+                        crocpot_data_entry.m_fThreeGrade,
+                    ],
+                    price_multiplier_looks: crocpot_data_entry.m_iLookConstant as u32,
+                    price_multiplier_stats: crocpot_data_entry.m_iStatConstant as u32,
+                };
+                crocpot_table.insert(key, crocpot_odds);
+            }
+            Ok(crocpot_table)
+        } else {
+            Err(format!(
+                "Array missing: {}.{}",
+                CROCPOT_TABLE_KEY, CROCPOT_TABLE_CROCPOT_DATA_KEY
+            ))
+        }
+    } else {
+        Err(format!("Object missing: {}", CROCPOT_TABLE_KEY))
     }
 }
 
