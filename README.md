@@ -22,7 +22,7 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO FusionFa
 - [ ] Items
   - [x] Framework (equipping, stacking, deleting, etc)
   - [x] Vendors (buying, selling, buy-backs)
-  - [ ] Croc-Potting
+  - [x] Croc-Potting
   - [ ] Trading
   - [ ] C.R.A.T.E.s
 - [ ] Social features

@@ -105,6 +105,10 @@ impl Item {
         self.expiry_time = Some(time);
     }
 
+    pub fn set_appearance(&mut self, looks_item: &Item) {
+        self.appearance_id = Some(looks_item.id);
+    }
+
     pub fn split_items(from: &mut Option<Item>, mut quantity: u16) -> Option<Item> {
         if from.is_none() || quantity == 0 {
             return None;
@@ -212,7 +216,7 @@ pub struct ItemStats {
     pub tradeable: bool,
     pub max_stack_size: u16,
     pub required_level: i16,
-    pub rarity: Option<usize>,
+    pub rarity: Option<i8>,
 }
 
 pub struct VendorItem {
@@ -271,11 +275,11 @@ impl VendorData {
     }
 }
 
-pub struct CrocPotOdds {
-    base_chance: f32,
-    rarity_diff_multipliers: [f32; 4],
-    price_multiplier_looks: u32,
-    price_multiplier_stats: u32,
+pub struct CrocPotData {
+    pub base_chance: f32,
+    pub rarity_diff_multipliers: [f32; 4],
+    pub price_multiplier_looks: u32,
+    pub price_multiplier_stats: u32,
 }
 
 #[derive(Debug, Copy, Clone, Default)]

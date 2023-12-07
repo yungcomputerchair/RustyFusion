@@ -9,7 +9,7 @@ use crate::{
     enums::ItemType,
     error::{log, FFError, FFResult, Severity},
     npc::NPC,
-    CrocPotOdds, ItemStats, VendorData, VendorItem,
+    CrocPotData, ItemStats, VendorData, VendorItem,
 };
 
 static TABLE_DATA: OnceLock<TableData> = OnceLock::new();
@@ -17,7 +17,7 @@ static TABLE_DATA: OnceLock<TableData> = OnceLock::new();
 struct XDTData {
     vendor_data: HashMap<i32, VendorData>,
     item_data: HashMap<(i16, ItemType), ItemStats>,
-    crocpot_data: HashMap<i16, CrocPotOdds>,
+    crocpot_data: HashMap<i16, CrocPotData>,
 }
 impl XDTData {
     fn load() -> Result<Self, String> {
@@ -87,7 +87,7 @@ impl TableData {
             ))
     }
 
-    pub fn get_crocpot_data(&self, level_gap: i16) -> FFResult<&CrocPotOdds> {
+    pub fn get_crocpot_data(&self, level_gap: i16) -> FFResult<&CrocPotData> {
         self.xdt_data
             .crocpot_data
             .get(&level_gap)
@@ -237,7 +237,7 @@ fn load_item_data(
                         tradeable: data.m_iTradeAble != 0,
                         max_stack_size: data.m_iStackNumber as u16,
                         required_level: data.m_iMinReqLev.unwrap_or(0) as i16,
-                        rarity: data.m_iRarity.map(|v| v as usize),
+                        rarity: data.m_iRarity.map(|v| v as i8),
                     };
                     map.insert(key, data);
                 }
@@ -324,7 +324,7 @@ fn load_vendor_data(
 
 fn load_crocpot_data(
     root: &Map<std::string::String, Value>,
-) -> Result<HashMap<i16, CrocPotOdds>, String> {
+) -> Result<HashMap<i16, CrocPotData>, String> {
     const CROCPOT_TABLE_KEY: &str = "m_pCombiningTable";
     const CROCPOT_TABLE_CROCPOT_DATA_KEY: &str = "m_pCombiningData";
 
@@ -356,13 +356,13 @@ fn load_crocpot_data(
                 let crocpot_data_entry: CrocPotDataEntry = serde_json::from_value(v.clone())
                     .map_err(|e| format!("Malformed crocpot data entry: {} {}", e, v))?;
                 let key = crocpot_data_entry.m_iLevelGap as i16;
-                let crocpot_odds = CrocPotOdds {
-                    base_chance: crocpot_data_entry.m_fLevelGapStandard,
+                let crocpot_odds = CrocPotData {
+                    base_chance: crocpot_data_entry.m_fLevelGapStandard / 100.0,
                     rarity_diff_multipliers: [
-                        crocpot_data_entry.m_fSameGrade,
-                        crocpot_data_entry.m_fOneGrade,
-                        crocpot_data_entry.m_fTwoGrade,
-                        crocpot_data_entry.m_fThreeGrade,
+                        crocpot_data_entry.m_fSameGrade / 100.0,
+                        crocpot_data_entry.m_fOneGrade / 100.0,
+                        crocpot_data_entry.m_fTwoGrade / 100.0,
+                        crocpot_data_entry.m_fThreeGrade / 100.0,
                     ],
                     price_multiplier_looks: crocpot_data_entry.m_iLookConstant as u32,
                     price_multiplier_stats: crocpot_data_entry.m_iStatConstant as u32,

@@ -1,5 +1,6 @@
 use std::cmp::min;
 
+use rand::random;
 use rusty_fusion::{
     defines::PC_BATTERY_MAX,
     enums::{ItemLocation, ItemType},
@@ -77,6 +78,130 @@ pub fn item_delete(client: &mut FFClient, state: &mut ShardServerState) -> FFRes
         iSlotNum: pkt.iSlotNum,
     };
     client.send_packet(P_FE2CL_REP_PC_ITEM_DELETE_SUCC, &resp)
+}
+
+pub fn item_combination(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+    let pkt: sP_CL2FE_REQ_PC_ITEM_COMBINATION = *client.get_packet(P_CL2FE_REQ_PC_ITEM_COMBINATION);
+    catch_fail(
+        (|| {
+            let player = state.get_player_mut(client.get_player_id()?)?;
+
+            let looks_item = player
+                .get_item(ItemLocation::Inven, pkt.iCostumeItemSlot as usize)?
+                .as_ref()
+                .ok_or(FFError::build(
+                    Severity::Warning,
+                    format!("Costume item (slot {}) empty", pkt.iCostumeItemSlot),
+                ))?;
+            let looks_item_stats = looks_item.get_stats()?;
+            let looks_item_rarity = looks_item_stats.rarity.ok_or(FFError::build(
+                Severity::Warning,
+                format!("Costume item has no rarity: {:?}", looks_item),
+            ))?;
+
+            let stats_item = player
+                .get_item(ItemLocation::Inven, pkt.iStatItemSlot as usize)?
+                .as_ref()
+                .ok_or(FFError::build(
+                    Severity::Warning,
+                    format!("Stats item (slot {}) empty", pkt.iStatItemSlot),
+                ))?;
+            let stats_item_stats = stats_item.get_stats()?;
+            let stats_item_rarity = stats_item_stats.rarity.ok_or(FFError::build(
+                Severity::Warning,
+                format!("Stats item has no rarity: {:?}", stats_item),
+            ))?;
+
+            let level_gap =
+                (looks_item_stats.required_level - stats_item_stats.required_level).abs();
+            let rarity_gap = (looks_item_rarity - stats_item_rarity).unsigned_abs();
+            if rarity_gap > 3 {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!("Rarity gap {} larger than 3", rarity_gap),
+                ));
+            }
+
+            let crocpot_data = tdata_get().get_crocpot_data(level_gap)?;
+            let cost = (looks_item_stats.buy_price * crocpot_data.price_multiplier_looks)
+                + (stats_item_stats.buy_price * crocpot_data.price_multiplier_stats);
+            if player.get_taros() < cost {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!(
+                        "Not enough taros to perform combination ({} < {})",
+                        player.get_taros(),
+                        cost
+                    ),
+                ));
+            }
+            let taros_left = player.set_taros(player.get_taros() - cost);
+
+            let looks_item = player
+                .set_item(ItemLocation::Inven, pkt.iCostumeItemSlot as usize, None)
+                .unwrap()
+                .unwrap();
+            let mut stats_item = player
+                .set_item(ItemLocation::Inven, pkt.iStatItemSlot as usize, None)
+                .unwrap()
+                .unwrap();
+
+            let success_chance = crocpot_data.base_chance
+                * crocpot_data.rarity_diff_multipliers[rarity_gap as usize];
+            let roll: f32 = random();
+            let succeeded = roll < success_chance;
+            if succeeded {
+                // set the appearance of the stats item
+                stats_item.set_appearance(&looks_item);
+
+                // put it back (where the looks item came from, since that's what the client expects)
+                player
+                    .set_item(
+                        ItemLocation::Inven,
+                        pkt.iCostumeItemSlot as usize,
+                        Some(stats_item),
+                    )
+                    .unwrap();
+            } else {
+                // put the items back
+                player
+                    .set_item(
+                        ItemLocation::Inven,
+                        pkt.iCostumeItemSlot as usize,
+                        Some(looks_item),
+                    )
+                    .unwrap();
+                player
+                    .set_item(
+                        ItemLocation::Inven,
+                        pkt.iStatItemSlot as usize,
+                        Some(stats_item),
+                    )
+                    .unwrap();
+            }
+
+            let resp = sP_FE2CL_REP_PC_ITEM_COMBINATION_SUCC {
+                iNewItemSlot: pkt.iCostumeItemSlot,
+                sNewItem: Some(stats_item).into(),
+                iStatItemSlot: pkt.iStatItemSlot,
+                iCashItemSlot1: pkt.iCashItemSlot1,
+                iCashItemSlot2: pkt.iCashItemSlot2,
+                iCandy: taros_left as i32,
+                iSuccessFlag: if succeeded { 1 } else { 0 },
+            };
+            client.send_packet(P_FE2CL_REP_PC_ITEM_COMBINATION_SUCC, &resp)
+        })(),
+        || {
+            let resp = sP_FE2CL_REP_PC_ITEM_COMBINATION_FAIL {
+                iErrorCode: unused!(),
+                iCostumeItemSlot: pkt.iCostumeItemSlot,
+                iStatItemSlot: pkt.iStatItemSlot,
+                iCashItemSlot1: pkt.iCashItemSlot1,
+                iCashItemSlot2: pkt.iCashItemSlot2,
+            };
+            client.send_packet(P_FE2CL_REP_PC_ITEM_COMBINATION_FAIL, &resp)
+        },
+    )
 }
 
 pub fn vendor_start(client: &mut FFClient) -> FFResult<()> {
