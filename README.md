@@ -1,9 +1,9 @@
 # RustyFusion
-RustyFusion is an open-source server emulator for Cartoon Network's MMO FusionFall written in Rust. Inspired by the [OpenFusion project](https://github.com/OpenFusionProject) in which I am an active contributor. RustyFusion was initially just an experiment for me to gain experience writing Rust but is now on a trajectory toward eventual feature-completion. **Please note that, until then, RustyFusion is NOT ready for use as a production FusionFall server!**
+RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfall written in Rust inspired by the [OpenFusion project](https://github.com/OpenFusionProject) in which I am an active contributor. RustyFusion was initially an experiment for me to gain experience writing Rust but is now on course for eventual feature-completion. **Please note that, until then, RustyFusion is NOT ready for use as a production Fusionfall server!**
 
 ## RustyFusion vs. OpenFusion
-- **Compatibility:** RustyFusion is designed to work with general-purpose FusionFall clients, as it speaks the original FusionFall network protocol. This means that [OpenFusionClient](https://github.com/OpenFusionProject/OpenFusionClient) can connect to a RustyFusion server with no extra work. RustyFusion also uses the same tabledata repository as OpenFusion for data sourcing, and it will later be compatible with the OpenFusion monitor protocol and database schema once database support is added.
-- **Safety:** Because RustyFusion is written in Rust as opposed to OpenFusion's choice of C++, it is, in theory, **much less** prone to memory safety issues, security vulnerabilities, and undefined behavior than OpenFusion's implementation of the game with near-zero decrease in performance.
+- **Compatibility:** RustyFusion is designed to work with general-purpose Fusionfall clients, as it speaks the original Fusionfall network protocol. This means that [OpenFusionClient](https://github.com/OpenFusionProject/OpenFusionClient) can connect to a RustyFusion server with no extra work. RustyFusion also uses the same tabledata repository as OpenFusion for data sourcing, and it will later be compatible with the OpenFusion monitor protocol and database schema once database support is added.
+- **Safety:** Because RustyFusion is written in Rust as opposed to OpenFusion's choice of C++, it is, in theory, **much less** prone to memory safety issues, security vulnerabilities, and undefined behavior than OpenFusion's implementation of the game with a near-zero decrease in performance.
 - **Scalability:** Unlike OpenFusion, RustyFusion's login server and shard server are **two separate binaries** that communicate to each other over the network, allowing for a more flexible server architecture with multiple shard servers.
 - **Reliability:** RustyFusion comes after years of writing, refactoring, and evaluating OpenFusion code. There were a handful of cut corners and bad design decisions made in the development of OF that this project aims to avoid. Some already implemented examples include the increased usage of high-level types, a proper logging system, and strict error-handling. These changes should lead to a cleaner codebase with less bugs.
 
@@ -24,7 +24,8 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO FusionFa
   - [x] Vendors (buying, selling, buy-backs)
   - [x] Croc-Potting
   - [ ] Trading
-  - [ ] C.R.A.T.E.s
+  - [x] C.R.A.T.E.s
+  - [ ] Gumballs + other usables
 - [ ] Social features
   - [x] Basic chat
   - [ ] Friends
@@ -35,9 +36,10 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO FusionFa
   - [ ] Mobs
   - [ ] Core combat loop + mob AI
   - [ ] Abilities and (de)buffs
-- [ ] E.G.G.s
+- [ ] E.G.G.s (the ones on the ground that buff you)
 - [ ] Missions
 - [ ] Entity pathing
+- [ ] Infected Zone races
 - [ ] Admin features
   - [ ] Custom command system
   - [ ] OpenFusion monitor protocol
