@@ -127,6 +127,7 @@ mod gm;
 mod item;
 mod login;
 mod pc;
+mod trade;
 fn handle_packet(
     key: usize,
     clients: &mut HashMap<usize, FFClient>,
@@ -172,6 +173,8 @@ fn handle_packet(
             item::vendor_item_restore_buy(clients.get_self(), state)
         }
         P_CL2FE_REQ_PC_VENDOR_BATTERY_BUY => item::vendor_battery_buy(clients.get_self(), state),
+        //
+        P_CL2FE_REQ_PC_TRADE_OFFER => trade::trade_offer(&mut clients, state),
         //
         P_CL2FE_REP_LIVE_CHECK => Ok(()),
         //

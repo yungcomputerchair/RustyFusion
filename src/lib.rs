@@ -350,7 +350,8 @@ pub trait Entity {
 
     fn cleanup(&mut self, state: &mut ShardServerState);
 
-    fn as_any(&mut self) -> &mut dyn Any;
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
 #[derive(Debug, Copy, Clone, Default)]

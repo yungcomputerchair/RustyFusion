@@ -7,7 +7,11 @@ use self::{
         PacketID::{self, *},
     },
 };
-use crate::{error::FFResult, player::Player, state::ServerState};
+use crate::{
+    error::{FFError, FFResult, Severity},
+    player::Player,
+    state::ServerState,
+};
 
 pub const CONN_ID_DISCONNECTED: i64 = -1;
 const PACKET_BUFFER_SIZE: usize = 4096 * 3;
@@ -75,5 +79,12 @@ impl<'a> ClientMap<'a> {
         self.clients
             .values_mut()
             .filter(|c| matches!(c.client_type, ClientType::GameClient { .. }))
+    }
+
+    pub fn get_from_player_id(&mut self, pc_id: i32) -> FFResult<&mut FFClient> {
+        self.clients
+            .values_mut()
+            .find(|c| matches!(c.client_type, ClientType::GameClient { pc_id: Some(pid), .. } if pid == pc_id))
+            .ok_or(FFError::build(Severity::Warning, format!("Couldn't find player with ID {}", pc_id)))
     }
 }

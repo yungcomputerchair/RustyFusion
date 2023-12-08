@@ -92,7 +92,11 @@ impl Entity for NPC {
 
     fn cleanup(&mut self, _state: &mut ShardServerState) {}
 
-    fn as_any(&mut self) -> &mut dyn std::any::Any {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
 }

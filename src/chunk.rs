@@ -60,19 +60,37 @@ impl EntityMap {
         }
     }
 
-    pub fn get_player(&mut self, pc_id: i32) -> Option<&mut Player> {
+    pub fn get_player(&self, pc_id: i32) -> Option<&Player> {
+        let id = EntityID::Player(pc_id);
+        self.registry.get(&id).and_then(|entry| {
+            let entity_ref = entry.entity.as_ref().as_any();
+            let player_ref = entity_ref.downcast_ref();
+            player_ref
+        })
+    }
+
+    pub fn get_player_mut(&mut self, pc_id: i32) -> Option<&mut Player> {
         let id = EntityID::Player(pc_id);
         self.registry.get_mut(&id).and_then(|entry| {
-            let entity_ref = entry.entity.as_mut().as_any();
+            let entity_ref = entry.entity.as_mut().as_any_mut();
             let player_ref = entity_ref.downcast_mut();
             player_ref
         })
     }
 
-    pub fn get_npc(&mut self, npc_id: i32) -> Option<&mut NPC> {
+    pub fn get_npc(&self, npc_id: i32) -> Option<&NPC> {
+        let id = EntityID::NPC(npc_id);
+        self.registry.get(&id).and_then(|entry| {
+            let entity_ref = entry.entity.as_ref().as_any();
+            let npc_ref = entity_ref.downcast_ref();
+            npc_ref
+        })
+    }
+
+    pub fn get_npc_mut(&mut self, npc_id: i32) -> Option<&mut NPC> {
         let id = EntityID::NPC(npc_id);
         self.registry.get_mut(&id).and_then(|entry| {
-            let entity_ref = entry.entity.as_mut().as_any();
+            let entity_ref = entry.entity.as_mut().as_any_mut();
             let npc_ref = entity_ref.downcast_mut();
             npc_ref
         })

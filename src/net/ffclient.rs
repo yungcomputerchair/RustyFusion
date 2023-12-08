@@ -75,7 +75,7 @@ impl FFClient {
         u64::from_le_bytes(self.fe_key)
     }
 
-    pub fn get_player_id(&mut self) -> FFResult<i32> {
+    pub fn get_player_id(&self) -> FFResult<i32> {
         if let ClientType::GameClient {
             pc_id: Some(pc_id), ..
         } = self.client_type

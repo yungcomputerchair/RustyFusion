@@ -145,6 +145,7 @@ pub struct Player {
     nano_potions: u32,
     weapon_boosts: u32,
     buddy_warp_time: i32,
+    trading_with: Option<i32>,
 }
 impl Player {
     pub fn new(uid: i64) -> Self {
@@ -176,6 +177,10 @@ impl Player {
 
     pub fn set_client_id(&mut self, client_id: usize) {
         self.client_id = Some(client_id);
+    }
+
+    pub fn get_trading_with(&self) -> Option<i32> {
+        self.trading_with
     }
 
     pub fn get_style(&self) -> sPCStyle {
@@ -553,7 +558,11 @@ impl Entity for Player {
         }
     }
 
-    fn as_any(&mut self) -> &mut dyn Any {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
 }

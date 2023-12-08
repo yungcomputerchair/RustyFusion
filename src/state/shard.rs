@@ -62,8 +62,15 @@ impl ShardServerState {
         self.login_server_conn_id = conn_id;
     }
 
-    pub fn get_player_mut(&mut self, pc_id: i32) -> FFResult<&mut Player> {
+    pub fn get_player(&self, pc_id: i32) -> FFResult<&Player> {
         self.entity_map.get_player(pc_id).ok_or(FFError::build(
+            Severity::Warning,
+            format!("Player with ID {} doesn't exist", pc_id),
+        ))
+    }
+
+    pub fn get_player_mut(&mut self, pc_id: i32) -> FFResult<&mut Player> {
+        self.entity_map.get_player_mut(pc_id).ok_or(FFError::build(
             Severity::Warning,
             format!("Player with ID {} doesn't exist", pc_id),
         ))
