@@ -34,14 +34,14 @@ fn byte_swap(er_size: usize, buf: &mut [u8], size: usize) -> usize {
     num + num2
 }
 
-pub fn decrypt_packet(buf: &mut [u8], key: &[u8]) {
+pub fn decrypt_payload(buf: &mut [u8], key: &[u8]) {
     debug_assert!(key.len() == CRYPTO_KEY_SIZE);
     let er_size: usize = buf.len() % (CRYPTO_KEY_SIZE / 2 + 1) * 2 + CRYPTO_KEY_SIZE;
     let xor_size: usize = byte_swap(er_size, buf, buf.len());
     xor(buf, key, xor_size);
 }
 
-pub fn encrypt_packet(buf: &mut [u8], key: &[u8]) {
+pub fn encrypt_payload(buf: &mut [u8], key: &[u8]) {
     debug_assert!(key.len() == CRYPTO_KEY_SIZE);
     let er_size: usize = buf.len() % (CRYPTO_KEY_SIZE / 2 + 1) * 2 + CRYPTO_KEY_SIZE;
     xor(buf, key, buf.len());
@@ -66,7 +66,7 @@ mod tests {
     use crate::net::struct_to_bytes;
     use crate::util;
 
-    use super::{decrypt_packet, encrypt_packet, CRYPTO_KEY_SIZE};
+    use super::{decrypt_payload, encrypt_payload, CRYPTO_KEY_SIZE};
 
     #[test]
     fn test_enc_dec() {
@@ -83,9 +83,9 @@ mod tests {
         let mut buf: Vec<u8> = bytes.to_vec();
 
         let key: [u8; CRYPTO_KEY_SIZE] = 4382366871217075016_u64.to_le_bytes();
-        encrypt_packet(&mut buf, &key);
+        encrypt_payload(&mut buf, &key);
         assert_ne!(buf.as_slice(), bytes);
-        decrypt_packet(&mut buf, &key);
+        decrypt_payload(&mut buf, &key);
         assert_eq!(buf.as_slice(), bytes);
 
         let pkt_dec: sP_LS2CL_REP_LOGIN_SUCC = unsafe { *bytes_to_struct(&buf) };
