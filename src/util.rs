@@ -87,3 +87,16 @@ pub fn slot_num_to_loc_and_slot_num(mut slot_num: usize) -> FFResult<(ItemLocati
         format!("Bad slot number: {slot_num}"),
     ))
 }
+
+pub fn weighted_rand(weights: &[i32]) -> usize {
+    let sum: i32 = weights.iter().sum();
+    let mut roll = rand::thread_rng().gen_range(0..=sum);
+    for (idx, limit) in weights.iter().enumerate() {
+        if roll < *limit {
+            return idx;
+        } else {
+            roll -= *limit;
+        }
+    }
+    weights.len() - 1
+}

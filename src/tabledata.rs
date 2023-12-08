@@ -9,7 +9,7 @@ use crate::{
     enums::ItemType,
     error::{log, FFError, FFResult, Severity},
     npc::NPC,
-    CrocPotData, ItemStats, VendorData, VendorItem,
+    util, CrocPotData, Item, ItemStats, VendorData, VendorItem,
 };
 
 static TABLE_DATA: OnceLock<TableData> = OnceLock::new();
@@ -34,7 +34,7 @@ impl XDTData {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct NPCData {
     iNPCType: i32,
     iX: i32,
@@ -44,30 +44,30 @@ struct NPCData {
     iMapNum: Option<i32>,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct CrateDropChance {
     DropChance: i32,
     DropChanceTotal: i32,
     CrateTypeDropWeights: Vec<i32>,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct CrateDropType {
     CrateIDs: Vec<i32>,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct CrateData {
     ItemSetID: i32,
     RarityWeightID: i32,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct RarityWeights {
     Weights: Vec<i32>,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct ItemSet {
     IgnoreRarity: bool,
     IgnoreGender: bool,
@@ -78,7 +78,7 @@ struct ItemSet {
     ItemReferenceIDs: Vec<i32>,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct ItemReference {
     ItemID: i32,
     Type: i32,
@@ -163,6 +163,118 @@ impl TableData {
                     npc_data.iMapNum.unwrap_or(0) as u64,
                 )
             })
+    }
+
+    pub fn get_item_from_crate(&self, crate_id: i16, gender: i32) -> FFResult<Item> {
+        let crate_data =
+            self.drop_data
+                .crate_data
+                .get(&(crate_id as i32))
+                .ok_or(FFError::build(
+                    Severity::Warning,
+                    format!("No C.R.A.T.E. data for id {}", crate_id),
+                ))?;
+
+        let item_set =
+            self.drop_data
+                .item_sets
+                .get(&crate_data.ItemSetID)
+                .ok_or(FFError::build(
+                    Severity::Warning,
+                    format!("No item set with id {}", crate_data.ItemSetID),
+                ))?;
+
+        let rarity_weights = self
+            .drop_data
+            .rarity_weights
+            .get(&crate_data.RarityWeightID)
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("No rarity data for id {}", crate_data.RarityWeightID),
+            ))?;
+
+        // generate a rarity from the rarity weights. rarities start at 1
+        let rarity = (util::weighted_rand(&rarity_weights.Weights) + 1) as i32;
+
+        // build a pool of eligible items
+        let mut item_pool = Vec::new();
+        for item_ref_id in &item_set.ItemReferenceIDs {
+            let eligible: FFResult<bool> = (|| {
+                let item_ref = self
+                    .drop_data
+                    .item_refs
+                    .get(item_ref_id)
+                    .ok_or(FFError::build(
+                        Severity::Warning,
+                        format!("No item ref with id {}", item_ref_id),
+                    ))?;
+                let item_stats = self
+                    .get_item_stats(item_ref.ItemID as i16, (item_ref.Type as i16).try_into()?)?;
+                let item_rarity = *item_set
+                    .AlterRarityMap
+                    .get(&item_ref_id.to_string())
+                    .unwrap_or(
+                        &(item_stats.rarity.ok_or(FFError::build(
+                            Severity::Warning,
+                            format!("Item ref has no rarity: {:?}", item_ref),
+                        ))? as i32),
+                    );
+                let item_gender = *item_set
+                    .AlterGenderMap
+                    .get(&item_ref_id.to_string())
+                    .unwrap_or(
+                        &(item_stats.gender.ok_or(FFError::build(
+                            Severity::Warning,
+                            format!("Item ref has no gender: {:?}", item_ref),
+                        ))? as i32),
+                    );
+
+                // rarity checks
+                if item_rarity != 0 && !item_set.IgnoreRarity && rarity != item_rarity {
+                    return Ok(false);
+                }
+
+                // gender checks
+                if item_gender != 0 && !item_set.IgnoreGender && gender != item_gender {
+                    return Ok(false);
+                }
+
+                Ok(true)
+            })();
+            match eligible {
+                Ok(eligible) => {
+                    if eligible {
+                        item_pool.push(*item_ref_id);
+                    }
+                }
+                Err(e) => log(e.get_severity(), e.get_msg()),
+            }
+        }
+
+        if item_pool.is_empty() {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Item pool was empty: id {}, gender {}", crate_id, gender),
+            ));
+        }
+
+        // get the weights for each item
+        let mut item_weights = vec![item_set.DefaultItemWeight; item_pool.len()];
+        for (idx, item_ref_id) in item_pool.iter().enumerate() {
+            let override_weight = item_set.AlterItemWeightMap.get(&item_ref_id.to_string());
+            if let Some(weight) = override_weight {
+                item_weights[idx] = *weight;
+            }
+        }
+
+        // select an item
+        let rolled_item_ref_id = item_pool[util::weighted_rand(&item_weights)];
+        let rolled_item_ref = self.drop_data.item_refs.get(&rolled_item_ref_id).unwrap();
+
+        Ok(Item::new(
+            (rolled_item_ref.Type as i16).try_into()?,
+            rolled_item_ref.ItemID as i16,
+        ))
     }
 }
 
@@ -297,6 +409,7 @@ fn load_item_data(
                         max_stack_size: data.m_iStackNumber as u16,
                         required_level: data.m_iMinReqLev.unwrap_or(0) as i16,
                         rarity: data.m_iRarity.map(|v| v as i8),
+                        gender: data.m_iReqSex.map(|v| v as i8),
                     };
                     map.insert(key, data);
                 }

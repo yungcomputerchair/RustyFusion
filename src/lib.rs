@@ -217,6 +217,7 @@ pub struct ItemStats {
     pub max_stack_size: u16,
     pub required_level: i16,
     pub rarity: Option<i8>,
+    pub gender: Option<i8>,
 }
 
 pub struct VendorItem {
