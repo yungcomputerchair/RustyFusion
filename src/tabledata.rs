@@ -367,7 +367,7 @@ fn load_item_data(
             ItemType::UpperBody => "m_pShirtsItemTable",
             ItemType::LowerBody => "m_pPantsItemTable",
             ItemType::Foot => "m_pShoesItemTable",
-            ItemType::Head => "m_pHeadItemTable",
+            ItemType::Head => "m_pHatItemTable",
             ItemType::Face => "m_pGlassItemTable",
             ItemType::Back => "m_pBackItemTable",
             ItemType::General => "m_pGeneralItemTable",
