@@ -420,9 +420,16 @@ impl Player {
         self.special_state
     }
 
-    pub fn update_first_use_flag(&mut self, bit_offset: i32) -> i128 {
-        self.flags.tip_flags |= 1_i128 << (bit_offset - 1);
-        self.flags.tip_flags
+    pub fn update_first_use_flag(&mut self, bit_offset: i32) -> FFResult<i128> {
+        if !(1..=129).contains(&bit_offset) {
+            Err(FFError::build(
+                Severity::Warning,
+                format!("First use flag offset out of range: {}", bit_offset),
+            ))
+        } else {
+            self.flags.tip_flags |= 1_i128 << (bit_offset - 1);
+            Ok(self.flags.tip_flags)
+        }
     }
 
     pub fn set_appearance_flag(&mut self) {

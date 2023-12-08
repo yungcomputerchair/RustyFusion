@@ -181,9 +181,7 @@ pub fn pc_special_state_switch(
         iReqSpecialStateFlag: pkt.iSpecialStateFlag,
         iSpecialState: special_state,
     };
-    client.send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp)?;
-
-    Ok(())
+    client.send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp)
 }
 
 pub fn pc_first_use_flag_set(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
@@ -192,7 +190,6 @@ pub fn pc_first_use_flag_set(client: &mut FFClient, state: &mut ShardServerState
         client.get_packet(P_CL2FE_REQ_PC_FIRST_USE_FLAG_SET)?;
 
     let player = state.get_player_mut(pc_id)?;
-    player.update_first_use_flag(pkt.iFlagCode);
-
+    player.update_first_use_flag(pkt.iFlagCode)?;
     Ok(())
 }
