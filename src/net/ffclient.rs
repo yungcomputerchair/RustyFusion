@@ -195,6 +195,8 @@ impl FFClient {
         self.sock
             .write_all(send_buf)
             .map_err(FFError::from_io_err)?;
+
+        self.out_buf.fill(0);
         self.out_buf_ptr = 0;
         Ok(())
     }
