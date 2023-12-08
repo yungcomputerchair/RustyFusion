@@ -46,7 +46,7 @@ struct NPCData {
 
 pub struct TableData {
     xdt_data: XDTData,
-    npc_data: HashMap<i32, NPCData>,
+    npc_data: Vec<NPCData>,
 }
 impl TableData {
     fn new() -> Self {
@@ -98,9 +98,9 @@ impl TableData {
     }
 
     pub fn get_npcs(&self) -> impl Iterator<Item = NPC> + '_ {
-        self.npc_data.iter().map(|(npc_id, npc_data)| -> NPC {
+        self.npc_data.iter().enumerate().map(|(npc_id, npc_data)| -> NPC {
             NPC::new(
-                *npc_id,
+                npc_id as i32,
                 npc_data.iNPCType,
                 npc_data.iX,
                 npc_data.iY,
@@ -381,7 +381,7 @@ fn load_crocpot_data(
     }
 }
 
-fn load_npc_data() -> Result<HashMap<i32, NPCData>, String> {
+fn load_npc_data() -> Result<Vec<NPCData>, String> {
     const NPC_TABLE_KEY: &str = "NPCs";
 
     let raw = load_json("tabledata/NPCs.json")?;
@@ -390,12 +390,11 @@ fn load_npc_data() -> Result<HashMap<i32, NPCData>, String> {
             .get("NPCs")
             .ok_or(format!("Key missing: {}", NPC_TABLE_KEY))?;
         if let Value::Object(npcs) = npcs {
-            let mut npc_data = HashMap::new();
-            for (k, v) in npcs {
-                let npc_id: i32 = k.parse().map_err(|_| format!("Bad NPC data ID: {}", k))?;
+            let mut npc_data = Vec::new();
+            for (_, v) in npcs {
                 let npc_data_entry: NPCData = serde_json::from_value(v.clone())
                     .map_err(|e| format!("Malformed NPC data entry: {}", e))?;
-                npc_data.insert(npc_id, npc_data_entry);
+                npc_data.push(npc_data_entry);
             }
             Ok(npc_data)
         } else {
