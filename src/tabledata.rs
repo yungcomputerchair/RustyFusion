@@ -213,21 +213,11 @@ impl TableData {
                 let item_rarity = *item_set
                     .AlterRarityMap
                     .get(&item_ref_id.to_string())
-                    .unwrap_or(
-                        &(item_stats.rarity.ok_or(FFError::build(
-                            Severity::Warning,
-                            format!("Item ref has no rarity: {:?}", item_ref),
-                        ))? as i32),
-                    );
+                    .unwrap_or(&(item_stats.rarity.unwrap_or(0) as i32));
                 let item_gender = *item_set
                     .AlterGenderMap
                     .get(&item_ref_id.to_string())
-                    .unwrap_or(
-                        &(item_stats.gender.ok_or(FFError::build(
-                            Severity::Warning,
-                            format!("Item ref has no gender: {:?}", item_ref),
-                        ))? as i32),
-                    );
+                    .unwrap_or(&(item_stats.gender.unwrap_or(0) as i32));
 
                 // rarity checks
                 if item_rarity != 0 && !item_set.IgnoreRarity && rarity != item_rarity {

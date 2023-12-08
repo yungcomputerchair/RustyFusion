@@ -36,7 +36,7 @@ struct PlayerStyle {
 impl Default for PlayerStyle {
     fn default() -> Self {
         Self {
-            gender: 1,
+            gender: if rand::random::<bool>() { 1 } else { 2 },
             face_style: 1,
             hair_style: 1,
             hair_color: 1,
@@ -142,7 +142,7 @@ pub struct Player {
     mission_data: MissionData,
     inventory: PlayerInventory,
     taros: u32,
-    fusion_matter: i32,
+    fusion_matter: u32,
     nano_potions: u32,
     weapon_boosts: u32,
     buddy_warp_time: i32,
@@ -244,7 +244,7 @@ impl Player {
             iBatteryW: self.weapon_boosts as i32,
             iBatteryN: self.nano_potions as i32,
             iCandy: self.taros as i32,
-            iFusionMatter: self.fusion_matter,
+            iFusionMatter: self.fusion_matter as i32,
             iSpecialState: self.special_state,
             iMapNum: self.get_mapnum(),
             iX: self.position.x,
@@ -411,6 +411,10 @@ impl Player {
         self.taros
     }
 
+    pub fn get_fusion_matter(&self) -> u32 {
+        self.fusion_matter
+    }
+
     pub fn update_special_state(&mut self, flags: i8) -> i8 {
         self.special_state ^= flags;
         self.special_state
@@ -448,8 +452,8 @@ impl Player {
         self.combat_stats.level
     }
 
-    pub fn set_fusion_matter(&mut self, fusion_matter: i32) -> i32 {
-        self.fusion_matter = clamp(fusion_matter, 0, PC_FUSIONMATTER_MAX as i32);
+    pub fn set_fusion_matter(&mut self, fusion_matter: u32) -> u32 {
+        self.fusion_matter = clamp(fusion_matter, 0, PC_FUSIONMATTER_MAX);
         self.fusion_matter
     }
 
@@ -473,7 +477,7 @@ impl Player {
 
     pub fn set_god_mode(&mut self, god_mode: bool) {
         if god_mode {
-            self.set_fusion_matter(PC_FUSIONMATTER_MAX as i32);
+            self.set_fusion_matter(PC_FUSIONMATTER_MAX);
             self.set_hp(i32::MAX);
             self.set_level(PC_LEVEL_MAX as i16);
             self.set_taros(PC_CANDY_MAX);

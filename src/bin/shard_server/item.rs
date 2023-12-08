@@ -5,6 +5,7 @@ use rusty_fusion::{
     defines::PC_BATTERY_MAX,
     enums::{ItemLocation, ItemType},
     error::{catch_fail, FFError, Severity},
+    placeholder,
     tabledata::tdata_get,
     Item,
 };
@@ -201,6 +202,74 @@ pub fn item_combination(client: &mut FFClient, state: &mut ShardServerState) -> 
                 iCashItemSlot2: pkt.iCashItemSlot2,
             };
             client.send_packet(P_FE2CL_REP_PC_ITEM_COMBINATION_FAIL, &resp)
+        },
+    )
+}
+
+pub fn item_chest_open(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+    let pkt: sP_CL2FE_REQ_ITEM_CHEST_OPEN = *client.get_packet(P_CL2FE_REQ_ITEM_CHEST_OPEN)?;
+    catch_fail(
+        (|| {
+            let player = state.get_player_mut(client.get_player_id()?)?;
+            let location: ItemLocation = pkt.eIL.try_into()?;
+            if location != ItemLocation::Inven {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!("C.R.A.T.E. not in main inventory: {:?}", location),
+                ));
+            }
+
+            let chest = player
+                .set_item(location, pkt.iSlotNum as usize, None)?
+                .ok_or(FFError::build(
+                    Severity::Warning,
+                    format!("C.R.A.T.E. in empty slot: {}", pkt.iSlotNum),
+                ))?;
+
+            if chest.get_type() != ItemType::Chest {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!("Item is not a C.R.A.T.E.: {:?}", chest),
+                ));
+            }
+
+            let reward_item = tdata_get()
+                .get_item_from_crate(chest.get_id(), player.get_style().iGender as i32)
+                .unwrap_or(placeholder!(Item::new(ItemType::General, 119)));
+
+            player.set_item(location, pkt.iSlotNum as usize, Some(reward_item))?;
+
+            let reward_pkt = sP_FE2CL_REP_REWARD_ITEM {
+                m_iCandy: player.get_taros() as i32,
+                m_iFusionMatter: player.get_fusion_matter() as i32,
+                m_iBatteryN: player.get_nano_potions() as i32,
+                m_iBatteryW: player.get_weapon_boosts() as i32,
+                iItemCnt: 1,
+                iFatigue: unused!(),
+                iFatigue_Level: unused!(),
+                iNPC_TypeID: unused!(),
+                iTaskID: unused!(),
+            };
+            let reward_item_s = sItemReward {
+                sItem: Some(reward_item).into(),
+                eIL: location as i32,
+                iSlotNum: pkt.iSlotNum,
+            };
+            client.queue_packet(P_FE2CL_REP_REWARD_ITEM, &reward_pkt)?;
+            client.queue_struct(&reward_item_s)?;
+            client.flush()?;
+
+            let resp = sP_FE2CL_REP_ITEM_CHEST_OPEN_SUCC {
+                iSlotNum: pkt.iSlotNum,
+            };
+            client.send_packet(P_FE2CL_REP_ITEM_CHEST_OPEN_SUCC, &resp)
+        })(),
+        || {
+            let resp = sP_FE2CL_REP_ITEM_CHEST_OPEN_FAIL {
+                iSlotNum: pkt.iSlotNum,
+                iErrorCode: unused!(),
+            };
+            client.send_packet(P_FE2CL_REP_ITEM_CHEST_OPEN_FAIL, &resp)
         },
     )
 }
