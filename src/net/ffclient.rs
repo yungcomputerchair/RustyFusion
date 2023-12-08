@@ -1,5 +1,6 @@
 use std::{
     io::{Read, Write},
+    mem::size_of,
     net::{SocketAddr, TcpStream},
     time::SystemTime,
 };
@@ -32,10 +33,10 @@ pub struct FFClient {
     sock: TcpStream,
     addr: SocketAddr,
     in_buf: [u8; PACKET_BUFFER_SIZE],
+    in_buf_ptr: usize,
+    in_buf_len: usize,
     out_buf: [u8; PACKET_BUFFER_SIZE],
     out_buf_ptr: usize,
-    last_pkt_id: PacketID,
-    last_pkt_sz: usize,
     pub e_key: [u8; CRYPTO_KEY_SIZE],
     pub fe_key: [u8; CRYPTO_KEY_SIZE],
     pub enc_mode: EncryptionMode,
@@ -50,10 +51,10 @@ impl FFClient {
             sock: conn_data.0,
             addr: conn_data.1,
             in_buf: [0; PACKET_BUFFER_SIZE],
+            in_buf_ptr: 0,
+            in_buf_len: 0,
             out_buf: [0; PACKET_BUFFER_SIZE],
             out_buf_ptr: 0,
-            last_pkt_id: PacketID::P_NULL,
-            last_pkt_sz: 0,
             e_key: default_key,
             fe_key: default_key,
             enc_mode: EncryptionMode::EKey,
@@ -88,26 +89,62 @@ impl FFClient {
         }
     }
 
-    pub fn get_packet_id(&self) -> PacketID {
-        self.last_pkt_id
-    }
-
-    pub fn get_packet<T: FFPacket>(&self, pkt_id: PacketID) -> &T {
-        assert_eq!(
-            self.last_pkt_id, pkt_id,
-            "Tried to fetch packet {:?} != buffered {:?}",
-            pkt_id, self.last_pkt_id
-        );
-
-        let pkt_buf: &[u8] = &self.in_buf[4..self.last_pkt_sz];
-        unsafe { bytes_to_struct(pkt_buf) }
-    }
-
     pub fn get_last_heartbeat(&self) -> SystemTime {
         self.last_heartbeat
     }
 
-    pub fn read_packet(&mut self) -> FFResult<PacketID> {
+    pub fn peek_packet_id(&self) -> FFResult<PacketID> {
+        let from = self.in_buf_ptr;
+        let to = from + 4;
+        if to > self.in_buf_len {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Couldn't peek packet ID; buffer exhausted: {} > {}",
+                    to, self.in_buf_len
+                ),
+            ));
+        }
+
+        let id = u32::from_le_bytes(self.in_buf[from..to].try_into().unwrap());
+        PacketID::from_u32(id).ok_or(FFError::build(
+            Severity::Warning,
+            format!("Bad packet ID {id}"),
+        ))
+    }
+
+    pub fn get_packet<T: FFPacket>(&mut self, pkt_id: PacketID) -> FFResult<&T> {
+        let buffered_pkt_id = self.peek_packet_id()?;
+        assert_eq!(
+            buffered_pkt_id, pkt_id,
+            "Tried to fetch packet {:?} != buffered {:?}",
+            pkt_id, buffered_pkt_id
+        );
+        self.in_buf_ptr += 4;
+        self.get_struct()
+    }
+
+    pub fn get_struct<T: FFPacket>(&mut self) -> FFResult<&T> {
+        let sz: usize = size_of::<T>();
+        let from = self.in_buf_ptr;
+        let to = from + sz;
+        if to > self.in_buf_len {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Couldn't read struct; buffer exhausted: {} > {}",
+                    to, self.in_buf_len
+                ),
+            ));
+        }
+
+        let buf: &[u8] = &self.in_buf[from..to];
+        let s = unsafe { bytes_to_struct(buf) };
+        self.in_buf_ptr += sz;
+        Ok(s)
+    }
+
+    pub fn read_payload(&mut self) -> FFResult<()> {
         self.last_heartbeat = SystemTime::now();
 
         // read the size
@@ -120,15 +157,13 @@ impl FFClient {
         // read the packet
         let buf: &mut [u8] = &mut self.in_buf[..sz];
         self.sock.read_exact(buf).map_err(FFError::from_io_err)?;
+        self.in_buf_ptr = 0;
+        self.in_buf_len = sz;
 
         // decrypt the packet (client always encrypts with E key)
         decrypt_payload(buf, &self.e_key);
 
-        let id: u32 = u32::from_le_bytes(buf[..4].try_into().unwrap());
-        let id: PacketID = PacketID::from_u32(id).ok_or(FFError::build(
-            Severity::Warning,
-            format!("Bad packet ID {id}"),
-        ))?;
+        let id = self.peek_packet_id()?;
 
         if !SILENCED_PACKETS.contains(&id) {
             log(
@@ -136,10 +171,7 @@ impl FFClient {
                 &format!("{} sent {:?}", self.get_addr(), id),
             );
         }
-
-        self.last_pkt_id = id;
-        self.last_pkt_sz = sz;
-        Ok(id)
+        Ok(())
     }
 
     pub fn flush(&mut self) -> FFResult<()> {
@@ -187,7 +219,7 @@ impl FFClient {
     fn copy_to_buf(&mut self, dat: &[u8]) -> FFResult<()> {
         let sz = dat.len();
         let from = self.out_buf_ptr;
-        let to = self.out_buf_ptr + sz;
+        let to = from + sz;
         if to > PACKET_BUFFER_SIZE {
             return Err(FFError::build_dc(
                 Severity::Warning,

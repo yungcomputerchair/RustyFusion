@@ -8,7 +8,7 @@ pub fn send_freechat_message(
 ) -> FFResult<()> {
     let client = clients.get_self();
     let pkt: sP_CL2FE_REQ_SEND_FREECHAT_MESSAGE =
-        *client.get_packet(P_CL2FE_REQ_SEND_FREECHAT_MESSAGE);
+        *client.get_packet(P_CL2FE_REQ_SEND_FREECHAT_MESSAGE)?;
     catch_fail(
         (|| {
             let client = clients.get_self();
@@ -44,7 +44,7 @@ pub fn send_menuchat_message(
 ) -> FFResult<()> {
     let client = clients.get_self();
     let pkt: sP_CL2FE_REQ_SEND_MENUCHAT_MESSAGE =
-        *client.get_packet(P_CL2FE_REQ_SEND_MENUCHAT_MESSAGE);
+        *client.get_packet(P_CL2FE_REQ_SEND_MENUCHAT_MESSAGE)?;
 
     catch_fail(
         (|| {
@@ -81,7 +81,7 @@ pub fn pc_avatar_emotes_chat(
     let client = clients.get_self();
     let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_AVATAR_EMOTES_CHAT =
-        client.get_packet(P_CL2FE_REQ_PC_AVATAR_EMOTES_CHAT);
+        client.get_packet(P_CL2FE_REQ_PC_AVATAR_EMOTES_CHAT)?;
 
     let resp = sP_FE2CL_REP_PC_AVATAR_EMOTES_CHAT {
         iID_From: pkt.iID_From,

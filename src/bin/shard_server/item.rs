@@ -13,7 +13,7 @@ use super::*;
 
 pub fn item_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
-    let pkt: sP_CL2FE_REQ_ITEM_MOVE = *client.get_packet(P_CL2FE_REQ_ITEM_MOVE);
+    let pkt: sP_CL2FE_REQ_ITEM_MOVE = *client.get_packet(P_CL2FE_REQ_ITEM_MOVE)?;
 
     let pc_id = client.get_player_id()?;
     let player = state.get_player_mut(pc_id)?;
@@ -70,7 +70,7 @@ pub fn item_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFRes
 
 pub fn item_delete(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
     let pc_id = client.get_player_id()?;
-    let pkt: &sP_CL2FE_REQ_PC_ITEM_DELETE = client.get_packet(P_CL2FE_REQ_PC_ITEM_DELETE);
+    let pkt: &sP_CL2FE_REQ_PC_ITEM_DELETE = client.get_packet(P_CL2FE_REQ_PC_ITEM_DELETE)?;
     let player = state.get_player_mut(pc_id)?;
     player.set_item(pkt.eIL.try_into()?, pkt.iSlotNum as usize, None)?;
     let resp = sP_FE2CL_REP_PC_ITEM_DELETE_SUCC {
@@ -81,7 +81,8 @@ pub fn item_delete(client: &mut FFClient, state: &mut ShardServerState) -> FFRes
 }
 
 pub fn item_combination(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
-    let pkt: sP_CL2FE_REQ_PC_ITEM_COMBINATION = *client.get_packet(P_CL2FE_REQ_PC_ITEM_COMBINATION);
+    let pkt: sP_CL2FE_REQ_PC_ITEM_COMBINATION =
+        *client.get_packet(P_CL2FE_REQ_PC_ITEM_COMBINATION)?;
     catch_fail(
         (|| {
             let player = state.get_player_mut(client.get_player_id()?)?;
@@ -205,7 +206,7 @@ pub fn item_combination(client: &mut FFClient, state: &mut ShardServerState) -> 
 }
 
 pub fn vendor_start(client: &mut FFClient) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_PC_VENDOR_START = client.get_packet(P_CL2FE_REQ_PC_VENDOR_START);
+    let pkt: &sP_CL2FE_REQ_PC_VENDOR_START = client.get_packet(P_CL2FE_REQ_PC_VENDOR_START)?;
     let resp = sP_FE2CL_REP_PC_VENDOR_START_SUCC {
         iNPC_ID: pkt.iNPC_ID,
         iVendorID: pkt.iVendorID,
@@ -217,7 +218,7 @@ pub fn vendor_table_update(client: &mut FFClient) -> FFResult<()> {
     catch_fail(
         (|| {
             let pkt: &sP_CL2FE_REQ_PC_VENDOR_TABLE_UPDATE =
-                client.get_packet(P_CL2FE_REQ_PC_VENDOR_TABLE_UPDATE);
+                client.get_packet(P_CL2FE_REQ_PC_VENDOR_TABLE_UPDATE)?;
             let vendor_data = tdata_get().get_vendor_data(pkt.iVendorID)?;
             let resp = sP_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_SUCC {
                 item: vendor_data.as_arr()?,
@@ -241,7 +242,7 @@ pub fn vendor_item_buy(
     catch_fail(
         (|| {
             let pkt: sP_CL2FE_REQ_PC_VENDOR_ITEM_BUY =
-                *client.get_packet(P_CL2FE_REQ_PC_VENDOR_ITEM_BUY);
+                *client.get_packet(P_CL2FE_REQ_PC_VENDOR_ITEM_BUY)?;
 
             // sanitize the item
             let item: Option<Item> = pkt.Item.try_into()?;
@@ -306,7 +307,7 @@ pub fn vendor_item_sell(client: &mut FFClient, state: &mut ShardServerState) -> 
     catch_fail(
         (|| {
             let pkt: sP_CL2FE_REQ_PC_VENDOR_ITEM_SELL =
-                *client.get_packet(P_CL2FE_REQ_PC_VENDOR_ITEM_SELL);
+                *client.get_packet(P_CL2FE_REQ_PC_VENDOR_ITEM_SELL)?;
             let pc_id = client.get_player_id()?;
             let player = state.get_player_mut(pc_id)?;
 
@@ -367,7 +368,7 @@ pub fn vendor_item_restore_buy(
         (|| {
             let pc_id = client.get_player_id()?;
             let pkt: &sP_CL2FE_REQ_PC_VENDOR_ITEM_RESTORE_BUY =
-                client.get_packet(P_CL2FE_REQ_PC_VENDOR_ITEM_RESTORE_BUY);
+                client.get_packet(P_CL2FE_REQ_PC_VENDOR_ITEM_RESTORE_BUY)?;
             let item: Option<Item> = pkt.Item.try_into()?;
             let item: Item = item.ok_or(FFError::build(
                 Severity::Warning,
@@ -437,7 +438,7 @@ pub fn vendor_battery_buy(client: &mut FFClient, state: &mut ShardServerState) -
     catch_fail(
         (|| {
             let pkt: &sP_CL2FE_REQ_PC_VENDOR_BATTERY_BUY =
-                client.get_packet(P_CL2FE_REQ_PC_VENDOR_BATTERY_BUY);
+                client.get_packet(P_CL2FE_REQ_PC_VENDOR_BATTERY_BUY)?;
             let battery_type = pkt.Item.iID;
             let mut quantity = pkt.Item.iOpt as u32 * 100;
 

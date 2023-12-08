@@ -20,7 +20,7 @@ pub fn login(
     time: SystemTime,
 ) -> FFResult<()> {
     // TODO failure
-    let pkt: &sP_CL2LS_REQ_LOGIN = client.get_packet(P_CL2LS_REQ_LOGIN);
+    let pkt: &sP_CL2LS_REQ_LOGIN = client.get_packet(P_CL2LS_REQ_LOGIN)?;
 
     let mut players = Vec::new();
     let mut username = util::parse_utf16(&pkt.szID);
@@ -98,7 +98,7 @@ pub fn login(
 
 pub fn check_char_name(client: &mut FFClient) -> FFResult<()> {
     // TODO failure
-    let pkt: &sP_CL2LS_REQ_CHECK_CHAR_NAME = client.get_packet(P_CL2LS_REQ_CHECK_CHAR_NAME);
+    let pkt: &sP_CL2LS_REQ_CHECK_CHAR_NAME = client.get_packet(P_CL2LS_REQ_CHECK_CHAR_NAME)?;
     let resp = sP_LS2CL_REP_CHECK_CHAR_NAME_SUCC {
         szFirstName: pkt.szFirstName,
         szLastName: pkt.szLastName,
@@ -108,7 +108,7 @@ pub fn check_char_name(client: &mut FFClient) -> FFResult<()> {
 
 pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
     // TODO failure
-    let pkt: &sP_CL2LS_REQ_SAVE_CHAR_NAME = client.get_packet(P_CL2LS_REQ_SAVE_CHAR_NAME);
+    let pkt: &sP_CL2LS_REQ_SAVE_CHAR_NAME = client.get_packet(P_CL2LS_REQ_SAVE_CHAR_NAME)?;
 
     let pc_uid = util::get_uid();
     // TODO check with DB if UID is in use and reroll
@@ -131,7 +131,7 @@ pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> FF
 }
 
 pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
-    let pkt: &sP_CL2LS_REQ_CHAR_CREATE = client.get_packet(P_CL2LS_REQ_CHAR_CREATE);
+    let pkt: &sP_CL2LS_REQ_CHAR_CREATE = client.get_packet(P_CL2LS_REQ_CHAR_CREATE)?;
 
     let pc_uid = pkt.PCStyle.iPC_UID;
     if let Some(player) = state.players.get_mut(&pc_uid) {
@@ -169,7 +169,7 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
 }
 
 pub fn save_char_tutor(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
-    let pkt: &sP_CL2LS_REQ_SAVE_CHAR_TUTOR = client.get_packet(P_CL2LS_REQ_SAVE_CHAR_TUTOR);
+    let pkt: &sP_CL2LS_REQ_SAVE_CHAR_TUTOR = client.get_packet(P_CL2LS_REQ_SAVE_CHAR_TUTOR)?;
     let pc_uid = pkt.iPC_UID;
     let player = state.players.get_mut(&pc_uid).ok_or(FFError::build(
         Severity::Warning,
@@ -194,7 +194,7 @@ pub fn char_select(
 ) -> FFResult<()> {
     let client = clients.get_mut(&client_key).unwrap();
     if let ClientType::GameClient { serial_key, .. } = client.client_type {
-        let pkt: &sP_CL2LS_REQ_CHAR_SELECT = client.get_packet(P_CL2LS_REQ_CHAR_SELECT);
+        let pkt: &sP_CL2LS_REQ_CHAR_SELECT = client.get_packet(P_CL2LS_REQ_CHAR_SELECT)?;
         let pc_uid = pkt.iPC_UID;
         if !state.players.contains_key(&pc_uid) {
             return Err(FFError::build(

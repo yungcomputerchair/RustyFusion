@@ -7,7 +7,7 @@ use rusty_fusion::{
 use super::*;
 
 pub fn gm_pc_set_value(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
-    let pkt: sP_CL2FE_GM_REQ_PC_SET_VALUE = *client.get_packet(P_CL2FE_GM_REQ_PC_SET_VALUE);
+    let pkt: sP_CL2FE_GM_REQ_PC_SET_VALUE = *client.get_packet(P_CL2FE_GM_REQ_PC_SET_VALUE)?;
     let pc_id = pkt.iPC_ID;
     let value = pkt.iSetValue;
     let value_type = pkt.iSetValueType;
@@ -43,7 +43,7 @@ pub fn gm_pc_give_item(client: &mut FFClient, state: &mut ShardServerState) -> F
     catch_fail(
         (|| {
             let pc_id = client.get_player_id()?;
-            let pkt: &sP_CL2FE_REQ_PC_GIVE_ITEM = client.get_packet(P_CL2FE_REQ_PC_GIVE_ITEM);
+            let pkt: &sP_CL2FE_REQ_PC_GIVE_ITEM = client.get_packet(P_CL2FE_REQ_PC_GIVE_ITEM)?;
             let player = state.get_player_mut(pc_id)?;
             let slot_number = pkt.iSlotNum as usize;
 

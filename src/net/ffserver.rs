@@ -93,9 +93,13 @@ impl FFServer {
                 let clients: &mut HashMap<usize, FFClient> = &mut self.clients;
                 let client: &mut FFClient = clients.get_mut(&ev.key).unwrap();
                 let addr = client.get_addr();
-                let res = client.read_packet().and_then(|pkt_id| {
+
+                let res = (|clients: &mut HashMap<usize, FFClient>| {
+                    let client = clients.get_mut(&ev.key).unwrap();
+                    client.read_payload()?;
+                    let pkt_id = client.peek_packet_id()?;
                     (self.pkt_handler)(ev.key, clients, pkt_id, state, time_now)
-                });
+                })(clients);
 
                 if let Err(e) = res {
                     log(e.get_severity(), &format!("{} ({})", e.get_msg(), addr));
