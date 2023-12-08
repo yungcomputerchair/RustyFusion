@@ -18,6 +18,7 @@ use crate::{
 };
 
 use num_traits::{clamp, clamp_min};
+use uuid::Uuid;
 
 pub const TEST_ACC_UID_START: i64 = i64::MAX - 3;
 
@@ -145,7 +146,7 @@ pub struct Player {
     nano_potions: u32,
     weapon_boosts: u32,
     buddy_warp_time: i32,
-    pub trading_with: Option<i32>,
+    pub trade_id: Option<Uuid>,
 }
 impl Player {
     pub fn new(uid: i64) -> Self {

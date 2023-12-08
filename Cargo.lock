@@ -230,6 +230,7 @@ dependencies = [
  "serde",
  "serde_json",
  "toml",
+ "uuid",
 ]
 
 [[package]]
@@ -339,6 +340,16 @@ name = "unicode-ident"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "301abaae475aa91687eb82514b328ab47a211a533026cb25fc3e519b86adfc3c"
+
+[[package]]
+name = "uuid"
+version = "1.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e395fcf16a7a3d8127ec99782007af141946b4795001f876d54fb0d55978560"
+dependencies = [
+ "getrandom",
+ "rand",
+]
 
 [[package]]
 name = "wasi"

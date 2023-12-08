@@ -275,6 +275,8 @@ impl VendorData {
     }
 }
 
+pub struct TradeContext {}
+
 pub struct CrocPotData {
     pub base_chance: f32,
     pub rarity_diff_multipliers: [f32; 4],

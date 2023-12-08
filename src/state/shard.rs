@@ -1,12 +1,14 @@
 use std::collections::HashMap;
 
+use uuid::Uuid;
+
 use crate::{
     chunk::EntityMap,
     error::{FFError, FFResult, Severity},
     net::{LoginData, CONN_ID_DISCONNECTED},
     player::Player,
     tabledata::tdata_get,
-    Entity, Item,
+    Entity, Item, TradeContext,
 };
 
 pub struct ShardServerState {
@@ -15,6 +17,7 @@ pub struct ShardServerState {
     login_data: HashMap<i64, LoginData>,
     entity_map: EntityMap,
     buyback_lists: HashMap<i32, Vec<Item>>,
+    ongoing_trades: HashMap<Uuid, TradeContext>,
 }
 
 impl Default for ShardServerState {
@@ -25,6 +28,7 @@ impl Default for ShardServerState {
             login_data: HashMap::new(),
             entity_map: EntityMap::default(),
             buyback_lists: HashMap::new(),
+            ongoing_trades: HashMap::new(),
         };
         for npc in tdata_get().get_npcs() {
             let chunk_pos = npc.get_position().chunk_coords();
@@ -56,6 +60,10 @@ impl ShardServerState {
 
     pub fn get_buyback_lists(&mut self) -> &mut HashMap<i32, Vec<Item>> {
         &mut self.buyback_lists
+    }
+
+    pub fn get_ongoing_trades(&mut self) -> &mut HashMap<Uuid, TradeContext> {
+        &mut self.ongoing_trades
     }
 
     pub fn set_login_server_conn_id(&mut self, conn_id: i64) {
