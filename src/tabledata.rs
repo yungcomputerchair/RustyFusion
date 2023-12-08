@@ -1,9 +1,9 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
-use serde::Deserialize;
+use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::{Map, Value};
-use std::{collections::HashMap, sync::OnceLock};
+use std::{collections::HashMap, sync::OnceLock, time::SystemTime};
 
 use crate::{
     enums::ItemType,
@@ -44,9 +44,59 @@ struct NPCData {
     iMapNum: Option<i32>,
 }
 
+#[derive(Deserialize)]
+struct CrateDropChance {
+    DropChance: i32,
+    DropChanceTotal: i32,
+    CrateTypeDropWeights: Vec<i32>,
+}
+
+#[derive(Deserialize)]
+struct CrateDropType {
+    CrateIDs: Vec<i32>,
+}
+
+#[derive(Deserialize)]
+struct CrateData {
+    ItemSetID: i32,
+    RarityWeightID: i32,
+}
+
+#[derive(Deserialize)]
+struct RarityWeights {
+    Weights: Vec<i32>,
+}
+
+#[derive(Deserialize)]
+struct ItemSet {
+    IgnoreRarity: bool,
+    IgnoreGender: bool,
+    DefaultItemWeight: i32,
+    AlterRarityMap: HashMap<String, i32>,
+    AlterGenderMap: HashMap<String, i32>,
+    AlterItemWeightMap: HashMap<String, i32>,
+    ItemReferenceIDs: Vec<i32>,
+}
+
+#[derive(Deserialize)]
+struct ItemReference {
+    ItemID: i32,
+    Type: i32,
+}
+
+struct DropData {
+    crate_drop_chances: HashMap<i32, CrateDropChance>,
+    crate_drop_types: HashMap<i32, CrateDropType>,
+    crate_data: HashMap<i32, CrateData>,
+    rarity_weights: HashMap<i32, RarityWeights>,
+    item_sets: HashMap<i32, ItemSet>,
+    item_refs: HashMap<i32, ItemReference>,
+}
+
 pub struct TableData {
     xdt_data: XDTData,
     npc_data: Vec<NPCData>,
+    drop_data: DropData,
 }
 impl TableData {
     fn new() -> Self {
@@ -61,6 +111,7 @@ impl TableData {
         Ok(Self {
             xdt_data: XDTData::load()?,
             npc_data: load_npc_data()?,
+            drop_data: load_drop_data()?,
         })
     }
 
@@ -98,26 +149,34 @@ impl TableData {
     }
 
     pub fn get_npcs(&self) -> impl Iterator<Item = NPC> + '_ {
-        self.npc_data.iter().enumerate().map(|(npc_id, npc_data)| -> NPC {
-            NPC::new(
-                npc_id as i32,
-                npc_data.iNPCType,
-                npc_data.iX,
-                npc_data.iY,
-                npc_data.iZ,
-                npc_data.iAngle,
-                npc_data.iMapNum.unwrap_or(0) as u64,
-            )
-        })
+        self.npc_data
+            .iter()
+            .enumerate()
+            .map(|(npc_id, npc_data)| -> NPC {
+                NPC::new(
+                    npc_id as i32,
+                    npc_data.iNPCType,
+                    npc_data.iX,
+                    npc_data.iY,
+                    npc_data.iZ,
+                    npc_data.iAngle,
+                    npc_data.iMapNum.unwrap_or(0) as u64,
+                )
+            })
     }
 }
 
 pub fn tdata_init() -> &'static TableData {
     assert!(TABLE_DATA.get().is_none());
+    let load_start = SystemTime::now();
     if TABLE_DATA.set(TableData::new()).is_err() {
         panic!("Couldn't initialize TableData");
     }
-    log(Severity::Info, "Loaded TableData");
+    let load_time = SystemTime::now().duration_since(load_start).unwrap();
+    log(
+        Severity::Info,
+        &format!("Loaded TableData ({:.2}s)", load_time.as_secs_f32()),
+    );
     tdata_get()
 }
 
@@ -387,7 +446,7 @@ fn load_npc_data() -> Result<Vec<NPCData>, String> {
     let raw = load_json("tabledata/NPCs.json")?;
     if let Value::Object(root) = raw {
         let npcs = root
-            .get("NPCs")
+            .get(NPC_TABLE_KEY)
             .ok_or(format!("Key missing: {}", NPC_TABLE_KEY))?;
         if let Value::Object(npcs) = npcs {
             let mut npc_data = Vec::new();
@@ -403,4 +462,75 @@ fn load_npc_data() -> Result<Vec<NPCData>, String> {
     } else {
         Err(format!("Malformed NPC tabledata root: {}", raw))
     }
+}
+
+fn load_drop_data() -> Result<DropData, String> {
+    const CRATE_DROP_CHANCES_TABLE_KEY: &str = "CrateDropChances";
+    const CRATE_DROP_TYPES_TABLE_KEY: &str = "CrateDropTypes";
+    const CRATE_DATA_TABLE_KEY: &str = "Crates";
+    const RARITY_WEIGHTS_TABLE_KEY: &str = "RarityWeights";
+    const ITEM_SETS_TABLE_KEY: &str = "ItemSets";
+    const ITEM_REFERENCES_TABLE_KEY: &str = "ItemReferences";
+
+    const CRATE_DROP_CHANCES_ID_KEY: &str = "CrateDropChanceID";
+    const CRATE_DROP_TYPES_ID_KEY: &str = "CrateDropTypeID";
+    const CRATE_DATA_ID_KEY: &str = "CrateID";
+    const RARITY_WEIGHTS_ID_KEY: &str = "RarityWeightID";
+    const ITEM_SETS_ID_KEY: &str = "ItemSetID";
+    const ITEM_REFERENCES_ID_KEY: &str = "ItemReferenceID";
+
+    fn load_drop_table<T: DeserializeOwned>(
+        root: &Value,
+        table_key: &str,
+        id_key: &str,
+    ) -> Result<HashMap<i32, T>, String> {
+        if let Value::Object(root) = root {
+            let data = root
+                .get(table_key)
+                .ok_or(format!("Key missing: {}", table_key))?;
+            if let Value::Object(data) = data {
+                let mut data_map = HashMap::new();
+                for (n, v) in data {
+                    let key = v.get(id_key).ok_or(format!("Key missing: {}", id_key))?;
+                    if let Value::Number(key) = key {
+                        let key = key.as_i64().ok_or(format!("Key not i64: {}", key))?;
+                        let val: T = serde_json::from_value(v.clone())
+                            .map_err(|e| format!("Malformed drops data entry: {}", e))?;
+                        data_map.insert(key as i32, val);
+                    } else {
+                        return Err(format!(
+                            "Bad drops tabledata key (root.{}.{}): {}",
+                            table_key, n, key
+                        ));
+                    }
+                }
+                Ok(data_map)
+            } else {
+                Err(format!(
+                    "Bad drops tabledata (root.{}): {}",
+                    table_key, data
+                ))
+            }
+        } else {
+            Err(format!("Malformed drops tabledata root: {}", root))
+        }
+    }
+
+    let root = load_json("tabledata/drops.json")?;
+    Ok(DropData {
+        crate_drop_chances: load_drop_table(
+            &root,
+            CRATE_DROP_CHANCES_TABLE_KEY,
+            CRATE_DROP_CHANCES_ID_KEY,
+        )?,
+        crate_drop_types: load_drop_table(
+            &root,
+            CRATE_DROP_TYPES_TABLE_KEY,
+            CRATE_DROP_TYPES_ID_KEY,
+        )?,
+        crate_data: load_drop_table(&root, CRATE_DATA_TABLE_KEY, CRATE_DATA_ID_KEY)?,
+        rarity_weights: load_drop_table(&root, RARITY_WEIGHTS_TABLE_KEY, RARITY_WEIGHTS_ID_KEY)?,
+        item_sets: load_drop_table(&root, ITEM_SETS_TABLE_KEY, ITEM_SETS_ID_KEY)?,
+        item_refs: load_drop_table(&root, ITEM_REFERENCES_TABLE_KEY, ITEM_REFERENCES_ID_KEY)?,
+    })
 }
