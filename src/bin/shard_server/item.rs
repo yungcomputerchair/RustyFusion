@@ -41,29 +41,25 @@ pub fn item_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFRes
 
     let entity_id = player.get_id();
     if location_from == ItemLocation::Equip {
-        state
-            .get_entity_map()
-            .for_each_around(entity_id, clients, |c| {
-                let pkt = sP_FE2CL_PC_EQUIP_CHANGE {
-                    iPC_ID: pc_id,
-                    iEquipSlotNum: pkt.iFromSlotNum,
-                    EquipSlotItem: item_to.into(),
-                };
-                let _ = c.send_packet(P_FE2CL_PC_EQUIP_CHANGE, &pkt);
-            });
+        state.entity_map.for_each_around(entity_id, clients, |c| {
+            let pkt = sP_FE2CL_PC_EQUIP_CHANGE {
+                iPC_ID: pc_id,
+                iEquipSlotNum: pkt.iFromSlotNum,
+                EquipSlotItem: item_to.into(),
+            };
+            let _ = c.send_packet(P_FE2CL_PC_EQUIP_CHANGE, &pkt);
+        });
     }
 
     if location_to == ItemLocation::Equip {
-        state
-            .get_entity_map()
-            .for_each_around(entity_id, clients, |c| {
-                let pkt = sP_FE2CL_PC_EQUIP_CHANGE {
-                    iPC_ID: pc_id,
-                    iEquipSlotNum: pkt.iToSlotNum,
-                    EquipSlotItem: item_from.into(),
-                };
-                let _ = c.send_packet(P_FE2CL_PC_EQUIP_CHANGE, &pkt);
-            });
+        state.entity_map.for_each_around(entity_id, clients, |c| {
+            let pkt = sP_FE2CL_PC_EQUIP_CHANGE {
+                iPC_ID: pc_id,
+                iEquipSlotNum: pkt.iToSlotNum,
+                EquipSlotItem: item_from.into(),
+            };
+            let _ = c.send_packet(P_FE2CL_PC_EQUIP_CHANGE, &pkt);
+        });
     }
 
     Ok(())
@@ -409,7 +405,7 @@ pub fn vendor_item_sell(client: &mut FFClient, state: &mut ShardServerState) -> 
 
             let sell_price = stats.sell_price * quantity as u32;
             let new_taros = player.set_taros(player.get_taros() + sell_price);
-            let buyback_list = state.get_buyback_lists().entry(pc_id).or_default();
+            let buyback_list = state.buyback_lists.entry(pc_id).or_default();
             buyback_list.push(item.unwrap());
 
             let resp = sP_FE2CL_REP_PC_VENDOR_ITEM_SELL_SUCC {
@@ -443,13 +439,10 @@ pub fn vendor_item_restore_buy(
                 Severity::Warning,
                 format!("Bad item for buyback {:?}", pkt.Item),
             ))?;
-            let buyback_list = state
-                .get_buyback_lists()
-                .get_mut(&pc_id)
-                .ok_or(FFError::build(
-                    Severity::Warning,
-                    format!("Player {} has not sold any items", pc_id),
-                ))?;
+            let buyback_list = state.buyback_lists.get_mut(&pc_id).ok_or(FFError::build(
+                Severity::Warning,
+                format!("Player {} has not sold any items", pc_id),
+            ))?;
 
             let mut found_idx = None;
             for (i, list_item) in buyback_list.iter().enumerate() {

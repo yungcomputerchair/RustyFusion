@@ -64,7 +64,7 @@ pub fn trade_offer_accept(clients: &mut ClientMap, state: &mut ShardServerState)
             player_to.trade_id = Some(trade_id);
             let other_client = clients.get_from_player_id(pkt.iID_From)?;
             let _ = other_client.send_packet(P_FE2CL_REP_PC_TRADE_OFFER_SUCC, &resp);
-            state.get_ongoing_trades().insert(trade_id, TradeContext {});
+            state.ongoing_trades.insert(trade_id, TradeContext {});
             Ok(())
         })(),
         || {

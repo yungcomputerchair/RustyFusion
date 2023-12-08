@@ -14,10 +14,10 @@ use crate::{
 pub struct ShardServerState {
     login_server_conn_id: i64,
     next_pc_id: i32,
-    login_data: HashMap<i64, LoginData>,
-    entity_map: EntityMap,
-    buyback_lists: HashMap<i32, Vec<Item>>,
-    ongoing_trades: HashMap<Uuid, TradeContext>,
+    pub login_data: HashMap<i64, LoginData>,
+    pub entity_map: EntityMap,
+    pub buyback_lists: HashMap<i32, Vec<Item>>,
+    pub ongoing_trades: HashMap<Uuid, TradeContext>,
 }
 
 impl Default for ShardServerState {
@@ -32,7 +32,7 @@ impl Default for ShardServerState {
         };
         for npc in tdata_get().get_npcs() {
             let chunk_pos = npc.get_position().chunk_coords();
-            let entity_map = state.get_entity_map();
+            let entity_map = &mut state.entity_map;
             let id = entity_map.track(Box::new(npc));
             entity_map.update(id, Some(chunk_pos), None);
         }
@@ -48,22 +48,6 @@ impl ShardServerState {
         let id = self.next_pc_id;
         self.next_pc_id += 1;
         id
-    }
-
-    pub fn get_login_data(&mut self) -> &mut HashMap<i64, LoginData> {
-        &mut self.login_data
-    }
-
-    pub fn get_entity_map(&mut self) -> &mut EntityMap {
-        &mut self.entity_map
-    }
-
-    pub fn get_buyback_lists(&mut self) -> &mut HashMap<i32, Vec<Item>> {
-        &mut self.buyback_lists
-    }
-
-    pub fn get_ongoing_trades(&mut self) -> &mut HashMap<Uuid, TradeContext> {
-        &mut self.ongoing_trades
     }
 
     pub fn set_login_server_conn_id(&mut self, conn_id: i64) {

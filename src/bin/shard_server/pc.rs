@@ -12,7 +12,7 @@ pub fn pc_enter(
 ) -> FFResult<()> {
     let pkt: &sP_CL2FE_REQ_PC_ENTER = client.get_packet(P_CL2FE_REQ_PC_ENTER)?;
     let serial_key: i64 = pkt.iEnterSerialKey;
-    let login_data = state.get_login_data().remove(&serial_key).unwrap();
+    let login_data = state.login_data.remove(&serial_key).unwrap();
     let pc_id = state.gen_next_pc_id();
     let mut player = login_data.player;
     player.set_player_id(pc_id);
@@ -35,7 +35,7 @@ pub fn pc_enter(
     client.fe_key = login_data.uiFEKey.to_le_bytes();
     client.enc_mode = EncryptionMode::FEKey;
 
-    state.get_entity_map().track(Box::new(player));
+    state.entity_map.track(Box::new(player));
 
     client.send_packet(P_FE2CL_REP_PC_ENTER_SUCC, &resp)
 }
@@ -85,7 +85,7 @@ pub fn pc_move(
     };
 
     state
-        .get_entity_map()
+        .entity_map
         .for_each_around(EntityID::Player(pc_id), clients, |client| {
             let _ = client.send_packet(P_FE2CL_PC_MOVE, &resp);
         });
@@ -95,7 +95,7 @@ pub fn pc_move(
     let chunk = player.set_position(pos);
     player.set_rotation(angle);
     state
-        .get_entity_map()
+        .entity_map
         .update(entity_id, Some(chunk), Some(clients));
     Ok(())
 }
@@ -127,7 +127,7 @@ pub fn pc_jump(
     };
 
     state
-        .get_entity_map()
+        .entity_map
         .for_each_around(EntityID::Player(pc_id), clients, |client| {
             let _ = client.send_packet(P_FE2CL_PC_JUMP, &resp);
         });
@@ -137,7 +137,7 @@ pub fn pc_jump(
     let chunk = player.set_position(pos);
     player.set_rotation(angle);
     state
-        .get_entity_map()
+        .entity_map
         .update(entity_id, Some(chunk), Some(clients));
     Ok(())
 }
@@ -162,7 +162,7 @@ pub fn pc_stop(
     };
 
     state
-        .get_entity_map()
+        .entity_map
         .for_each_around(EntityID::Player(pc_id), clients, |client| {
             let _ = client.send_packet(P_FE2CL_PC_STOP, &resp);
         });
@@ -171,7 +171,7 @@ pub fn pc_stop(
     let entity_id = player.get_id();
     let chunk = player.set_position(pos);
     state
-        .get_entity_map()
+        .entity_map
         .update(entity_id, Some(chunk), Some(clients));
     Ok(())
 }

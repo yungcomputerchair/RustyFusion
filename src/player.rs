@@ -550,8 +550,8 @@ impl Entity for Player {
 
     fn cleanup(&mut self, state: &mut ShardServerState) {
         let pc_id = self.get_player_id();
-        if state.get_buyback_lists().contains_key(&pc_id) {
-            state.get_buyback_lists().remove(&pc_id);
+        if state.buyback_lists.contains_key(&pc_id) {
+            state.buyback_lists.remove(&pc_id);
         }
     }
 

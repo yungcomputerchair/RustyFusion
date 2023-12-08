@@ -61,7 +61,7 @@ pub fn login_update_info(server: &mut FFClient, state: &mut ShardServerState) ->
     };
 
     let serial_key = resp.iEnterSerialKey;
-    let ld = state.get_login_data();
+    let ld = &mut state.login_data;
     if ld.contains_key(&serial_key) {
         // this serial key was already registered...
         // extremely unlikely?
