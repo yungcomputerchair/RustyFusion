@@ -1,7 +1,6 @@
 use std::{any::Any, fmt::Display};
 
 use crate::{
-    chunk::EntityMap,
     defines::*,
     enums::ItemLocation,
     error::{FFError, FFResult, Severity},
@@ -523,17 +522,9 @@ impl Entity for Player {
         self.position
     }
 
-    fn set_position(
-        &mut self,
-        pos: Position,
-        entity_map: Option<&mut EntityMap>,
-        client_map: Option<&mut ClientMap>,
-    ) {
+    fn set_position(&mut self, pos: Position) -> (i32, i32) {
         self.position = pos;
-        if let Some(entity_map) = entity_map {
-            let chunk = self.position.chunk_coords();
-            entity_map.update(self.get_id(), Some(chunk), client_map);
-        }
+        self.position.chunk_coords()
     }
 
     fn set_rotation(&mut self, angle: i32) {

@@ -90,10 +90,14 @@ pub fn pc_move(
             let _ = client.send_packet(P_FE2CL_PC_MOVE, &resp);
         });
 
-    state.update_player(pc_id, |player, state| {
-        player.set_position(pos, Some(state.get_entity_map()), Some(clients));
-        player.set_rotation(angle);
-    })
+    let player = state.get_player_mut(pc_id)?;
+    let entity_id = player.get_id();
+    let chunk = player.set_position(pos);
+    player.set_rotation(angle);
+    state
+        .get_entity_map()
+        .update(entity_id, Some(chunk), Some(clients));
+    Ok(())
 }
 
 pub fn pc_jump(
@@ -128,10 +132,14 @@ pub fn pc_jump(
             let _ = client.send_packet(P_FE2CL_PC_JUMP, &resp);
         });
 
-    state.update_player(pc_id, |player, state| {
-        player.set_position(pos, Some(state.get_entity_map()), Some(clients));
-        player.set_rotation(angle);
-    })
+    let player = state.get_player_mut(pc_id)?;
+    let entity_id = player.get_id();
+    let chunk = player.set_position(pos);
+    player.set_rotation(angle);
+    state
+        .get_entity_map()
+        .update(entity_id, Some(chunk), Some(clients));
+    Ok(())
 }
 
 pub fn pc_stop(
@@ -159,9 +167,13 @@ pub fn pc_stop(
             let _ = client.send_packet(P_FE2CL_PC_STOP, &resp);
         });
 
-    state.update_player(pc_id, |player, state| {
-        player.set_position(pos, Some(state.get_entity_map()), Some(clients));
-    })
+    let player = state.get_player_mut(pc_id)?;
+    let entity_id = player.get_id();
+    let chunk = player.set_position(pos);
+    state
+        .get_entity_map()
+        .update(entity_id, Some(chunk), Some(clients));
+    Ok(())
 }
 
 pub fn pc_special_state_switch(

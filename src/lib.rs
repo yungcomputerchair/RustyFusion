@@ -5,7 +5,6 @@ extern crate num_derive;
 
 use std::{any::Any, cmp::min, hash::Hash, time::SystemTime};
 
-use chunk::EntityMap;
 use defines::SIZEOF_VENDOR_TABLE_SLOT;
 use enums::ItemType;
 use error::{FFError, FFResult};
@@ -344,12 +343,7 @@ pub trait Entity {
     fn get_id(&self) -> EntityID;
     fn get_client<'a>(&self, client_map: &'a mut ClientMap) -> Option<&'a mut FFClient>;
     fn get_position(&self) -> Position;
-    fn set_position(
-        &mut self,
-        pos: Position,
-        entity_map: Option<&mut EntityMap>,
-        client_map: Option<&mut ClientMap>,
-    );
+    fn set_position(&mut self, pos: Position) -> (i32, i32);
     fn set_rotation(&mut self, angle: i32);
     fn send_enter(&self, client: &mut FFClient) -> FFResult<()>;
     fn send_exit(&self, client: &mut FFClient) -> FFResult<()>;

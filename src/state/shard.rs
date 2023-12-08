@@ -68,16 +68,4 @@ impl ShardServerState {
             format!("Player with ID {} doesn't exist", pc_id),
         ))
     }
-
-    pub fn update_player(
-        &mut self,
-        pc_id: i32,
-        f: impl FnOnce(&mut Player, &mut Self),
-    ) -> FFResult<()> {
-        // to avoid a double-borrow, we create a copy of the player and then replace it
-        let mut player = *self.get_player_mut(pc_id)?;
-        f(&mut player, self);
-        *self.get_player_mut(pc_id)? = player;
-        Ok(())
-    }
 }

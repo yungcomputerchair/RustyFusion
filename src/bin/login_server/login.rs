@@ -33,15 +33,11 @@ pub fn login(
         let mut player = Player::new(TEST_ACC_UID_START);
         player.set_name(1, util::encode_utf16("TestF"), util::encode_utf16("TestL"));
         player.set_god_mode(true);
-        player.set_position(
-            Position {
-                x: 534829,
-                y: 538992,
-                z: -1029,
-            },
-            None,
-            None,
-        ); // Mt. Blackhead
+        player.set_position(Position {
+            x: 534829,
+            y: 538992,
+            z: -1029,
+        }); // Mt. Blackhead
         players.push(player);
 
         let mut player = Player::new(TEST_ACC_UID_START + 1);
