@@ -276,9 +276,61 @@ impl VendorData {
 }
 
 #[derive(Default, Clone, Copy)]
+pub struct TradeItem {
+    pub inven_slot_num: usize,
+    pub quantity: u16,
+}
+#[derive(Default, Clone, Copy)]
 struct TradeOffer {
     taros: u32,
-    items: [Option<Item>; 5],
+    items: [Option<TradeItem>; 5],
+}
+impl TradeOffer {
+    fn add_item(
+        &mut self,
+        trade_slot_num: usize,
+        inven_slot_num: usize,
+        quantity: u16,
+    ) -> FFResult<u16> {
+        if trade_slot_num >= self.items.len() {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Trade slot number {} out of range", trade_slot_num),
+            ));
+        }
+
+        self.items[trade_slot_num] = Some(TradeItem {
+            inven_slot_num,
+            quantity,
+        });
+
+        let mut quantity = 0;
+        for trade_item in self.items.iter().flatten() {
+            if trade_item.inven_slot_num == inven_slot_num {
+                quantity += trade_item.quantity;
+            }
+        }
+        Ok(quantity)
+    }
+
+    fn remove_item(&mut self, trade_slot_num: usize) -> FFResult<TradeItem> {
+        if trade_slot_num >= self.items.len() {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Trade slot number {} out of range", trade_slot_num),
+            ));
+        }
+
+        if self.items[trade_slot_num].is_none() {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Nothing in trade slot {}", trade_slot_num),
+            ));
+        }
+
+        let removed_item = self.items[trade_slot_num].take().unwrap();
+        Ok(removed_item)
+    }
 }
 pub struct TradeContext {
     offers: HashMap<i32, TradeOffer>,
@@ -302,6 +354,22 @@ impl TradeContext {
         let offer = self.get_offer_mut(pc_id)?;
         offer.taros = taros;
         Ok(())
+    }
+
+    pub fn add_item(
+        &mut self,
+        pc_id: i32,
+        trade_slot_num: usize,
+        inven_slot_num: usize,
+        quantity: u16,
+    ) -> FFResult<u16> {
+        let offer = self.get_offer_mut(pc_id)?;
+        offer.add_item(trade_slot_num, inven_slot_num, quantity)
+    }
+
+    pub fn remove_item(&mut self, pc_id: i32, trade_slot_num: usize) -> FFResult<TradeItem> {
+        let offer = self.get_offer_mut(pc_id)?;
+        offer.remove_item(trade_slot_num)
     }
 }
 

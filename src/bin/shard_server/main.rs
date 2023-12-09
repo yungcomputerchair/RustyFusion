@@ -179,6 +179,7 @@ fn handle_packet(
         P_CL2FE_REQ_PC_TRADE_OFFER_ACCEPT => trade::trade_offer_accept(&mut clients, state),
         P_CL2FE_REQ_PC_TRADE_OFFER_CANCEL => trade::trade_offer_cancel(&mut clients),
         P_CL2FE_REQ_PC_TRADE_CASH_REGISTER => trade::trade_cash_register(&mut clients, state),
+        P_CL2FE_REQ_PC_TRADE_ITEM_REGISTER => trade::trade_item_register(&mut clients, state),
         //
         P_CL2FE_REP_LIVE_CHECK => Ok(()),
         //
