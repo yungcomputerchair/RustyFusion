@@ -64,7 +64,9 @@ pub fn trade_offer_accept(clients: &mut ClientMap, state: &mut ShardServerState)
             player_to.trade_id = Some(trade_id);
             let other_client = clients.get_from_player_id(pkt.iID_From)?;
             let _ = other_client.send_packet(P_FE2CL_REP_PC_TRADE_OFFER_SUCC, &resp);
-            state.ongoing_trades.insert(trade_id, TradeContext {});
+            state
+                .ongoing_trades
+                .insert(trade_id, TradeContext::new([pkt.iID_From, pkt.iID_To]));
             Ok(())
         })(),
         || {
@@ -114,4 +116,65 @@ pub fn trade_offer_cancel(clients: &mut ClientMap) -> FFResult<()> {
     let other_client = clients.get_from_player_id(resp.iID_From)?;
     let _ = other_client.send_packet(P_FE2CL_REP_PC_TRADE_OFFER_CANCEL, &resp);
     Ok(())
+}
+
+pub fn trade_cash_register(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let pkt: sP_CL2FE_REQ_PC_TRADE_CASH_REGISTER = *clients
+        .get_self()
+        .get_packet(P_CL2FE_REQ_PC_TRADE_CASH_REGISTER)?;
+    catch_fail(
+        (|| {
+            let client = clients.get_self();
+            let pc_id = client.get_player_id()?;
+            let player = state.get_player(pc_id)?;
+            let trade_id = player.trade_id.ok_or(FFError::build(
+                Severity::Warning,
+                format!("Player {} is not trading", player.get_player_id()),
+            ))?;
+
+            let req_taros = pkt.iCandy as u32;
+            if player.get_taros() < req_taros {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!(
+                        "Player doesn't have enough taros ({} < {})",
+                        player.get_taros(),
+                        req_taros
+                    ),
+                ));
+            }
+
+            let trade = state
+                .ongoing_trades
+                .get_mut(&trade_id)
+                .ok_or(FFError::build(
+                    Severity::Warning,
+                    format!("Trade {} doesn't exist", trade_id),
+                ))?;
+            trade.set_taros(pc_id, req_taros)?;
+
+            let resp = sP_FE2CL_REP_PC_TRADE_CASH_REGISTER_SUCC {
+                iID_Request: pkt.iID_Request,
+                iID_From: pkt.iID_From,
+                iID_To: pkt.iID_To,
+                iCandy: pkt.iCandy,
+            };
+            // just blast the packet to both parties
+            let client_one = clients.get_from_player_id(pkt.iID_From)?;
+            let _ = client_one.send_packet(P_FE2CL_REP_PC_TRADE_CASH_REGISTER_SUCC, &resp);
+            let client_two = clients.get_from_player_id(pkt.iID_To)?;
+            let _ = client_two.send_packet(P_FE2CL_REP_PC_TRADE_CASH_REGISTER_SUCC, &resp);
+            Ok(())
+        })(),
+        || {
+            let client = clients.get_self();
+            let resp = sP_FE2CL_REP_PC_TRADE_CASH_REGISTER_FAIL {
+                iID_Request: pkt.iID_Request,
+                iID_From: pkt.iID_From,
+                iID_To: pkt.iID_To,
+                iErrorCode: unused!(),
+            };
+            client.send_packet(P_FE2CL_REP_PC_TRADE_CASH_REGISTER_FAIL, &resp)
+        },
+    )
 }

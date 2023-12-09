@@ -3,11 +3,11 @@
 #[macro_use]
 extern crate num_derive;
 
-use std::{any::Any, cmp::min, hash::Hash, time::SystemTime};
+use std::{any::Any, cmp::min, collections::HashMap, hash::Hash, time::SystemTime};
 
 use defines::SIZEOF_VENDOR_TABLE_SLOT;
 use enums::ItemType;
-use error::{FFError, FFResult};
+use error::{FFError, FFResult, Severity};
 use net::{
     ffclient::FFClient,
     packet::{sItemBase, sItemVendor, sNano, sRunningQuest},
@@ -275,7 +275,35 @@ impl VendorData {
     }
 }
 
-pub struct TradeContext {}
+#[derive(Default, Clone, Copy)]
+struct TradeOffer {
+    taros: u32,
+    items: [Option<Item>; 5],
+}
+pub struct TradeContext {
+    offers: HashMap<i32, TradeOffer>,
+}
+impl TradeContext {
+    pub fn new(pc_ids: [i32; 2]) -> Self {
+        let mut offers = HashMap::new();
+        offers.insert(pc_ids[0], TradeOffer::default());
+        offers.insert(pc_ids[1], TradeOffer::default());
+        Self { offers }
+    }
+
+    fn get_offer_mut(&mut self, pc_id: i32) -> FFResult<&mut TradeOffer> {
+        self.offers.get_mut(&pc_id).ok_or(FFError::build(
+            Severity::Warning,
+            format!("Player {} is not a part of the trade", pc_id),
+        ))
+    }
+
+    pub fn set_taros(&mut self, pc_id: i32, taros: u32) -> FFResult<()> {
+        let offer = self.get_offer_mut(pc_id)?;
+        offer.taros = taros;
+        Ok(())
+    }
+}
 
 pub struct CrocPotData {
     pub base_chance: f32,
