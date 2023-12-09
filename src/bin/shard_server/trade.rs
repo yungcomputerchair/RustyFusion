@@ -101,3 +101,17 @@ pub fn trade_offer_refusal(clients: &mut ClientMap) -> FFResult<()> {
     let _ = other_client.send_packet(P_FE2CL_REP_PC_TRADE_OFFER_REFUSAL, &resp);
     Ok(())
 }
+
+pub fn trade_offer_cancel(clients: &mut ClientMap) -> FFResult<()> {
+    let client = clients.get_self();
+    let pkt: &sP_CL2FE_REQ_PC_TRADE_OFFER_CANCEL =
+        client.get_packet(P_CL2FE_REQ_PC_TRADE_OFFER_CANCEL)?;
+    let resp = sP_FE2CL_REP_PC_TRADE_OFFER_CANCEL {
+        iID_Request: pkt.iID_Request,
+        iID_From: pkt.iID_From,
+        iID_To: pkt.iID_To,
+    };
+    let other_client = clients.get_from_player_id(resp.iID_From)?;
+    let _ = other_client.send_packet(P_FE2CL_REP_PC_TRADE_OFFER_CANCEL, &resp);
+    Ok(())
+}
