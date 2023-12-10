@@ -90,7 +90,7 @@ impl Entity for NPC {
         client.send_packet(PacketID::P_FE2CL_NPC_EXIT, &pkt)
     }
 
-    fn cleanup(&mut self, _state: &mut ShardServerState) {}
+    fn cleanup(&mut self, _clients: &mut ClientMap, _state: &mut ShardServerState) {}
 
     fn as_any(&self) -> &dyn std::any::Any {
         self

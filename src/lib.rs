@@ -3,7 +3,7 @@
 #[macro_use]
 extern crate num_derive;
 
-use std::{any::Any, cmp::min, collections::HashMap, hash::Hash, time::SystemTime};
+use std::{any::Any, cmp::min, hash::Hash, time::SystemTime};
 
 use defines::{SIZEOF_TRADE_SLOT, SIZEOF_VENDOR_TABLE_SLOT};
 use enums::ItemType;
@@ -344,30 +344,44 @@ impl TradeOffer {
     }
 }
 pub struct TradeContext {
-    offers: HashMap<i32, TradeOffer>,
+    pc_ids: [i32; 2],
+    offers: [TradeOffer; 2],
 }
 impl TradeContext {
     pub fn new(pc_ids: [i32; 2]) -> Self {
-        let mut offers = HashMap::new();
-        offers.insert(pc_ids[0], TradeOffer::default());
-        offers.insert(pc_ids[1], TradeOffer::default());
-        Self { offers }
+        Self {
+            pc_ids,
+            offers: Default::default(),
+        }
+    }
+
+    pub fn get_id_from(&self) -> i32 {
+        self.pc_ids[0]
+    }
+
+    pub fn get_id_to(&self) -> i32 {
+        self.pc_ids[1]
     }
 
     pub fn get_other_id(&self, pc_id: i32) -> i32 {
-        for id in self.offers.keys() {
-            if *id != pc_id {
-                return *id;
+        for id in self.pc_ids {
+            if id != pc_id {
+                return id;
             }
         }
         panic!("Bad trade state");
     }
 
     fn get_offer_mut(&mut self, pc_id: i32) -> FFResult<&mut TradeOffer> {
-        self.offers.get_mut(&pc_id).ok_or(FFError::build(
-            Severity::Warning,
-            format!("Player {} is not a part of the trade", pc_id),
-        ))
+        let idx = self
+            .pc_ids
+            .iter()
+            .position(|id| *id == pc_id)
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Player {} is not a part of the trade", pc_id),
+            ))?;
+        Ok(&mut self.offers[idx])
     }
 
     pub fn set_taros(&mut self, pc_id: i32, taros: u32) -> FFResult<()> {
@@ -396,7 +410,7 @@ impl TradeContext {
     }
 
     fn is_ready(&self) -> bool {
-        self.offers.iter().all(|(_, offer)| offer.confirmed)
+        self.offers.iter().all(|offer| offer.confirmed)
     }
 
     pub fn lock_in(&mut self, pc_id: i32) -> FFResult<bool> {
@@ -541,7 +555,7 @@ pub trait Entity {
     fn send_enter(&self, client: &mut FFClient) -> FFResult<()>;
     fn send_exit(&self, client: &mut FFClient) -> FFResult<()>;
 
-    fn cleanup(&mut self, state: &mut ShardServerState);
+    fn cleanup(&mut self, clients: &mut ClientMap, state: &mut ShardServerState);
 
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;

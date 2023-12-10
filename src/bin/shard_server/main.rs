@@ -116,7 +116,7 @@ fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>, state: 
             let entity_map = &mut state.entity_map;
             entity_map.update(id, None, Some(&mut clients));
             let mut player = entity_map.untrack(id);
-            player.cleanup(state);
+            player.cleanup(&mut clients, state);
         }
         _ => (),
     }

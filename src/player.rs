@@ -8,7 +8,8 @@ use crate::{
         ffclient::FFClient,
         packet::{
             sPCAppearanceData, sPCLoadData2CL, sPCStyle, sPCStyle2, sP_FE2CL_PC_EXIT,
-            sP_FE2CL_PC_NEW, sTimeBuff, PacketID,
+            sP_FE2CL_PC_NEW, sP_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL, sTimeBuff,
+            PacketID::{self, *},
         },
         ClientMap,
     },
@@ -586,10 +587,27 @@ impl Entity for Player {
         client.send_packet(PacketID::P_FE2CL_PC_EXIT, &pkt)
     }
 
-    fn cleanup(&mut self, state: &mut ShardServerState) {
+    fn cleanup(&mut self, clients: &mut ClientMap, state: &mut ShardServerState) {
         let pc_id = self.get_player_id();
+
+        // cleanup the buyback list
         if state.buyback_lists.contains_key(&pc_id) {
             state.buyback_lists.remove(&pc_id);
+        }
+
+        // cleanup ongoing trade
+        if let Some(trade_id) = self.trade_id {
+            let trade = state.ongoing_trades.remove(&trade_id).unwrap();
+            let pc_id_other = trade.get_other_id(pc_id);
+            let player_other = state.get_player_mut(pc_id_other).unwrap();
+            player_other.trade_id = None;
+            let client_other = clients.get_from_player_id(pc_id_other).unwrap();
+            let pkt_cancel = sP_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL {
+                iID_Request: pc_id,
+                iID_From: trade.get_id_from(),
+                iID_To: trade.get_id_to(),
+            };
+            let _ = client_other.send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL, &pkt_cancel);
         }
     }
 
