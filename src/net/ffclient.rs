@@ -34,7 +34,7 @@ pub struct FFClient {
     addr: SocketAddr,
     in_buf: [u8; PACKET_BUFFER_SIZE],
     in_buf_ptr: usize,
-    in_buf_len: usize,
+    in_data_len: usize,
     out_buf: [u8; PACKET_BUFFER_SIZE],
     out_buf_ptr: usize,
     pub e_key: [u8; CRYPTO_KEY_SIZE],
@@ -52,7 +52,7 @@ impl FFClient {
             addr: conn_data.1,
             in_buf: [0; PACKET_BUFFER_SIZE],
             in_buf_ptr: 0,
-            in_buf_len: 0,
+            in_data_len: 0,
             out_buf: [0; PACKET_BUFFER_SIZE],
             out_buf_ptr: 0,
             e_key: default_key,
@@ -96,12 +96,12 @@ impl FFClient {
     pub fn peek_packet_id(&self) -> FFResult<PacketID> {
         let from = self.in_buf_ptr;
         let to = from + 4;
-        if to > self.in_buf_len {
+        if to > self.in_data_len {
             return Err(FFError::build(
                 Severity::Warning,
                 format!(
-                    "Couldn't peek packet ID; buffer exhausted: {} > {}",
-                    to, self.in_buf_len
+                    "Couldn't peek packet ID; not enough bytes came in: {} > {}",
+                    to, self.in_data_len
                 ),
             ));
         }
@@ -128,12 +128,12 @@ impl FFClient {
         let sz: usize = size_of::<T>();
         let from = self.in_buf_ptr;
         let to = from + sz;
-        if to > self.in_buf_len {
+        if to > self.in_data_len {
             return Err(FFError::build(
                 Severity::Warning,
                 format!(
-                    "Couldn't read struct; buffer exhausted: {} > {}",
-                    to, self.in_buf_len
+                    "Couldn't read struct; not enough bytes came in: {} > {}",
+                    to, self.in_data_len
                 ),
             ));
         }
@@ -158,7 +158,7 @@ impl FFClient {
         let buf: &mut [u8] = &mut self.in_buf[..sz];
         self.sock.read_exact(buf).map_err(FFError::from_io_err)?;
         self.in_buf_ptr = 0;
-        self.in_buf_len = sz;
+        self.in_data_len = sz;
 
         // decrypt the packet (client always encrypts with E key)
         decrypt_payload(buf, &self.e_key);
