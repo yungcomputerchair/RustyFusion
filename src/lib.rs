@@ -315,7 +315,6 @@ impl TradeOffer {
             quantity,
         });
 
-        self.confirmed = false;
         Ok(self.get_count(inven_slot_num))
     }
 
@@ -362,6 +361,7 @@ impl TradeContext {
     pub fn set_taros(&mut self, pc_id: i32, taros: u32) -> FFResult<()> {
         let offer = self.get_offer_mut(pc_id)?;
         offer.taros = taros;
+        offer.confirmed = false;
         Ok(())
     }
 
@@ -373,12 +373,24 @@ impl TradeContext {
         quantity: u16,
     ) -> FFResult<u16> {
         let offer = self.get_offer_mut(pc_id)?;
+        offer.confirmed = false;
         offer.add_item(trade_slot_num, inven_slot_num, quantity)
     }
 
     pub fn remove_item(&mut self, pc_id: i32, trade_slot_num: usize) -> FFResult<(u16, usize)> {
         let offer = self.get_offer_mut(pc_id)?;
+        offer.confirmed = false;
         offer.remove_item(trade_slot_num)
+    }
+
+    fn is_ready(&self) -> bool {
+        self.offers.iter().all(|(_, offer)| offer.confirmed)
+    }
+
+    pub fn lock_in(&mut self, pc_id: i32) -> FFResult<bool> {
+        let offer = self.get_offer_mut(pc_id)?;
+        offer.confirmed = true;
+        Ok(self.is_ready())
     }
 }
 
