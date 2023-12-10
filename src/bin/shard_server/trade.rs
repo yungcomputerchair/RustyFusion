@@ -69,8 +69,8 @@ pub fn trade_offer_accept(clients: &mut ClientMap, state: &mut ShardServerState)
             let player_from = state.get_player_mut(pc_id_other)?;
             if player_from.trade_offered_to != Some(pc_id) {
                 return Err(FFError::build(
-                    Severity::Warning,
-                    format!("{} never offered to trade with {}", pkt.iID_From, pc_id),
+                    Severity::Info,
+                    format!("Trade offer from {} to {} expired", pkt.iID_From, pc_id),
                 ));
             } else {
                 player_from.trade_offered_to = None;
@@ -122,7 +122,7 @@ pub fn trade_offer_refusal(clients: &mut ClientMap) -> FFResult<()> {
     Ok(())
 }
 
-pub fn trade_offer_cancel(clients: &mut ClientMap) -> FFResult<()> {
+pub fn trade_offer_cancel(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
     let pkt: &sP_CL2FE_REQ_PC_TRADE_OFFER_CANCEL =
         client.get_packet(P_CL2FE_REQ_PC_TRADE_OFFER_CANCEL)?;
@@ -131,7 +131,17 @@ pub fn trade_offer_cancel(clients: &mut ClientMap) -> FFResult<()> {
         iID_From: pkt.iID_From,
         iID_To: pkt.iID_To,
     };
-    let other_client = clients.get_from_player_id(resp.iID_From)?;
+
+    let pc_id = client.get_player_id()?;
+    let pc_id_other = resp.iID_From;
+    let player_other = state.get_player_mut(pc_id_other)?;
+
+    // only reset offer if it was made to us last
+    if player_other.trade_offered_to == Some(pc_id) {
+        player_other.trade_offered_to = None;
+    }
+
+    let other_client = clients.get_from_player_id(pc_id_other)?;
     let _ = other_client.send_packet(P_FE2CL_REP_PC_TRADE_OFFER_CANCEL, &resp);
     Ok(())
 }
