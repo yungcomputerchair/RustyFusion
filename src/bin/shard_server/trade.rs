@@ -63,28 +63,28 @@ pub fn trade_offer_accept(clients: &mut ClientMap, state: &mut ShardServerState)
                 iID_To: pkt.iID_To,
             };
 
-            let player_from = state.get_player_mut(pkt.iID_From)?;
-            if player_from.trade_offered_to != Some(pkt.iID_To) {
+            let pc_id = clients.get_self().get_player_id()?;
+            let pc_id_other = pkt.iID_From;
+
+            let player_from = state.get_player_mut(pc_id_other)?;
+            if player_from.trade_offered_to != Some(pc_id) {
                 return Err(FFError::build(
                     Severity::Warning,
-                    format!(
-                        "{} never offered to trade with {}",
-                        pkt.iID_From, pkt.iID_To
-                    ),
+                    format!("{} never offered to trade with {}", pkt.iID_From, pc_id),
                 ));
             } else {
                 player_from.trade_offered_to = None;
             }
             player_from.trade_id = Some(trade_id);
 
-            let player_to = state.get_player_mut(pkt.iID_To)?;
+            let player_to = state.get_player_mut(pc_id)?;
             player_to.trade_id = Some(trade_id);
 
-            let other_client = clients.get_from_player_id(pkt.iID_From)?;
+            let other_client = clients.get_from_player_id(pc_id_other)?;
             let _ = other_client.send_packet(P_FE2CL_REP_PC_TRADE_OFFER_SUCC, &resp);
             state
                 .ongoing_trades
-                .insert(trade_id, TradeContext::new([pkt.iID_From, pkt.iID_To]));
+                .insert(trade_id, TradeContext::new([pc_id_other, pc_id]));
             Ok(())
         })(),
         || {
@@ -162,13 +162,7 @@ pub fn trade_cash_register(clients: &mut ClientMap, state: &mut ShardServerState
                 ));
             }
 
-            let trade = state
-                .ongoing_trades
-                .get_mut(&trade_id)
-                .ok_or(FFError::build(
-                    Severity::Warning,
-                    format!("Trade {} doesn't exist", trade_id),
-                ))?;
+            let trade = state.ongoing_trades.get_mut(&trade_id).unwrap();
             trade.set_taros(pc_id, req_taros)?;
 
             let resp = sP_FE2CL_REP_PC_TRADE_CASH_REGISTER_SUCC {
@@ -177,12 +171,11 @@ pub fn trade_cash_register(clients: &mut ClientMap, state: &mut ShardServerState
                 iID_To: pkt.iID_To,
                 iCandy: pkt.iCandy,
             };
-            // just blast the packet to both parties
-            let client_one = clients.get_from_player_id(pkt.iID_From)?;
-            let _ = client_one.send_packet(P_FE2CL_REP_PC_TRADE_CASH_REGISTER_SUCC, &resp);
-            let client_two = clients.get_from_player_id(pkt.iID_To)?;
-            let _ = client_two.send_packet(P_FE2CL_REP_PC_TRADE_CASH_REGISTER_SUCC, &resp);
-            Ok(())
+            let other_client = clients.get_from_player_id(trade.get_other_id(pc_id))?;
+            let _ = other_client.send_packet(P_FE2CL_REP_PC_TRADE_CASH_REGISTER_SUCC, &resp);
+            clients
+                .get_self()
+                .send_packet(P_FE2CL_REP_PC_TRADE_CASH_REGISTER_SUCC, &resp)
         })(),
         || {
             let client = clients.get_self();
@@ -235,13 +228,7 @@ pub fn trade_item_register(clients: &mut ClientMap, state: &mut ShardServerState
                 ));
             }
 
-            let trade = state
-                .ongoing_trades
-                .get_mut(&trade_id)
-                .ok_or(FFError::build(
-                    Severity::Warning,
-                    format!("Trade {} doesn't exist", trade_id),
-                ))?;
+            let trade = state.ongoing_trades.get_mut(&trade_id).unwrap();
             let trade_slot_num = pkt.Item.iSlotNum as usize;
             let quantity_left = item.get_quantity()
                 - trade.add_item(pc_id, trade_slot_num, inven_slot_num, quantity)?;
@@ -256,11 +243,11 @@ pub fn trade_item_register(clients: &mut ClientMap, state: &mut ShardServerState
                     ..pkt.Item
                 },
             };
-            let client_one = clients.get_from_player_id(pkt.iID_From)?;
-            let _ = client_one.send_packet(P_FE2CL_REP_PC_TRADE_ITEM_REGISTER_SUCC, &resp);
-            let client_two = clients.get_from_player_id(pkt.iID_To)?;
-            let _ = client_two.send_packet(P_FE2CL_REP_PC_TRADE_ITEM_REGISTER_SUCC, &resp);
-            Ok(())
+            let other_client = clients.get_from_player_id(trade.get_other_id(pc_id))?;
+            let _ = other_client.send_packet(P_FE2CL_REP_PC_TRADE_ITEM_REGISTER_SUCC, &resp);
+            clients
+                .get_self()
+                .send_packet(P_FE2CL_REP_PC_TRADE_ITEM_REGISTER_SUCC, &resp)
         })(),
         || {
             let client = clients.get_self();
@@ -292,13 +279,9 @@ pub fn trade_item_unregister(
                 format!("Player {} is not trading", player.get_player_id()),
             ))?;
 
-            let trade = state
-                .ongoing_trades
-                .get_mut(&trade_id)
-                .ok_or(FFError::build(
-                    Severity::Warning,
-                    format!("Trade {} doesn't exist", trade_id),
-                ))?;
+            let trade = state.ongoing_trades.get_mut(&trade_id).unwrap();
+            let other_pc_id = trade.get_other_id(pc_id);
+
             let trade_slot_num = pkt.Item.iSlotNum as usize;
             let (quantity_left, inven_slot_num) = trade.remove_item(pc_id, trade_slot_num)?;
             let item = state
@@ -323,11 +306,11 @@ pub fn trade_item_unregister(
                     ..pkt.Item
                 },
             };
-            let client_one = clients.get_from_player_id(pkt.iID_From)?;
-            let _ = client_one.send_packet(P_FE2CL_REP_PC_TRADE_ITEM_UNREGISTER_SUCC, &resp);
-            let client_two = clients.get_from_player_id(pkt.iID_To)?;
-            let _ = client_two.send_packet(P_FE2CL_REP_PC_TRADE_ITEM_UNREGISTER_SUCC, &resp);
-            Ok(())
+            let other_client = clients.get_from_player_id(other_pc_id)?;
+            let _ = other_client.send_packet(P_FE2CL_REP_PC_TRADE_ITEM_UNREGISTER_SUCC, &resp);
+            clients
+                .get_self()
+                .send_packet(P_FE2CL_REP_PC_TRADE_ITEM_UNREGISTER_SUCC, &resp)
         })(),
         || {
             let client = clients.get_self();

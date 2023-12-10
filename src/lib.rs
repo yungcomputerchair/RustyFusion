@@ -351,6 +351,15 @@ impl TradeContext {
         Self { offers }
     }
 
+    pub fn get_other_id(&self, pc_id: i32) -> i32 {
+        for id in self.offers.keys() {
+            if *id != pc_id {
+                return *id;
+            }
+        }
+        panic!("Bad trade state");
+    }
+
     fn get_offer_mut(&mut self, pc_id: i32) -> FFResult<&mut TradeOffer> {
         self.offers.get_mut(&pc_id).ok_or(FFError::build(
             Severity::Warning,
