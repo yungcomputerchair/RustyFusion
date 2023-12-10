@@ -238,7 +238,6 @@ pub fn trade_item_register(clients: &mut ClientMap, state: &mut ShardServerState
                     ..pkt.Item
                 },
             };
-            // just blast the packet to both parties
             let client_one = clients.get_from_player_id(pkt.iID_From)?;
             let _ = client_one.send_packet(P_FE2CL_REP_PC_TRADE_ITEM_REGISTER_SUCC, &resp);
             let client_two = clients.get_from_player_id(pkt.iID_To)?;
@@ -306,7 +305,6 @@ pub fn trade_item_unregister(
                     ..pkt.Item
                 },
             };
-            // just blast the packet to both parties
             let client_one = clients.get_from_player_id(pkt.iID_From)?;
             let _ = client_one.send_packet(P_FE2CL_REP_PC_TRADE_ITEM_UNREGISTER_SUCC, &resp);
             let client_two = clients.get_from_player_id(pkt.iID_To)?;
@@ -322,6 +320,41 @@ pub fn trade_item_unregister(
                 iErrorCode: unused!(),
             };
             client.send_packet(P_FE2CL_REP_PC_TRADE_ITEM_UNREGISTER_FAIL, &resp)
+        },
+    )
+}
+
+pub fn trade_emotes_chat(clients: &mut ClientMap) -> FFResult<()> {
+    let pkt: sP_CL2FE_REQ_PC_TRADE_EMOTES_CHAT = *clients
+        .get_self()
+        .get_packet(P_CL2FE_REQ_PC_TRADE_EMOTES_CHAT)?;
+    catch_fail(
+        (|| {
+            let resp = sP_FE2CL_REP_PC_TRADE_EMOTES_CHAT {
+                iID_Request: pkt.iID_Request,
+                iID_From: pkt.iID_From,
+                iID_To: pkt.iID_To,
+                szFreeChat: pkt.szFreeChat,
+                iEmoteCode: pkt.iEmoteCode,
+            };
+            let client_one = clients.get_from_player_id(pkt.iID_From)?;
+            let _ = client_one.send_packet(P_FE2CL_REP_PC_TRADE_EMOTES_CHAT, &resp);
+            let client_two = clients.get_from_player_id(pkt.iID_To)?;
+            let _ = client_two.send_packet(P_FE2CL_REP_PC_TRADE_EMOTES_CHAT, &resp);
+            Ok(())
+        })(),
+        || {
+            let resp = sP_FE2CL_REP_PC_TRADE_EMOTES_CHAT_FAIL {
+                iID_Request: pkt.iID_Request,
+                iID_From: pkt.iID_From,
+                iID_To: pkt.iID_To,
+                szFreeChat: pkt.szFreeChat,
+                iEmoteCode: pkt.iEmoteCode,
+                iErrorCode: unused!(),
+            };
+            clients
+                .get_self()
+                .send_packet(P_FE2CL_REP_PC_TRADE_EMOTES_CHAT_FAIL, &resp)
         },
     )
 }
