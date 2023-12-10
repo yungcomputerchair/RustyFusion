@@ -419,6 +419,29 @@ impl Player {
         Ok(old_item)
     }
 
+    pub fn find_free_slot(&self, location: ItemLocation) -> FFResult<usize> {
+        let inven = match location {
+            ItemLocation::Equip => self.inventory.equipped.as_slice(),
+            ItemLocation::Inven => self.inventory.main.as_slice(),
+            ItemLocation::QInven => self.inventory.mission.as_slice(),
+            ItemLocation::Bank => self.inventory.bank.as_slice(),
+        };
+
+        for (slot_num, slot) in inven.iter().enumerate() {
+            if slot.is_none() {
+                return Ok(slot_num);
+            }
+        }
+        Err(FFError::build(
+            Severity::Warning,
+            format!(
+                "Player {} has no free slots in {:?}",
+                self.get_player_id(),
+                location
+            ),
+        ))
+    }
+
     pub fn get_equipped(&self) -> [Option<Item>; 9] {
         self.inventory.equipped
     }

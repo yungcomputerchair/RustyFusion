@@ -365,6 +365,82 @@ pub fn trade_confirm_cancel(clients: &mut ClientMap, state: &mut ShardServerStat
     Ok(())
 }
 
+pub fn trade_confirm(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let client = clients.get_self();
+    let pkt: &sP_CL2FE_REQ_PC_TRADE_CONFIRM = client.get_packet(P_CL2FE_REQ_PC_TRADE_CONFIRM)?;
+    let resp = sP_FE2CL_REP_PC_TRADE_CONFIRM {
+        iID_Request: pkt.iID_Request,
+        iID_From: pkt.iID_From,
+        iID_To: pkt.iID_To,
+    };
+
+    let pc_id = client.get_player_id()?;
+    let player = state.get_player(pc_id)?;
+    let trade_id = player.trade_id.ok_or(FFError::build(
+        Severity::Warning,
+        format!("Player {} is not trading", player.get_player_id()),
+    ))?;
+
+    let trade = state.ongoing_trades.get_mut(&trade_id).unwrap();
+    let pc_id_other = trade.get_other_id(pc_id);
+    let both_ready = trade.lock_in(pc_id)?;
+
+    client.send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM, &resp)?;
+    let client_other = clients.get_from_player_id(pc_id_other)?;
+    let _ = client_other.send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM, &resp);
+
+    if !both_ready {
+        return Ok(());
+    }
+
+    // carry out trade
+
+    let player = state.get_player_mut(pc_id).unwrap();
+    player.trade_id = None;
+    let mut player = *player;
+
+    let player_other = state.get_player_mut(pc_id_other).unwrap();
+    player_other.trade_id = None;
+    let mut player_other = *player_other;
+
+    let trade = state.ongoing_trades.remove(&trade_id).unwrap();
+    if let Ok((items, items_other)) = trade.resolve((&mut player, &mut player_other)) {
+        // save traded state
+        *state.get_player_mut(pc_id).unwrap() = player;
+        *state.get_player_mut(pc_id_other).unwrap() = player_other;
+
+        let resp = sP_FE2CL_REP_PC_TRADE_CONFIRM_SUCC {
+            iID_Request: resp.iID_Request,
+            iID_From: resp.iID_From,
+            iID_To: resp.iID_To,
+            iCandy: player_other.get_taros() as i32,
+            Item: items_other,
+            ItemStay: items,
+        };
+        let _ = client_other.send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM_SUCC, &resp);
+
+        let resp = sP_FE2CL_REP_PC_TRADE_CONFIRM_SUCC {
+            iCandy: player.get_taros() as i32,
+            Item: items,
+            ItemStay: items_other,
+            ..resp
+        };
+        clients
+            .get_self()
+            .send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM_SUCC, &resp)
+    } else {
+        let resp = sP_FE2CL_REP_PC_TRADE_CONFIRM_ABORT {
+            iID_Request: resp.iID_Request,
+            iID_From: resp.iID_From,
+            iID_To: resp.iID_To,
+        };
+        let _ = client_other.send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM_ABORT, &resp);
+        clients
+            .get_self()
+            .send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM_ABORT, &resp)
+    }
+}
+
 pub fn trade_emotes_chat(clients: &mut ClientMap) -> FFResult<()> {
     let pkt: sP_CL2FE_REQ_PC_TRADE_EMOTES_CHAT = *clients
         .get_self()

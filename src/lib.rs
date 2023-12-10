@@ -5,16 +5,19 @@ extern crate num_derive;
 
 use std::{any::Any, cmp::min, collections::HashMap, hash::Hash, time::SystemTime};
 
-use defines::SIZEOF_VENDOR_TABLE_SLOT;
+use defines::{SIZEOF_TRADE_SLOT, SIZEOF_VENDOR_TABLE_SLOT};
 use enums::ItemType;
 use error::{FFError, FFResult, Severity};
 use net::{
     ffclient::FFClient,
-    packet::{sItemBase, sItemVendor, sNano, sRunningQuest},
+    packet::{sItemBase, sItemTrade, sItemVendor, sNano, sRunningQuest},
     ClientMap,
 };
+use player::Player;
 use state::shard::ShardServerState;
 use tabledata::tdata_get;
+
+use crate::enums::ItemLocation;
 
 #[macro_export]
 macro_rules! unused {
@@ -400,6 +403,68 @@ impl TradeContext {
         let offer = self.get_offer_mut(pc_id)?;
         offer.confirmed = true;
         Ok(self.is_ready())
+    }
+
+    pub fn resolve(
+        mut self,
+        players: (&mut Player, &mut Player),
+    ) -> FFResult<(
+        [sItemTrade; SIZEOF_TRADE_SLOT as usize],
+        [sItemTrade; SIZEOF_TRADE_SLOT as usize],
+    )> {
+        fn transfer(
+            offer: &mut TradeOffer,
+            from: &mut Player,
+            to: &mut Player,
+        ) -> FFResult<Vec<sItemTrade>> {
+            // taros
+            from.set_taros(from.get_taros() - offer.taros);
+            to.set_taros(to.get_taros() + offer.taros);
+
+            // items
+            let mut items = Vec::new();
+            for item in offer.items.iter().flatten() {
+                let slot = from
+                    .get_item_mut(ItemLocation::Inven, item.inven_slot_num)
+                    .unwrap();
+                let item_traded = Item::split_items(slot, item.quantity).unwrap();
+                let free_slot = to.find_free_slot(ItemLocation::Inven)?;
+                to.set_item(ItemLocation::Inven, free_slot, Some(item_traded))
+                    .unwrap();
+                items.push(sItemTrade {
+                    iType: item_traded.ty as i16,
+                    iID: item_traded.id,
+                    iOpt: item_traded.quantity as i32,
+                    iInvenNum: free_slot as i32,
+                    iSlotNum: unused!(),
+                });
+            }
+
+            Ok(items)
+        }
+
+        let blank_item = sItemTrade {
+            iType: 0,
+            iID: 0,
+            iOpt: 0,
+            iInvenNum: 0,
+            iSlotNum: 0,
+        };
+        let mut items = (
+            transfer(
+                self.get_offer_mut(players.0.get_player_id()).unwrap(),
+                players.0,
+                players.1,
+            )?,
+            transfer(
+                self.get_offer_mut(players.1.get_player_id()).unwrap(),
+                players.1,
+                players.0,
+            )?,
+        );
+        items.0.resize(SIZEOF_TRADE_SLOT as usize, blank_item);
+        items.1.resize(SIZEOF_TRADE_SLOT as usize, blank_item);
+        Ok((items.1.try_into().unwrap(), items.0.try_into().unwrap()))
     }
 }
 
