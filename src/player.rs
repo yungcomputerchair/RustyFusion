@@ -147,6 +147,7 @@ pub struct Player {
     weapon_boosts: u32,
     buddy_warp_time: i32,
     pub trade_id: Option<Uuid>,
+    pub trade_offered_to: Option<i32>,
 }
 impl Player {
     pub fn new(uid: i64) -> Self {

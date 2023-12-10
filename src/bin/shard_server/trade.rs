@@ -3,13 +3,13 @@ use uuid::Uuid;
 
 use super::*;
 
-pub fn trade_offer(clients: &mut ClientMap, state: &ShardServerState) -> FFResult<()> {
+pub fn trade_offer(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let pkt: sP_CL2FE_REQ_PC_TRADE_OFFER =
         *clients.get_self().get_packet(P_CL2FE_REQ_PC_TRADE_OFFER)?;
     catch_fail(
         (|| {
             let client = clients.get_self();
-            let player = state.get_player(client.get_player_id()?)?;
+            let player = state.get_player_mut(client.get_player_id()?)?;
             if player.trade_id.is_some() {
                 return Err(FFError::build(
                     Severity::Warning,
@@ -24,6 +24,10 @@ pub fn trade_offer(clients: &mut ClientMap, state: &ShardServerState) -> FFResul
                     format!("To player {} already trading", other_player.get_player_id()),
                 ));
             }
+
+            // to avoid other clients making offers on our behalf
+            let player = state.get_player_mut(client.get_player_id()?)?;
+            player.trade_offered_to = Some(pkt.iID_To);
 
             let other_client = clients.get_from_player_id(pkt.iID_To)?;
             let resp = sP_FE2CL_REP_PC_TRADE_OFFER {
@@ -58,10 +62,24 @@ pub fn trade_offer_accept(clients: &mut ClientMap, state: &mut ShardServerState)
                 iID_From: pkt.iID_From,
                 iID_To: pkt.iID_To,
             };
+
             let player_from = state.get_player_mut(pkt.iID_From)?;
+            if player_from.trade_offered_to != Some(pkt.iID_To) {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!(
+                        "{} never offered to trade with {}",
+                        pkt.iID_From, pkt.iID_To
+                    ),
+                ));
+            } else {
+                player_from.trade_offered_to = None;
+            }
             player_from.trade_id = Some(trade_id);
+
             let player_to = state.get_player_mut(pkt.iID_To)?;
             player_to.trade_id = Some(trade_id);
+
             let other_client = clients.get_from_player_id(pkt.iID_From)?;
             let _ = other_client.send_packet(P_FE2CL_REP_PC_TRADE_OFFER_SUCC, &resp);
             state
