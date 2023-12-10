@@ -257,3 +257,71 @@ pub fn trade_item_register(clients: &mut ClientMap, state: &mut ShardServerState
         },
     )
 }
+
+pub fn trade_item_unregister(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let pkt: sP_CL2FE_REQ_PC_TRADE_ITEM_UNREGISTER = *clients
+        .get_self()
+        .get_packet(P_CL2FE_REQ_PC_TRADE_ITEM_UNREGISTER)?;
+    catch_fail(
+        (|| {
+            let client = clients.get_self();
+            let pc_id = client.get_player_id()?;
+            let player = state.get_player(pc_id)?;
+            let trade_id = player.trade_id.ok_or(FFError::build(
+                Severity::Warning,
+                format!("Player {} is not trading", player.get_player_id()),
+            ))?;
+
+            let trade = state
+                .ongoing_trades
+                .get_mut(&trade_id)
+                .ok_or(FFError::build(
+                    Severity::Warning,
+                    format!("Trade {} doesn't exist", trade_id),
+                ))?;
+            let trade_slot_num = pkt.Item.iSlotNum as usize;
+            let (quantity_left, inven_slot_num) = trade.remove_item(pc_id, trade_slot_num)?;
+            let item = state
+                .get_player(pc_id)
+                .unwrap()
+                .get_item(ItemLocation::Inven, inven_slot_num)
+                .unwrap()
+                .unwrap();
+            let quantity = item.get_quantity() - quantity_left;
+
+            let resp = sP_FE2CL_REP_PC_TRADE_ITEM_UNREGISTER_SUCC {
+                iID_Request: pkt.iID_Request,
+                iID_From: pkt.iID_From,
+                iID_To: pkt.iID_To,
+                TradeItem: pkt.Item,
+                InvenItem: sItemTrade {
+                    iOpt: quantity as i32,
+                    iInvenNum: inven_slot_num as i32,
+                    /* IMPORTANT: the client sends us type 8 here so we MUST override it.
+                     * This took me an entire day to diagnose. */
+                    iType: item.get_type() as i16,
+                    ..pkt.Item
+                },
+            };
+            // just blast the packet to both parties
+            let client_one = clients.get_from_player_id(pkt.iID_From)?;
+            let _ = client_one.send_packet(P_FE2CL_REP_PC_TRADE_ITEM_UNREGISTER_SUCC, &resp);
+            let client_two = clients.get_from_player_id(pkt.iID_To)?;
+            let _ = client_two.send_packet(P_FE2CL_REP_PC_TRADE_ITEM_UNREGISTER_SUCC, &resp);
+            Ok(())
+        })(),
+        || {
+            let client = clients.get_self();
+            let resp = sP_FE2CL_REP_PC_TRADE_ITEM_UNREGISTER_FAIL {
+                iID_Request: pkt.iID_Request,
+                iID_From: pkt.iID_From,
+                iID_To: pkt.iID_To,
+                iErrorCode: unused!(),
+            };
+            client.send_packet(P_FE2CL_REP_PC_TRADE_ITEM_UNREGISTER_FAIL, &resp)
+        },
+    )
+}

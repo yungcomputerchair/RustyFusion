@@ -286,6 +286,16 @@ struct TradeOffer {
     items: [Option<TradeItem>; 5],
 }
 impl TradeOffer {
+    fn get_count(&self, inven_slot_num: usize) -> u16 {
+        let mut quantity = 0;
+        for trade_item in self.items.iter().flatten() {
+            if trade_item.inven_slot_num == inven_slot_num {
+                quantity += trade_item.quantity;
+            }
+        }
+        quantity
+    }
+
     fn add_item(
         &mut self,
         trade_slot_num: usize,
@@ -304,16 +314,10 @@ impl TradeOffer {
             quantity,
         });
 
-        let mut quantity = 0;
-        for trade_item in self.items.iter().flatten() {
-            if trade_item.inven_slot_num == inven_slot_num {
-                quantity += trade_item.quantity;
-            }
-        }
-        Ok(quantity)
+        Ok(self.get_count(inven_slot_num))
     }
 
-    fn remove_item(&mut self, trade_slot_num: usize) -> FFResult<TradeItem> {
+    fn remove_item(&mut self, trade_slot_num: usize) -> FFResult<(u16, usize)> {
         if trade_slot_num >= self.items.len() {
             return Err(FFError::build(
                 Severity::Warning,
@@ -329,7 +333,10 @@ impl TradeOffer {
         }
 
         let removed_item = self.items[trade_slot_num].take().unwrap();
-        Ok(removed_item)
+        Ok((
+            self.get_count(removed_item.inven_slot_num),
+            removed_item.inven_slot_num,
+        ))
     }
 }
 pub struct TradeContext {
@@ -367,7 +374,7 @@ impl TradeContext {
         offer.add_item(trade_slot_num, inven_slot_num, quantity)
     }
 
-    pub fn remove_item(&mut self, pc_id: i32, trade_slot_num: usize) -> FFResult<TradeItem> {
+    pub fn remove_item(&mut self, pc_id: i32, trade_slot_num: usize) -> FFResult<(u16, usize)> {
         let offer = self.get_offer_mut(pc_id)?;
         offer.remove_item(trade_slot_num)
     }
