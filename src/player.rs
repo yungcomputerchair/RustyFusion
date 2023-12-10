@@ -356,40 +356,54 @@ impl Player {
         location: ItemLocation,
         slot_num: usize,
     ) -> FFResult<&mut Option<Item>> {
-        let err = Err(FFError::build(
+        let err_oob = Err(FFError::build(
             Severity::Warning,
             format!("Bad slot number: {slot_num} (location {:?})", location),
         ));
-        match location {
+        let err_trading = Err(FFError::build(
+            Severity::Warning,
+            format!(
+                "Can't mutate inventory. Player {} trading",
+                self.get_player_id()
+            ),
+        ));
+
+        let res = match location {
             ItemLocation::Equip => {
                 if slot_num < SIZEOF_EQUIP_SLOT as usize {
                     Ok(&mut self.inventory.equipped[slot_num])
                 } else {
-                    err
+                    err_oob
                 }
             }
             ItemLocation::Inven => {
                 if slot_num < SIZEOF_INVEN_SLOT as usize {
                     Ok(&mut self.inventory.main[slot_num])
                 } else {
-                    err
+                    err_oob
                 }
             }
             ItemLocation::QInven => {
                 if slot_num < SIZEOF_QINVEN_SLOT as usize {
                     Ok(&mut self.inventory.mission[slot_num])
                 } else {
-                    err
+                    err_oob
                 }
             }
             ItemLocation::Bank => {
                 if slot_num < SIZEOF_BANK_SLOT as usize {
                     Ok(&mut self.inventory.bank[slot_num])
                 } else {
-                    err
+                    err_oob
                 }
             }
+        };
+
+        if res.as_ref().is_ok_and(|v| v.is_some()) && self.trade_id.is_some() {
+            return err_trading;
         }
+
+        res
     }
 
     pub fn set_item(

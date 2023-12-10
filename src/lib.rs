@@ -276,7 +276,7 @@ impl VendorData {
 }
 
 #[derive(Default, Clone, Copy)]
-pub struct TradeItem {
+struct TradeItem {
     pub inven_slot_num: usize,
     pub quantity: u16,
 }
@@ -284,6 +284,7 @@ pub struct TradeItem {
 struct TradeOffer {
     taros: u32,
     items: [Option<TradeItem>; 5],
+    confirmed: bool,
 }
 impl TradeOffer {
     fn get_count(&self, inven_slot_num: usize) -> u16 {
@@ -314,6 +315,7 @@ impl TradeOffer {
             quantity,
         });
 
+        self.confirmed = false;
         Ok(self.get_count(inven_slot_num))
     }
 
