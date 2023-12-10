@@ -335,6 +335,36 @@ pub fn trade_item_unregister(
     )
 }
 
+pub fn trade_confirm_cancel(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let client = clients.get_self();
+    let pkt: &sP_CL2FE_REQ_PC_TRADE_CONFIRM_CANCEL =
+        client.get_packet(P_CL2FE_REQ_PC_TRADE_CONFIRM_CANCEL)?;
+    let resp = sP_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL {
+        iID_Request: pkt.iID_Request,
+        iID_From: pkt.iID_From,
+        iID_To: pkt.iID_To,
+    };
+
+    let pc_id = client.get_player_id()?;
+    let player = state.get_player_mut(pc_id)?;
+    let trade_id = player.trade_id.ok_or(FFError::build(
+        Severity::Warning,
+        format!("Player {} is not trading", player.get_player_id()),
+    ))?;
+
+    player.trade_id = None;
+
+    let trade = state.ongoing_trades.remove(&trade_id).unwrap();
+
+    let other_pc_id = trade.get_other_id(pc_id);
+    let other_player = state.get_player_mut(other_pc_id).unwrap();
+    other_player.trade_id = None;
+
+    let other_client = clients.get_from_player_id(other_pc_id).unwrap();
+    let _ = other_client.send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL, &resp);
+    Ok(())
+}
+
 pub fn trade_emotes_chat(clients: &mut ClientMap) -> FFResult<()> {
     let pkt: sP_CL2FE_REQ_PC_TRADE_EMOTES_CHAT = *clients
         .get_self()
