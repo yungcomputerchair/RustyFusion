@@ -366,7 +366,7 @@ impl Player {
             Severity::Warning,
             format!(
                 "Can't mutate inventory. Player {} trading",
-                self.get_player_id()
+                self.id.unwrap_or_default()
             ),
         ));
 
