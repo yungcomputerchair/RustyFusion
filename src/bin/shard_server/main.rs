@@ -128,6 +128,7 @@ mod item;
 mod login;
 mod pc;
 mod trade;
+mod transport;
 fn handle_packet(
     key: usize,
     clients: &mut HashMap<usize, FFClient>,
@@ -184,6 +185,10 @@ fn handle_packet(
         P_CL2FE_REQ_PC_TRADE_CONFIRM_CANCEL => trade::trade_confirm_cancel(&mut clients, state),
         P_CL2FE_REQ_PC_TRADE_CONFIRM => trade::trade_confirm(&mut clients, state),
         P_CL2FE_REQ_PC_TRADE_EMOTES_CHAT => trade::trade_emotes_chat(&mut clients),
+        //
+        P_CL2FE_REQ_REGIST_TRANSPORTATION_LOCATION => {
+            transport::regist_transportation_location(clients.get_self(), state)
+        }
         //
         P_CL2FE_REP_LIVE_CHECK => Ok(()),
         //

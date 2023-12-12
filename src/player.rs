@@ -467,8 +467,45 @@ impl Player {
                 format!("First use flag offset out of range: {}", bit_offset),
             ))
         } else {
-            self.flags.tip_flags |= 1_i128 << (bit_offset - 1);
+            self.flags.tip_flags |= 1 << (bit_offset - 1);
             Ok(self.flags.tip_flags)
+        }
+    }
+
+    pub fn get_scamper_flags(&self) -> i32 {
+        self.flags.scamper_flags
+    }
+
+    pub fn get_skyway_flags(&self) -> [i64; WYVERN_LOCATION_FLAG_SIZE as usize] {
+        self.flags.skyway_flags
+    }
+
+    pub fn update_scamper_flags(&mut self, bit_offset: i32) -> FFResult<i32> {
+        if !(1..=32).contains(&bit_offset) {
+            Err(FFError::build(
+                Severity::Warning,
+                format!("Scamper flag offset out of range: {}", bit_offset),
+            ))
+        } else {
+            self.flags.scamper_flags |= 1 << (bit_offset - 1);
+            Ok(self.flags.scamper_flags)
+        }
+    }
+
+    pub fn update_skyway_flags(
+        &mut self,
+        bit_offset: i32,
+    ) -> FFResult<[i64; WYVERN_LOCATION_FLAG_SIZE as usize]> {
+        if !(1..=(WYVERN_LOCATION_FLAG_SIZE as i32 * 64)).contains(&bit_offset) {
+            Err(FFError::build(
+                Severity::Warning,
+                format!("Skyway flag offset out of range: {}", bit_offset),
+            ))
+        } else {
+            let idx = if bit_offset > 32 { 1 } else { 0 };
+            let offset = (bit_offset - 1) % 32;
+            self.flags.skyway_flags[idx] = 1 << offset;
+            Ok(self.flags.skyway_flags)
         }
     }
 
