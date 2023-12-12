@@ -11,7 +11,7 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
 - [x] Barebones login server functionality (connection and character creation)
 - [x] Barebones "land walker" shard server functionality (connection, basic GM commands, seeing other players & NPCs, etc)
 - [x] Config and tabledata frameworks
-- [ ] Database (account system and player persistance)
+- [ ] Database (account system and player persistence)
 - [ ] Chunking
   - [x] Framework
   - [ ] Instancing (infected zones + other private instances)
@@ -30,7 +30,7 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
   - [ ] Friends
   - [ ] Groups
   - [ ] Email system
-- [ ] Nano framework    <<<<
+- [ ] ***Nano framework***
 - [ ] Combat
   - [ ] Mobs
   - [ ] Core combat loop + mob AI
@@ -45,6 +45,8 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
   - [ ] Custom command system
   - [ ] OpenFusion monitor protocol
 - [ ] "Academy" (build 1013) support (currently, only build 104 is supported)
+
+Items that are ***highlighted*** are in planning or WIP. Some items have dependencies in other categories, so the list won't get completed in order.
 
 ## Developing
 Cargo (Rust's package manager) makes working with Rust projects extremely easy to setup. Just clone the repo (recursively, to grab critical tabledata), build, and run:
