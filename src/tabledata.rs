@@ -9,7 +9,7 @@ use crate::{
     enums::ItemType,
     error::{log, FFError, FFResult, Severity},
     npc::NPC,
-    util, CrocPotData, Item, ItemStats, VendorData, VendorItem,
+    util, CrocPotData, Item, ItemStats, Position, VendorData, VendorItem,
 };
 
 static TABLE_DATA: OnceLock<TableData> = OnceLock::new();
@@ -18,6 +18,7 @@ struct XDTData {
     vendor_data: HashMap<i32, VendorData>,
     item_data: HashMap<(i16, ItemType), ItemStats>,
     crocpot_data: HashMap<i16, CrocPotData>,
+    transportation_data: TransportationData,
 }
 impl XDTData {
     fn load() -> Result<Self, String> {
@@ -27,6 +28,7 @@ impl XDTData {
                 vendor_data: load_vendor_data(&root)?,
                 item_data: load_item_data(&root)?,
                 crocpot_data: load_crocpot_data(&root)?,
+                transportation_data: load_transportation_data(&root)?,
             })
         } else {
             Err(format!("Bad XDT tabledata (root): {}", raw))
@@ -42,6 +44,16 @@ struct NPCData {
     iZ: i32,
     iAngle: i32,
     iMapNum: Option<i32>,
+}
+
+pub struct ScamperData {
+    npc_id: i32,
+    pos: Position,
+    zone: i32,
+}
+
+struct TransportationData {
+    scamper_data: HashMap<i32, ScamperData>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -145,6 +157,17 @@ impl TableData {
             .ok_or(FFError::build(
                 Severity::Warning,
                 format!("CrocPotOdds for level gap {} don't exist", level_gap),
+            ))
+    }
+
+    pub fn get_scamper_data(&self, location_id: i32) -> FFResult<&ScamperData> {
+        self.xdt_data
+            .transportation_data
+            .scamper_data
+            .get(&location_id)
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Scamper data for location id {} doesn't exist", location_id),
             ))
     }
 
@@ -540,6 +563,64 @@ fn load_crocpot_data(
         }
     } else {
         Err(format!("Object missing: {}", CROCPOT_TABLE_KEY))
+    }
+}
+
+fn load_transportation_data(
+    root: &Map<std::string::String, Value>,
+) -> Result<TransportationData, String> {
+    const TRANSPORTATION_TABLE_KEY: &str = "m_pTransportationTable";
+
+    fn load_scamper_data(
+        root: &Map<std::string::String, Value>,
+    ) -> Result<HashMap<i32, ScamperData>, String> {
+        const SCAMPER_DATA_KEY: &str = "m_pTransportationWarpLocation";
+
+        #[derive(Debug, Deserialize)]
+        struct ScamperDataEntry {
+            m_iLocationID: i32,
+            m_iNPCID: i32,
+            m_iXpos: i32,
+            m_iYpos: i32,
+            m_iZpos: i32,
+            m_iZone: i32,
+        }
+
+        let data = root
+            .get(SCAMPER_DATA_KEY)
+            .ok_or(format!("Key missing: {}", SCAMPER_DATA_KEY))?;
+        if let Value::Array(data) = data {
+            let mut scamper_map = HashMap::new();
+            for v in data {
+                let data_entry: ScamperDataEntry = serde_json::from_value(v.clone())
+                    .map_err(|e| format!("Malformed scamper data entry: {} {}", e, v))?;
+                let key = data_entry.m_iLocationID;
+                let data_entry = ScamperData {
+                    npc_id: data_entry.m_iNPCID,
+                    pos: Position {
+                        x: data_entry.m_iXpos,
+                        y: data_entry.m_iYpos,
+                        z: data_entry.m_iZpos,
+                    },
+                    zone: data_entry.m_iZone,
+                };
+                scamper_map.insert(key, data_entry);
+            }
+            Ok(scamper_map)
+        } else {
+            Err(format!("Array missing: {}", SCAMPER_DATA_KEY))
+        }
+    }
+
+    let table = root
+        .get(TRANSPORTATION_TABLE_KEY)
+        .ok_or(format!("Key missing: {}", TRANSPORTATION_TABLE_KEY))?;
+    if let Value::Object(table) = table {
+        Ok(TransportationData {
+            scamper_data: load_scamper_data(table)?,
+        })
+    } else {
+        Err(format!("Object missing: {}", TRANSPORTATION_TABLE_KEY))
     }
 }
 
