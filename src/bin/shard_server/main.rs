@@ -147,7 +147,7 @@ fn handle_packet(
         P_CL2LS_REQ_LOGIN => wrong_server(clients.get_self()),
         //
         P_CL2FE_REQ_PC_ENTER => pc::pc_enter(clients.get_self(), key, state, time),
-        P_CL2FE_REQ_PC_LOADING_COMPLETE => pc::pc_loading_complete(clients.get_self()),
+        P_CL2FE_REQ_PC_LOADING_COMPLETE => pc::pc_loading_complete(&mut clients, state),
         P_CL2FE_REQ_PC_MOVE => pc::pc_move(&mut clients, state, time),
         P_CL2FE_REQ_PC_JUMP => pc::pc_jump(&mut clients, state, time),
         P_CL2FE_REQ_PC_STOP => pc::pc_stop(&mut clients, state, time),
@@ -188,6 +188,9 @@ fn handle_packet(
         //
         P_CL2FE_REQ_REGIST_TRANSPORTATION_LOCATION => {
             transport::regist_transportation_location(clients.get_self(), state)
+        }
+        P_CL2FE_REQ_PC_WARP_USE_TRANSPORTATION => {
+            transport::warp_use_transportation(&mut clients, state)
         }
         //
         P_CL2FE_REP_LIVE_CHECK => Ok(()),

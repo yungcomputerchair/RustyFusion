@@ -1,4 +1,4 @@
-use rusty_fusion::{util, Position};
+use rusty_fusion::{error::catch_fail, util, Position};
 
 use super::*;
 
@@ -40,11 +40,29 @@ pub fn pc_enter(
     client.send_packet(P_FE2CL_REP_PC_ENTER_SUCC, &resp)
 }
 
-pub fn pc_loading_complete(client: &mut FFClient) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_PC_LOADING_COMPLETE =
-        client.get_packet(P_CL2FE_REQ_PC_LOADING_COMPLETE)?;
+pub fn pc_loading_complete(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let pkt: &sP_CL2FE_REQ_PC_LOADING_COMPLETE = clients
+        .get_self()
+        .get_packet(P_CL2FE_REQ_PC_LOADING_COMPLETE)?;
     let resp = sP_FE2CL_REP_PC_LOADING_COMPLETE_SUCC { iPC_ID: pkt.iPC_ID };
-    client.send_packet(P_FE2CL_REP_PC_LOADING_COMPLETE_SUCC, &resp)
+    catch_fail(
+        (|| {
+            let player = state.get_player(clients.get_self().get_player_id()?)?;
+            let chunk = player.get_position().chunk_coords();
+            state
+                .entity_map
+                .update(player.get_id(), Some(chunk), Some(clients));
+            clients
+                .get_self()
+                .send_packet(P_FE2CL_REP_PC_LOADING_COMPLETE_SUCC, &resp)
+        })(),
+        || {
+            Err(FFError::build_dc(
+                Severity::Warning,
+                "Loading complete failed".to_string(),
+            ))
+        },
+    )
 }
 
 pub fn pc_goto(client: &mut FFClient) -> FFResult<()> {

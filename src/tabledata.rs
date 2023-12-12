@@ -47,19 +47,19 @@ struct NPCData {
 }
 
 pub struct TripData {
-    npc_id: i32,
-    transportation_type: TransportationType,
-    start_location: i32,
-    end_location: i32,
-    cost: i32,
-    speed: i32,
-    route_number: i32,
+    pub npc_id: i32,
+    pub transportation_type: TransportationType,
+    pub start_location: i32,
+    pub end_location: i32,
+    pub cost: u32,
+    pub speed: i32,
+    pub route_number: i32,
 }
 
+#[derive(Debug)]
 pub struct ScamperData {
-    npc_id: i32,
-    pos: Position,
-    zone: i32,
+    pub npc_id: i32,
+    pub pos: Position,
 }
 
 struct TransportationData {
@@ -629,7 +629,7 @@ fn load_transportation_data(
                     npc_id: trip_entry.m_iNPCID,
                     start_location: trip_entry.m_iStartLocation,
                     end_location: trip_entry.m_iEndLocation,
-                    cost: trip_entry.m_iCost,
+                    cost: trip_entry.m_iCost as u32,
                     speed: trip_entry.m_iSpeed,
                     route_number: trip_entry.m_iRouteNum,
                     transportation_type: trip_entry
@@ -676,7 +676,6 @@ fn load_transportation_data(
                         y: data_entry.m_iYpos,
                         z: data_entry.m_iZpos,
                     },
-                    zone: data_entry.m_iZone,
                 };
                 scamper_map.insert(key, data_entry);
             }
