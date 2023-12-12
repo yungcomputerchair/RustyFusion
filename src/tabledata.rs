@@ -6,7 +6,7 @@ use serde_json::{Map, Value};
 use std::{collections::HashMap, sync::OnceLock, time::SystemTime};
 
 use crate::{
-    enums::ItemType,
+    enums::{ItemType, TransportationType},
     error::{log, FFError, FFResult, Severity},
     npc::NPC,
     util, CrocPotData, Item, ItemStats, Position, VendorData, VendorItem,
@@ -46,6 +46,16 @@ struct NPCData {
     iMapNum: Option<i32>,
 }
 
+pub struct TripData {
+    npc_id: i32,
+    transportation_type: TransportationType,
+    start_location: i32,
+    end_location: i32,
+    cost: i32,
+    speed: i32,
+    route_number: i32,
+}
+
 pub struct ScamperData {
     npc_id: i32,
     pos: Position,
@@ -53,6 +63,7 @@ pub struct ScamperData {
 }
 
 struct TransportationData {
+    trip_data: HashMap<i32, TripData>,
     scamper_data: HashMap<i32, ScamperData>,
 }
 
@@ -157,6 +168,17 @@ impl TableData {
             .ok_or(FFError::build(
                 Severity::Warning,
                 format!("CrocPotOdds for level gap {} don't exist", level_gap),
+            ))
+    }
+
+    pub fn get_trip_data(&self, trip_id: i32) -> FFResult<&TripData> {
+        self.xdt_data
+            .transportation_data
+            .trip_data
+            .get(&trip_id)
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Trip data for trip id {} doesn't exist", trip_id),
             ))
     }
 
@@ -571,6 +593,58 @@ fn load_transportation_data(
 ) -> Result<TransportationData, String> {
     const TRANSPORTATION_TABLE_KEY: &str = "m_pTransportationTable";
 
+    fn load_trip_data(
+        root: &Map<std::string::String, Value>,
+    ) -> Result<HashMap<i32, TripData>, String> {
+        const TRIP_DATA_KEY: &str = "m_pTransportationData";
+
+        #[derive(Debug, Deserialize)]
+        struct TripDataEntry {
+            m_iVehicleID: i32,
+            m_iNPCID: i32,
+            m_iLocalString: i32,
+            m_iMoveType: i32,
+            m_iStartLocation: i32,
+            m_iEndLocation: i32,
+            m_iCost: i32,
+            m_iSpeed: i32,
+            m_iMesh: i32,
+            m_iSound: i32,
+            m_iRouteNum: i32,
+        }
+
+        let data = root
+            .get(TRIP_DATA_KEY)
+            .ok_or(format!("Key missing: {}", TRIP_DATA_KEY))?;
+        if let Value::Array(data) = data {
+            let mut trip_map = HashMap::new();
+            for v in data {
+                let trip_entry: TripDataEntry = serde_json::from_value(v.clone())
+                    .map_err(|e| format!("Malformed trip data entry: {} {}", e, v))?;
+                let key = trip_entry.m_iVehicleID;
+                if key == 0 {
+                    continue;
+                }
+                let trip_entry = TripData {
+                    npc_id: trip_entry.m_iNPCID,
+                    start_location: trip_entry.m_iStartLocation,
+                    end_location: trip_entry.m_iEndLocation,
+                    cost: trip_entry.m_iCost,
+                    speed: trip_entry.m_iSpeed,
+                    route_number: trip_entry.m_iRouteNum,
+                    transportation_type: trip_entry
+                        .m_iMoveType
+                        .try_into()
+                        .map_err(|e: FFError| e.get_msg().to_string())?,
+                };
+                trip_map.insert(key, trip_entry);
+            }
+            Ok(trip_map)
+        } else {
+            Err(format!("Array missing: {}", TRIP_DATA_KEY))
+        }
+    }
+
     fn load_scamper_data(
         root: &Map<std::string::String, Value>,
     ) -> Result<HashMap<i32, ScamperData>, String> {
@@ -617,6 +691,7 @@ fn load_transportation_data(
         .ok_or(format!("Key missing: {}", TRANSPORTATION_TABLE_KEY))?;
     if let Value::Object(table) = table {
         Ok(TransportationData {
+            trip_data: load_trip_data(table)?,
             scamper_data: load_scamper_data(table)?,
         })
     } else {
