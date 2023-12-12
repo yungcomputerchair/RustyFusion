@@ -1,4 +1,5 @@
 use std::{
+    cmp::min,
     fmt::Display,
     fs::File,
     io::{BufWriter, Write},
@@ -13,18 +14,22 @@ pub fn catch_fail<T>(
     result: FFResult<T>,
     mut on_fail: impl FnMut() -> FFResult<()>,
 ) -> FFResult<T> {
-    if result.is_err() {
-        on_fail()?; // on_fail errors have higher priority
+    if let Err(e) = &result {
+        let fail_result = on_fail();
+        if let Err(ee) = fail_result {
+            return Err(ee.chain(e.clone()));
+        }
     }
     result
 }
 
-#[derive(Clone, Copy, Debug)]
+#[repr(usize)]
+#[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Severity {
-    Debug,
-    Info,
-    Warning,
-    Fatal,
+    Debug = 3,
+    Info = 2,
+    Warning = 1,
+    Fatal = 0,
 }
 impl Display for Severity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -37,18 +42,8 @@ impl Display for Severity {
         write!(f, "{}", s)
     }
 }
-impl From<Severity> for usize {
-    fn from(value: Severity) -> Self {
-        match value {
-            Severity::Debug => 3,
-            Severity::Info => 2,
-            Severity::Warning => 1,
-            Severity::Fatal => 0,
-        }
-    }
-}
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FFError {
     severity: Severity,
     msg: String,
@@ -79,6 +74,14 @@ impl FFError {
             },
             msg: format!("I/O error ({:?})", error.kind()),
             should_dc: true,
+        }
+    }
+
+    pub fn chain(self, other: FFError) -> Self {
+        Self {
+            severity: min(self.severity, other.severity),
+            msg: format!("{}\nfrom [{}] {}", self.msg, other.severity, other.msg),
+            should_dc: self.should_dc || other.should_dc,
         }
     }
 
@@ -136,7 +139,7 @@ pub fn logger_flush_scheduled(
 }
 
 pub fn log(severity: Severity, msg: &str) {
-    let val: usize = severity.into();
+    let val = severity as usize;
     let threshold = config_get().general.logging_level.get();
 
     if val > threshold {
