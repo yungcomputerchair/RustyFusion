@@ -20,7 +20,7 @@ struct XDTData {
     item_data: HashMap<(i16, ItemType), ItemStats>,
     crocpot_data: HashMap<i16, CrocPotData>,
     transportation_data: TransportationData,
-    nano_data: HashMap<i32, NanoData>,
+    nano_data: HashMap<i16, NanoData>,
 }
 impl XDTData {
     fn load() -> Result<Self, String> {
@@ -70,9 +70,10 @@ struct TransportationData {
     scamper_data: HashMap<i32, ScamperData>,
 }
 
+#[derive(Debug)]
 pub struct NanoData {
-    style: NanoStyle,
-    skills: [i32; SIZEOF_NANO_SKILLS],
+    pub style: NanoStyle,
+    pub skills: [i16; SIZEOF_NANO_SKILLS],
 }
 
 #[derive(Debug, Deserialize)]
@@ -201,7 +202,7 @@ impl TableData {
             ))
     }
 
-    pub fn get_nano_data(&self, nano_id: i32) -> FFResult<&NanoData> {
+    pub fn get_nano_data(&self, nano_id: i16) -> FFResult<&NanoData> {
         self.xdt_data.nano_data.get(&nano_id).ok_or(FFError::build(
             Severity::Warning,
             format!("Nano data for nano id {} doesn't exist", nano_id),
@@ -715,7 +716,7 @@ fn load_transportation_data(
 
 fn load_nano_data(
     root: &Map<std::string::String, Value>,
-) -> Result<HashMap<i32, NanoData>, String> {
+) -> Result<HashMap<i16, NanoData>, String> {
     const NANO_TABLE_KEY: &str = "m_pNanoTable";
     const NANO_TABLE_NANO_DATA_KEY: &str = "m_pNanoData";
 
@@ -737,7 +738,7 @@ fn load_nano_data(
         m_iDodge: i32,
         m_iNeedQItemID: i32,
         m_iNeedFusionMatterCnt: i32,
-        m_iTune: [i32; 3],
+        m_iTune: [i16; 3],
         m_iMesh: i32,
         m_iIcon1: i32,
         m_iEffect1: i32,
@@ -757,7 +758,7 @@ fn load_nano_data(
             for v in nano_data {
                 let nano_data_entry: NanoDataEntry = serde_json::from_value(v.clone())
                     .map_err(|e| format!("Malformed nano data entry: {} {}", e, v))?;
-                let key = nano_data_entry.m_iNanoNumber;
+                let key = nano_data_entry.m_iNanoNumber as i16;
                 if key == 0 {
                     continue;
                 }

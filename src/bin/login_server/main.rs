@@ -22,8 +22,9 @@ use rusty_fusion::{
     },
     player::Player,
     state::{login::LoginServerState, ServerState},
+    tabledata::tdata_init,
     timer::TimerMap,
-    unused, tabledata::tdata_init,
+    unused,
 };
 
 fn main() -> Result<()> {

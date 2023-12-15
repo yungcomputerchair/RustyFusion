@@ -1,6 +1,7 @@
 #![allow(non_upper_case_globals)]
 
 pub const SIZEOF_NANO_SKILLS: usize = 3;
+pub const NANO_STAMINA_MAX: i16 = 150;
 
 /* Constants ripped from the client */
 

@@ -85,17 +85,17 @@ struct GuideData {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct NanoData {
-    nano_inventory: [Nano; SIZEOF_NANO_BANK_SLOT as usize],
-    slot_nano_ids: [u16; SIZEOF_NANO_CARRY_SLOT as usize],
-    active_slot: i16,
+struct Nanocom {
+    nano_inventory: [Option<Nano>; SIZEOF_NANO_BANK_SLOT as usize],
+    equipped_ids: [Option<u16>; SIZEOF_NANO_CARRY_SLOT as usize],
+    active_slot: Option<usize>,
 }
-impl Default for NanoData {
+impl Default for Nanocom {
     fn default() -> Self {
         Self {
-            nano_inventory: [Nano::default(); SIZEOF_NANO_BANK_SLOT as usize],
-            slot_nano_ids: Default::default(),
-            active_slot: Default::default(),
+            nano_inventory: [None; SIZEOF_NANO_BANK_SLOT as usize],
+            equipped_ids: [None; SIZEOF_NANO_CARRY_SLOT as usize],
+            active_slot: None,
         }
     }
 }
@@ -139,7 +139,7 @@ pub struct Player {
     special_state: i8,
     combat_stats: CombatStats,
     guide_data: GuideData,
-    nano_data: NanoData,
+    nano_data: Nanocom,
     mission_data: MissionData,
     inventory: PlayerInventory,
     taros: u32,
@@ -225,14 +225,39 @@ impl Player {
         self.instance_id as i32
     }
 
-    fn get_active_nano(&self) -> Option<Nano> {
-        if self.nano_data.active_slot == -1 {
-            return None;
+    pub fn get_active_nano(&self) -> Option<&Nano> {
+        match self.nano_data.active_slot {
+            Some(active_slot) => {
+                let nano_id =
+                    self.nano_data.equipped_ids[active_slot].expect("Empty nano equipped");
+                let nano = self.nano_data.nano_inventory[nano_id as usize].as_ref();
+                Some(nano.expect("Locked nano equipped"))
+            }
+            None => None,
         }
-        Some(
-            self.nano_data.nano_inventory
-                [self.nano_data.slot_nano_ids[self.nano_data.active_slot as usize] as usize],
-        )
+    }
+
+    pub fn get_active_nano_mut(&mut self) -> Option<&mut Nano> {
+        match self.nano_data.active_slot {
+            Some(active_slot) => {
+                let nano_id =
+                    self.nano_data.equipped_ids[active_slot].expect("Empty nano equipped");
+                let nano = self.nano_data.nano_inventory[nano_id as usize].as_mut();
+                Some(nano.expect("Locked nano equipped"))
+            }
+            None => None,
+        }
+    }
+
+    pub fn unlock_nano(&mut self, nano_id: usize, selected_skill: usize) -> FFResult<()> {
+        if nano_id >= SIZEOF_NANO_BANK_SLOT as usize {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Invalid nano ID: {}", nano_id),
+            ));
+        }
+        self.nano_data.nano_inventory[nano_id] = Some(Nano::new(nano_id as i16, selected_skill)?);
+        Ok(())
     }
 
     pub fn get_load_data(&self) -> sPCLoadData2CL {
@@ -257,9 +282,12 @@ impl Player {
             aEquip: self.inventory.equipped.map(Option::<Item>::into),
             aInven: self.inventory.main.map(Option::<Item>::into),
             aQInven: self.inventory.mission.map(Option::<Item>::into),
-            aNanoBank: self.nano_data.nano_inventory.map(Nano::into),
-            aNanoSlots: self.nano_data.slot_nano_ids,
-            iActiveNanoSlotNum: self.nano_data.active_slot,
+            aNanoBank: self.nano_data.nano_inventory.map(Option::<Nano>::into),
+            aNanoSlots: self.nano_data.equipped_ids.map(|id| id.unwrap_or(0)),
+            iActiveNanoSlotNum: match self.nano_data.active_slot {
+                Some(active_slot) => active_slot as i16,
+                None => -1,
+            },
             iConditionBitFlag: self.get_condition_bit_flag(),
             eCSTB___Add: placeholder!(0),
             TimeBuff: sTimeBuff {
@@ -303,7 +331,7 @@ impl Player {
             iZ: self.position.z,
             iAngle: self.rotation,
             ItemEquip: self.inventory.equipped.map(Option::<Item>::into),
-            Nano: self.get_active_nano().unwrap_or_default().into(),
+            Nano: self.get_active_nano().copied().into(),
             eRT: unused!(),
         }
     }

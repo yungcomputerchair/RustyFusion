@@ -5,7 +5,7 @@ extern crate num_derive;
 
 use std::{any::Any, cmp::min, hash::Hash, time::SystemTime};
 
-use defines::{SIZEOF_TRADE_SLOT, SIZEOF_VENDOR_TABLE_SLOT};
+use defines::{NANO_STAMINA_MAX, SIZEOF_TRADE_SLOT, SIZEOF_VENDOR_TABLE_SLOT};
 use enums::ItemType;
 use error::{FFError, FFResult, Severity};
 use net::{
@@ -15,7 +15,7 @@ use net::{
 };
 use player::Player;
 use state::shard::ShardServerState;
-use tabledata::tdata_get;
+use tabledata::{tdata_get, NanoData};
 
 use crate::enums::ItemLocation;
 
@@ -489,18 +489,48 @@ pub struct CrocPotData {
     pub price_multiplier_stats: u32,
 }
 
-#[derive(Debug, Copy, Clone, Default)]
-struct Nano {
+#[derive(Debug, Copy, Clone)]
+pub struct Nano {
     id: i16,
-    skill_id: i16,
-    stamina: i16,
+    pub selected_skill: usize,
+    pub stamina: i16,
 }
-impl From<Nano> for sNano {
-    fn from(value: Nano) -> Self {
-        Self {
-            iID: value.id,
-            iSkillID: value.skill_id,
-            iStamina: value.stamina,
+impl Nano {
+    pub fn new(id: i16, selected_skill: usize) -> FFResult<Self> {
+        if selected_skill >= 3 {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Selected skill out of bounds: {}", selected_skill),
+            ));
+        }
+
+        Ok(Self {
+            id,
+            selected_skill,
+            stamina: NANO_STAMINA_MAX,
+        })
+    }
+
+    pub fn get_nano_data(&self) -> FFResult<&NanoData> {
+        tdata_get().get_nano_data(self.id)
+    }
+}
+impl From<Option<Nano>> for sNano {
+    fn from(value: Option<Nano>) -> Self {
+        match value {
+            Some(nano) => {
+                let nano_data = nano.get_nano_data().unwrap();
+                Self {
+                    iID: nano.id,
+                    iSkillID: nano_data.skills[nano.selected_skill],
+                    iStamina: nano.stamina,
+                }
+            }
+            None => sNano {
+                iID: 0,
+                iSkillID: 0,
+                iStamina: 0,
+            },
         }
     }
 }
