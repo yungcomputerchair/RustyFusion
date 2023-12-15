@@ -23,7 +23,7 @@ use rusty_fusion::{
     player::Player,
     state::{login::LoginServerState, ServerState},
     timer::TimerMap,
-    unused,
+    unused, tabledata::tdata_init,
 };
 
 fn main() -> Result<()> {
@@ -31,6 +31,7 @@ fn main() -> Result<()> {
 
     let config = config_init();
     logger_init(config.login.log_path.get());
+    tdata_init();
 
     let polling_interval = Duration::from_millis(50);
     let listen_addr = config.login.listen_addr.get();
