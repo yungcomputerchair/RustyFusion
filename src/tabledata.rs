@@ -6,7 +6,8 @@ use serde_json::{Map, Value};
 use std::{collections::HashMap, sync::OnceLock, time::SystemTime};
 
 use crate::{
-    enums::{ItemType, TransportationType},
+    defines::SIZEOF_NANO_SKILLS,
+    enums::{ItemType, NanoStyle, TransportationType},
     error::{log, FFError, FFResult, Severity},
     npc::NPC,
     util, CrocPotData, Item, ItemStats, Position, VendorData, VendorItem,
@@ -19,6 +20,7 @@ struct XDTData {
     item_data: HashMap<(i16, ItemType), ItemStats>,
     crocpot_data: HashMap<i16, CrocPotData>,
     transportation_data: TransportationData,
+    nano_data: HashMap<i32, NanoData>,
 }
 impl XDTData {
     fn load() -> Result<Self, String> {
@@ -29,6 +31,7 @@ impl XDTData {
                 item_data: load_item_data(&root)?,
                 crocpot_data: load_crocpot_data(&root)?,
                 transportation_data: load_transportation_data(&root)?,
+                nano_data: load_nano_data(&root)?,
             })
         } else {
             Err(format!("Bad XDT tabledata (root): {}", raw))
@@ -65,6 +68,11 @@ pub struct ScamperData {
 struct TransportationData {
     trip_data: HashMap<i32, TripData>,
     scamper_data: HashMap<i32, ScamperData>,
+}
+
+pub struct NanoData {
+    style: NanoStyle,
+    skills: [i32; SIZEOF_NANO_SKILLS],
 }
 
 #[derive(Debug, Deserialize)]
@@ -191,6 +199,13 @@ impl TableData {
                 Severity::Warning,
                 format!("Scamper data for location id {} doesn't exist", location_id),
             ))
+    }
+
+    pub fn get_nano_data(&self, nano_id: i32) -> FFResult<&NanoData> {
+        self.xdt_data.nano_data.get(&nano_id).ok_or(FFError::build(
+            Severity::Warning,
+            format!("Nano data for nano id {} doesn't exist", nano_id),
+        ))
     }
 
     pub fn get_npcs(&self) -> impl Iterator<Item = NPC> + '_ {
@@ -695,6 +710,75 @@ fn load_transportation_data(
         })
     } else {
         Err(format!("Object missing: {}", TRANSPORTATION_TABLE_KEY))
+    }
+}
+
+fn load_nano_data(
+    root: &Map<std::string::String, Value>,
+) -> Result<HashMap<i32, NanoData>, String> {
+    const NANO_TABLE_KEY: &str = "m_pNanoTable";
+    const NANO_TABLE_NANO_DATA_KEY: &str = "m_pNanoData";
+
+    #[derive(Debug, Deserialize)]
+    struct NanoDataEntry {
+        m_iNanoNumber: i32,
+        m_iNanoName: i32,
+        m_iComment: i32,
+        m_iNanoBattery1: i32,
+        m_iNanoBattery2: i32,
+        m_iNanoBattery3: i32,
+        m_iNanoDrain: i32,
+        m_iBatteryRecharge: i32,
+        m_iStyle: i32,
+        m_iNanoSet: i32,
+        m_iPower: i32,
+        m_iAccuracy: i32,
+        m_iProtection: i32,
+        m_iDodge: i32,
+        m_iNeedQItemID: i32,
+        m_iNeedFusionMatterCnt: i32,
+        m_iTune: [i32; 3],
+        m_iMesh: i32,
+        m_iIcon1: i32,
+        m_iEffect1: i32,
+        m_iSound: i32,
+    }
+
+    let nano_table = root
+        .get(NANO_TABLE_KEY)
+        .ok_or(format!("Key missing: {}", NANO_TABLE_KEY))?;
+    if let Value::Object(nano_table) = nano_table {
+        let nano_data = nano_table.get(NANO_TABLE_NANO_DATA_KEY).ok_or(format!(
+            "Key missing: {}.{}",
+            NANO_TABLE_KEY, NANO_TABLE_NANO_DATA_KEY
+        ))?;
+        if let Value::Array(nano_data) = nano_data {
+            let mut nano_table = HashMap::new();
+            for v in nano_data {
+                let nano_data_entry: NanoDataEntry = serde_json::from_value(v.clone())
+                    .map_err(|e| format!("Malformed nano data entry: {} {}", e, v))?;
+                let key = nano_data_entry.m_iNanoNumber;
+                if key == 0 {
+                    continue;
+                }
+                let nano_data_entry = NanoData {
+                    style: nano_data_entry
+                        .m_iStyle
+                        .try_into()
+                        .map_err(|e: FFError| e.get_msg().to_string())?,
+                    skills: nano_data_entry.m_iTune,
+                };
+                nano_table.insert(key, nano_data_entry);
+            }
+            Ok(nano_table)
+        } else {
+            Err(format!(
+                "Array missing: {}.{}",
+                NANO_TABLE_KEY, NANO_TABLE_NANO_DATA_KEY
+            ))
+        }
+    } else {
+        Err(format!("Object missing: {}", NANO_TABLE_KEY))
     }
 }
 

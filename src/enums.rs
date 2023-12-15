@@ -1,7 +1,27 @@
 #![allow(non_camel_case_types)]
 
-use crate::error::{FFError, FFResult, Severity};
+use crate::{
+    defines::*,
+    error::{FFError, FFResult, Severity},
+};
 use num_traits::FromPrimitive;
+
+#[repr(i32)]
+#[derive(PartialEq, Eq, Hash, FromPrimitive, Clone, Copy, Debug)]
+pub enum NanoStyle {
+    Adaptium = NANO_STYLE_CRYSTAL as i32,
+    Blastons = NANO_STYLE_ENERGY as i32,
+    Cosmix = NANO_STYLE_FLUID as i32,
+}
+impl TryFrom<i32> for NanoStyle {
+    type Error = FFError;
+    fn try_from(value: i32) -> FFResult<Self> {
+        Self::from_i32(value).ok_or(FFError::build(
+            Severity::Warning,
+            format!("Invalid NanoStyle value {}", value),
+        ))
+    }
+}
 
 /* Enums ripped from the client */
 

@@ -1,5 +1,9 @@
 #![allow(non_upper_case_globals)]
 
+pub const SIZEOF_NANO_SKILLS: usize = 3;
+
+/* Constants ripped from the client */
+
 pub const SUCC: u32 = 1;
 pub const FAIL: u32 = 0;
 pub const SIZEOF_BYTE: u32 = 1;
