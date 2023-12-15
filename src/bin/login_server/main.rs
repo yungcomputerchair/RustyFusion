@@ -85,8 +85,9 @@ fn main() -> Result<()> {
 struct Cleanup {}
 impl Drop for Cleanup {
     fn drop(&mut self) {
-        println!("Cleaning up...");
+        print!("Cleaning up...");
         logger_flush().expect("Errors writing final log");
+        println!("done");
     }
 }
 
