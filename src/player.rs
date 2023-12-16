@@ -225,6 +225,25 @@ impl Player {
         self.instance_id as i32
     }
 
+    pub fn change_nano(&mut self, slot: usize, nano_id: Option<u16>) -> FFResult<()> {
+        if !(0..SIZEOF_NANO_CARRY_SLOT as usize).contains(&slot) {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Invalid nano slot: {}", slot),
+            ));
+        }
+        self.nano_data.equipped_ids[slot] = nano_id;
+        Ok(())
+    }
+
+    pub fn get_active_nano_slot(&self) -> Option<usize> {
+        self.nano_data.active_slot
+    }
+
+    pub fn set_active_nano_slot(&mut self, slot: Option<usize>) {
+        self.nano_data.active_slot = slot;
+    }
+
     pub fn get_active_nano(&self) -> Option<&Nano> {
         match self.nano_data.active_slot {
             Some(active_slot) => {

@@ -127,6 +127,7 @@ mod chat;
 mod gm;
 mod item;
 mod login;
+mod nano;
 mod pc;
 mod trade;
 mod transport;
@@ -175,6 +176,9 @@ fn handle_packet(
             item::vendor_item_restore_buy(clients.get_self(), state)
         }
         P_CL2FE_REQ_PC_VENDOR_BATTERY_BUY => item::vendor_battery_buy(clients.get_self(), state),
+        //
+        P_CL2FE_REQ_NANO_EQUIP => nano::nano_equip(&mut clients, state),
+        P_CL2FE_REQ_NANO_UNEQUIP => nano::nano_unequip(&mut clients, state),
         //
         P_CL2FE_REQ_PC_TRADE_OFFER => trade::trade_offer(&mut clients, state),
         P_CL2FE_REQ_PC_TRADE_OFFER_REFUSAL => trade::trade_offer_refusal(&mut clients),
