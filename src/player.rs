@@ -304,6 +304,13 @@ impl Player {
                 format!("Invalid nano ID: {}", nano_id),
             ));
         }
+
+        if self.nano_data.nano_inventory[nano_id].is_none() {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Nano {} is locked", nano_id),
+            ));
+        }
         let nano = self.nano_data.nano_inventory[nano_id].as_mut().unwrap();
 
         if let Some(skill_idx) = skill_selection {

@@ -1,4 +1,4 @@
-use rusty_fusion::{placeholder, Combatant};
+use rusty_fusion::{error::catch_fail, placeholder, tabledata::tdata_get, Combatant};
 
 use super::*;
 
@@ -104,4 +104,47 @@ pub fn nano_active(clients: &mut ClientMap, state: &mut ShardServerState) -> FFR
     clients
         .get_self()
         .send_packet(P_FE2CL_REP_NANO_ACTIVE_SUCC, &resp)
+}
+
+pub fn nano_tune(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+    let pkt: sP_CL2FE_REQ_NANO_TUNE = *client.get_packet(P_CL2FE_REQ_NANO_TUNE)?;
+    catch_fail(
+        (|| {
+            let pc_id = client.get_player_id()?;
+            let player = state.get_player_mut(pc_id)?;
+
+            // TODO consume tuning items
+            let item_slots = placeholder!([-1; 10]);
+            let items = placeholder!([None.into(); 10]);
+
+            let nano_data = tdata_get().get_nano_data(pkt.iNanoID)?;
+            let skill_idx = nano_data
+                .skills
+                .iter()
+                .position(|sid| *sid == pkt.iTuneID)
+                .ok_or(FFError::build(
+                    Severity::Warning,
+                    format!("Bad skill ID {} for nano {}", pkt.iTuneID, pkt.iNanoID),
+                ))?;
+
+            player.tune_nano(pkt.iNanoID as usize, Some(skill_idx))?;
+
+            let resp = sP_FE2CL_REP_NANO_TUNE_SUCC {
+                iNanoID: pkt.iNanoID,
+                iSkillID: pkt.iTuneID,
+                iPC_FusionMatter: player.get_fusion_matter() as i32,
+                aiItemSlotNum: item_slots,
+                aItem: items,
+            };
+            client.send_packet(P_FE2CL_REP_NANO_TUNE_SUCC, &resp)
+        })(),
+        || {
+            let pc_id = client.get_player_id()?;
+            let resp = sP_FE2CL_REP_NANO_TUNE_FAIL {
+                iPC_ID: pc_id,
+                iErrorCode: unused!(),
+            };
+            client.send_packet(P_FE2CL_REP_NANO_TUNE_FAIL, &resp)
+        },
+    )
 }
