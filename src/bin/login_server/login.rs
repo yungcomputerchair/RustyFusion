@@ -172,7 +172,7 @@ pub fn save_char_tutor(client: &mut FFClient, state: &mut LoginServerState) -> F
         format!("Couldn't get player {}", pc_uid),
     ))?;
     if pkt.iTutorialFlag == 1 {
-        player.set_tutorial_flag();
+        player.set_tutorial_done();
         Ok(())
     } else {
         Err(FFError::build(

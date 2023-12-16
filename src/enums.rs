@@ -23,6 +23,21 @@ impl TryFrom<i32> for NanoStyle {
     }
 }
 
+#[repr(i16)]
+#[derive(PartialEq, Eq, Hash, FromPrimitive, Clone, Copy, Debug)]
+pub enum PlayerGuide {
+    Computress = 5,
+}
+impl TryFrom<i16> for PlayerGuide {
+    type Error = FFError;
+    fn try_from(value: i16) -> FFResult<Self> {
+        Self::from_i16(value).ok_or(FFError::build(
+            Severity::Warning,
+            format!("Invalid PlayerGuide value {}", value),
+        ))
+    }
+}
+
 /* Enums ripped from the client */
 
 #[repr(i32)]

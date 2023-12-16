@@ -2,7 +2,7 @@ use std::{any::Any, fmt::Display};
 
 use crate::{
     defines::*,
-    enums::ItemLocation,
+    enums::{ItemLocation, PlayerGuide},
     error::{FFError, FFResult, Severity},
     net::{
         ffclient::FFClient,
@@ -79,10 +79,18 @@ impl Display for PlayerName {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 struct GuideData {
-    current_guide: i16,
+    current_guide: PlayerGuide,
     total_guides: i16,
+}
+impl Default for GuideData {
+    fn default() -> Self {
+        Self {
+            current_guide: PlayerGuide::Computress,
+            total_guides: 1,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -295,7 +303,7 @@ impl Player {
             PCStyle: self.get_style(),
             PCStyle2: self.get_style_2(),
             iLevel: self.combat_stats.level,
-            iMentor: self.guide_data.current_guide,
+            iMentor: self.guide_data.current_guide as i16,
             iMentorCount: self.guide_data.total_guides,
             iHP: self.combat_stats.hp,
             iBatteryW: self.weapon_boosts as i32,
@@ -570,8 +578,9 @@ impl Player {
         self.flags.appearance_flag = true;
     }
 
-    pub fn set_tutorial_flag(&mut self) {
+    pub fn set_tutorial_done(&mut self) {
         self.flags.tutorial_flag = true;
+        // TODO delete all active missions
     }
 
     pub fn set_payzone_flag(&mut self) {
@@ -624,7 +633,7 @@ impl Player {
             self.set_level(PC_LEVEL_MAX as i16);
             self.set_taros(PC_CANDY_MAX);
             self.set_appearance_flag();
-            self.set_tutorial_flag();
+            self.set_tutorial_done();
             self.set_payzone_flag();
             self.flags.scamper_flags = -1;
             self.flags.tip_flags = -1;
