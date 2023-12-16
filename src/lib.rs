@@ -492,23 +492,16 @@ pub struct CrocPotData {
 #[derive(Debug, Copy, Clone)]
 pub struct Nano {
     id: i16,
-    pub selected_skill: usize,
+    pub selected_skill: Option<usize>,
     pub stamina: i16,
 }
 impl Nano {
-    pub fn new(id: i16, selected_skill: usize) -> FFResult<Self> {
-        if selected_skill >= 3 {
-            return Err(FFError::build(
-                Severity::Warning,
-                format!("Selected skill out of bounds: {}", selected_skill),
-            ));
-        }
-
-        Ok(Self {
+    pub fn new(id: i16) -> Self {
+        Self {
             id,
-            selected_skill,
+            selected_skill: None,
             stamina: NANO_STAMINA_MAX,
-        })
+        }
     }
 
     pub fn get_nano_data(&self) -> FFResult<&NanoData> {
@@ -518,20 +511,28 @@ impl Nano {
 impl From<Option<Nano>> for sNano {
     fn from(value: Option<Nano>) -> Self {
         match value {
-            Some(nano) => {
-                let nano_data = nano.get_nano_data().unwrap();
-                Self {
-                    iID: nano.id,
-                    iSkillID: nano_data.skills[nano.selected_skill],
-                    iStamina: nano.stamina,
-                }
-            }
+            Some(nano) => Self {
+                iID: nano.id,
+                iSkillID: match nano.selected_skill {
+                    Some(skill_idx) => {
+                        let nano_data = nano.get_nano_data().unwrap();
+                        nano_data.skills[skill_idx]
+                    }
+                    None => 0,
+                },
+                iStamina: nano.stamina,
+            },
             None => sNano {
                 iID: 0,
                 iSkillID: 0,
                 iStamina: 0,
             },
         }
+    }
+}
+impl Nano {
+    pub fn tune(&mut self, skill_idx: Option<usize>) {
+        self.selected_skill = skill_idx;
     }
 }
 

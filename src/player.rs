@@ -286,14 +286,36 @@ impl Player {
         }
     }
 
-    pub fn unlock_nano(&mut self, nano_id: usize, selected_skill: usize) -> FFResult<()> {
+    pub fn unlock_nano(&mut self, nano_id: usize) -> FFResult<&mut Nano> {
         if nano_id >= SIZEOF_NANO_BANK_SLOT as usize {
             return Err(FFError::build(
                 Severity::Warning,
                 format!("Invalid nano ID: {}", nano_id),
             ));
         }
-        self.nano_data.nano_inventory[nano_id] = Some(Nano::new(nano_id as i16, selected_skill)?);
+        self.nano_data.nano_inventory[nano_id] = Some(Nano::new(nano_id as i16));
+        Ok(self.nano_data.nano_inventory[nano_id].as_mut().unwrap())
+    }
+
+    pub fn tune_nano(&mut self, nano_id: usize, skill_selection: Option<usize>) -> FFResult<()> {
+        if nano_id >= SIZEOF_NANO_BANK_SLOT as usize {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Invalid nano ID: {}", nano_id),
+            ));
+        }
+        let nano = self.nano_data.nano_inventory[nano_id].as_mut().unwrap();
+
+        if let Some(skill_idx) = skill_selection {
+            if skill_idx >= SIZEOF_NANO_SKILLS {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!("Invalid nano skill index: {}", skill_idx),
+                ));
+            }
+        }
+
+        nano.tune(skill_selection);
         Ok(())
     }
 
@@ -639,9 +661,10 @@ impl Player {
             self.flags.tip_flags = -1;
             self.flags.skyway_flags = [-1; WYVERN_LOCATION_FLAG_SIZE as usize];
 
-            // unlock all nanos
+            // unlock all nanos, tune to first skill
             for i in 1..SIZEOF_NANO_BANK_SLOT as usize {
-                self.unlock_nano(i, 0).unwrap();
+                self.unlock_nano(i).unwrap();
+                self.tune_nano(i, Some(0)).unwrap();
             }
 
             // fill empty nanocom slots with random nanos
