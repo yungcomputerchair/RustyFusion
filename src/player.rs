@@ -19,6 +19,7 @@ use crate::{
 };
 
 use num_traits::{clamp, clamp_min};
+use rand::Rng;
 use uuid::Uuid;
 
 pub const TEST_ACC_UID_START: i64 = i64::MAX - 3;
@@ -632,6 +633,15 @@ impl Player {
             // unlock all nanos
             for i in 1..SIZEOF_NANO_BANK_SLOT as usize {
                 self.unlock_nano(i, 0).unwrap();
+            }
+
+            // fill empty nanocom slots with random nanos
+            let mut rng = rand::thread_rng();
+            for i in 0..SIZEOF_NANO_CARRY_SLOT as usize {
+                if self.nano_data.equipped_ids[i].is_none() {
+                    let nano_id = rng.gen_range(1..SIZEOF_NANO_BANK_SLOT as u16);
+                    self.nano_data.equipped_ids[i] = Some(nano_id);
+                }
             }
         } // TODO GM special state
     }
