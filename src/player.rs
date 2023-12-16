@@ -240,8 +240,17 @@ impl Player {
         self.nano_data.active_slot
     }
 
-    pub fn set_active_nano_slot(&mut self, slot: Option<usize>) {
+    pub fn set_active_nano_slot(&mut self, slot: Option<usize>) -> FFResult<()> {
+        if let Some(slot) = slot {
+            if !(0..SIZEOF_NANO_CARRY_SLOT as usize).contains(&slot) {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!("Invalid nano slot: {}", slot),
+                ));
+            }
+        }
         self.nano_data.active_slot = slot;
+        Ok(())
     }
 
     pub fn get_active_nano(&self) -> Option<&Nano> {
