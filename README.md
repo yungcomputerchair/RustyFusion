@@ -31,10 +31,16 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
   - [ ] Groups
   - [ ] Email system
 - [ ] ***Nano framework***
+  - [x] Swapping equipped nanos
+  - [x] Summoning nanos
+  - [ ] Acquiring nanos
+  - [ ] Changing nano powers
 - [ ] Combat
   - [ ] Mobs
   - [ ] Core combat loop + mob AI
   - [ ] Abilities and (de)buffs
+    - [ ] Passive skills (including nano)
+    - [ ] Active skills (including nano)
     - [ ] Gumballs + other usables
   - [ ] Mob drops
 - [ ] E.G.G.s (the ones on the ground that buff you)
