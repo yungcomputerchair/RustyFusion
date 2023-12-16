@@ -589,6 +589,7 @@ impl Player {
 
     pub fn set_god_mode(&mut self, god_mode: bool) {
         if god_mode {
+            // max stats
             self.set_fusion_matter(PC_FUSIONMATTER_MAX);
             self.set_hp(i32::MAX);
             self.set_level(PC_LEVEL_MAX as i16);
@@ -599,6 +600,11 @@ impl Player {
             self.flags.scamper_flags = -1;
             self.flags.tip_flags = -1;
             self.flags.skyway_flags = [-1; WYVERN_LOCATION_FLAG_SIZE as usize];
+
+            // unlock all nanos
+            for i in 1..SIZEOF_NANO_BANK_SLOT as usize {
+                self.unlock_nano(i, 0).unwrap();
+            }
         } // TODO GM special state
     }
 }
