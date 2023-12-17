@@ -117,8 +117,8 @@ pub fn nano_tune(client: &mut FFClient, state: &mut ShardServerState) -> FFResul
             let item_slots = placeholder!([-1; 10]);
             let items = placeholder!([None.into(); 10]);
 
-            let nano_data = tdata_get().get_nano_data(pkt.iNanoID)?;
-            let skill_idx = nano_data
+            let stats = tdata_get().get_nano_stats(pkt.iNanoID)?;
+            let skill_idx = stats
                 .skills
                 .iter()
                 .position(|sid| *sid == pkt.iTuneID)

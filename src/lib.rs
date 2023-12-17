@@ -15,7 +15,7 @@ use net::{
 };
 use player::Player;
 use state::shard::ShardServerState;
-use tabledata::{tdata_get, NanoData};
+use tabledata::{tdata_get, NanoStats};
 
 use crate::enums::ItemLocation;
 
@@ -504,8 +504,8 @@ impl Nano {
         }
     }
 
-    pub fn get_nano_data(&self) -> FFResult<&NanoData> {
-        tdata_get().get_nano_data(self.id)
+    pub fn get_stats(&self) -> FFResult<&NanoStats> {
+        tdata_get().get_nano_stats(self.id)
     }
 }
 impl From<Option<Nano>> for sNano {
@@ -515,8 +515,8 @@ impl From<Option<Nano>> for sNano {
                 iID: nano.id,
                 iSkillID: match nano.selected_skill {
                     Some(skill_idx) => {
-                        let nano_data = nano.get_nano_data().unwrap();
-                        nano_data.skills[skill_idx]
+                        let stats = nano.get_stats().unwrap();
+                        stats.skills[skill_idx]
                     }
                     None => 0,
                 },
