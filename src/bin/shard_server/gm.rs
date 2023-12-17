@@ -92,7 +92,7 @@ pub fn gm_pc_give_nano(clients: &mut ClientMap, state: &mut ShardServerState) ->
                 });
 
             let player = state.get_player_mut(pc_id)?;
-            let nano = *player.unlock_nano(nano_id as usize)?;
+            let nano = *player.unlock_nano(nano_id)?;
 
             let resp = sP_FE2CL_REP_PC_NANO_CREATE_SUCC {
                 iPC_FusionMatter: player.get_fusion_matter() as i32,

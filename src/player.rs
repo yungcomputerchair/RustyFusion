@@ -96,7 +96,7 @@ impl Default for GuideData {
 #[derive(Debug, Clone, Copy)]
 struct Nanocom {
     nano_inventory: [Option<Nano>; SIZEOF_NANO_BANK_SLOT as usize],
-    equipped_ids: [Option<u16>; SIZEOF_NANO_CARRY_SLOT as usize],
+    equipped_ids: [Option<i16>; SIZEOF_NANO_CARRY_SLOT as usize],
     active_slot: Option<usize>,
 }
 impl Default for Nanocom {
@@ -234,7 +234,7 @@ impl Player {
         self.instance_id as i32
     }
 
-    pub fn change_nano(&mut self, slot: usize, nano_id: Option<u16>) -> FFResult<()> {
+    pub fn change_nano(&mut self, slot: usize, nano_id: Option<i16>) -> FFResult<()> {
         if !(0..SIZEOF_NANO_CARRY_SLOT as usize).contains(&slot) {
             return Err(FFError::build(
                 Severity::Warning,
@@ -286,7 +286,8 @@ impl Player {
         }
     }
 
-    pub fn unlock_nano(&mut self, nano_id: usize) -> FFResult<&mut Nano> {
+    pub fn unlock_nano(&mut self, nano_id: i16) -> FFResult<&mut Nano> {
+        let nano_id = nano_id as usize;
         if nano_id >= SIZEOF_NANO_BANK_SLOT as usize {
             return Err(FFError::build(
                 Severity::Warning,
@@ -297,7 +298,8 @@ impl Player {
         Ok(self.nano_data.nano_inventory[nano_id].as_mut().unwrap())
     }
 
-    pub fn get_nano(&self, nano_id: usize) -> FFResult<&Nano> {
+    pub fn get_nano(&self, nano_id: i16) -> FFResult<&Nano> {
+        let nano_id = nano_id as usize;
         if nano_id >= SIZEOF_NANO_BANK_SLOT as usize {
             return Err(FFError::build(
                 Severity::Warning,
@@ -312,7 +314,8 @@ impl Player {
             ))
     }
 
-    pub fn get_nano_mut(&mut self, nano_id: usize) -> FFResult<&mut Nano> {
+    pub fn get_nano_mut(&mut self, nano_id: i16) -> FFResult<&mut Nano> {
+        let nano_id = nano_id as usize;
         if nano_id >= SIZEOF_NANO_BANK_SLOT as usize {
             return Err(FFError::build(
                 Severity::Warning,
@@ -327,7 +330,7 @@ impl Player {
             ))
     }
 
-    pub fn tune_nano(&mut self, nano_id: usize, skill_selection: Option<usize>) -> FFResult<()> {
+    pub fn tune_nano(&mut self, nano_id: i16, skill_selection: Option<usize>) -> FFResult<()> {
         let nano = self.get_nano_mut(nano_id)?;
 
         if let Some(skill_idx) = skill_selection {
@@ -366,7 +369,7 @@ impl Player {
             aInven: self.inventory.main.map(Option::<Item>::into),
             aQInven: self.inventory.mission.map(Option::<Item>::into),
             aNanoBank: self.nano_data.nano_inventory.map(Option::<Nano>::into),
-            aNanoSlots: self.nano_data.equipped_ids.map(|id| id.unwrap_or(0)),
+            aNanoSlots: self.nano_data.equipped_ids.map(|id| id.unwrap_or(0) as u16),
             iActiveNanoSlotNum: match self.nano_data.active_slot {
                 Some(active_slot) => active_slot as i16,
                 None => -1,
@@ -686,7 +689,7 @@ impl Player {
             self.flags.skyway_flags = [-1; WYVERN_LOCATION_FLAG_SIZE as usize];
 
             // unlock all nanos, tune to first skill
-            for i in 1..SIZEOF_NANO_BANK_SLOT as usize {
+            for i in 1..SIZEOF_NANO_BANK_SLOT as i16 {
                 self.unlock_nano(i).unwrap();
                 self.tune_nano(i, Some(0)).unwrap();
             }
@@ -695,7 +698,7 @@ impl Player {
             let mut rng = rand::thread_rng();
             for i in 0..SIZEOF_NANO_CARRY_SLOT as usize {
                 if self.nano_data.equipped_ids[i].is_none() {
-                    let nano_id = rng.gen_range(1..SIZEOF_NANO_BANK_SLOT as u16);
+                    let nano_id = rng.gen_range(1..SIZEOF_NANO_BANK_SLOT as i16);
                     self.nano_data.equipped_ids[i] = Some(nano_id);
                 }
             }
