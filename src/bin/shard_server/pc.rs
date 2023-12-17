@@ -194,6 +194,64 @@ pub fn pc_stop(
     Ok(())
 }
 
+pub fn pc_vehicle_on(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    catch_fail(
+        (|| {
+            let client = clients.get_self();
+            let pc_id = client.get_player_id()?;
+
+            // TODO anticheat
+
+            let resp = sP_FE2CL_PC_VEHICLE_ON_SUCC { UNUSED: unused!() };
+            state
+                .entity_map
+                .for_each_around(EntityID::Player(pc_id), clients, |client| {
+                    let _ = client.send_packet(P_FE2CL_PC_VEHICLE_ON_SUCC, &resp);
+                });
+            clients
+                .get_self()
+                .send_packet(P_FE2CL_PC_VEHICLE_ON_SUCC, &resp)
+        })(),
+        || {
+            let resp = sP_FE2CL_PC_VEHICLE_ON_FAIL {
+                iErrorCode: unused!(),
+            };
+            clients
+                .get_self()
+                .send_packet(P_FE2CL_PC_VEHICLE_ON_FAIL, &resp)
+        },
+    )
+}
+
+pub fn pc_vehicle_off(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    catch_fail(
+        (|| {
+            let client = clients.get_self();
+            let pc_id = client.get_player_id()?;
+
+            // TODO anticheat
+
+            let resp = sP_FE2CL_PC_VEHICLE_OFF_SUCC { UNUSED: unused!() };
+            state
+                .entity_map
+                .for_each_around(EntityID::Player(pc_id), clients, |client| {
+                    let _ = client.send_packet(P_FE2CL_PC_VEHICLE_OFF_SUCC, &resp);
+                });
+            clients
+                .get_self()
+                .send_packet(P_FE2CL_PC_VEHICLE_OFF_SUCC, &resp)
+        })(),
+        || {
+            let resp = sP_FE2CL_PC_VEHICLE_OFF_FAIL {
+                iErrorCode: unused!(),
+            };
+            clients
+                .get_self()
+                .send_packet(P_FE2CL_PC_VEHICLE_OFF_FAIL, &resp)
+        },
+    )
+}
+
 pub fn pc_special_state_switch(
     clients: &mut ClientMap,
     state: &mut ShardServerState,

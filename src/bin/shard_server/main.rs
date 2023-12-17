@@ -153,6 +153,8 @@ fn handle_packet(
         P_CL2FE_REQ_PC_MOVE => pc::pc_move(&mut clients, state, time),
         P_CL2FE_REQ_PC_JUMP => pc::pc_jump(&mut clients, state, time),
         P_CL2FE_REQ_PC_STOP => pc::pc_stop(&mut clients, state, time),
+        P_CL2FE_REQ_PC_VEHICLE_ON => pc::pc_vehicle_on(&mut clients, state),
+        P_CL2FE_REQ_PC_VEHICLE_OFF => pc::pc_vehicle_off(&mut clients, state),
         P_CL2FE_REQ_PC_GOTO => pc::pc_goto(clients.get_self()),
         P_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH => pc::pc_special_state_switch(&mut clients, state),
         P_CL2FE_REQ_PC_FIRST_USE_FLAG_SET => pc::pc_first_use_flag_set(clients.get_self(), state),

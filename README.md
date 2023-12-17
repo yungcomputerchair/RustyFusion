@@ -19,7 +19,7 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
   - [x] S.C.A.M.P.E.R. (fast-travel)
   - [ ] Monkey Skyway System (wyvern style)
   - [ ] Sliders (bus style)
-  - [ ] ***Vehicles***
+  - [x] Vehicles
 - [x] Items
   - [x] Framework (equipping, stacking, deleting, etc)
   - [x] Vendors (buying, selling, buy-backs)
@@ -48,7 +48,7 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
 - [ ] Missions
 - [ ] Entity pathing
 - [ ] Infected Zone races
-- [ ] Guide changing
+- [ ] ***Guide changing***
 - [ ] Admin features
   - [ ] Custom command system
   - [ ] OpenFusion monitor protocol
