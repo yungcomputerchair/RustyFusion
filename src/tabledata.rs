@@ -76,8 +76,17 @@ pub struct NanoStats {
     pub skills: [i16; SIZEOF_NANO_SKILLS],
 }
 
+#[derive(Debug)]
+pub struct NanoTuning {
+    pub fusion_matter_cost: u32,
+    pub req_item_id: i16,
+    pub req_item_quantity: usize,
+    pub skill_id: i16,
+}
+
 struct NanoData {
     nano_stats: HashMap<i16, NanoStats>,
+    nano_tunings: HashMap<i16, NanoTuning>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -214,6 +223,17 @@ impl TableData {
             .ok_or(FFError::build(
                 Severity::Warning,
                 format!("Nano stats for nano id {} doesn't exist", nano_id),
+            ))
+    }
+
+    pub fn get_nano_tuning(&self, tuning_id: i16) -> FFResult<&NanoTuning> {
+        self.xdt_data
+            .nano_data
+            .nano_tunings
+            .get(&tuning_id)
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Nano tuning with tuning id {} doesn't exist", tuning_id),
             ))
     }
 
@@ -793,8 +813,62 @@ fn load_nano_data(root: &Map<std::string::String, Value>) -> Result<NanoData, St
         }
     }
 
+    pub fn load_tunings(
+        root: &Map<std::string::String, Value>,
+    ) -> Result<HashMap<i16, NanoTuning>, String> {
+        const NANO_TABLE_NANO_TUNE_DATA_KEY: &str = "m_pNanoTuneData";
+
+        #[derive(Debug, Deserialize)]
+        struct NanoTuningEntry {
+            m_iTuneNumber: i32,
+            m_iReqFusionMatter: i32,
+            m_iReqItemID: i32,
+            m_iReqItemCount: i32,
+            m_iSkillID: i32,
+        }
+
+        let nano_table = root
+            .get(NANO_TABLE_KEY)
+            .ok_or(format!("Key missing: {}", NANO_TABLE_KEY))?;
+        if let Value::Object(nano_table) = nano_table {
+            let nano_tuning = nano_table
+                .get(NANO_TABLE_NANO_TUNE_DATA_KEY)
+                .ok_or(format!(
+                    "Key missing: {}.{}",
+                    NANO_TABLE_KEY, NANO_TABLE_NANO_TUNE_DATA_KEY
+                ))?;
+            if let Value::Array(nano_tuning) = nano_tuning {
+                let mut nano_tuning_table = HashMap::new();
+                for v in nano_tuning {
+                    let nano_tuning_entry: NanoTuningEntry = serde_json::from_value(v.clone())
+                        .map_err(|e| format!("Malformed nano tuning entry: {} {}", e, v))?;
+                    let key = nano_tuning_entry.m_iTuneNumber as i16;
+                    if key == 0 {
+                        continue;
+                    }
+                    let nano_tuning_entry = NanoTuning {
+                        fusion_matter_cost: nano_tuning_entry.m_iReqFusionMatter as u32,
+                        req_item_id: nano_tuning_entry.m_iReqItemID as i16,
+                        req_item_quantity: nano_tuning_entry.m_iReqItemCount as usize,
+                        skill_id: nano_tuning_entry.m_iSkillID as i16,
+                    };
+                    nano_tuning_table.insert(key, nano_tuning_entry);
+                }
+                Ok(nano_tuning_table)
+            } else {
+                Err(format!(
+                    "Array missing: {}.{}",
+                    NANO_TABLE_KEY, NANO_TABLE_NANO_TUNE_DATA_KEY
+                ))
+            }
+        } else {
+            Err(format!("Object missing: {}", NANO_TABLE_KEY))
+        }
+    }
+
     Ok(NanoData {
         nano_stats: load_stats(root)?,
+        nano_tunings: load_tunings(root)?,
     })
 }
 
