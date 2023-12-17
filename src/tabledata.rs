@@ -80,7 +80,7 @@ pub struct NanoStats {
 pub struct NanoTuning {
     pub fusion_matter_cost: u32,
     pub req_item_id: i16,
-    pub req_item_quantity: usize,
+    pub req_item_quantity: u16,
     pub skill_id: i16,
 }
 
@@ -849,7 +849,7 @@ fn load_nano_data(root: &Map<std::string::String, Value>) -> Result<NanoData, St
                     let nano_tuning_entry = NanoTuning {
                         fusion_matter_cost: nano_tuning_entry.m_iReqFusionMatter as u32,
                         req_item_id: nano_tuning_entry.m_iReqItemID as i16,
-                        req_item_quantity: nano_tuning_entry.m_iReqItemCount as usize,
+                        req_item_quantity: nano_tuning_entry.m_iReqItemCount as u16,
                         skill_id: nano_tuning_entry.m_iSkillID as i16,
                     };
                     nano_tuning_table.insert(key, nano_tuning_entry);

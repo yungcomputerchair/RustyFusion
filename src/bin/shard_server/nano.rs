@@ -1,4 +1,6 @@
-use rusty_fusion::{error::catch_fail, placeholder, tabledata::tdata_get, Combatant};
+use rusty_fusion::{
+    enums::ItemLocation, error::catch_fail, placeholder, tabledata::tdata_get, Combatant, Item,
+};
 
 use super::*;
 
@@ -113,25 +115,81 @@ pub fn nano_tune(client: &mut FFClient, state: &mut ShardServerState) -> FFResul
             let pc_id = client.get_player_id()?;
             let player = state.get_player_mut(pc_id)?;
 
-            // TODO consume tuning items
-            let item_slots = placeholder!([-1; 10]);
-            let items = placeholder!([None.into(); 10]);
+            let tuning = tdata_get().get_nano_tuning(pkt.iTuneID)?;
+            let skill_id = tuning.skill_id;
 
             let stats = tdata_get().get_nano_stats(pkt.iNanoID)?;
-            let skill_idx = stats
-                .skills
-                .iter()
-                .position(|sid| *sid == pkt.iTuneID)
-                .ok_or(FFError::build(
-                    Severity::Warning,
-                    format!("Bad skill ID {} for nano {}", pkt.iTuneID, pkt.iNanoID),
-                ))?;
+            let skill_idx =
+                stats
+                    .skills
+                    .iter()
+                    .position(|sid| *sid == skill_id)
+                    .ok_or(FFError::build(
+                        Severity::Warning,
+                        format!("Bad skill ID {} for nano {}", skill_id, pkt.iNanoID),
+                    ))?;
 
-            player.tune_nano(pkt.iNanoID as usize, Some(skill_idx))?;
+            // check for + consume tuning items
+            let mut item_slots = [-1; 10];
+            let mut items = [None.into(); 10];
+            let mut quantity_left = tuning.req_item_quantity;
+
+            let mut player_working = *player;
+            if player_working
+                .get_nano(pkt.iNanoID as usize)?
+                .selected_skill
+                .is_some()
+            {
+                // existing skill = not free. consume items
+                for (i, slot_num) in pkt.aiNeedItemSlotNum.iter().enumerate() {
+                    if quantity_left == 0 {
+                        break;
+                    }
+
+                    let slot =
+                        player_working.get_item_mut(ItemLocation::Inven, *slot_num as usize)?;
+                    if slot.is_some_and(|stack| stack.get_id() == tuning.req_item_id) {
+                        let removed = Item::split_items(slot, quantity_left);
+                        quantity_left -= removed.unwrap().get_quantity();
+                        item_slots[i] = *slot_num;
+                        items[i] = (*slot).into();
+                    }
+                }
+
+                if quantity_left != 0 {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!(
+                            "Not enough items to tune nano ({} < {})",
+                            tuning.req_item_quantity - quantity_left,
+                            tuning.req_item_quantity
+                        ),
+                    ));
+                }
+
+                // consume FM
+                if player_working.get_fusion_matter() < tuning.fusion_matter_cost {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!(
+                            "Not enough fusion matter to tune nano {} ({} < {})",
+                            pkt.iNanoID,
+                            player_working.get_fusion_matter(),
+                            tuning.fusion_matter_cost
+                        ),
+                    ));
+                }
+                player_working.set_fusion_matter(
+                    player_working.get_fusion_matter() - tuning.fusion_matter_cost,
+                );
+            }
+
+            player_working.tune_nano(pkt.iNanoID as usize, Some(skill_idx))?;
+            *player = player_working; // commit changes
 
             let resp = sP_FE2CL_REP_NANO_TUNE_SUCC {
                 iNanoID: pkt.iNanoID,
-                iSkillID: pkt.iTuneID,
+                iSkillID: skill_id,
                 iPC_FusionMatter: player.get_fusion_matter() as i32,
                 aiItemSlotNum: item_slots,
                 aItem: items,

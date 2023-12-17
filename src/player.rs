@@ -297,21 +297,38 @@ impl Player {
         Ok(self.nano_data.nano_inventory[nano_id].as_mut().unwrap())
     }
 
-    pub fn tune_nano(&mut self, nano_id: usize, skill_selection: Option<usize>) -> FFResult<()> {
+    pub fn get_nano(&self, nano_id: usize) -> FFResult<&Nano> {
         if nano_id >= SIZEOF_NANO_BANK_SLOT as usize {
             return Err(FFError::build(
                 Severity::Warning,
                 format!("Invalid nano ID: {}", nano_id),
             ));
         }
-
-        if self.nano_data.nano_inventory[nano_id].is_none() {
-            return Err(FFError::build(
+        self.nano_data.nano_inventory[nano_id]
+            .as_ref()
+            .ok_or(FFError::build(
                 Severity::Warning,
                 format!("Nano {} is locked", nano_id),
+            ))
+    }
+
+    pub fn get_nano_mut(&mut self, nano_id: usize) -> FFResult<&mut Nano> {
+        if nano_id >= SIZEOF_NANO_BANK_SLOT as usize {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Invalid nano ID: {}", nano_id),
             ));
         }
-        let nano = self.nano_data.nano_inventory[nano_id].as_mut().unwrap();
+        self.nano_data.nano_inventory[nano_id]
+            .as_mut()
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Nano {} is locked", nano_id),
+            ))
+    }
+
+    pub fn tune_nano(&mut self, nano_id: usize, skill_selection: Option<usize>) -> FFResult<()> {
+        let nano = self.get_nano_mut(nano_id)?;
 
         if let Some(skill_idx) = skill_selection {
             if skill_idx >= SIZEOF_NANO_SKILLS {
