@@ -38,6 +38,11 @@ pub fn login(
             y: 538992,
             z: -1029,
         }); // Mt. Blackhead
+        player.set_item(
+            ItemLocation::Equip,
+            EQUIP_SLOT_VEHICLE as usize,
+            Some(Item::new(ItemType::Vehicle, ID_KND_HOVERBOARD)),
+        )?;
         players.push(player);
 
         let mut player = Player::new(TEST_ACC_UID_START + 1);
