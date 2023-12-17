@@ -1,4 +1,4 @@
-use std::{any::Any, fmt::Display};
+use std::{any::Any, cmp::max, fmt::Display};
 
 use crate::{
     defines::*,
@@ -287,6 +287,7 @@ impl Player {
     }
 
     pub fn unlock_nano(&mut self, nano_id: i16) -> FFResult<&mut Nano> {
+        let new_level = max(self.get_level(), nano_id);
         let nano_id = nano_id as usize;
         if nano_id >= SIZEOF_NANO_BANK_SLOT as usize {
             return Err(FFError::build(
@@ -295,6 +296,7 @@ impl Player {
             ));
         }
         self.nano_data.nano_inventory[nano_id] = Some(Nano::new(nano_id as i16));
+        self.set_level(new_level);
         Ok(self.nano_data.nano_inventory[nano_id].as_mut().unwrap())
     }
 

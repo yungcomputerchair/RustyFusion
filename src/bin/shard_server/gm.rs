@@ -1,5 +1,3 @@
-use std::cmp::max;
-
 use rusty_fusion::{
     defines,
     error::{catch_fail, FFError, Severity},
@@ -99,7 +97,7 @@ pub fn gm_pc_give_nano(clients: &mut ClientMap, state: &mut ShardServerState) ->
                 iQuestItemSlotNum: 0,
                 QuestItem: None.into(),
                 Nano: Some(nano).into(),
-                iPC_Level: max(player.get_level(), pkt.iNanoID),
+                iPC_Level: player.get_level(),
             };
 
             clients
