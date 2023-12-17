@@ -2,7 +2,7 @@ use std::{any::Any, fmt::Display};
 
 use crate::{
     defines::*,
-    enums::{ItemLocation, PlayerGuide},
+    enums::{ItemLocation, ItemType, PlayerGuide},
     error::{FFError, FFResult, Severity},
     net::{
         ffclient::FFClient,
@@ -629,6 +629,17 @@ impl Player {
 
     pub fn set_tutorial_done(&mut self) {
         self.flags.tutorial_flag = true;
+        // unlock buttercup
+        self.unlock_nano(ID_BUTTERCUP).unwrap();
+        self.tune_nano(ID_BUTTERCUP, Some(0)).unwrap();
+        self.change_nano(0, Some(ID_BUTTERCUP)).unwrap();
+        // equip lightning gun
+        self.set_item(
+            ItemLocation::Equip,
+            EQUIP_SLOT_HAND as usize,
+            Some(Item::new(ItemType::Hand, ID_LIGHTNING_GUN)),
+        )
+        .unwrap();
         // TODO delete all active missions
     }
 

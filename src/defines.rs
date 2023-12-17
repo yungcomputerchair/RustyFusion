@@ -2,6 +2,8 @@
 
 pub const SIZEOF_NANO_SKILLS: usize = 3;
 pub const NANO_STAMINA_MAX: i16 = 150;
+pub const ID_LIGHTNING_GUN: i16 = 328;
+pub const ID_BUTTERCUP: i16 = 1;
 
 /* Constants ripped from the client */
 
