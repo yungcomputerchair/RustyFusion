@@ -48,6 +48,7 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
 - [ ] Missions
 - [ ] Entity pathing
 - [ ] Infected Zone races
+- [ ] Guide changing
 - [ ] Admin features
   - [ ] Custom command system
   - [ ] OpenFusion monitor protocol
