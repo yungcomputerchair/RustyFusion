@@ -57,10 +57,6 @@ pub struct Position {
     pub z: i32,
 }
 impl Position {
-    pub fn new(x: i32, y: i32, z: i32) -> Self {
-        Self { x, y, z }
-    }
-
     pub fn chunk_coords(&self) -> (i32, i32) {
         let chunk_x = (self.x * chunk::NCHUNKS as i32) / chunk::MAP_BOUNDS;
         let chunk_y = (self.y * chunk::NCHUNKS as i32) / chunk::MAP_BOUNDS;
@@ -538,7 +534,7 @@ impl Nano {
 
 #[derive(Debug, Copy, Clone, Default)]
 struct Mission {
-    id: i32,
+    task_id: i32,
     target_npc_ids: [i32; 3],
     target_npc_counts: [i32; 3],
     target_item_ids: [i32; 3],
@@ -547,7 +543,7 @@ struct Mission {
 impl From<Mission> for sRunningQuest {
     fn from(value: Mission) -> Self {
         Self {
-            m_aCurrTaskID: value.id,
+            m_aCurrTaskID: value.task_id,
             m_aKillNPCID: value.target_npc_ids,
             m_aKillNPCCount: value.target_npc_counts,
             m_aNeededItemID: value.target_item_ids,

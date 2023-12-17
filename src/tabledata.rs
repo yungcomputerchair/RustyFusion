@@ -20,6 +20,7 @@ struct XDTData {
     item_data: HashMap<(i16, ItemType), ItemStats>,
     crocpot_data: HashMap<i16, CrocPotData>,
     transportation_data: TransportationData,
+    instance_data: InstanceData,
     nano_data: NanoData,
 }
 impl XDTData {
@@ -31,6 +32,7 @@ impl XDTData {
                 item_data: load_item_data(&root)?,
                 crocpot_data: load_crocpot_data(&root)?,
                 transportation_data: load_transportation_data(&root)?,
+                instance_data: load_instance_data(&root)?,
                 nano_data: load_nano_data(&root)?,
             })
         } else {
@@ -68,6 +70,23 @@ pub struct ScamperData {
 struct TransportationData {
     trip_data: HashMap<i32, TripData>,
     scamper_data: HashMap<i32, ScamperData>,
+}
+
+#[derive(Debug)]
+pub struct WarpData {
+    pub pos: Position,
+    pub is_instance: bool,
+    pub is_group_warp: bool,
+    pub map_num: i32,
+    pub min_level: i16,
+    pub req_task: Option<(i32, i32)>, // mission id, task id
+    pub req_item: Option<(ItemType, i16)>,
+    pub req_item_consumed: Option<(ItemType, i16)>,
+    pub cost: u32,
+}
+
+struct InstanceData {
+    warp_data: HashMap<i32, WarpData>,
 }
 
 #[derive(Debug)]
@@ -742,11 +761,108 @@ fn load_transportation_data(
     }
 }
 
+fn load_instance_data(root: &Map<std::string::String, Value>) -> Result<InstanceData, String> {
+    const INSTANCE_TABLE_KEY: &str = "m_pInstanceTable";
+
+    fn load_warp_data(
+        table_root: &Map<std::string::String, Value>,
+    ) -> Result<HashMap<i32, WarpData>, String> {
+        const WARP_DATA_KEY: &str = "m_pWarpData";
+
+        #[derive(Debug, Deserialize)]
+        struct WarpDataEntry {
+            m_iWarpNumber: i32,
+            m_iWarpGroupType: i32,
+            m_iNpcNumber: i32,
+            m_iIsInstance: i32,
+            m_iToMapNum: i32,
+            m_iToX: i32,
+            m_iToY: i32,
+            m_iToZ: i32,
+            m_iLimit_Level: i32,
+            m_iLimit_TaskID: i32,
+            m_iMissionID: i32,
+            m_iLimit_ItemType: i32,
+            m_iLimit_ItemID: i32,
+            m_iLimit_UseItemType: i32,
+            m_iLimit_UseItemID: i32,
+            m_iCost: i32,
+        }
+
+        let data = table_root
+            .get(WARP_DATA_KEY)
+            .ok_or(format!("Key missing: {}", WARP_DATA_KEY))?;
+        if let Value::Array(data) = data {
+            let mut warp_map = HashMap::new();
+            for v in data {
+                let warp_data_entry: WarpDataEntry = serde_json::from_value(v.clone())
+                    .map_err(|e| format!("Malformed warp data entry: {} {}", e, v))?;
+                let key = warp_data_entry.m_iWarpNumber;
+                let data_entry = WarpData {
+                    pos: Position {
+                        x: warp_data_entry.m_iToX,
+                        y: warp_data_entry.m_iToY,
+                        z: warp_data_entry.m_iToZ,
+                    },
+                    is_instance: warp_data_entry.m_iIsInstance != 0,
+                    is_group_warp: warp_data_entry.m_iWarpGroupType != 0,
+                    map_num: warp_data_entry.m_iToMapNum,
+                    min_level: warp_data_entry.m_iLimit_Level as i16,
+                    req_task: if warp_data_entry.m_iMissionID == 0 {
+                        None
+                    } else {
+                        Some((
+                            warp_data_entry.m_iMissionID,
+                            warp_data_entry.m_iLimit_TaskID,
+                        ))
+                    },
+                    req_item: if warp_data_entry.m_iLimit_ItemID == 0 {
+                        None
+                    } else {
+                        Some((
+                            (warp_data_entry.m_iLimit_ItemType as i16)
+                                .try_into()
+                                .map_err(|e: FFError| e.get_msg().to_string())?,
+                            warp_data_entry.m_iLimit_ItemID as i16,
+                        ))
+                    },
+                    req_item_consumed: if warp_data_entry.m_iLimit_UseItemID == 0 {
+                        None
+                    } else {
+                        Some((
+                            (warp_data_entry.m_iLimit_UseItemType as i16)
+                                .try_into()
+                                .map_err(|e: FFError| e.get_msg().to_string())?,
+                            warp_data_entry.m_iLimit_UseItemID as i16,
+                        ))
+                    },
+                    cost: warp_data_entry.m_iCost as u32,
+                };
+                warp_map.insert(key, data_entry);
+            }
+            Ok(warp_map)
+        } else {
+            Err(format!("Array missing: {}", WARP_DATA_KEY))
+        }
+    }
+
+    let table = root
+        .get(INSTANCE_TABLE_KEY)
+        .ok_or(format!("Key missing: {}", INSTANCE_TABLE_KEY))?;
+    if let Value::Object(table) = table {
+        Ok(InstanceData {
+            warp_data: load_warp_data(table)?,
+        })
+    } else {
+        Err(format!("Object missing: {}", INSTANCE_TABLE_KEY))
+    }
+}
+
 fn load_nano_data(root: &Map<std::string::String, Value>) -> Result<NanoData, String> {
     const NANO_TABLE_KEY: &str = "m_pNanoTable";
 
     fn load_stats(
-        root: &Map<std::string::String, Value>,
+        table_root: &Map<std::string::String, Value>,
     ) -> Result<HashMap<i16, NanoStats>, String> {
         const NANO_TABLE_NANO_DATA_KEY: &str = "m_pNanoData";
 
@@ -775,46 +891,39 @@ fn load_nano_data(root: &Map<std::string::String, Value>) -> Result<NanoData, St
             m_iSound: i32,
         }
 
-        let nano_table = root
-            .get(NANO_TABLE_KEY)
-            .ok_or(format!("Key missing: {}", NANO_TABLE_KEY))?;
-        if let Value::Object(nano_table) = nano_table {
-            let nano_data = nano_table.get(NANO_TABLE_NANO_DATA_KEY).ok_or(format!(
-                "Key missing: {}.{}",
-                NANO_TABLE_KEY, NANO_TABLE_NANO_DATA_KEY
-            ))?;
-            if let Value::Array(nano_data) = nano_data {
-                let mut nano_table = HashMap::new();
-                for v in nano_data {
-                    let nano_data_entry: NanoStatsEntry = serde_json::from_value(v.clone())
-                        .map_err(|e| format!("Malformed nano data entry: {} {}", e, v))?;
-                    let key = nano_data_entry.m_iNanoNumber as i16;
-                    if key == 0 {
-                        continue;
-                    }
-                    let nano_data_entry = NanoStats {
-                        style: nano_data_entry
-                            .m_iStyle
-                            .try_into()
-                            .map_err(|e: FFError| e.get_msg().to_string())?,
-                        skills: nano_data_entry.m_iTune,
-                    };
-                    nano_table.insert(key, nano_data_entry);
+        let nano_data = table_root.get(NANO_TABLE_NANO_DATA_KEY).ok_or(format!(
+            "Key missing: {}.{}",
+            NANO_TABLE_KEY, NANO_TABLE_NANO_DATA_KEY
+        ))?;
+        if let Value::Array(nano_data) = nano_data {
+            let mut nano_table = HashMap::new();
+            for v in nano_data {
+                let nano_data_entry: NanoStatsEntry = serde_json::from_value(v.clone())
+                    .map_err(|e| format!("Malformed nano data entry: {} {}", e, v))?;
+                let key = nano_data_entry.m_iNanoNumber as i16;
+                if key == 0 {
+                    continue;
                 }
-                Ok(nano_table)
-            } else {
-                Err(format!(
-                    "Array missing: {}.{}",
-                    NANO_TABLE_KEY, NANO_TABLE_NANO_DATA_KEY
-                ))
+                let nano_data_entry = NanoStats {
+                    style: nano_data_entry
+                        .m_iStyle
+                        .try_into()
+                        .map_err(|e: FFError| e.get_msg().to_string())?,
+                    skills: nano_data_entry.m_iTune,
+                };
+                nano_table.insert(key, nano_data_entry);
             }
+            Ok(nano_table)
         } else {
-            Err(format!("Object missing: {}", NANO_TABLE_KEY))
+            Err(format!(
+                "Array missing: {}.{}",
+                NANO_TABLE_KEY, NANO_TABLE_NANO_DATA_KEY
+            ))
         }
     }
 
     pub fn load_tunings(
-        root: &Map<std::string::String, Value>,
+        table_root: &Map<std::string::String, Value>,
     ) -> Result<HashMap<i16, NanoTuning>, String> {
         const NANO_TABLE_NANO_TUNE_DATA_KEY: &str = "m_pNanoTuneData";
 
@@ -827,49 +936,49 @@ fn load_nano_data(root: &Map<std::string::String, Value>) -> Result<NanoData, St
             m_iSkillID: i32,
         }
 
-        let nano_table = root
-            .get(NANO_TABLE_KEY)
-            .ok_or(format!("Key missing: {}", NANO_TABLE_KEY))?;
-        if let Value::Object(nano_table) = nano_table {
-            let nano_tuning = nano_table
-                .get(NANO_TABLE_NANO_TUNE_DATA_KEY)
-                .ok_or(format!(
-                    "Key missing: {}.{}",
-                    NANO_TABLE_KEY, NANO_TABLE_NANO_TUNE_DATA_KEY
-                ))?;
-            if let Value::Array(nano_tuning) = nano_tuning {
-                let mut nano_tuning_table = HashMap::new();
-                for v in nano_tuning {
-                    let nano_tuning_entry: NanoTuningEntry = serde_json::from_value(v.clone())
-                        .map_err(|e| format!("Malformed nano tuning entry: {} {}", e, v))?;
-                    let key = nano_tuning_entry.m_iTuneNumber as i16;
-                    if key == 0 {
-                        continue;
-                    }
-                    let nano_tuning_entry = NanoTuning {
-                        fusion_matter_cost: nano_tuning_entry.m_iReqFusionMatter as u32,
-                        req_item_id: nano_tuning_entry.m_iReqItemID as i16,
-                        req_item_quantity: nano_tuning_entry.m_iReqItemCount as u16,
-                        skill_id: nano_tuning_entry.m_iSkillID as i16,
-                    };
-                    nano_tuning_table.insert(key, nano_tuning_entry);
+        let nano_tuning = table_root
+            .get(NANO_TABLE_NANO_TUNE_DATA_KEY)
+            .ok_or(format!(
+                "Key missing: {}.{}",
+                NANO_TABLE_KEY, NANO_TABLE_NANO_TUNE_DATA_KEY
+            ))?;
+        if let Value::Array(nano_tuning) = nano_tuning {
+            let mut nano_tuning_table = HashMap::new();
+            for v in nano_tuning {
+                let nano_tuning_entry: NanoTuningEntry = serde_json::from_value(v.clone())
+                    .map_err(|e| format!("Malformed nano tuning entry: {} {}", e, v))?;
+                let key = nano_tuning_entry.m_iTuneNumber as i16;
+                if key == 0 {
+                    continue;
                 }
-                Ok(nano_tuning_table)
-            } else {
-                Err(format!(
-                    "Array missing: {}.{}",
-                    NANO_TABLE_KEY, NANO_TABLE_NANO_TUNE_DATA_KEY
-                ))
+                let nano_tuning_entry = NanoTuning {
+                    fusion_matter_cost: nano_tuning_entry.m_iReqFusionMatter as u32,
+                    req_item_id: nano_tuning_entry.m_iReqItemID as i16,
+                    req_item_quantity: nano_tuning_entry.m_iReqItemCount as u16,
+                    skill_id: nano_tuning_entry.m_iSkillID as i16,
+                };
+                nano_tuning_table.insert(key, nano_tuning_entry);
             }
+            Ok(nano_tuning_table)
         } else {
-            Err(format!("Object missing: {}", NANO_TABLE_KEY))
+            Err(format!(
+                "Array missing: {}.{}",
+                NANO_TABLE_KEY, NANO_TABLE_NANO_TUNE_DATA_KEY
+            ))
         }
     }
 
-    Ok(NanoData {
-        nano_stats: load_stats(root)?,
-        nano_tunings: load_tunings(root)?,
-    })
+    let table = root
+        .get(NANO_TABLE_KEY)
+        .ok_or(format!("Key missing: {}", NANO_TABLE_KEY))?;
+    if let Value::Object(table) = table {
+        Ok(NanoData {
+            nano_stats: load_stats(table)?,
+            nano_tunings: load_tunings(table)?,
+        })
+    } else {
+        Err(format!("Object missing: {}", NANO_TABLE_KEY))
+    }
 }
 
 fn load_npc_data() -> Result<Vec<NPCData>, String> {

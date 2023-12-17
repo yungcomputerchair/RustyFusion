@@ -84,7 +84,11 @@ pub fn pc_move(
     let client = clients.get_self();
     let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_MOVE = client.get_packet(P_CL2FE_REQ_PC_MOVE)?;
-    let pos = Position::new(pkt.iX, pkt.iY, pkt.iZ);
+    let pos = Position {
+        x: pkt.iX,
+        y: pkt.iY,
+        z: pkt.iZ,
+    };
     let angle = pkt.iAngle;
 
     let resp = sP_FE2CL_PC_MOVE {
@@ -126,7 +130,11 @@ pub fn pc_jump(
     let client = clients.get_self();
     let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_JUMP = client.get_packet(P_CL2FE_REQ_PC_JUMP)?;
-    let pos = Position::new(pkt.iX, pkt.iY, pkt.iZ);
+    let pos = Position {
+        x: pkt.iX,
+        y: pkt.iY,
+        z: pkt.iZ,
+    };
     let angle = pkt.iAngle;
 
     let resp = sP_FE2CL_PC_JUMP {
@@ -168,7 +176,11 @@ pub fn pc_stop(
     let client = clients.get_self();
     let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_STOP = client.get_packet(P_CL2FE_REQ_PC_STOP)?;
-    let pos = Position::new(pkt.iX, pkt.iY, pkt.iZ);
+    let pos = Position {
+        x: pkt.iX,
+        y: pkt.iY,
+        z: pkt.iZ,
+    };
 
     let resp = sP_FE2CL_PC_STOP {
         iCliTime: pkt.iCliTime,
