@@ -5,7 +5,7 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
 - **Compatibility:** RustyFusion is designed to work with general-purpose Fusionfall clients, as it speaks the original Fusionfall network protocol. This means that [OpenFusionClient](https://github.com/OpenFusionProject/OpenFusionClient) can connect to a RustyFusion server with no extra work. RustyFusion also uses the same tabledata repository as OpenFusion for data sourcing, and it will later be compatible with the OpenFusion monitor protocol and database schema once database support is added.
 - **Safety:** Because RustyFusion is written in Rust as opposed to OpenFusion's choice of C++, it is, in theory, **much less** prone to memory safety issues, security vulnerabilities, and undefined behavior than OpenFusion's implementation of the game with a near-zero decrease in performance.
 - **Scalability:** Unlike OpenFusion, RustyFusion's login server and shard server are **two separate binaries** that communicate to each other over the network, allowing for a more flexible server architecture with multiple shard servers.
-- **Reliability:** RustyFusion comes after years of writing, refactoring, and evaluating OpenFusion code. There were a handful of cut corners and bad design decisions made in the development of OF that this project aims to avoid. Some already implemented examples include the increased usage of high-level types, a proper logging system, and strict error-handling. These changes should lead to a cleaner codebase with less bugs.
+- **Reliability:** RustyFusion comes after years of writing, refactoring, and evaluating OpenFusion code. There were a handful of cut corners and bad design decisions made in the development of OF that this project aims to avoid. Some already implemented examples include the increased usage of high-level types, a proper logging system, strict error-handling, and stricter packet validation ("anti-cheat"). These changes should lead to a cleaner codebase with less bugs.
 
 ## What's Done and Left To Do (Roughly)
 - [x] Barebones login server functionality (connection and character creation)
@@ -20,6 +20,7 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
   - [ ] Monkey Skyway System (wyvern style)
   - [ ] Sliders (bus style)
   - [x] Vehicles
+  - [x] Warping through NPCs
 - [x] Items
   - [x] Framework (equipping, stacking, deleting, etc)
   - [x] Vendors (buying, selling, buy-backs)
