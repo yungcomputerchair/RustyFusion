@@ -13,6 +13,8 @@ pub fn regist_transportation_location(
         *client.get_packet(P_CL2FE_REQ_REGIST_TRANSPORTATION_LOCATION)?;
     catch_fail(
         (|| {
+            // TODO NPC proximity check
+
             let transport_type: TransportationType = pkt.eTT.try_into()?;
             let player = state.get_player_mut(client.get_player_id()?)?;
             match transport_type {
@@ -61,6 +63,9 @@ pub fn warp_use_transportation(
             let client = clients.get_self();
             let pc_id = client.get_player_id()?;
             let player = state.get_player_mut(pc_id)?;
+
+            // TODO NPC proximity check
+
             let trip = tdata_get().get_trip_data(pkt.iTransporationID)?;
             if player.get_taros() < trip.cost {
                 return Err(FFError::build(
