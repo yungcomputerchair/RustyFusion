@@ -1,4 +1,4 @@
-use rusty_fusion::{enums::ItemLocation, error::catch_fail, TradeContext};
+use rusty_fusion::{defines::RANGE_INTERACT, enums::ItemLocation, error::catch_fail, TradeContext};
 use uuid::Uuid;
 
 use super::*;
@@ -9,7 +9,13 @@ pub fn trade_offer(clients: &mut ClientMap, state: &mut ShardServerState) -> FFR
     catch_fail(
         (|| {
             let client = clients.get_self();
-            let player = state.get_player_mut(client.get_player_id()?)?;
+            let pc_id = client.get_player_id()?;
+            state.entity_map.validate_proximity(
+                &[EntityID::Player(pc_id), EntityID::Player(pkt.iID_To)],
+                RANGE_INTERACT,
+            )?;
+
+            let player = state.get_player_mut(pc_id)?;
             if player.trade_id.is_some() {
                 return Err(FFError::build(
                     Severity::Warning,
