@@ -65,17 +65,6 @@ pub fn pc_loading_complete(clients: &mut ClientMap, state: &mut ShardServerState
     )
 }
 
-pub fn pc_goto(client: &mut FFClient) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_PC_GOTO = client.get_packet(P_CL2FE_REQ_PC_GOTO)?;
-
-    let resp = sP_FE2CL_REP_PC_GOTO_SUCC {
-        iX: pkt.iToX,
-        iY: pkt.iToY,
-        iZ: pkt.iToZ,
-    };
-    client.send_packet(P_FE2CL_REP_PC_GOTO_SUCC, &resp)
-}
-
 pub fn pc_move(
     clients: &mut ClientMap,
     state: &mut ShardServerState,
@@ -113,6 +102,9 @@ pub fn pc_move(
         });
 
     let player = state.get_player_mut(pc_id)?;
+
+    // TODO anticheat
+
     let entity_id = player.get_id();
     let chunk = player.set_position(pos);
     player.set_rotation(angle);
@@ -159,6 +151,9 @@ pub fn pc_jump(
         });
 
     let player = state.get_player_mut(pc_id)?;
+
+    // TODO anticheat
+
     let entity_id = player.get_id();
     let chunk = player.set_position(pos);
     player.set_rotation(angle);
@@ -198,6 +193,9 @@ pub fn pc_stop(
         });
 
     let player = state.get_player_mut(pc_id)?;
+
+    // TODO anticheat
+
     let entity_id = player.get_id();
     let chunk = player.set_position(pos);
     state

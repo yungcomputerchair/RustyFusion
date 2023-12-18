@@ -6,6 +6,8 @@ use rusty_fusion::{
 
 use super::*;
 
+// TODO anticheat
+
 pub fn gm_pc_set_value(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
     let pkt: sP_CL2FE_GM_REQ_PC_SET_VALUE = *client.get_packet(P_CL2FE_GM_REQ_PC_SET_VALUE)?;
     let pc_id = pkt.iPC_ID;
@@ -115,4 +117,15 @@ pub fn gm_pc_give_nano(clients: &mut ClientMap, state: &mut ShardServerState) ->
                 .send_packet(P_FE2CL_REP_PC_NANO_CREATE_FAIL, &resp)
         },
     )
+}
+
+pub fn gm_pc_goto(client: &mut FFClient) -> FFResult<()> {
+    let pkt: &sP_CL2FE_REQ_PC_GOTO = client.get_packet(P_CL2FE_REQ_PC_GOTO)?;
+
+    let resp = sP_FE2CL_REP_PC_GOTO_SUCC {
+        iX: pkt.iToX,
+        iY: pkt.iToY,
+        iZ: pkt.iToZ,
+    };
+    client.send_packet(P_FE2CL_REP_PC_GOTO_SUCC, &resp)
 }
