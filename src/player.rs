@@ -649,6 +649,10 @@ impl Player {
         self.flags.payzone_flag = true;
     }
 
+    pub fn get_payzone_flag(&self) -> bool {
+        self.flags.payzone_flag
+    }
+
     pub fn set_taros(&mut self, taros: u32) -> u32 {
         self.taros = clamp(taros, 0, PC_CANDY_MAX);
         self.taros

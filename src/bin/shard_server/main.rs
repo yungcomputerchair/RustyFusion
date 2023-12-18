@@ -202,6 +202,8 @@ fn handle_packet(
         P_CL2FE_REQ_PC_WARP_USE_TRANSPORTATION => {
             transport::warp_use_transportation(&mut clients, state)
         }
+        P_CL2FE_REQ_PC_WARP_USE_NPC => transport::warp_use_npc(&mut clients, state),
+        P_CL2FE_REQ_PC_TIME_TO_GO_WARP => transport::time_to_go_warp(&mut clients, state),
         //
         P_CL2FE_REP_LIVE_CHECK => Ok(()),
         //

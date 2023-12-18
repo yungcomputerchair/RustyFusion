@@ -75,6 +75,7 @@ struct TransportationData {
 #[derive(Debug)]
 pub struct WarpData {
     pub pos: Position,
+    pub npc_type: i32,
     pub is_instance: bool,
     pub is_group_warp: bool,
     pub map_num: i32,
@@ -231,6 +232,17 @@ impl TableData {
             .ok_or(FFError::build(
                 Severity::Warning,
                 format!("Scamper data for location id {} doesn't exist", location_id),
+            ))
+    }
+
+    pub fn get_warp_data(&self, warp_id: i32) -> FFResult<&WarpData> {
+        self.xdt_data
+            .instance_data
+            .warp_data
+            .get(&warp_id)
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Warp data for warp id {} doesn't exist", warp_id),
             ))
     }
 
@@ -804,6 +816,7 @@ fn load_instance_data(root: &Map<std::string::String, Value>) -> Result<Instance
                         y: warp_data_entry.m_iToY,
                         z: warp_data_entry.m_iToZ,
                     },
+                    npc_type: warp_data_entry.m_iNpcNumber,
                     is_instance: warp_data_entry.m_iIsInstance != 0,
                     is_group_warp: warp_data_entry.m_iWarpGroupType != 0,
                     map_num: warp_data_entry.m_iToMapNum,
