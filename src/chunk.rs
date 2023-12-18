@@ -26,10 +26,6 @@ pub struct EntityMap {
 }
 
 impl EntityMap {
-    pub fn get_all(&mut self) -> impl Iterator<Item = &mut Box<dyn Entity>> {
-        self.registry.values_mut().map(|entry| &mut entry.entity)
-    }
-
     pub fn get_from_id(&mut self, id: EntityID) -> Option<&mut Box<dyn Entity>> {
         self.registry.get_mut(&id).map(|entry| &mut entry.entity)
     }
@@ -78,6 +74,19 @@ impl EntityMap {
         })
     }
 
+    pub fn find_player(&self, f: impl Fn(&Player) -> bool) -> Option<EntityID> {
+        self.registry.values().find_map(|entry| {
+            let entity_id = entry.entity.get_id();
+            if let EntityID::Player(pc_id) = entity_id {
+                let pc = self.get_player(pc_id).unwrap();
+                if f(pc) {
+                    return Some(entity_id);
+                }
+            }
+            None
+        })
+    }
+
     pub fn get_npc(&self, npc_id: i32) -> Option<&NPC> {
         let id = EntityID::NPC(npc_id);
         self.registry.get(&id).and_then(|entry| {
@@ -93,6 +102,19 @@ impl EntityMap {
             let entity_ref = entry.entity.as_mut().as_any_mut();
             let npc_ref = entity_ref.downcast_mut();
             npc_ref
+        })
+    }
+
+    pub fn find_npc(&self, f: impl Fn(&NPC) -> bool) -> Option<EntityID> {
+        self.registry.values().find_map(|entry| {
+            let entity_id = entry.entity.get_id();
+            if let EntityID::NPC(npc_id) = entity_id {
+                let npc = self.get_npc(npc_id).unwrap();
+                if f(npc) {
+                    return Some(entity_id);
+                }
+            }
+            None
         })
     }
 

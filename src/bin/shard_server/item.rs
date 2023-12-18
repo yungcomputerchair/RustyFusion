@@ -2,7 +2,7 @@ use std::cmp::min;
 
 use rand::random;
 use rusty_fusion::{
-    defines::PC_BATTERY_MAX,
+    defines::{PC_BATTERY_MAX, RANGE_INTERACT},
     enums::{ItemLocation, ItemType},
     error::{catch_fail, FFError, Severity},
     placeholder,
@@ -270,13 +270,24 @@ pub fn item_chest_open(client: &mut FFClient, state: &mut ShardServerState) -> F
     )
 }
 
-pub fn vendor_start(client: &mut FFClient) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_PC_VENDOR_START = client.get_packet(P_CL2FE_REQ_PC_VENDOR_START)?;
-    let resp = sP_FE2CL_REP_PC_VENDOR_START_SUCC {
-        iNPC_ID: pkt.iNPC_ID,
-        iVendorID: pkt.iVendorID,
-    };
-    client.send_packet(P_FE2CL_REP_PC_VENDOR_START_SUCC, &resp)
+pub fn vendor_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+    let pkt: sP_CL2FE_REQ_PC_VENDOR_START = *client.get_packet(P_CL2FE_REQ_PC_VENDOR_START)?;
+    catch_fail(
+        (|| {
+            helpers::validate_vendor(client, state, pkt.iVendorID)?;
+            let resp = sP_FE2CL_REP_PC_VENDOR_START_SUCC {
+                iNPC_ID: pkt.iNPC_ID,
+                iVendorID: pkt.iVendorID,
+            };
+            client.send_packet(P_FE2CL_REP_PC_VENDOR_START_SUCC, &resp)
+        })(),
+        || {
+            let resp = sP_FE2CL_REP_PC_VENDOR_START_FAIL {
+                iErrorCode: unused!(),
+            };
+            client.send_packet(P_FE2CL_REP_PC_VENDOR_START_FAIL, &resp)
+        },
+    )
 }
 
 pub fn vendor_table_update(client: &mut FFClient) -> FFResult<()> {
@@ -308,6 +319,7 @@ pub fn vendor_item_buy(
         (|| {
             let pkt: sP_CL2FE_REQ_PC_VENDOR_ITEM_BUY =
                 *client.get_packet(P_CL2FE_REQ_PC_VENDOR_ITEM_BUY)?;
+            helpers::validate_vendor(client, state, pkt.iVendorID)?;
 
             // sanitize the item
             let item: Option<Item> = pkt.Item.try_into()?;
@@ -432,8 +444,10 @@ pub fn vendor_item_restore_buy(
     catch_fail(
         (|| {
             let pc_id = client.get_player_id()?;
-            let pkt: &sP_CL2FE_REQ_PC_VENDOR_ITEM_RESTORE_BUY =
-                client.get_packet(P_CL2FE_REQ_PC_VENDOR_ITEM_RESTORE_BUY)?;
+            let pkt: sP_CL2FE_REQ_PC_VENDOR_ITEM_RESTORE_BUY =
+                *client.get_packet(P_CL2FE_REQ_PC_VENDOR_ITEM_RESTORE_BUY)?;
+            helpers::validate_vendor(client, state, pkt.iVendorID)?;
+
             let item: Option<Item> = pkt.Item.try_into()?;
             let item: Item = item.ok_or(FFError::build(
                 Severity::Warning,
@@ -499,8 +513,10 @@ pub fn vendor_battery_buy(client: &mut FFClient, state: &mut ShardServerState) -
 
     catch_fail(
         (|| {
-            let pkt: &sP_CL2FE_REQ_PC_VENDOR_BATTERY_BUY =
-                client.get_packet(P_CL2FE_REQ_PC_VENDOR_BATTERY_BUY)?;
+            let pkt: sP_CL2FE_REQ_PC_VENDOR_BATTERY_BUY =
+                *client.get_packet(P_CL2FE_REQ_PC_VENDOR_BATTERY_BUY)?;
+            helpers::validate_vendor(client, state, pkt.iVendorID)?;
+
             let battery_type = pkt.Item.iID;
             let mut quantity = pkt.Item.iOpt as u32 * 100;
 
@@ -564,4 +580,29 @@ pub fn vendor_battery_buy(client: &mut FFClient, state: &mut ShardServerState) -
             client.send_packet(P_FE2CL_REP_PC_VENDOR_BATTERY_BUY_FAIL, &resp)
         },
     )
+}
+
+mod helpers {
+    use super::*;
+
+    pub fn validate_vendor(
+        client: &mut FFClient,
+        state: &mut ShardServerState,
+        vendor_id: i32,
+    ) -> FFResult<()> {
+        /*
+         * due to a client bug where the iNPC_ID field in vendor packets is incorrectly
+         * set to the same value as iVendorID, we need to lookup the NPC by its type
+         * instead (which is equal to iVendorID for whatever reason)
+         */
+        let npc = state.find_npc_by_type(vendor_id).ok_or(FFError::build(
+            Severity::Warning,
+            format!("NPC with type {} doesn't exist", vendor_id),
+        ))?;
+
+        let pc_id = client.get_player_id()?;
+        state
+            .entity_map
+            .validate_proximity(&[EntityID::Player(pc_id), npc.get_id()], RANGE_INTERACT)
+    }
 }

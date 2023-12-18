@@ -9,7 +9,7 @@ use crate::{
     npc::NPC,
     player::Player,
     tabledata::tdata_get,
-    Entity, Item, TradeContext,
+    Entity, EntityID, Item, TradeContext,
 };
 
 pub struct ShardServerState {
@@ -53,6 +53,15 @@ impl ShardServerState {
 
     pub fn set_login_server_conn_id(&mut self, conn_id: i64) {
         self.login_server_conn_id = conn_id;
+    }
+
+    pub fn find_npc_by_type(&self, npc_type: i32) -> Option<&NPC> {
+        let id = self.entity_map.find_npc(|npc| npc.ty == npc_type);
+        if let Some(EntityID::NPC(npc_id)) = id {
+            Some(self.entity_map.get_npc(npc_id).unwrap())
+        } else {
+            None
+        }
     }
 
     pub fn get_npc(&self, npc_id: i32) -> FFResult<&NPC> {
