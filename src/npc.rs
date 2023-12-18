@@ -12,25 +12,17 @@ use crate::{
 #[derive(Debug, Clone, Copy, Default)]
 pub struct NPC {
     id: i32,
-    npc_type: i32,
+    pub ty: i32,
     position: Position,
     rotation: i32,
     _instance_id: u64,
     combat_stats: CombatStats,
 }
 impl NPC {
-    pub fn new(
-        id: i32,
-        npc_type: i32,
-        x: i32,
-        y: i32,
-        z: i32,
-        angle: i32,
-        instance_id: u64,
-    ) -> Self {
+    pub fn new(id: i32, ty: i32, x: i32, y: i32, z: i32, angle: i32, instance_id: u64) -> Self {
         Self {
             id,
-            npc_type,
+            ty,
             position: Position { x, y, z },
             rotation: angle % 360,
             _instance_id: instance_id,
@@ -45,7 +37,7 @@ impl NPC {
     fn get_appearance_data(&self) -> sNPCAppearanceData {
         sNPCAppearanceData {
             iNPC_ID: self.id,
-            iNPCType: self.npc_type,
+            iNPCType: self.ty,
             iHP: self.get_hp(),
             iConditionBitFlag: self.get_condition_bit_flag(),
             iX: self.position.x,

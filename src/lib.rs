@@ -62,6 +62,13 @@ impl Position {
         let chunk_y = (self.y * chunk::NCHUNKS as i32) / chunk::MAP_BOUNDS;
         (chunk_x, chunk_y)
     }
+
+    pub fn distance_to(&self, other: &Position) -> u32 {
+        let dx = self.x.abs_diff(other.x);
+        let dy = self.y.abs_diff(other.y);
+        let dz = self.z.abs_diff(other.z);
+        ((dx * dx + dy * dy + dz * dz) as f32).sqrt() as u32
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

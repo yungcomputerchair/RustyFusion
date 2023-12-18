@@ -63,7 +63,7 @@ pub struct TripData {
 
 #[derive(Debug)]
 pub struct ScamperData {
-    pub npc_id: i32,
+    pub npc_type: i32,
     pub pos: Position,
 }
 
@@ -745,7 +745,7 @@ fn load_transportation_data(
                     .map_err(|e| format!("Malformed scamper data entry: {} {}", e, v))?;
                 let key = data_entry.m_iLocationID;
                 let data_entry = ScamperData {
-                    npc_id: data_entry.m_iNPCID,
+                    npc_type: data_entry.m_iNPCID,
                     pos: Position {
                         x: data_entry.m_iXpos,
                         y: data_entry.m_iYpos,

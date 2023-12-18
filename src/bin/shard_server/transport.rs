@@ -1,6 +1,9 @@
 use rusty_fusion::{
-    defines::ID_TIME_MACHINE_WARP, enums::TransportationType, error::catch_fail,
-    tabledata::tdata_get, Combatant, Item,
+    defines::{ID_TIME_MACHINE_WARP, RANGE_INTERACT},
+    enums::TransportationType,
+    error::catch_fail,
+    tabledata::tdata_get,
+    Combatant, Item,
 };
 
 use super::*;
@@ -13,15 +16,31 @@ pub fn regist_transportation_location(
         *client.get_packet(P_CL2FE_REQ_REGIST_TRANSPORTATION_LOCATION)?;
     catch_fail(
         (|| {
-            // TODO NPC proximity check
+            let pc_id = client.get_player_id()?;
+            let npc = state.get_npc(pkt.iNPC_ID)?;
+            let npc_type = npc.ty;
+            state
+                .entity_map
+                .validate_proximity(&[EntityID::Player(pc_id), npc.get_id()], RANGE_INTERACT)?;
 
+            let player = state.get_player_mut(pc_id)?;
             let transport_type: TransportationType = pkt.eTT.try_into()?;
-            let player = state.get_player_mut(client.get_player_id()?)?;
             match transport_type {
                 TransportationType::Warp => {
+                    let location_data = tdata_get().get_scamper_data(pkt.iLocationID)?;
+                    if location_data.npc_type != npc_type {
+                        return Err(FFError::build(
+                            Severity::Warning,
+                            format!(
+                                "Player {} tried to register a warp location with the wrong NPC type",
+                                player.get_player_id()
+                            ),
+                        ));
+                    }
                     player.update_scamper_flags(pkt.iLocationID)?;
                 }
                 TransportationType::Wyvern => {
+                    // TODO NPC type validation
                     player.update_skyway_flags(pkt.iLocationID)?;
                 }
                 TransportationType::Bus => {
@@ -62,10 +81,14 @@ pub fn warp_use_transportation(
         (|| {
             let client = clients.get_self();
             let pc_id = client.get_player_id()?;
+
+            let npc = state.get_npc(pkt.iNPC_ID)?;
+            let npc_type = npc.ty;
+            state
+                .entity_map
+                .validate_proximity(&[EntityID::Player(pc_id), npc.get_id()], RANGE_INTERACT)?;
+
             let player = state.get_player_mut(pc_id)?;
-
-            // TODO NPC proximity check
-
             let trip = tdata_get().get_trip_data(pkt.iTransporationID)?;
             if player.get_taros() < trip.cost {
                 return Err(FFError::build(
@@ -79,6 +102,17 @@ pub fn warp_use_transportation(
 
             match trip.transportation_type {
                 TransportationType::Warp => {
+                    let src_data = tdata_get().get_scamper_data(trip.start_location)?;
+                    if src_data.npc_type != npc_type {
+                        return Err(FFError::build(
+                            Severity::Warning,
+                            format!(
+                                "Player {} tried to warp with the wrong NPC type",
+                                player.get_player_id()
+                            ),
+                        ));
+                    }
+
                     let dest_data = tdata_get().get_scamper_data(trip.end_location)?;
                     player.set_position(dest_data.pos);
                 }
@@ -125,7 +159,7 @@ pub fn warp_use_npc(clients: &mut ClientMap, state: &mut ShardServerState) -> FF
             let item_remaining = helpers::do_warp(
                 clients,
                 state,
-                pkt.iNPC_ID,
+                Some(pkt.iNPC_ID),
                 pkt.iWarpID,
                 pkt.eIL1,
                 pkt.iItemSlot1 as usize,
@@ -176,7 +210,7 @@ pub fn time_to_go_warp(clients: &mut ClientMap, state: &mut ShardServerState) ->
             let item_remaining = helpers::do_warp(
                 clients,
                 state,
-                pkt.iNPC_ID,
+                None,
                 ID_TIME_MACHINE_WARP,
                 pkt.eIL1,
                 pkt.iItemSlot1 as usize,
@@ -218,18 +252,30 @@ mod helpers {
     pub fn do_warp(
         clients: &mut ClientMap,
         state: &mut ShardServerState,
-        _npc_id: i32,
+        npc_id: Option<i32>,
         warp_id: i32,
         req_item_location_ord: i32,
         req_item_slot: usize,
         req_item_consume_location_ord: i32,
         req_item_consume_slot: usize,
     ) -> FFResult<Option<Item>> {
-        // TODO NPC proximity check
-
         let warp_data = tdata_get().get_warp_data(warp_id)?;
         let client = clients.get_self();
         let pc_id = client.get_player_id()?;
+
+        if let Some(npc_id) = npc_id {
+            let npc = state.get_npc(npc_id)?;
+            if npc.ty != warp_data.npc_type {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!("Player {} tried to warp with the wrong NPC type", pc_id),
+                ));
+            }
+            state
+                .entity_map
+                .validate_proximity(&[EntityID::Player(pc_id), npc.get_id()], RANGE_INTERACT)?;
+        }
+
         let player = state.get_player_mut(pc_id)?;
 
         // TODO group proximity check

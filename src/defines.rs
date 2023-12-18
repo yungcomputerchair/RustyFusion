@@ -1,11 +1,15 @@
 #![allow(non_upper_case_globals)]
 
 pub const SIZEOF_NANO_SKILLS: usize = 3;
+
 pub const NANO_STAMINA_MAX: i16 = 150;
+
 pub const ID_LIGHTNING_GUN: i16 = 328;
 pub const ID_KND_HOVERBOARD: i16 = 1;
 pub const ID_BUTTERCUP: i16 = 1;
 pub const ID_TIME_MACHINE_WARP: i32 = 28;
+
+pub const RANGE_INTERACT: u32 = 800;
 
 /* Constants ripped from the client */
 

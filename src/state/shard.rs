@@ -6,6 +6,7 @@ use crate::{
     chunk::EntityMap,
     error::{FFError, FFResult, Severity},
     net::{LoginData, CONN_ID_DISCONNECTED},
+    npc::NPC,
     player::Player,
     tabledata::tdata_get,
     Entity, Item, TradeContext,
@@ -52,6 +53,20 @@ impl ShardServerState {
 
     pub fn set_login_server_conn_id(&mut self, conn_id: i64) {
         self.login_server_conn_id = conn_id;
+    }
+
+    pub fn get_npc(&self, npc_id: i32) -> FFResult<&NPC> {
+        self.entity_map.get_npc(npc_id).ok_or(FFError::build(
+            Severity::Warning,
+            format!("NPC with ID {} doesn't exist", npc_id),
+        ))
+    }
+
+    pub fn get_npc_mut(&mut self, npc_id: i32) -> FFResult<&mut NPC> {
+        self.entity_map.get_npc_mut(npc_id).ok_or(FFError::build(
+            Severity::Warning,
+            format!("NPC with ID {} doesn't exist", npc_id),
+        ))
     }
 
     pub fn get_player(&self, pc_id: i32) -> FFResult<&Player> {

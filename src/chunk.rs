@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     config::config_get,
-    error::{log, Severity},
+    error::{log, FFError, FFResult, Severity},
     net::{ffclient::FFClient, ClientMap},
     npc::NPC,
     player::Player,
@@ -94,6 +94,38 @@ impl EntityMap {
             let npc_ref = entity_ref.downcast_mut();
             npc_ref
         })
+    }
+
+    pub fn validate_proximity(&self, ids: &[EntityID], range: u32) -> FFResult<()> {
+        let mut positions = Vec::with_capacity(ids.len());
+        for id in ids {
+            if let Some(entity) = self.registry.get(id) {
+                positions.push(entity.entity.get_position());
+            } else {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!("Entity with ID {:?} doesn't exist", id),
+                ));
+            }
+        }
+
+        for i in 0..positions.len() {
+            for j in (i + 1)..positions.len() {
+                let pos1 = positions[i];
+                let pos2 = positions[j];
+                let distance = pos1.distance_to(&pos2);
+                if distance > range {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!(
+                            "Entity with ID {:?} is too far from entity with ID {:?} ({} > {})",
+                            ids[i], ids[j], distance, range
+                        ),
+                    ));
+                }
+            }
+        }
+        Ok(())
     }
 
     pub fn track(&mut self, entity: Box<dyn Entity>) -> EntityID {
