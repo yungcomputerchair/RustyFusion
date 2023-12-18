@@ -175,8 +175,12 @@ impl FFClient {
     }
 
     pub fn flush(&mut self) -> FFResult<()> {
+        let sz: usize = self.out_buf_ptr; // everything buffered
+        self.flush_exact(sz)
+    }
+
+    pub fn flush_exact(&mut self, sz: usize) -> FFResult<()> {
         // send the size
-        let sz: usize = self.out_buf_ptr;
         assert!(sz <= PACKET_BUFFER_SIZE);
 
         // send the size unencrypted
