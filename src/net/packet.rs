@@ -530,7 +530,7 @@ pub enum PacketID {
     P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL = 0x32000004, // 838860804
 }
 
-pub trait FFPacket {}
+pub trait FFPacket: std::fmt::Debug {}
 
 #[repr(packed(4))]
 #[repr(C)]

@@ -121,7 +121,13 @@ impl FFClient {
             pkt_id, buffered_pkt_id
         );
         self.in_buf_ptr += 4;
-        self.get_struct()
+        let pkt = self.get_struct()?;
+
+        if !SILENCED_PACKETS.contains(&pkt_id) {
+            log(Severity::Debug, &format!("{:?}", pkt));
+        }
+
+        Ok(pkt)
     }
 
     pub fn get_struct<T: FFPacket>(&mut self) -> FFResult<&T> {
