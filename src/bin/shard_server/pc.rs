@@ -1,4 +1,4 @@
-use rusty_fusion::{error::catch_fail, util, Position};
+use rusty_fusion::{defines::EXIT_CODE_REQ_BY_PC, error::catch_fail, util, Position};
 
 use super::*;
 
@@ -38,6 +38,14 @@ pub fn pc_enter(
     state.entity_map.track(Box::new(player));
 
     client.send_packet(P_FE2CL_REP_PC_ENTER_SUCC, &resp)
+}
+
+pub fn pc_exit(client: &mut FFClient) -> FFResult<()> {
+    let resp = sP_FE2CL_REP_PC_EXIT_SUCC {
+        iID: client.get_player_id()?,
+        iExitCode: EXIT_CODE_REQ_BY_PC as i32,
+    };
+    client.send_packet(P_FE2CL_REP_PC_EXIT_SUCC, &resp)
 }
 
 pub fn pc_loading_complete(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
