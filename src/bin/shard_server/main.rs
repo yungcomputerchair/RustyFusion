@@ -157,6 +157,7 @@ fn handle_packet(
         P_CL2FE_REQ_PC_VEHICLE_OFF => pc::pc_vehicle_off(&mut clients, state),
         P_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH => pc::pc_special_state_switch(&mut clients, state),
         P_CL2FE_REQ_PC_FIRST_USE_FLAG_SET => pc::pc_first_use_flag_set(clients.get_self(), state),
+        P_CL2FE_REQ_PC_CHANGE_MENTOR => pc::pc_change_mentor(clients.get_self(), state),
         P_CL2FE_REQ_PC_EXIT => pc::pc_exit(clients.get_self()),
         //
         P_CL2FE_REQ_PC_GIVE_ITEM => gm::gm_pc_give_item(clients.get_self(), state),

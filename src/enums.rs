@@ -26,6 +26,10 @@ impl TryFrom<i32> for NanoStyle {
 #[repr(i16)]
 #[derive(PartialEq, Eq, Hash, FromPrimitive, Clone, Copy, Debug)]
 pub enum PlayerGuide {
+    Edd = 1,
+    Dexter = 2,
+    Mojo = 3,
+    Ben = 4,
     Computress = 5,
 }
 impl TryFrom<i16> for PlayerGuide {

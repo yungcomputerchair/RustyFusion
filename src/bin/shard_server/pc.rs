@@ -299,3 +299,27 @@ pub fn pc_first_use_flag_set(client: &mut FFClient, state: &mut ShardServerState
     player.update_first_use_flag(pkt.iFlagCode)?;
     Ok(())
 }
+
+pub fn pc_change_mentor(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+    let pkt: sP_CL2FE_REQ_PC_CHANGE_MENTOR = *client.get_packet(P_CL2FE_REQ_PC_CHANGE_MENTOR)?;
+    catch_fail(
+        (|| {
+            let player = state.get_player_mut(client.get_player_id()?)?;
+            let guide_count = player.update_guide(pkt.iMentor.try_into()?);
+
+            let resp = sP_FE2CL_REP_PC_CHANGE_MENTOR_SUCC {
+                iMentor: pkt.iMentor,
+                iMentorCnt: guide_count as i16,
+                iFusionMatter: player.get_fusion_matter() as i32,
+            };
+            client.send_packet(P_FE2CL_REP_PC_CHANGE_MENTOR_SUCC, &resp)
+        })(),
+        || {
+            let resp = sP_FE2CL_REP_PC_CHANGE_MENTOR_FAIL {
+                iMentor: pkt.iMentor,
+                iErrorCode: unused!(),
+            };
+            client.send_packet(P_FE2CL_REP_PC_CHANGE_MENTOR_FAIL, &resp)
+        },
+    )
+}

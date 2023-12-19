@@ -18,7 +18,7 @@ use crate::{
     CombatStats, Combatant, Entity, EntityID, Item, Mission, Nano, Position,
 };
 
-use num_traits::{clamp, clamp_min};
+use num_traits::{clamp, clamp_max, clamp_min};
 use rand::Rng;
 use uuid::Uuid;
 
@@ -82,13 +82,13 @@ impl Display for PlayerName {
 #[derive(Debug, Clone, Copy)]
 struct GuideData {
     current_guide: PlayerGuide,
-    total_guides: i16,
+    total_guides: usize,
 }
 impl Default for GuideData {
     fn default() -> Self {
         Self {
             current_guide: PlayerGuide::Computress,
-            total_guides: 1,
+            total_guides: 0,
         }
     }
 }
@@ -355,7 +355,7 @@ impl Player {
             PCStyle2: self.get_style_2(),
             iLevel: self.combat_stats.level,
             iMentor: self.guide_data.current_guide as i16,
-            iMentorCount: self.guide_data.total_guides,
+            iMentorCount: self.guide_data.total_guides as i16,
             iHP: self.combat_stats.hp,
             iBatteryW: self.weapon_boosts as i32,
             iBatteryN: self.nano_potions as i32,
@@ -643,6 +643,13 @@ impl Player {
         )
         .unwrap();
         // TODO delete all active missions
+    }
+
+    pub fn update_guide(&mut self, guide: PlayerGuide) -> usize {
+        self.guide_data.current_guide = guide;
+        self.guide_data.total_guides =
+            clamp_max(self.guide_data.total_guides + 1, i16::MAX as usize);
+        self.guide_data.total_guides
     }
 
     pub fn set_payzone_flag(&mut self) {
