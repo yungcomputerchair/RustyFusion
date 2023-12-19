@@ -135,13 +135,14 @@ impl FFClient {
         let from = self.in_buf_ptr;
         let to = from + sz;
         if to > self.in_data_len {
-            return Err(FFError::build(
+            log(
                 Severity::Warning,
-                format!(
-                    "Couldn't read struct; not enough bytes came in: {} > {}",
-                    to, self.in_data_len
+                &format!(
+                    "Bad struct read; not enough bytes came in: {} < {}",
+                    self.in_data_len, to
                 ),
-            ));
+            );
+            // we keep going. Why? because each and every handler should handle corrupt structs.
         }
 
         let buf: &[u8] = &self.in_buf[from..to];
@@ -159,6 +160,16 @@ impl FFClient {
             .read_exact(&mut sz_buf)
             .map_err(FFError::from_io_err)?;
         let sz: usize = u32::from_le_bytes(sz_buf) as usize;
+
+        if sz > PACKET_BUFFER_SIZE {
+            return Err(FFError::build_dc(
+                Severity::Warning,
+                format!(
+                    "Payload bigger than input buffer ({} > {})",
+                    sz, PACKET_BUFFER_SIZE
+                ),
+            ));
+        }
 
         // read the packet
         let buf: &mut [u8] = &mut self.in_buf[..sz];
@@ -212,38 +223,38 @@ impl FFClient {
     }
 
     pub fn send_packet<T: FFPacket>(&mut self, pkt_id: PacketID, pkt: &T) -> FFResult<()> {
-        self.queue_packet(pkt_id, pkt)?;
+        self.queue_packet(pkt_id, pkt);
         self.flush()
     }
 
-    pub fn queue_packet<T: FFPacket>(&mut self, pkt_id: PacketID, pkt: &T) -> FFResult<()> {
+    pub fn queue_packet<T: FFPacket>(&mut self, pkt_id: PacketID, pkt: &T) {
         // add the packet ID and contents
         let id_buf = (pkt_id as u32).to_le_bytes();
-        self.copy_to_buf(&id_buf)?;
-        self.queue_struct(pkt)
+        self.copy_to_buf(&id_buf);
+        self.queue_struct(pkt);
     }
 
-    pub fn queue_struct<T: FFPacket>(&mut self, s: &T) -> FFResult<()> {
+    pub fn queue_struct<T: FFPacket>(&mut self, s: &T) {
         let struct_buf = unsafe { struct_to_bytes(s) };
-        self.copy_to_buf(struct_buf)
+        self.copy_to_buf(struct_buf);
     }
 
-    fn copy_to_buf(&mut self, dat: &[u8]) -> FFResult<()> {
+    fn copy_to_buf(&mut self, dat: &[u8]) {
         let sz = dat.len();
         let from = self.out_buf_ptr;
         let to = from + sz;
         if to > PACKET_BUFFER_SIZE {
-            return Err(FFError::build_dc(
-                Severity::Warning,
-                format!(
+            log(
+                Severity::Fatal,
+                &format!(
                     "Payload too big for output ({} > {})",
                     sz, PACKET_BUFFER_SIZE
                 ),
-            ));
+            );
+            panic!();
         }
 
         self.out_buf[from..to].copy_from_slice(dat);
         self.out_buf_ptr = to;
-        Ok(())
     }
 }

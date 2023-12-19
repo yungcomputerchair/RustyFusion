@@ -251,8 +251,8 @@ pub fn item_chest_open(client: &mut FFClient, state: &mut ShardServerState) -> F
                 eIL: location as i32,
                 iSlotNum: pkt.iSlotNum,
             };
-            client.queue_packet(P_FE2CL_REP_REWARD_ITEM, &reward_pkt)?;
-            client.queue_struct(&reward_item_s)?;
+            client.queue_packet(P_FE2CL_REP_REWARD_ITEM, &reward_pkt);
+            client.queue_struct(&reward_item_s);
             client.flush()?;
 
             let resp = sP_FE2CL_REP_ITEM_CHEST_OPEN_SUCC {
