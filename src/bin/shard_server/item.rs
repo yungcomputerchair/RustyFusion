@@ -2,7 +2,7 @@ use std::cmp::min;
 
 use rand::random;
 use rusty_fusion::{
-    defines::{PC_BATTERY_MAX, RANGE_INTERACT},
+    defines::{EQUIP_SLOT_VEHICLE, PC_BATTERY_MAX, RANGE_INTERACT},
     enums::{ItemLocation, ItemType},
     error::{catch_fail, FFError, Severity},
     placeholder,
@@ -62,6 +62,26 @@ pub fn item_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFRes
         });
     }
 
+    // dismount vehicle
+    let player = state.get_player_mut(pc_id).unwrap();
+    if ((location_from == ItemLocation::Equip && pkt.iFromSlotNum == EQUIP_SLOT_VEHICLE as i32)
+        || (location_to == ItemLocation::Equip && pkt.iToSlotNum == EQUIP_SLOT_VEHICLE as i32))
+        && player.vehicle_speed.is_some()
+    {
+        player.vehicle_speed = None;
+        let bcast = sP_FE2CL_PC_STATE_CHANGE {
+            iPC_ID: pc_id,
+            iState: player.get_state_bit_flag(),
+        };
+        state.entity_map.for_each_around(entity_id, clients, |c| {
+            let _ = c.send_packet(P_FE2CL_PC_STATE_CHANGE, &bcast);
+        });
+        let pkt = sP_FE2CL_PC_VEHICLE_OFF_SUCC { UNUSED: unused!() };
+        clients
+            .get_self()
+            .send_packet(P_FE2CL_PC_VEHICLE_OFF_SUCC, &pkt)?;
+    }
+
     Ok(())
 }
 
@@ -69,7 +89,18 @@ pub fn item_delete(client: &mut FFClient, state: &mut ShardServerState) -> FFRes
     let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_ITEM_DELETE = client.get_packet(P_CL2FE_REQ_PC_ITEM_DELETE)?;
     let player = state.get_player_mut(pc_id)?;
-    player.set_item(pkt.eIL.try_into()?, pkt.iSlotNum as usize, None)?;
+    let location = pkt.eIL.try_into()?;
+    if location != ItemLocation::Inven {
+        return Err(FFError::build(
+            Severity::Warning,
+            format!(
+                "Tried to delete item from invalid inventory: {:?}",
+                location
+            ),
+        ));
+    }
+    player.set_item(location, pkt.iSlotNum as usize, None)?;
+
     let resp = sP_FE2CL_REP_PC_ITEM_DELETE_SUCC {
         eIL: pkt.eIL,
         iSlotNum: pkt.iSlotNum,
