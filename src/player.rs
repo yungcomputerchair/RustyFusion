@@ -711,11 +711,12 @@ impl Player {
         self.guide_data.total_guides
     }
 
-    pub fn set_payzone_flag(&mut self) {
+    pub fn set_future_done(&mut self) {
         self.flags.payzone_flag = true;
+        // TODO delete all active missions
     }
 
-    pub fn get_payzone_flag(&self) -> bool {
+    pub fn is_future_done(&self) -> bool {
         self.flags.payzone_flag
     }
 
@@ -766,7 +767,7 @@ impl Player {
             self.set_taros(PC_CANDY_MAX);
             self.set_appearance_flag();
             self.set_tutorial_done();
-            self.set_payzone_flag();
+            self.set_future_done();
             self.flags.scamper_flags = -1;
             self.flags.tip_flags = -1;
             self.flags.skyway_flags = [-1; WYVERN_LOCATION_FLAG_SIZE as usize];

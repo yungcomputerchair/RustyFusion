@@ -200,7 +200,7 @@ pub fn time_to_go_warp(clients: &mut ClientMap, state: &mut ShardServerState) ->
     catch_fail(
         (|| {
             let player = state.get_player(clients.get_self().get_player_id()?)?;
-            if player.get_payzone_flag() {
+            if player.is_future_done() {
                 return Err(FFError::build(
                     Severity::Warning,
                     format!("Player {} is in the past", player.get_player_id()),
@@ -265,6 +265,8 @@ mod helpers {
         let client = clients.get_self();
         let pc_id = client.get_player_id()?;
 
+        let mut to_past = false;
+
         if let Some(npc_id) = npc_id {
             let npc = state.get_npc(npc_id)?;
             if npc.ty != warp_data.npc_type {
@@ -278,6 +280,7 @@ mod helpers {
             // for some reason, the time machine NPC's range is HUGE
             // but we don't need to check anyway since it's a special case
             if npc.ty != TYPE_TIME_MACHINE {
+                to_past = true;
                 state
                     .entity_map
                     .validate_proximity(&[EntityID::Player(pc_id), npc.get_id()], RANGE_INTERACT)?;
@@ -347,6 +350,10 @@ mod helpers {
             }
             Item::split_items(item, 1); // consume item
             item_consumed = *item;
+        }
+
+        if to_past {
+            player.set_future_done();
         }
 
         player.set_taros(player.get_taros() - warp_data.cost);
