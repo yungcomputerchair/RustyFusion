@@ -74,13 +74,23 @@ impl EntityMap {
         })
     }
 
-    pub fn find_player(&self, f: impl Fn(&Player) -> bool) -> Option<EntityID> {
+    pub fn get_player_ids(&self) -> impl Iterator<Item = i32> + '_ {
+        self.registry.keys().filter_map(|id| {
+            if let EntityID::Player(pc_id) = id {
+                Some(*pc_id)
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn find_player(&self, f: impl Fn(&Player) -> bool) -> Option<i32> {
         self.registry.values().find_map(|entry| {
             let entity_id = entry.entity.get_id();
             if let EntityID::Player(pc_id) = entity_id {
                 let pc = self.get_player(pc_id).unwrap();
                 if f(pc) {
-                    return Some(entity_id);
+                    return Some(pc_id);
                 }
             }
             None
@@ -105,13 +115,23 @@ impl EntityMap {
         })
     }
 
-    pub fn find_npc(&self, f: impl Fn(&NPC) -> bool) -> Option<EntityID> {
+    pub fn get_npc_ids(&self) -> impl Iterator<Item = i32> + '_ {
+        self.registry.keys().filter_map(|id| {
+            if let EntityID::NPC(npc_id) = id {
+                Some(*npc_id)
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn find_npc(&self, f: impl Fn(&NPC) -> bool) -> Option<i32> {
         self.registry.values().find_map(|entry| {
             let entity_id = entry.entity.get_id();
             if let EntityID::NPC(npc_id) = entity_id {
                 let npc = self.get_npc(npc_id).unwrap();
                 if f(npc) {
-                    return Some(entity_id);
+                    return Some(npc_id);
                 }
             }
             None
