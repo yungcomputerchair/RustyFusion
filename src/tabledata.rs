@@ -520,6 +520,7 @@ fn load_item_data(
                         required_level: data.m_iMinReqLev.unwrap_or(0) as i16,
                         rarity: data.m_iRarity.map(|v| v as i8),
                         gender: data.m_iReqSex.map(|v| v as i8),
+                        speed: data.m_iUp_runSpeed,
                     };
                     map.insert(key, data);
                 }

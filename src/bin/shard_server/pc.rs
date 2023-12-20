@@ -1,4 +1,9 @@
-use rusty_fusion::{defines::EXIT_CODE_REQ_BY_PC, error::catch_fail, util, Position};
+use rusty_fusion::{
+    defines::{EQUIP_SLOT_VEHICLE, EXIT_CODE_REQ_BY_PC},
+    enums::ItemLocation,
+    error::catch_fail,
+    util, Position,
+};
 
 use super::*;
 
@@ -217,15 +222,43 @@ pub fn pc_vehicle_on(clients: &mut ClientMap, state: &mut ShardServerState) -> F
         (|| {
             let client = clients.get_self();
             let pc_id = client.get_player_id()?;
+            let player = state.get_player_mut(pc_id)?;
 
-            // TODO anticheat
+            let vehicle = player
+                .get_item(ItemLocation::Equip, EQUIP_SLOT_VEHICLE as usize)
+                .unwrap();
+            if vehicle.is_none() {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!(
+                        "Player {} tried to mount a vehicle without one equipped",
+                        pc_id
+                    ),
+                ));
+            }
+            let vehicle = vehicle.as_ref().unwrap();
 
-            let resp = sP_FE2CL_PC_VEHICLE_ON_SUCC { UNUSED: unused!() };
+            if let Some(vehicle_speed) = vehicle.get_stats()?.speed {
+                player.vehicle_speed = Some(vehicle_speed);
+            } else {
+                log(
+                    Severity::Fatal,
+                    &format!("Vehicle has no speed: {:?}", vehicle),
+                );
+                panic!();
+            }
+
+            let bcast = sP_FE2CL_PC_STATE_CHANGE {
+                iPC_ID: pc_id,
+                iState: player.get_state_bit_flag(),
+            };
             state
                 .entity_map
                 .for_each_around(EntityID::Player(pc_id), clients, |client| {
-                    let _ = client.send_packet(P_FE2CL_PC_VEHICLE_ON_SUCC, &resp);
+                    let _ = client.send_packet(P_FE2CL_PC_STATE_CHANGE, &bcast);
                 });
+
+            let resp = sP_FE2CL_PC_VEHICLE_ON_SUCC { UNUSED: unused!() };
             clients
                 .get_self()
                 .send_packet(P_FE2CL_PC_VEHICLE_ON_SUCC, &resp)
@@ -246,15 +279,20 @@ pub fn pc_vehicle_off(clients: &mut ClientMap, state: &mut ShardServerState) -> 
         (|| {
             let client = clients.get_self();
             let pc_id = client.get_player_id()?;
+            let player = state.get_player_mut(pc_id)?;
+            player.vehicle_speed = None;
 
-            // TODO anticheat
-
-            let resp = sP_FE2CL_PC_VEHICLE_OFF_SUCC { UNUSED: unused!() };
+            let bcast = sP_FE2CL_PC_STATE_CHANGE {
+                iPC_ID: pc_id,
+                iState: player.get_state_bit_flag(),
+            };
             state
                 .entity_map
                 .for_each_around(EntityID::Player(pc_id), clients, |client| {
-                    let _ = client.send_packet(P_FE2CL_PC_VEHICLE_OFF_SUCC, &resp);
+                    let _ = client.send_packet(P_FE2CL_PC_STATE_CHANGE, &bcast);
                 });
+
+            let resp = sP_FE2CL_PC_VEHICLE_OFF_SUCC { UNUSED: unused!() };
             clients
                 .get_self()
                 .send_packet(P_FE2CL_PC_VEHICLE_OFF_SUCC, &resp)

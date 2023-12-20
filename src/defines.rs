@@ -11,6 +11,8 @@ pub const ID_TIME_MACHINE_WARP: i32 = 28;
 
 pub const RANGE_INTERACT: u32 = 800;
 
+pub const FLAG_PC_STATE_VEHICLE: i8 = 8;
+
 /* Constants ripped from the client */
 
 pub const SUCC: u32 = 1;

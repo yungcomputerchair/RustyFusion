@@ -158,6 +158,7 @@ pub struct Player {
     buddy_warp_time: i32,
     pub trade_id: Option<Uuid>,
     pub trade_offered_to: Option<i32>,
+    pub vehicle_speed: Option<i32>,
 }
 impl Player {
     pub fn new(uid: i64) -> Self {
@@ -404,12 +405,20 @@ impl Player {
         }
     }
 
+    pub fn get_state_bit_flag(&self) -> i8 {
+        let mut flags = 0;
+        if self.vehicle_speed.is_some() {
+            flags |= FLAG_PC_STATE_VEHICLE;
+        }
+        flags
+    }
+
     pub fn get_appearance_data(&self) -> sPCAppearanceData {
         sPCAppearanceData {
             iID: self.id.unwrap_or_default(),
             PCStyle: self.get_style(),
             iConditionBitFlag: self.get_condition_bit_flag(),
-            iPCState: placeholder!(0),
+            iPCState: self.get_state_bit_flag(),
             iSpecialState: self.special_state,
             iLv: self.combat_stats.level,
             iHP: self.combat_stats.hp,
