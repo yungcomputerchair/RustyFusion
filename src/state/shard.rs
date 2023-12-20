@@ -6,6 +6,7 @@ use crate::{
     chunk::EntityMap,
     enums::ItemType,
     error::{log, FFError, FFResult, Severity},
+    helpers,
     net::{
         packet::{PacketID::*, *},
         ClientMap, LoginData, CONN_ID_DISCONNECTED,
@@ -13,7 +14,7 @@ use crate::{
     npc::NPC,
     player::Player,
     tabledata::tdata_get,
-    Entity, EntityID, Item, TradeContext,
+    Entity, Item, TradeContext,
 };
 
 pub struct ShardServerState {
@@ -132,15 +133,8 @@ impl ShardServerState {
         }
 
         for pc_id in pc_ids_dismounted {
-            let player = self.entity_map.get_player_mut(pc_id).unwrap();
-            let bcast = sP_FE2CL_PC_STATE_CHANGE {
-                iPC_ID: pc_id,
-                iState: player.get_state_bit_flag(),
-            };
-            self.entity_map
-                .for_each_around(EntityID::Player(pc_id), clients, |c| {
-                    let _ = c.send_packet(P_FE2CL_PC_STATE_CHANGE, &bcast);
-                });
+            let player = self.entity_map.get_player(pc_id).unwrap();
+            helpers::broadcast_state(pc_id, player.get_state_bit_flag(), clients, self);
         }
     }
 }

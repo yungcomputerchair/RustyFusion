@@ -69,13 +69,7 @@ pub fn item_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFRes
         && player.vehicle_speed.is_some()
     {
         player.vehicle_speed = None;
-        let bcast = sP_FE2CL_PC_STATE_CHANGE {
-            iPC_ID: pc_id,
-            iState: player.get_state_bit_flag(),
-        };
-        state.entity_map.for_each_around(entity_id, clients, |c| {
-            let _ = c.send_packet(P_FE2CL_PC_STATE_CHANGE, &bcast);
-        });
+        rusty_fusion::helpers::broadcast_state(pc_id, player.get_state_bit_flag(), clients, state);
         let pkt = sP_FE2CL_PC_VEHICLE_OFF_SUCC { UNUSED: unused!() };
         clients
             .get_self()

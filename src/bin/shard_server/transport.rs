@@ -344,6 +344,11 @@ mod helpers {
         player.set_taros(player.get_taros() - warp_data.cost);
         let chunk = player.set_position(warp_data.pos);
         // TODO instancing
+
+        // force vehicle dismount
+        player.vehicle_speed = None;
+        rusty_fusion::helpers::broadcast_state(pc_id, player.get_state_bit_flag(), clients, state);
+
         state
             .entity_map
             .update(EntityID::Player(pc_id), Some(chunk), Some(clients));

@@ -247,16 +247,12 @@ pub fn pc_vehicle_on(clients: &mut ClientMap, state: &mut ShardServerState) -> F
                 );
                 panic!();
             }
-
-            let bcast = sP_FE2CL_PC_STATE_CHANGE {
-                iPC_ID: pc_id,
-                iState: player.get_state_bit_flag(),
-            };
-            state
-                .entity_map
-                .for_each_around(EntityID::Player(pc_id), clients, |client| {
-                    let _ = client.send_packet(P_FE2CL_PC_STATE_CHANGE, &bcast);
-                });
+            rusty_fusion::helpers::broadcast_state(
+                pc_id,
+                player.get_state_bit_flag(),
+                clients,
+                state,
+            );
 
             let resp = sP_FE2CL_PC_VEHICLE_ON_SUCC { UNUSED: unused!() };
             clients
@@ -280,17 +276,14 @@ pub fn pc_vehicle_off(clients: &mut ClientMap, state: &mut ShardServerState) -> 
             let client = clients.get_self();
             let pc_id = client.get_player_id()?;
             let player = state.get_player_mut(pc_id)?;
-            player.vehicle_speed = None;
 
-            let bcast = sP_FE2CL_PC_STATE_CHANGE {
-                iPC_ID: pc_id,
-                iState: player.get_state_bit_flag(),
-            };
-            state
-                .entity_map
-                .for_each_around(EntityID::Player(pc_id), clients, |client| {
-                    let _ = client.send_packet(P_FE2CL_PC_STATE_CHANGE, &bcast);
-                });
+            player.vehicle_speed = None;
+            rusty_fusion::helpers::broadcast_state(
+                pc_id,
+                player.get_state_bit_flag(),
+                clients,
+                state,
+            );
 
             let resp = sP_FE2CL_PC_VEHICLE_OFF_SUCC { UNUSED: unused!() };
             clients

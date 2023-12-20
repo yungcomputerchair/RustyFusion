@@ -38,6 +38,7 @@ macro_rules! placeholder {
 pub mod defines;
 pub mod enums;
 pub mod error;
+pub mod helpers;
 pub mod net;
 pub mod state;
 pub mod timer;
