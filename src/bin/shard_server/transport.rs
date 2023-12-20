@@ -247,6 +247,8 @@ pub fn time_to_go_warp(clients: &mut ClientMap, state: &mut ShardServerState) ->
 mod helpers {
     #![allow(clippy::too_many_arguments)]
 
+    use rusty_fusion::defines::TYPE_TIME_MACHINE;
+
     use super::*;
 
     pub fn do_warp(
@@ -271,9 +273,15 @@ mod helpers {
                     format!("Player {} tried to warp with the wrong NPC type", pc_id),
                 ));
             }
-            state
-                .entity_map
-                .validate_proximity(&[EntityID::Player(pc_id), npc.get_id()], RANGE_INTERACT)?;
+
+            // proximity check.
+            // for some reason, the time machine NPC's range is HUGE
+            // but we don't need to check anyway since it's a special case
+            if npc.ty != TYPE_TIME_MACHINE {
+                state
+                    .entity_map
+                    .validate_proximity(&[EntityID::Player(pc_id), npc.get_id()], RANGE_INTERACT)?;
+            }
         }
 
         let player = state.get_player_mut(pc_id)?;
@@ -342,16 +350,18 @@ mod helpers {
         }
 
         player.set_taros(player.get_taros() - warp_data.cost);
-        let chunk = player.set_position(warp_data.pos);
+        player.set_position(warp_data.pos);
         // TODO instancing
 
         // force vehicle dismount
         player.vehicle_speed = None;
         rusty_fusion::helpers::broadcast_state(pc_id, player.get_state_bit_flag(), clients, state);
 
+        // we remove the player from the chunk here and wait for PC_LOADING_COMPLETE to put them back.
+        // it needs to be done this way or the client will miss the PC/NPC_ENTER packets.
         state
             .entity_map
-            .update(EntityID::Player(pc_id), Some(chunk), Some(clients));
+            .update(EntityID::Player(pc_id), None, Some(clients));
 
         Ok(item_consumed)
     }

@@ -8,6 +8,7 @@ pub const ID_LIGHTNING_GUN: i16 = 328;
 pub const ID_KND_HOVERBOARD: i16 = 1;
 pub const ID_BUTTERCUP: i16 = 1;
 pub const ID_TIME_MACHINE_WARP: i32 = 28;
+pub const TYPE_TIME_MACHINE: i32 = 1425;
 
 pub const RANGE_INTERACT: u32 = 800;
 
