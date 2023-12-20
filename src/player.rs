@@ -568,6 +568,56 @@ impl Player {
         ))
     }
 
+    pub fn find_items_any(&self, f: impl Fn(&Item) -> bool) -> Vec<(ItemLocation, usize)> {
+        let mut found = Vec::new();
+        found.extend(
+            self.find_items(ItemLocation::Equip, &f)
+                .iter()
+                .map(|slot_num| (ItemLocation::Equip, *slot_num)),
+        );
+        found.extend(
+            self.find_items(ItemLocation::Inven, &f)
+                .iter()
+                .map(|slot_num| (ItemLocation::Inven, *slot_num)),
+        );
+        found.extend(
+            self.find_items(ItemLocation::Bank, &f)
+                .iter()
+                .map(|slot_num| (ItemLocation::Bank, *slot_num)),
+        );
+        found.extend(
+            self.find_items(ItemLocation::QInven, &f)
+                .iter()
+                .map(|slot_num| (ItemLocation::QInven, *slot_num)),
+        );
+        found
+    }
+
+    pub fn find_items(&self, location: ItemLocation, f: impl Fn(&Item) -> bool) -> Vec<usize> {
+        let inven = match location {
+            ItemLocation::Equip => self.inventory.equipped.as_slice(),
+            ItemLocation::Inven => self.inventory.main.as_slice(),
+            ItemLocation::QInven => self.inventory.mission.as_slice(),
+            ItemLocation::Bank => self.inventory.bank.as_slice(),
+        };
+
+        inven
+            .iter()
+            .enumerate()
+            .filter_map(|(slot_num, slot)| {
+                if let Some(item) = slot {
+                    if f(item) {
+                        Some(slot_num)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
     pub fn get_equipped(&self) -> [Option<Item>; 9] {
         self.inventory.equipped
     }

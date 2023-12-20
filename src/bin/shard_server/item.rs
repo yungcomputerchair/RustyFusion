@@ -360,7 +360,7 @@ pub fn vendor_item_buy(
             ))?;
             if item.get_type() == ItemType::Vehicle {
                 // set expiration date
-                let duration = Duration::from_secs(config_get().shard.vehicle_duration.get());
+                let duration = Duration::from_secs(config_get().shard.vehicle_duration.get() * 60);
                 let expires = time + duration;
                 item.set_expiry_time(expires);
             }

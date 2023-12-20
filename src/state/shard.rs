@@ -1,15 +1,19 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::SystemTime};
 
 use uuid::Uuid;
 
 use crate::{
     chunk::EntityMap,
-    error::{FFError, FFResult, Severity},
-    net::{LoginData, CONN_ID_DISCONNECTED},
+    enums::ItemType,
+    error::{log, FFError, FFResult, Severity},
+    net::{
+        packet::{PacketID::*, *},
+        ClientMap, LoginData, CONN_ID_DISCONNECTED,
+    },
     npc::NPC,
     player::Player,
     tabledata::tdata_get,
-    Entity, Item, TradeContext,
+    Entity, EntityID, Item, TradeContext,
 };
 
 pub struct ShardServerState {
@@ -90,5 +94,53 @@ impl ShardServerState {
             Severity::Warning,
             format!("Player with ID {} doesn't exist", pc_id),
         ))
+    }
+
+    pub fn check_for_expired_vehicles(&mut self, time: SystemTime, clients: &mut ClientMap) {
+        log(Severity::Info, "Checking for expired vehicles");
+        let pc_ids: Vec<i32> = self.entity_map.get_player_ids().collect();
+        let mut pc_ids_dismounted = Vec::with_capacity(pc_ids.len());
+        for pc_id in pc_ids {
+            let player = self.entity_map.get_player_mut(pc_id).unwrap();
+            for (location, slot_num) in player.find_items_any(|item| item.ty == ItemType::Vehicle) {
+                let vehicle_slot = player.get_item_mut(location, slot_num).unwrap();
+                if let Some(expiry_time) = vehicle_slot.unwrap().expiry_time {
+                    if time > expiry_time {
+                        vehicle_slot.take();
+
+                        // dismount
+                        let client = player.get_client(clients).unwrap();
+                        if player.vehicle_speed.is_some() {
+                            player.vehicle_speed = None;
+                            let pkt = sP_FE2CL_PC_VEHICLE_OFF_SUCC { UNUSED: unused!() };
+                            let _ = client.send_packet(P_FE2CL_PC_VEHICLE_OFF_SUCC, &pkt);
+                            pc_ids_dismounted.push(pc_id);
+                        }
+
+                        // delete
+                        let pkt = sP_FE2CL_PC_DELETE_TIME_LIMIT_ITEM { iItemListCount: 1 };
+                        let dat = sTimeLimitItemDeleteInfo2CL {
+                            eIL: location as i32,
+                            iSlotNum: slot_num as i32,
+                        };
+                        client.queue_packet(P_FE2CL_PC_DELETE_TIME_LIMIT_ITEM, &pkt);
+                        client.queue_struct(&dat);
+                        let _ = client.flush();
+                    }
+                }
+            }
+        }
+
+        for pc_id in pc_ids_dismounted {
+            let player = self.entity_map.get_player_mut(pc_id).unwrap();
+            let bcast = sP_FE2CL_PC_STATE_CHANGE {
+                iPC_ID: pc_id,
+                iState: player.get_state_bit_flag(),
+            };
+            self.entity_map
+                .for_each_around(EntityID::Player(pc_id), clients, |c| {
+                    let _ = c.send_packet(P_FE2CL_PC_STATE_CHANGE, &bcast);
+                });
+        }
     }
 }

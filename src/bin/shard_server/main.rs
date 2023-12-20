@@ -61,6 +61,15 @@ fn main() -> Result<()> {
         Duration::from_secs(config.general.live_check_interval.get()),
         false,
     );
+    timers.register_timer(
+        |t, srv, st| {
+            st.as_shard()
+                .check_for_expired_vehicles(t, &mut srv.get_client_map());
+            Ok(())
+        },
+        Duration::from_secs(60),
+        false,
+    );
 
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();

@@ -15,7 +15,7 @@ use crate::{
 
 use super::{
     ffclient::{ClientType, FFClient},
-    DisconnectCallback, PacketCallback,
+    ClientMap, DisconnectCallback, PacketCallback,
 };
 
 const EPOLL_KEY_SELF: usize = 0;
@@ -119,6 +119,10 @@ impl FFServer {
 
     pub fn get_clients(&mut self) -> impl Iterator<Item = (&usize, &mut FFClient)> + '_ {
         self.clients.iter_mut()
+    }
+
+    pub fn get_client_map(&mut self) -> ClientMap {
+        ClientMap::new(0, &mut self.clients)
     }
 
     pub fn disconnect_client(
