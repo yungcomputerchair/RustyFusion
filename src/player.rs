@@ -142,7 +142,7 @@ pub struct Player {
     perms: i16,
     position: Position,
     rotation: i32,
-    instance_id: InstanceID,
+    pub instance_id: InstanceID,
     style: PlayerStyle,
     flags: PlayerFlags,
     name: PlayerName,

@@ -332,7 +332,7 @@ impl EntityMap {
 
     fn get_chunk(&mut self, coords: ChunkCoords) -> Option<&mut Chunk> {
         if (0..NCHUNKS as i32).contains(&coords.x) && (0..NCHUNKS as i32).contains(&coords.y) {
-            let chunks_instance = self.chunks.get_mut(&coords.i)?;
+            let chunks_instance = self.init_instance(coords.i);
             let chunk = &mut chunks_instance[coords.x as usize][coords.y as usize];
             return Some(chunk);
         }
@@ -353,7 +353,7 @@ impl EntityMap {
         entities
     }
 
-    pub fn init_instance(&mut self, instance_id: InstanceID) {
+    pub fn init_instance(&mut self, instance_id: InstanceID) -> &mut [[Chunk; NCHUNKS]; NCHUNKS] {
         self.chunks.entry(instance_id).or_insert_with(|| {
             let chunks: [[Chunk; NCHUNKS]; NCHUNKS] =
                 std::array::from_fn(|_| std::array::from_fn(|_| Chunk::default()));
@@ -362,7 +362,7 @@ impl EntityMap {
                 &format!("Initialized instance {:?}", instance_id),
             );
             chunks
-        });
+        })
     }
 }
 impl Default for EntityMap {

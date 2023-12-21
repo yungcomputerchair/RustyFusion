@@ -79,7 +79,7 @@ pub struct WarpData {
     pub npc_type: i32,
     pub is_instance: bool,
     pub is_group_warp: bool,
-    pub map_num: i32,
+    pub map_num: u32,
     pub min_level: i16,
     pub req_task: Option<(i32, i32)>, // mission id, task id
     pub req_item: Option<(ItemType, i16)>,
@@ -824,7 +824,7 @@ fn load_instance_data(root: &Map<std::string::String, Value>) -> Result<Instance
                     npc_type: warp_data_entry.m_iNpcNumber,
                     is_instance: warp_data_entry.m_iIsInstance != 0,
                     is_group_warp: warp_data_entry.m_iWarpGroupType != 0,
-                    map_num: warp_data_entry.m_iToMapNum,
+                    map_num: warp_data_entry.m_iToMapNum as u32,
                     min_level: warp_data_entry.m_iLimit_Level as i16,
                     req_task: if warp_data_entry.m_iMissionID == 0 {
                         None
