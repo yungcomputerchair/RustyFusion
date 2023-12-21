@@ -6,8 +6,24 @@ use crate::{
     net::{ffclient::FFClient, ClientMap},
     npc::NPC,
     player::Player,
-    Entity, EntityID,
+    Entity, EntityID, Position,
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ChunkCoords {
+    pub i: u64,
+    pub x: i32,
+    pub y: i32,
+}
+impl ChunkCoords {
+    pub fn from_pos_inst(pos: Position, instance_id: u64) -> Self {
+        Self {
+            x: (pos.x * NCHUNKS as i32) / MAP_BOUNDS,
+            y: (pos.y * NCHUNKS as i32) / MAP_BOUNDS,
+            i: instance_id,
+        }
+    }
+}
 
 pub const NCHUNKS: usize = 16 * 8; // 16 map squares with side lengths of 8 chunks
 pub const MAP_BOUNDS: i32 = 8192 * 100; // top corner of (16, 16)
@@ -17,12 +33,12 @@ fn get_visibility_range() -> usize {
 
 struct RegistryEntry {
     entity: Box<dyn Entity>,
-    chunk: Option<(i32, i32)>,
+    chunk: Option<ChunkCoords>,
 }
 
 pub struct EntityMap {
     registry: HashMap<EntityID, RegistryEntry>,
-    chunks: [[Chunk; NCHUNKS]; NCHUNKS],
+    chunks: HashMap<u64, [[Chunk; NCHUNKS]; NCHUNKS]>,
 }
 
 impl EntityMap {
@@ -48,8 +64,8 @@ impl EntityMap {
         &mut self,
         id: EntityID,
     ) -> Option<impl Iterator<Item = &mut Box<dyn Entity>>> {
-        if let Some((x, y)) = self.registry.get(&id).and_then(|entry| entry.chunk) {
-            let ids = self.get_around(x, y, get_visibility_range());
+        if let Some(coords) = self.registry.get(&id).and_then(|entry| entry.chunk) {
+            let ids = self.get_around(coords, get_visibility_range());
             Some(self.get_from_ids(&ids))
         } else {
             None
@@ -195,7 +211,7 @@ impl EntityMap {
     pub fn update(
         &mut self,
         id: EntityID,
-        to_chunk: Option<(i32, i32)>,
+        to_chunk: Option<ChunkCoords>,
         client_map: Option<&mut ClientMap>,
     ) {
         let entry = self.registry.get_mut(&id).unwrap_or_else(|| {
@@ -272,13 +288,13 @@ impl EntityMap {
     fn remove_from_chunk(&mut self, id: EntityID) -> HashSet<EntityID> {
         let mut affected = HashSet::new();
         let entry = self.registry.get_mut(&id).unwrap();
-        if let Some((x, y)) = entry.chunk {
-            let chunk = &mut self.chunks[x as usize][y as usize];
-            if !chunk.remove(id) {
-                panic!("Chunk ({x}, {y}) did not contain entity with ID {:?}", id);
-            }
+        if let Some(coords) = entry.chunk {
             entry.chunk = None;
-            affected.extend(self.get_around(x, y, get_visibility_range()));
+            let chunk = self.get_chunk(coords).unwrap();
+            if !chunk.remove(id) {
+                panic!("Chunk {:?} did not contain entity with ID {:?}", coords, id);
+            }
+            affected.extend(self.get_around(coords, get_visibility_range()));
         }
         affected
     }
@@ -286,48 +302,65 @@ impl EntityMap {
     fn insert_into_chunk(
         &mut self,
         id: EntityID,
-        to_chunk: Option<(i32, i32)>,
+        to_chunk: Option<ChunkCoords>,
     ) -> HashSet<EntityID> {
         let mut affected = HashSet::new();
-        if let Some((x, y)) = to_chunk {
-            if let Some(chunk) = self.get_chunk(x, y) {
+        if let Some(coords) = to_chunk {
+            if let Some(chunk) = self.get_chunk(coords) {
                 if !chunk.insert(id) {
-                    panic!("Chunk ({x}, {y}) already contained entity with ID {:?}", id);
+                    panic!(
+                        "Chunk {:?} already contained entity with ID {:?}",
+                        coords, id
+                    );
                 }
                 let entry = self.registry.get_mut(&id).unwrap();
                 entry.chunk = to_chunk;
-                affected.extend(self.get_around(x, y, get_visibility_range()));
+                affected.extend(self.get_around(coords, get_visibility_range()));
                 affected.remove(&id); // we don't want ourself in this
             }
         }
         affected
     }
 
-    fn get_chunk(&mut self, x: i32, y: i32) -> Option<&mut Chunk> {
-        if (0..NCHUNKS as i32).contains(&x) && (0..NCHUNKS as i32).contains(&y) {
-            let chunk = &mut self.chunks[x as usize][y as usize];
+    fn get_chunk(&mut self, coords: ChunkCoords) -> Option<&mut Chunk> {
+        if (0..NCHUNKS as i32).contains(&coords.x) && (0..NCHUNKS as i32).contains(&coords.y) {
+            let chunks_instance = self.chunks.get_mut(&coords.i)?;
+            let chunk = &mut chunks_instance[coords.x as usize][coords.y as usize];
             return Some(chunk);
         }
         None
     }
 
-    fn get_around(&mut self, x: i32, y: i32, range: usize) -> HashSet<EntityID> {
+    fn get_around(&mut self, coords: ChunkCoords, range: usize) -> HashSet<EntityID> {
         let range = range as i32;
         let mut entities = HashSet::new();
-        for x in (x - range)..=(x + range) {
-            for y in (y - range)..=(y + range) {
-                if let Some(chunk) = self.get_chunk(x, y) {
+        for x in (coords.x - range)..=(coords.x + range) {
+            for y in (coords.y - range)..=(coords.y + range) {
+                let coords = ChunkCoords { x, y, i: coords.i };
+                if let Some(chunk) = self.get_chunk(coords) {
                     entities.extend(chunk.get_all());
                 }
             }
         }
         entities
     }
+
+    pub fn init_instance(&mut self, instance_id: u64) {
+        self.chunks.entry(instance_id).or_insert_with(|| {
+            let chunks: [[Chunk; NCHUNKS]; NCHUNKS] =
+                std::array::from_fn(|_| std::array::from_fn(|_| Chunk::default()));
+            log(
+                Severity::Info,
+                &format!("Initialized instance {}", instance_id),
+            );
+            chunks
+        });
+    }
 }
 impl Default for EntityMap {
     fn default() -> Self {
         Self {
-            chunks: std::array::from_fn(|_| std::array::from_fn(|_| Chunk::default())),
+            chunks: HashMap::new(),
             registry: HashMap::new(),
         }
     }

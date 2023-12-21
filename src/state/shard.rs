@@ -37,8 +37,9 @@ impl Default for ShardServerState {
             ongoing_trades: HashMap::new(),
         };
         for npc in tdata_get().get_npcs() {
-            let chunk_pos = npc.get_position().chunk_coords();
+            let chunk_pos = npc.get_chunk_coords();
             let entity_map = &mut state.entity_map;
+            entity_map.init_instance(chunk_pos.i);
             let id = entity_map.track(Box::new(npc));
             entity_map.update(id, Some(chunk_pos), None);
         }

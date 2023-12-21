@@ -1,4 +1,5 @@
 use crate::{
+    chunk::ChunkCoords,
     error::FFResult,
     net::{
         ffclient::FFClient,
@@ -15,7 +16,7 @@ pub struct NPC {
     pub ty: i32,
     position: Position,
     rotation: i32,
-    _instance_id: u64,
+    instance_id: u64,
     combat_stats: CombatStats,
 }
 impl NPC {
@@ -25,7 +26,7 @@ impl NPC {
             ty,
             position: Position { x, y, z },
             rotation: angle % 360,
-            _instance_id: instance_id,
+            instance_id,
             combat_stats: CombatStats {
                 level: unused!(),
                 _max_hp: unused!(),
@@ -61,9 +62,12 @@ impl Entity for NPC {
         self.position
     }
 
-    fn set_position(&mut self, pos: Position) -> (i32, i32) {
+    fn get_chunk_coords(&self) -> ChunkCoords {
+        ChunkCoords::from_pos_inst(self.position, self.instance_id)
+    }
+
+    fn set_position(&mut self, pos: Position) {
         self.position = pos;
-        self.position.chunk_coords()
     }
 
     fn set_rotation(&mut self, angle: i32) {

@@ -61,7 +61,7 @@ pub fn pc_loading_complete(clients: &mut ClientMap, state: &mut ShardServerState
     catch_fail(
         (|| {
             let player = state.get_player(clients.get_self().get_player_id()?)?;
-            let chunk = player.get_position().chunk_coords();
+            let chunk = player.get_chunk_coords();
             state
                 .entity_map
                 .update(player.get_id(), Some(chunk), Some(clients));
@@ -119,8 +119,9 @@ pub fn pc_move(
     // TODO anticheat
 
     let entity_id = player.get_id();
-    let chunk = player.set_position(pos);
+    player.set_position(pos);
     player.set_rotation(angle);
+    let chunk = player.get_chunk_coords();
     state
         .entity_map
         .update(entity_id, Some(chunk), Some(clients));
@@ -168,8 +169,9 @@ pub fn pc_jump(
     // TODO anticheat
 
     let entity_id = player.get_id();
-    let chunk = player.set_position(pos);
+    player.set_position(pos);
     player.set_rotation(angle);
+    let chunk = player.get_chunk_coords();
     state
         .entity_map
         .update(entity_id, Some(chunk), Some(clients));
@@ -210,7 +212,8 @@ pub fn pc_stop(
     // TODO anticheat
 
     let entity_id = player.get_id();
-    let chunk = player.set_position(pos);
+    player.set_position(pos);
+    let chunk = player.get_chunk_coords();
     state
         .entity_map
         .update(entity_id, Some(chunk), Some(clients));

@@ -5,6 +5,7 @@ extern crate num_derive;
 
 use std::{any::Any, cmp::min, hash::Hash, time::SystemTime};
 
+use chunk::ChunkCoords;
 use defines::{NANO_STAMINA_MAX, SIZEOF_TRADE_SLOT, SIZEOF_VENDOR_TABLE_SLOT};
 use enums::ItemType;
 use error::{FFError, FFResult, Severity};
@@ -58,12 +59,6 @@ pub struct Position {
     pub z: i32,
 }
 impl Position {
-    pub fn chunk_coords(&self) -> (i32, i32) {
-        let chunk_x = (self.x * chunk::NCHUNKS as i32) / chunk::MAP_BOUNDS;
-        let chunk_y = (self.y * chunk::NCHUNKS as i32) / chunk::MAP_BOUNDS;
-        (chunk_x, chunk_y)
-    }
-
     pub fn distance_to(&self, other: &Position) -> u32 {
         let dx = self.x.abs_diff(other.x);
         let dy = self.y.abs_diff(other.y);
@@ -586,7 +581,8 @@ pub trait Entity {
     fn get_id(&self) -> EntityID;
     fn get_client<'a>(&self, client_map: &'a mut ClientMap) -> Option<&'a mut FFClient>;
     fn get_position(&self) -> Position;
-    fn set_position(&mut self, pos: Position) -> (i32, i32);
+    fn get_chunk_coords(&self) -> ChunkCoords;
+    fn set_position(&mut self, pos: Position);
     fn set_rotation(&mut self, angle: i32);
     fn send_enter(&self, client: &mut FFClient) -> FFResult<()>;
     fn send_exit(&self, client: &mut FFClient) -> FFResult<()>;

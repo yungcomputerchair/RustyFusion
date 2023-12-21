@@ -1,6 +1,7 @@
 use std::{any::Any, cmp::max, fmt::Display};
 
 use crate::{
+    chunk::ChunkCoords,
     defines::*,
     enums::{ItemLocation, ItemType, PlayerGuide},
     error::{FFError, FFResult, Severity},
@@ -815,9 +816,12 @@ impl Entity for Player {
         self.position
     }
 
-    fn set_position(&mut self, pos: Position) -> (i32, i32) {
+    fn get_chunk_coords(&self) -> ChunkCoords {
+        ChunkCoords::from_pos_inst(self.position, self.instance_id)
+    }
+
+    fn set_position(&mut self, pos: Position) {
         self.position = pos;
-        self.position.chunk_coords()
     }
 
     fn set_rotation(&mut self, angle: i32) {
