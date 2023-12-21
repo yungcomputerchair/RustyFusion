@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
+use uuid::Uuid;
+
 use crate::{
     config::config_get,
     error::{log, FFError, FFResult, Severity},
@@ -9,14 +11,20 @@ use crate::{
     Entity, EntityID, Position,
 };
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct InstanceID {
+    pub map_num: u32,
+    pub instance_num: Option<Uuid>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ChunkCoords {
-    pub i: u64,
+    pub i: InstanceID,
     pub x: i32,
     pub y: i32,
 }
 impl ChunkCoords {
-    pub fn from_pos_inst(pos: Position, instance_id: u64) -> Self {
+    pub fn from_pos_inst(pos: Position, instance_id: InstanceID) -> Self {
         Self {
             x: (pos.x * NCHUNKS as i32) / MAP_BOUNDS,
             y: (pos.y * NCHUNKS as i32) / MAP_BOUNDS,
@@ -38,7 +46,7 @@ struct RegistryEntry {
 
 pub struct EntityMap {
     registry: HashMap<EntityID, RegistryEntry>,
-    chunks: HashMap<u64, [[Chunk; NCHUNKS]; NCHUNKS]>,
+    chunks: HashMap<InstanceID, [[Chunk; NCHUNKS]; NCHUNKS]>,
 }
 
 impl EntityMap {
@@ -345,13 +353,13 @@ impl EntityMap {
         entities
     }
 
-    pub fn init_instance(&mut self, instance_id: u64) {
+    pub fn init_instance(&mut self, instance_id: InstanceID) {
         self.chunks.entry(instance_id).or_insert_with(|| {
             let chunks: [[Chunk; NCHUNKS]; NCHUNKS] =
                 std::array::from_fn(|_| std::array::from_fn(|_| Chunk::default()));
             log(
                 Severity::Info,
-                &format!("Initialized instance {}", instance_id),
+                &format!("Initialized instance {:?}", instance_id),
             );
             chunks
         });

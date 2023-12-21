@@ -1,5 +1,5 @@
 use crate::{
-    chunk::ChunkCoords,
+    chunk::{ChunkCoords, InstanceID},
     error::FFResult,
     net::{
         ffclient::FFClient,
@@ -16,11 +16,19 @@ pub struct NPC {
     pub ty: i32,
     position: Position,
     rotation: i32,
-    instance_id: u64,
+    instance_id: InstanceID,
     combat_stats: CombatStats,
 }
 impl NPC {
-    pub fn new(id: i32, ty: i32, x: i32, y: i32, z: i32, angle: i32, instance_id: u64) -> Self {
+    pub fn new(
+        id: i32,
+        ty: i32,
+        x: i32,
+        y: i32,
+        z: i32,
+        angle: i32,
+        instance_id: InstanceID,
+    ) -> Self {
         Self {
             id,
             ty,

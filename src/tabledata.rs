@@ -6,7 +6,8 @@ use serde_json::{Map, Value};
 use std::{collections::HashMap, sync::OnceLock, time::SystemTime};
 
 use crate::{
-    defines::SIZEOF_NANO_SKILLS,
+    chunk::InstanceID,
+    defines::{ID_OVERWORLD, SIZEOF_NANO_SKILLS},
     enums::{ItemType, NanoStyle, TransportationType},
     error::{log, FFError, FFResult, Severity},
     npc::NPC,
@@ -48,7 +49,7 @@ struct NPCData {
     iY: i32,
     iZ: i32,
     iAngle: i32,
-    iMapNum: Option<i32>,
+    iMapNum: Option<u32>,
 }
 
 pub struct TripData {
@@ -280,7 +281,10 @@ impl TableData {
                     npc_data.iY,
                     npc_data.iZ,
                     npc_data.iAngle,
-                    npc_data.iMapNum.unwrap_or(0) as u64,
+                    InstanceID {
+                        map_num: npc_data.iMapNum.unwrap_or(ID_OVERWORLD),
+                        instance_num: None,
+                    },
                 )
             })
     }

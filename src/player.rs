@@ -1,7 +1,7 @@
 use std::{any::Any, cmp::max, fmt::Display};
 
 use crate::{
-    chunk::ChunkCoords,
+    chunk::{ChunkCoords, InstanceID},
     defines::*,
     enums::{ItemLocation, ItemType, PlayerGuide},
     error::{FFError, FFResult, Severity},
@@ -142,7 +142,7 @@ pub struct Player {
     perms: i16,
     position: Position,
     rotation: i32,
-    instance_id: u64,
+    instance_id: InstanceID,
     style: PlayerStyle,
     flags: PlayerFlags,
     name: PlayerName,
@@ -233,7 +233,7 @@ impl Player {
     }
 
     fn get_mapnum(&self) -> i32 {
-        self.instance_id as i32
+        self.instance_id.map_num as i32
     }
 
     pub fn change_nano(&mut self, slot: usize, nano_id: Option<i16>) -> FFResult<()> {
