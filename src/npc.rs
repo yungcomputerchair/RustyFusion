@@ -12,7 +12,7 @@ use crate::{
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct NPC {
-    id: i32,
+    id: Option<i32>,
     pub ty: i32,
     position: Position,
     rotation: i32,
@@ -20,17 +20,9 @@ pub struct NPC {
     combat_stats: CombatStats,
 }
 impl NPC {
-    pub fn new(
-        id: i32,
-        ty: i32,
-        x: i32,
-        y: i32,
-        z: i32,
-        angle: i32,
-        instance_id: InstanceID,
-    ) -> Self {
+    pub fn new(ty: i32, x: i32, y: i32, z: i32, angle: i32, instance_id: InstanceID) -> Self {
         Self {
-            id,
+            id: None,
             ty,
             position: Position { x, y, z },
             rotation: angle % 360,
@@ -43,9 +35,17 @@ impl NPC {
         }
     }
 
+    pub fn get_npc_id(&self) -> i32 {
+        self.id.expect("NPC ID accessed before it was set")
+    }
+
+    pub fn set_npc_id(&mut self, npc_id: i32) {
+        self.id = Some(npc_id);
+    }
+
     fn get_appearance_data(&self) -> sNPCAppearanceData {
         sNPCAppearanceData {
-            iNPC_ID: self.id,
+            iNPC_ID: self.id.unwrap_or_default(),
             iNPCType: self.ty,
             iHP: self.get_hp(),
             iConditionBitFlag: self.get_condition_bit_flag(),
@@ -59,7 +59,7 @@ impl NPC {
 }
 impl Entity for NPC {
     fn get_id(&self) -> EntityID {
-        EntityID::NPC(self.id)
+        EntityID::NPC(self.get_npc_id())
     }
 
     fn get_client<'a>(&self, _client_map: &'a mut ClientMap) -> Option<&'a mut FFClient> {
@@ -90,7 +90,9 @@ impl Entity for NPC {
     }
 
     fn send_exit(&self, client: &mut FFClient) -> FFResult<()> {
-        let pkt = sP_FE2CL_NPC_EXIT { iNPC_ID: self.id };
+        let pkt = sP_FE2CL_NPC_EXIT {
+            iNPC_ID: self.get_npc_id(),
+        };
         client.send_packet(PacketID::P_FE2CL_NPC_EXIT, &pkt)
     }
 

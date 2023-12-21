@@ -270,23 +270,19 @@ impl TableData {
     }
 
     pub fn get_npcs(&self) -> impl Iterator<Item = NPC> + '_ {
-        self.npc_data
-            .iter()
-            .enumerate()
-            .map(|(npc_id, npc_data)| -> NPC {
-                NPC::new(
-                    npc_id as i32,
-                    npc_data.iNPCType,
-                    npc_data.iX,
-                    npc_data.iY,
-                    npc_data.iZ,
-                    npc_data.iAngle,
-                    InstanceID {
-                        map_num: npc_data.iMapNum.unwrap_or(ID_OVERWORLD),
-                        instance_num: None,
-                    },
-                )
-            })
+        self.npc_data.iter().map(|npc_data| -> NPC {
+            NPC::new(
+                npc_data.iNPCType,
+                npc_data.iX,
+                npc_data.iY,
+                npc_data.iZ,
+                npc_data.iAngle,
+                InstanceID {
+                    map_num: npc_data.iMapNum.unwrap_or(ID_OVERWORLD),
+                    instance_num: None,
+                },
+            )
+        })
     }
 
     pub fn get_item_from_crate(&self, crate_id: i16, gender: i32) -> FFResult<Item> {
