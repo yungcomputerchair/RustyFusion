@@ -77,6 +77,16 @@ struct ChunkMap {
     player_count: usize,
     chunks: [[Chunk; NCHUNKS]; NCHUNKS],
 }
+impl ChunkMap {
+    fn get_ids(&self) -> Vec<EntityID> {
+        self.chunks
+            .iter()
+            .flatten()
+            .flat_map(|chunk| chunk.get_all())
+            .cloned()
+            .collect()
+    }
+}
 
 pub struct EntityMap {
     registry: HashMap<EntityID, RegistryEntry>,
@@ -434,6 +444,9 @@ impl EntityMap {
 
         let chunk_map = self.chunk_maps.get(&instance_id).unwrap();
         if chunk_map.player_count == 0 {
+            for id in chunk_map.get_ids() {
+                self.untrack(id);
+            }
             self.chunk_maps.remove(&instance_id);
             log(
                 Severity::Debug,
