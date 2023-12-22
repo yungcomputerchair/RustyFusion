@@ -1,9 +1,13 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::{Display, Formatter},
+};
 
 use uuid::Uuid;
 
 use crate::{
     config::config_get,
+    defines::ID_OVERWORLD,
     error::{log, FFError, FFResult, Severity},
     net::{ffclient::FFClient, ClientMap},
     npc::NPC,
@@ -11,10 +15,30 @@ use crate::{
     Entity, EntityID, Position,
 };
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct InstanceID {
     pub map_num: u32,
     pub instance_num: Option<Uuid>,
+}
+impl Default for InstanceID {
+    fn default() -> Self {
+        Self {
+            map_num: ID_OVERWORLD,
+            instance_num: None,
+        }
+    }
+}
+impl Display for InstanceID {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}:{}",
+            self.map_num,
+            self.instance_num
+                .map(|id| id.to_string())
+                .unwrap_or("None".to_string())
+        )
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -32,6 +56,11 @@ impl ChunkCoords {
         }
     }
 }
+impl Display for ChunkCoords {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {}, {})", self.x, self.y, self.i)
+    }
+}
 
 pub const NCHUNKS: usize = 16 * 8; // 16 map squares with side lengths of 8 chunks
 pub const MAP_BOUNDS: i32 = 8192 * 100; // top corner of (16, 16)
@@ -44,9 +73,14 @@ struct RegistryEntry {
     chunk: Option<ChunkCoords>,
 }
 
+struct ChunkMap {
+    player_count: usize,
+    chunks: [[Chunk; NCHUNKS]; NCHUNKS],
+}
+
 pub struct EntityMap {
     registry: HashMap<EntityID, RegistryEntry>,
-    chunks: HashMap<InstanceID, [[Chunk; NCHUNKS]; NCHUNKS]>,
+    chunk_maps: HashMap<InstanceID, ChunkMap>,
 }
 
 impl EntityMap {
@@ -225,12 +259,18 @@ impl EntityMap {
         let entry = self.registry.get_mut(&id).unwrap_or_else(|| {
             panic!("Entity with id {:?} untracked", id);
         });
-        if entry.chunk == to_chunk {
+        let from_chunk = entry.chunk;
+        if from_chunk == to_chunk {
             return;
         }
 
         let around_from = self.remove_from_chunk(id);
         let around_to = self.insert_into_chunk(id, to_chunk);
+        if let Some(coords) = from_chunk {
+            if to_chunk.is_none() {
+                self.check_instance_for_cleanup(coords.i);
+            }
+        }
 
         // if there's no client map, nobody needs to be notified
         if client_map.is_none() {
@@ -274,7 +314,10 @@ impl EntityMap {
 
         log(
             Severity::Debug,
-            &format!("Moved to {:?}", self.registry[&id].chunk),
+            &match self.registry[&id].chunk {
+                Some(coords) => format!("Moved to {}", coords),
+                None => "Removed".to_string(),
+            },
         );
     }
 
@@ -302,6 +345,9 @@ impl EntityMap {
             if !chunk.remove(id) {
                 panic!("Chunk {:?} did not contain entity with ID {:?}", coords, id);
             }
+            if let EntityID::Player(_) = id {
+                self.instance_player_exit(coords.i);
+            }
             affected.extend(self.get_around(coords, get_visibility_range()));
         }
         affected
@@ -321,6 +367,9 @@ impl EntityMap {
                         coords, id
                     );
                 }
+                if let EntityID::Player(_) = id {
+                    self.instance_player_enter(coords.i);
+                }
                 let entry = self.registry.get_mut(&id).unwrap();
                 entry.chunk = to_chunk;
                 affected.extend(self.get_around(coords, get_visibility_range()));
@@ -332,8 +381,8 @@ impl EntityMap {
 
     fn get_chunk(&mut self, coords: ChunkCoords) -> Option<&mut Chunk> {
         if (0..NCHUNKS as i32).contains(&coords.x) && (0..NCHUNKS as i32).contains(&coords.y) {
-            let chunks_instance = self.init_instance(coords.i);
-            let chunk = &mut chunks_instance[coords.x as usize][coords.y as usize];
+            let chunk_map = self.init_instance(coords.i);
+            let chunk = &mut chunk_map.chunks[coords.x as usize][coords.y as usize];
             return Some(chunk);
         }
         None
@@ -353,23 +402,51 @@ impl EntityMap {
         entities
     }
 
-    pub fn init_instance(&mut self, instance_id: InstanceID) -> &mut [[Chunk; NCHUNKS]; NCHUNKS] {
-        self.chunks.entry(instance_id).or_insert_with(|| {
+    fn init_instance(&mut self, instance_id: InstanceID) -> &mut ChunkMap {
+        self.chunk_maps.entry(instance_id).or_insert_with(|| {
             let chunks: [[Chunk; NCHUNKS]; NCHUNKS] =
                 std::array::from_fn(|_| std::array::from_fn(|_| Chunk::default()));
             log(
                 Severity::Info,
-                &format!("Initialized instance {:?}", instance_id),
+                &format!("Initialized instance {}", instance_id),
             );
-            chunks
+            ChunkMap {
+                player_count: 0,
+                chunks,
+            }
         })
+    }
+
+    fn instance_player_enter(&mut self, instance_id: InstanceID) {
+        let chunk_map = self.init_instance(instance_id);
+        chunk_map.player_count += 1;
+    }
+
+    fn instance_player_exit(&mut self, instance_id: InstanceID) {
+        let chunk_map = self.init_instance(instance_id);
+        chunk_map.player_count -= 1;
+    }
+
+    fn check_instance_for_cleanup(&mut self, instance_id: InstanceID) {
+        if instance_id.instance_num.is_none() {
+            return; // don't clean up the main instance
+        }
+
+        let chunk_map = self.chunk_maps.get(&instance_id).unwrap();
+        if chunk_map.player_count == 0 {
+            self.chunk_maps.remove(&instance_id);
+            log(
+                Severity::Info,
+                &format!("Cleaned up instance {}", instance_id),
+            );
+        }
     }
 }
 impl Default for EntityMap {
     fn default() -> Self {
         Self {
-            chunks: HashMap::new(),
             registry: HashMap::new(),
+            chunk_maps: HashMap::new(),
         }
     }
 }
