@@ -1,7 +1,8 @@
 use rusty_fusion::{
+    chunk::InstanceID,
     defines,
     error::{catch_fail, FFError, Severity},
-    placeholder, Combatant, Item,
+    placeholder, Combatant, Item, Position,
 };
 
 use super::*;
@@ -119,13 +120,30 @@ pub fn gm_pc_give_nano(clients: &mut ClientMap, state: &mut ShardServerState) ->
     )
 }
 
-pub fn gm_pc_goto(client: &mut FFClient) -> FFResult<()> {
+pub fn gm_pc_goto(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let client = clients.get_self();
     let pkt: &sP_CL2FE_REQ_PC_GOTO = client.get_packet(P_CL2FE_REQ_PC_GOTO)?;
+    let new_pos = Position {
+        x: pkt.iToX,
+        y: pkt.iToY,
+        z: pkt.iToZ,
+    };
+    let pc_id = client.get_player_id()?;
+    let player = state.get_player_mut(pc_id)?;
+
+    player.set_position(new_pos);
+    player.instance_id = InstanceID::default();
+
+    state
+        .entity_map
+        .update(EntityID::Player(pc_id), None, Some(clients));
 
     let resp = sP_FE2CL_REP_PC_GOTO_SUCC {
-        iX: pkt.iToX,
-        iY: pkt.iToY,
-        iZ: pkt.iToZ,
+        iX: new_pos.x,
+        iY: new_pos.y,
+        iZ: new_pos.z,
     };
-    client.send_packet(P_FE2CL_REP_PC_GOTO_SUCC, &resp)
+    clients
+        .get_self()
+        .send_packet(P_FE2CL_REP_PC_GOTO_SUCC, &resp)
 }
