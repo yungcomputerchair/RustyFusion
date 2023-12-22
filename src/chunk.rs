@@ -407,7 +407,7 @@ impl EntityMap {
             let chunks: [[Chunk; NCHUNKS]; NCHUNKS] =
                 std::array::from_fn(|_| std::array::from_fn(|_| Chunk::default()));
             log(
-                Severity::Info,
+                Severity::Debug,
                 &format!("Initialized instance {}", instance_id),
             );
             ChunkMap {
@@ -436,7 +436,7 @@ impl EntityMap {
         if chunk_map.player_count == 0 {
             self.chunk_maps.remove(&instance_id);
             log(
-                Severity::Info,
+                Severity::Debug,
                 &format!("Cleaned up instance {}", instance_id),
             );
         }

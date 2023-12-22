@@ -107,7 +107,7 @@ impl ShardServerState {
     }
 
     pub fn check_for_expired_vehicles(&mut self, time: SystemTime, clients: &mut ClientMap) {
-        log(Severity::Info, "Checking for expired vehicles");
+        log(Severity::Debug, "Checking for expired vehicles");
         let pc_ids: Vec<i32> = self.entity_map.get_player_ids().collect();
         let mut pc_ids_dismounted = Vec::with_capacity(pc_ids.len());
         for pc_id in pc_ids {
