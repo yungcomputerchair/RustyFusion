@@ -18,7 +18,7 @@ pub fn pc_enter(
     let pkt: &sP_CL2FE_REQ_PC_ENTER = client.get_packet(P_CL2FE_REQ_PC_ENTER)?;
     let serial_key: i64 = pkt.iEnterSerialKey;
     let login_data = state.login_data.remove(&serial_key).unwrap();
-    let pc_id = state.gen_next_pc_id();
+    let pc_id = state.entity_map.gen_next_pc_id();
     let mut player = login_data.player;
     player.set_player_id(pc_id);
     player.set_client_id(key);

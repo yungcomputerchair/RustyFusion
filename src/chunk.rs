@@ -1,3 +1,5 @@
+#![allow(clippy::needless_range_loop)]
+
 use std::{
     collections::{HashMap, HashSet},
     fmt::{Display, Formatter},
@@ -91,6 +93,8 @@ impl ChunkMap {
 pub struct EntityMap {
     registry: HashMap<EntityID, RegistryEntry>,
     chunk_maps: HashMap<InstanceID, ChunkMap>,
+    next_pc_id: i32,
+    next_npc_id: i32,
 }
 
 impl EntityMap {
@@ -238,6 +242,18 @@ impl EntityMap {
         Ok(())
     }
 
+    pub fn gen_next_pc_id(&mut self) -> i32 {
+        let id = self.next_pc_id;
+        self.next_pc_id += 1;
+        id
+    }
+
+    pub fn gen_next_npc_id(&mut self) -> i32 {
+        let id = self.next_npc_id;
+        self.next_npc_id += 1;
+        id
+    }
+
     pub fn track(&mut self, entity: Box<dyn Entity>) -> EntityID {
         let id = entity.get_id();
         if self.registry.contains_key(&id) {
@@ -293,15 +309,19 @@ impl EntityMap {
             // us to them
             let from = self.get_from_id(id).unwrap();
             if let Some(from_client) = from.get_client(client_map) {
-                let to = self.get_from_id(*e).unwrap();
-                let _ = to.send_exit(from_client);
+                // possible for the ID to be unregistered if the instance was cleaned up
+                if let Some(to) = self.get_from_id(*e) {
+                    let _ = to.send_exit(from_client);
+                }
             }
 
             // them to us
-            let from = self.get_from_id(*e).unwrap();
-            if let Some(from_client) = from.get_client(client_map) {
-                let to = self.get_from_id(id).unwrap();
-                let _ = to.send_exit(from_client);
+            // possible for the ID to be unregistered if the instance was cleaned up
+            if let Some(from) = self.get_from_id(*e) {
+                if let Some(from_client) = from.get_client(client_map) {
+                    let to = self.get_from_id(id).unwrap();
+                    let _ = to.send_exit(from_client);
+                }
             }
         }
 
@@ -413,18 +433,48 @@ impl EntityMap {
     }
 
     fn init_instance(&mut self, instance_id: InstanceID) -> &mut ChunkMap {
+        let new = !self.chunk_maps.contains_key(&instance_id);
         self.chunk_maps.entry(instance_id).or_insert_with(|| {
-            let chunks: [[Chunk; NCHUNKS]; NCHUNKS] =
-                std::array::from_fn(|_| std::array::from_fn(|_| Chunk::default()));
+            let chunk_map = ChunkMap {
+                player_count: 0,
+                chunks: std::array::from_fn(|_| std::array::from_fn(|_| Chunk::default())),
+            };
             log(
                 Severity::Debug,
                 &format!("Initialized instance {}", instance_id),
             );
-            ChunkMap {
-                player_count: 0,
-                chunks,
+            chunk_map
+        });
+        if instance_id.instance_num.is_some() && new {
+            let main_instance = InstanceID {
+                map_num: instance_id.map_num,
+                instance_num: None,
+            };
+            let mut npc_count = 0;
+            let template_chunks = self.chunk_maps.get(&main_instance).unwrap().chunks.clone();
+            for x in 0..NCHUNKS {
+                for y in 0..NCHUNKS {
+                    for id in template_chunks[x][y].get_all() {
+                        if let EntityID::NPC(npc_id) = *id {
+                            let mut npc = self.get_npc(npc_id).unwrap().clone();
+                            npc.instance_id = instance_id;
+                            npc.set_npc_id(self.gen_next_npc_id());
+
+                            let chunk =
+                                &mut self.chunk_maps.get_mut(&instance_id).unwrap().chunks[x][y];
+                            chunk.insert(npc.get_id());
+                            self.track(Box::new(npc));
+                            npc_count += 1;
+                        }
+                    }
+                }
             }
-        })
+            log(
+                Severity::Debug,
+                &format!("Copied {} NPCs to instance {}", npc_count, instance_id),
+            );
+        }
+        self.chunk_maps.get_mut(&instance_id).unwrap()
     }
 
     fn instance_player_enter(&mut self, instance_id: InstanceID) {
@@ -460,11 +510,13 @@ impl Default for EntityMap {
         Self {
             registry: HashMap::new(),
             chunk_maps: HashMap::new(),
+            next_pc_id: 1,
+            next_npc_id: 1,
         }
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Chunk {
     tracked: HashSet<EntityID>,
 }

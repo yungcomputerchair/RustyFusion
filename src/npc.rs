@@ -10,13 +10,13 @@ use crate::{
     CombatStats, Combatant, Entity, EntityID, Position,
 };
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone)]
 pub struct NPC {
     id: Option<i32>,
     pub ty: i32,
     position: Position,
     rotation: i32,
-    instance_id: InstanceID,
+    pub instance_id: InstanceID,
     combat_stats: CombatStats,
 }
 impl NPC {

@@ -19,8 +19,6 @@ use crate::{
 
 pub struct ShardServerState {
     login_server_conn_id: i64,
-    next_pc_id: i32,
-    next_npc_id: i32,
     pub login_data: HashMap<i64, LoginData>,
     pub entity_map: EntityMap,
     pub buyback_lists: HashMap<i32, Vec<Item>>,
@@ -31,17 +29,15 @@ impl Default for ShardServerState {
     fn default() -> Self {
         let mut state = Self {
             login_server_conn_id: CONN_ID_DISCONNECTED,
-            next_pc_id: 1,
-            next_npc_id: 1,
             login_data: HashMap::new(),
             entity_map: EntityMap::default(),
             buyback_lists: HashMap::new(),
             ongoing_trades: HashMap::new(),
         };
         for mut npc in tdata_get().get_npcs() {
-            npc.set_npc_id(state.gen_next_npc_id());
             let chunk_pos = npc.get_chunk_coords();
             let entity_map = &mut state.entity_map;
+            npc.set_npc_id(entity_map.gen_next_npc_id());
             let id = entity_map.track(Box::new(npc));
             entity_map.update(id, Some(chunk_pos), None);
         }
@@ -51,18 +47,6 @@ impl Default for ShardServerState {
 impl ShardServerState {
     pub fn get_login_server_conn_id(&self) -> i64 {
         self.login_server_conn_id
-    }
-
-    pub fn gen_next_pc_id(&mut self) -> i32 {
-        let id = self.next_pc_id;
-        self.next_pc_id += 1;
-        id
-    }
-
-    pub fn gen_next_npc_id(&mut self) -> i32 {
-        let id = self.next_npc_id;
-        self.next_npc_id += 1;
-        id
     }
 
     pub fn set_login_server_conn_id(&mut self, conn_id: i64) {
