@@ -167,7 +167,7 @@ impl Player {
             uid,
             client_id: None,
             combat_stats: CombatStats {
-                _max_hp: placeholder!(100),
+                max_hp: placeholder!(100),
                 hp: placeholder!(100),
                 level: 1,
             },
@@ -801,6 +801,10 @@ impl Combatant for Player {
 
     fn get_hp(&self) -> i32 {
         self.combat_stats.hp
+    }
+
+    fn get_max_hp(&self) -> i32 {
+        self.combat_stats.max_hp
     }
 }
 impl Entity for Player {

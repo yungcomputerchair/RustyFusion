@@ -17,7 +17,7 @@ pub struct NPC {
     position: Position,
     rotation: i32,
     pub instance_id: InstanceID,
-    combat_stats: CombatStats,
+    combat_stats: Option<CombatStats>,
 }
 impl NPC {
     pub fn new(ty: i32, x: i32, y: i32, z: i32, angle: i32, instance_id: InstanceID) -> Self {
@@ -27,11 +27,7 @@ impl NPC {
             position: Position { x, y, z },
             rotation: angle % 360,
             instance_id,
-            combat_stats: CombatStats {
-                level: unused!(),
-                _max_hp: unused!(),
-                hp: 400,
-            },
+            combat_stats: None,
         }
     }
 
@@ -112,10 +108,14 @@ impl Combatant for NPC {
     }
 
     fn get_level(&self) -> i16 {
-        self.combat_stats.level
+        self.combat_stats.unwrap_or_default().level
     }
 
     fn get_hp(&self) -> i32 {
-        self.combat_stats.hp
+        self.combat_stats.unwrap_or_default().hp
+    }
+
+    fn get_max_hp(&self) -> i32 {
+        self.combat_stats.unwrap_or_default().max_hp
     }
 }
