@@ -161,20 +161,20 @@ impl FFServer {
         state: &mut ServerState,
         mut live_check_handler: impl FnMut(&mut FFClient) -> FFResult<()>,
     ) -> FFResult<()> {
-        let live_check_interval =
-            Duration::from_secs(config_get().general.live_check_interval.get());
-        let timeout = live_check_interval * 2;
-        assert!(timeout > live_check_interval);
+        log(Severity::Debug, "Doing live checks");
+        let live_check_time = Duration::from_secs(config_get().general.live_check_time.get());
 
         let mut dc_keys = Vec::new();
         for (key, client) in server.get_clients() {
-            let last_heartbeat = client.get_last_heartbeat();
-            let since = time.duration_since(last_heartbeat).unwrap_or_default();
-            if since > timeout {
-                dc_keys.push(*key);
-                continue;
-            }
-            if since > live_check_interval {
+            let since = time
+                .duration_since(client.last_heartbeat)
+                .unwrap_or_default();
+            if since > live_check_time {
+                if client.live_check_pending {
+                    // hasn't responded to live check, mark for DC
+                    dc_keys.push(*key);
+                    continue;
+                }
                 let _ = live_check_handler(client);
             }
         }

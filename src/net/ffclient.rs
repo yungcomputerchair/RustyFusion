@@ -41,7 +41,8 @@ pub struct FFClient {
     pub fe_key: [u8; CRYPTO_KEY_SIZE],
     pub enc_mode: EncryptionMode,
     pub client_type: ClientType,
-    last_heartbeat: SystemTime,
+    pub last_heartbeat: SystemTime,
+    pub live_check_pending: bool,
 }
 
 impl FFClient {
@@ -60,6 +61,7 @@ impl FFClient {
             enc_mode: EncryptionMode::EKey,
             client_type: ClientType::Unknown,
             last_heartbeat: SystemTime::now(),
+            live_check_pending: false,
         }
     }
 
@@ -87,10 +89,6 @@ impl FFClient {
                 "Couldn't get player ID for client".to_string(),
             ))
         }
-    }
-
-    pub fn get_last_heartbeat(&self) -> SystemTime {
-        self.last_heartbeat
     }
 
     pub fn peek_packet_id(&self) -> FFResult<PacketID> {
@@ -153,6 +151,7 @@ impl FFClient {
 
     pub fn read_payload(&mut self) -> FFResult<()> {
         self.last_heartbeat = SystemTime::now();
+        self.live_check_pending = false;
 
         // read the size
         let mut sz_buf: [u8; 4] = [0; 4];

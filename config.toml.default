@@ -8,7 +8,8 @@ logging_level = 2 # how verbose logging should be.
                   # 2 = also include [INFO]
                   # 3 = also include [DEBUG]
 log_write_interval = 60 # how long (seconds) between log file writes
-live_check_interval = 30 # how long (seconds) between live checks
+live_check_time = 60 # how much network silence (minimum, seconds) before sending a live check.
+                     # the live check timer will run at twice this frequency
 
 [login]
 log_path = "login.log" # path to log file, or blank for console logging only

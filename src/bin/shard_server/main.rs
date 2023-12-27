@@ -58,7 +58,7 @@ fn main() -> Result<()> {
     );
     timers.register_timer(
         |t, srv, st| FFServer::do_live_checks(t, srv, st, send_live_check),
-        Duration::from_secs(config.general.live_check_interval.get()),
+        Duration::from_secs(config.general.live_check_time.get()) / 2,
         false,
     );
     timers.register_timer(
@@ -269,6 +269,7 @@ fn send_live_check(client: &mut FFClient) -> FFResult<()> {
             serial_key: _,
             pc_id: _,
         } => {
+            client.live_check_pending = true;
             let pkt = sP_FE2CL_REQ_LIVE_CHECK {
                 iTempValue: unused!(),
             };

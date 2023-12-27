@@ -60,7 +60,7 @@ fn main() -> Result<()> {
     );
     timers.register_timer(
         |t, srv, st| FFServer::do_live_checks(t, srv, st, send_live_check),
-        Duration::from_secs(config.general.live_check_interval.get()),
+        Duration::from_secs(config.general.live_check_time.get()) / 2,
         false,
     );
 
@@ -146,12 +146,14 @@ fn send_live_check(client: &mut FFClient) -> FFResult<()> {
             serial_key: _,
             pc_id: _,
         } => {
+            client.live_check_pending = true;
             let pkt = sP_LS2CL_REQ_LIVE_CHECK {
                 iTempValue: unused!(),
             };
             client.send_packet(P_LS2CL_REQ_LIVE_CHECK, &pkt)
         }
         ClientType::ShardServer(_) => {
+            client.live_check_pending = true;
             let pkt = sP_LS2FE_REQ_LIVE_CHECK {
                 iTempValue: unused!(),
             };
