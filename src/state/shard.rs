@@ -34,10 +34,9 @@ impl Default for ShardServerState {
             buyback_lists: HashMap::new(),
             ongoing_trades: HashMap::new(),
         };
-        for mut npc in tdata_get().get_npcs() {
+        for npc in tdata_get().get_npcs(&mut state.entity_map) {
             let chunk_pos = npc.get_chunk_coords();
             let entity_map = &mut state.entity_map;
-            npc.set_npc_id(entity_map.gen_next_npc_id());
             let id = entity_map.track(Box::new(npc));
             entity_map.update(id, Some(chunk_pos), None);
         }

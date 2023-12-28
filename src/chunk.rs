@@ -451,6 +451,8 @@ impl EntityMap {
                 instance_num: None,
             };
             let mut npc_count = 0;
+            let mut id_mappings = HashMap::new();
+            let mut follower_mappings = HashMap::new();
             let template_chunks = self.chunk_maps.get(&main_instance).unwrap().chunks.clone();
             for x in 0..NCHUNKS {
                 for y in 0..NCHUNKS {
@@ -458,7 +460,16 @@ impl EntityMap {
                         if let EntityID::NPC(npc_id) = *id {
                             let mut npc = self.get_npc(npc_id).unwrap().clone();
                             npc.instance_id = instance_id;
-                            npc.set_npc_id(self.gen_next_npc_id());
+                            let new_id = self.gen_next_npc_id();
+                            id_mappings.insert(npc.id, new_id);
+                            npc.id = new_id;
+
+                            // since there's no guarantee on what order the NPCs will be iterated upon,
+                            // we update follower ids after everyone is cloned
+                            if !npc.follower_ids.is_empty() {
+                                follower_mappings.insert(new_id, npc.follower_ids.clone());
+                            }
+                            npc.follower_ids.clear();
 
                             let chunk =
                                 &mut self.chunk_maps.get_mut(&instance_id).unwrap().chunks[x][y];
@@ -469,6 +480,16 @@ impl EntityMap {
                     }
                 }
             }
+
+            // update followers
+            for (leader_id, follower_ids) in follower_mappings {
+                let npc = self.get_npc_mut(leader_id).unwrap();
+                for follower_id in follower_ids {
+                    let new_follower_id = id_mappings[&follower_id];
+                    npc.follower_ids.insert(new_follower_id);
+                }
+            }
+
             log(
                 Severity::Debug,
                 &format!("Copied {} NPCs to instance {}", npc_count, instance_id),

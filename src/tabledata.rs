@@ -6,7 +6,7 @@ use serde_json::{Map, Value};
 use std::{collections::HashMap, sync::OnceLock, time::SystemTime};
 
 use crate::{
-    chunk::InstanceID,
+    chunk::{EntityMap, InstanceID},
     defines::{ID_OVERWORLD, SIZEOF_NANO_SKILLS},
     enums::{ItemType, NanoStyle, TransportationType},
     error::{log, FFError, FFResult, Severity},
@@ -42,14 +42,20 @@ impl XDTData {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug)]
 struct NPCData {
-    iNPCType: i32,
-    iX: i32,
-    iY: i32,
-    iZ: i32,
-    iAngle: i32,
-    iMapNum: Option<u32>,
+    npc_type: i32,
+    pos: Position,
+    angle: i32,
+    map_num: Option<u32>,
+    followers: Vec<FollowerData>,
+}
+
+#[derive(Debug)]
+struct FollowerData {
+    npc_type: i32,
+    offset_x: i32,
+    offset_y: i32,
 }
 
 pub struct TripData {
@@ -269,20 +275,44 @@ impl TableData {
             ))
     }
 
-    pub fn get_npcs(&self) -> impl Iterator<Item = NPC> + '_ {
-        self.npc_data.iter().map(|npc_data| -> NPC {
-            NPC::new(
-                npc_data.iNPCType,
-                npc_data.iX,
-                npc_data.iY,
-                npc_data.iZ,
-                npc_data.iAngle,
+    pub fn get_npcs(&self, entity_map: &mut EntityMap) -> Vec<NPC> {
+        let mut npcs = Vec::new();
+        for dat in &self.npc_data {
+            let mut npc = NPC::new(
+                entity_map.gen_next_npc_id(),
+                dat.npc_type,
+                Position {
+                    x: dat.pos.x,
+                    y: dat.pos.y,
+                    z: dat.pos.z,
+                },
+                dat.angle,
                 InstanceID {
-                    map_num: npc_data.iMapNum.unwrap_or(ID_OVERWORLD),
+                    map_num: dat.map_num.unwrap_or(ID_OVERWORLD),
                     instance_num: None,
                 },
-            )
-        })
+            );
+            for follower in &dat.followers {
+                let id = entity_map.gen_next_npc_id();
+                npcs.push(NPC::new(
+                    id,
+                    follower.npc_type,
+                    Position {
+                        x: dat.pos.x + follower.offset_x,
+                        y: dat.pos.y + follower.offset_y,
+                        z: dat.pos.z,
+                    },
+                    dat.angle,
+                    InstanceID {
+                        map_num: dat.map_num.unwrap_or(ID_OVERWORLD),
+                        instance_num: None,
+                    },
+                ));
+                npc.follower_ids.insert(id);
+            }
+            npcs.push(npc);
+        }
+        npcs
     }
 
     pub fn get_item_from_crate(&self, crate_id: i16, gender: i32) -> FFResult<Item> {
@@ -997,26 +1027,79 @@ fn load_nano_data(root: &Map<std::string::String, Value>) -> Result<NanoData, St
 
 fn load_npc_data() -> Result<Vec<NPCData>, String> {
     const NPC_TABLE_KEY: &str = "NPCs";
+    const MOB_TABLE_KEY: &str = "mobs";
+    const MOB_GROUP_TABLE_KEY: &str = "groups";
 
-    let raw = load_json("tabledata/NPCs.json")?;
-    if let Value::Object(root) = raw {
-        let npcs = root
-            .get(NPC_TABLE_KEY)
-            .ok_or(format!("Key missing: {}", NPC_TABLE_KEY))?;
-        if let Value::Object(npcs) = npcs {
-            let mut npc_data = Vec::new();
-            for (_, v) in npcs {
-                let npc_data_entry: NPCData = serde_json::from_value(v.clone())
-                    .map_err(|e| format!("Malformed NPC data entry: {}", e))?;
-                npc_data.push(npc_data_entry);
-            }
-            Ok(npc_data)
-        } else {
-            panic!("Bad NPC tabledata (root.NPCs): {npcs}");
+    fn load_npc_table(val: &Value, table_key: &str) -> Result<Vec<NPCData>, String> {
+        #[derive(Deserialize)]
+        struct FollowerDataEntry {
+            iNPCType: i32,
+            iOffsetX: i32,
+            iOffsetY: i32,
         }
-    } else {
-        Err(format!("Malformed NPC tabledata root: {}", raw))
+
+        #[derive(Deserialize)]
+        struct NPCDataEntry {
+            aFollowers: Option<Vec<FollowerDataEntry>>,
+            iAngle: i32,
+            iMapNum: Option<u32>,
+            iNPCType: i32,
+            iX: i32,
+            iY: i32,
+            iZ: i32,
+        }
+
+        if let Value::Object(root) = val {
+            let npcs = root
+                .get(table_key)
+                .ok_or(format!("Key missing: {}", table_key))?;
+            if let Value::Object(npcs) = npcs {
+                let mut npc_data = Vec::new();
+                for (_, v) in npcs {
+                    let npc_data_entry: NPCDataEntry = serde_json::from_value(v.clone())
+                        .map_err(|e| format!("Malformed NPC data entry: {}", e))?;
+                    let npc_data_entry = NPCData {
+                        npc_type: npc_data_entry.iNPCType,
+                        pos: Position {
+                            x: npc_data_entry.iX,
+                            y: npc_data_entry.iY,
+                            z: npc_data_entry.iZ,
+                        },
+                        angle: npc_data_entry.iAngle,
+                        map_num: npc_data_entry.iMapNum,
+                        followers: if let Some(followers) = npc_data_entry.aFollowers {
+                            followers
+                                .into_iter()
+                                .map(|f| FollowerData {
+                                    npc_type: f.iNPCType,
+                                    offset_x: f.iOffsetX,
+                                    offset_y: f.iOffsetY,
+                                })
+                                .collect()
+                        } else {
+                            Vec::new()
+                        },
+                    };
+                    npc_data.push(npc_data_entry);
+                }
+                Ok(npc_data)
+            } else {
+                panic!("Bad NPC tabledata (root.{}): {}", table_key, npcs);
+            }
+        } else {
+            Err(format!("Malformed NPC tabledata root: {}", val))
+        }
     }
+
+    let mut npc_data = Vec::new();
+    npc_data.extend(load_npc_table(
+        &load_json("tabledata/NPCs.json")?,
+        NPC_TABLE_KEY,
+    )?);
+    let mob_json = load_json("tabledata/mobs.json")?;
+    npc_data.extend(load_npc_table(&mob_json, MOB_TABLE_KEY)?);
+    npc_data.extend(load_npc_table(&mob_json, MOB_GROUP_TABLE_KEY)?);
+    Ok(npc_data)
 }
 
 fn load_drop_data() -> Result<DropData, String> {
