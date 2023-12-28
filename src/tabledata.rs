@@ -294,7 +294,7 @@ impl TableData {
             );
             for follower in &dat.followers {
                 let id = entity_map.gen_next_npc_id();
-                npcs.push(NPC::new(
+                let mut follower = NPC::new(
                     id,
                     follower.npc_type,
                     Position {
@@ -307,7 +307,9 @@ impl TableData {
                         map_num: dat.map_num.unwrap_or(ID_OVERWORLD),
                         instance_num: None,
                     },
-                ));
+                );
+                follower.leader_id = Some(npc.id);
+                npcs.push(follower);
                 npc.follower_ids.insert(id);
             }
             npcs.push(npc);

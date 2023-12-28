@@ -21,6 +21,7 @@ pub struct NPC {
     pub instance_id: InstanceID,
     combat_stats: Option<CombatStats>,
     pub follower_ids: HashSet<i32>,
+    pub leader_id: Option<i32>,
 }
 impl NPC {
     pub fn new(id: i32, ty: i32, position: Position, angle: i32, instance_id: InstanceID) -> Self {
@@ -32,6 +33,7 @@ impl NPC {
             instance_id,
             combat_stats: None,
             follower_ids: HashSet::new(),
+            leader_id: None,
         }
     }
 

@@ -452,6 +452,7 @@ impl EntityMap {
             };
             let mut npc_count = 0;
             let mut id_mappings = HashMap::new();
+            let mut leader_mappings = HashMap::new();
             let mut follower_mappings = HashMap::new();
             let template_chunks = self.chunk_maps.get(&main_instance).unwrap().chunks.clone();
             for x in 0..NCHUNKS {
@@ -465,11 +466,15 @@ impl EntityMap {
                             npc.id = new_id;
 
                             // since there's no guarantee on what order the NPCs will be iterated upon,
-                            // we update follower ids after everyone is cloned
+                            // we update leader/follower ids after everyone is cloned
                             if !npc.follower_ids.is_empty() {
                                 follower_mappings.insert(new_id, npc.follower_ids.clone());
                             }
                             npc.follower_ids.clear();
+                            if npc.leader_id.is_some() {
+                                leader_mappings.insert(new_id, npc.leader_id.unwrap());
+                            }
+                            npc.leader_id = None;
 
                             let chunk =
                                 &mut self.chunk_maps.get_mut(&instance_id).unwrap().chunks[x][y];
@@ -479,6 +484,13 @@ impl EntityMap {
                         }
                     }
                 }
+            }
+
+            // update leaders
+            for (follower_id, leader_id) in leader_mappings {
+                let npc = self.get_npc_mut(follower_id).unwrap();
+                let new_leader_id = id_mappings[&leader_id];
+                npc.leader_id = Some(new_leader_id);
             }
 
             // update followers
