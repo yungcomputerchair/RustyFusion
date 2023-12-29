@@ -160,6 +160,7 @@ pub struct Player {
     pub trade_id: Option<Uuid>,
     pub trade_offered_to: Option<i32>,
     pub vehicle_speed: Option<i32>,
+    pub pre_warp_map_num: u32,
 }
 impl Player {
     pub fn new(uid: i64) -> Self {
@@ -176,6 +177,7 @@ impl Player {
                 y: placeholder!(187177),
                 z: placeholder!(-5500),
             },
+            pre_warp_map_num: ID_OVERWORLD,
             ..Default::default()
         }
     }

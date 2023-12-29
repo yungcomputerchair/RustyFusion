@@ -93,8 +93,14 @@ pub struct WarpData {
     pub cost: u32,
 }
 
+pub struct MapData {
+    pub ep_id: Option<u32>,
+    pub map_square: (i32, i32),
+}
+
 struct InstanceData {
     warp_data: HashMap<i32, WarpData>,
+    map_data: HashMap<u32, MapData>,
 }
 
 #[derive(Debug)]
@@ -272,6 +278,17 @@ impl TableData {
             .ok_or(FFError::build(
                 Severity::Warning,
                 format!("Nano tuning with tuning id {} doesn't exist", tuning_id),
+            ))
+    }
+
+    pub fn get_map_data(&self, map_num: u32) -> FFResult<&MapData> {
+        self.xdt_data
+            .instance_data
+            .map_data
+            .get(&map_num)
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Map data for map num {} doesn't exist", map_num),
             ))
     }
 
@@ -892,12 +909,51 @@ fn load_instance_data(root: &Map<std::string::String, Value>) -> Result<Instance
         }
     }
 
+    fn load_map_data(
+        table_root: &Map<std::string::String, Value>,
+    ) -> Result<HashMap<u32, MapData>, String> {
+        const INSTANCE_DATA_KEY: &str = "m_pInstanceData";
+
+        #[derive(Debug, Deserialize)]
+        struct MapDataEntry {
+            m_iInstanceNameID: u32,
+            m_iIsEP: u32,
+            m_iZoneX: i32,
+            m_iZoneY: i32,
+        }
+
+        let data = table_root
+            .get(INSTANCE_DATA_KEY)
+            .ok_or(format!("Key missing: {}", INSTANCE_DATA_KEY))?;
+        if let Value::Array(data) = data {
+            let mut map_map = HashMap::new();
+            for v in data {
+                let map_data_entry: MapDataEntry = serde_json::from_value(v.clone())
+                    .map_err(|e| format!("Malformed map data entry: {} {}", e, v))?;
+                let key = map_data_entry.m_iInstanceNameID;
+                let map_data_entry = MapData {
+                    ep_id: if map_data_entry.m_iIsEP == 0 {
+                        None
+                    } else {
+                        Some(map_data_entry.m_iIsEP as u32)
+                    },
+                    map_square: (map_data_entry.m_iZoneX, map_data_entry.m_iZoneY),
+                };
+                map_map.insert(key, map_data_entry);
+            }
+            Ok(map_map)
+        } else {
+            Err(format!("Array missing: {}", INSTANCE_DATA_KEY))
+        }
+    }
+
     let table = root
         .get(INSTANCE_TABLE_KEY)
         .ok_or(format!("Key missing: {}", INSTANCE_TABLE_KEY))?;
     if let Value::Object(table) = table {
         Ok(InstanceData {
             warp_data: load_warp_data(table)?,
+            map_data: load_map_data(table)?,
         })
     } else {
         Err(format!("Object missing: {}", INSTANCE_TABLE_KEY))

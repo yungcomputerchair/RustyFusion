@@ -367,6 +367,7 @@ mod helpers {
                 None
             },
         };
+        player.pre_warp_map_num = player.instance_id.map_num; // for tracking EP warps
         player.instance_id = instance_id;
 
         // force vehicle dismount

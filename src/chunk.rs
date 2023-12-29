@@ -64,8 +64,11 @@ impl Display for ChunkCoords {
     }
 }
 
-pub const NCHUNKS: usize = 16 * 8; // 16 map squares with side lengths of 8 chunks
-pub const MAP_BOUNDS: i32 = 8192 * 100; // top corner of (16, 16)
+pub const MAP_SQUARE_COUNT: i32 = 16; // how many map squares there are in each direction
+pub const NCHUNKS: usize = MAP_SQUARE_COUNT as usize * 8; // 16 map squares with side lengths of 8 chunks
+pub const MAP_SQUARE_SIZE: i32 = 51200;
+pub const MAP_BOUNDS: i32 = MAP_SQUARE_SIZE * MAP_SQUARE_COUNT; // top corner of (16, 16)
+
 fn get_visibility_range() -> usize {
     config_get().shard.visibility_range.get()
 }
