@@ -11,7 +11,7 @@ use crate::{
     enums::{ItemType, NanoStyle, TransportationType},
     error::{log, FFError, FFResult, Severity},
     npc::NPC,
-    util, CrocPotData, Item, ItemStats, Position, VendorData, VendorItem,
+    util, CrocPotData, Item, ItemStats, Path, PathPoint, Position, VendorData, VendorItem,
 };
 
 static TABLE_DATA: OnceLock<TableData> = OnceLock::new();
@@ -171,10 +171,17 @@ struct DropData {
     item_refs: HashMap<i32, ItemReference>,
 }
 
+struct PathData {
+    skyway_paths: HashMap<i32, Path>,
+    slider_path: Path,
+    npc_paths: HashMap<i32, Path>,
+}
+
 pub struct TableData {
     xdt_data: XDTData,
     npc_data: Vec<NPCData>,
     drop_data: DropData,
+    path_data: PathData,
 }
 impl TableData {
     fn new() -> Self {
@@ -190,6 +197,7 @@ impl TableData {
             xdt_data: XDTData::load()?,
             npc_data: load_npc_data()?,
             drop_data: load_drop_data()?,
+            path_data: load_path_data()?,
         })
     }
 
@@ -1229,4 +1237,160 @@ fn load_drop_data() -> Result<DropData, String> {
         item_sets: load_drop_table(&root, ITEM_SETS_TABLE_KEY, ITEM_SETS_ID_KEY)?,
         item_refs: load_drop_table(&root, ITEM_REFERENCES_TABLE_KEY, ITEM_REFERENCES_ID_KEY)?,
     })
+}
+
+fn load_path_data() -> Result<PathData, String> {
+    #[derive(Deserialize)]
+    struct PathPointEntry {
+        iX: i32,
+        iY: i32,
+        iZ: i32,
+        bStop: Option<bool>,
+        iStopTicks: Option<usize>,
+    }
+
+    fn load_skyway_paths(
+        root: &Map<std::string::String, Value>,
+    ) -> Result<HashMap<i32, Path>, String> {
+        const SKYWAY_TABLE_KEY: &str = "skyway";
+
+        #[derive(Deserialize)]
+        struct SkywayPathEntry {
+            iRouteID: i32,
+            iMonkeySpeed: i32,
+            aPoints: Vec<PathPointEntry>,
+        }
+
+        let skyway_table = root
+            .get(SKYWAY_TABLE_KEY)
+            .ok_or(format!("Key missing: {}", SKYWAY_TABLE_KEY))?;
+        if let Value::Object(skyway_table) = skyway_table {
+            let mut skyway_paths = HashMap::new();
+            for (_, v) in skyway_table {
+                let skyway_path_entry: SkywayPathEntry = serde_json::from_value(v.clone())
+                    .map_err(|e| format!("Malformed skyway path entry: {} {}", e, v))?;
+                let key = skyway_path_entry.iRouteID;
+                let speed = skyway_path_entry.iMonkeySpeed;
+                let mut points = Vec::new();
+                for point in &skyway_path_entry.aPoints {
+                    points.push(PathPoint {
+                        pos: Position {
+                            x: point.iX,
+                            y: point.iY,
+                            z: point.iZ,
+                        },
+                        speed,
+                        stop_ticks: 0,
+                    });
+                }
+                let skyway_path = Path::new(points, false);
+                skyway_paths.insert(key, skyway_path);
+            }
+            Ok(skyway_paths)
+        } else {
+            Err(format!(
+                "Bad skyway path data (root.{}): {}",
+                SKYWAY_TABLE_KEY, skyway_table
+            ))
+        }
+    }
+
+    fn load_slider_path(root: &Map<std::string::String, Value>) -> Result<Path, String> {
+        const SLIDER_TABLE_KEY: &str = "slider";
+        const SLIDER_SPEED: i32 = 1200;
+        const SLIDER_SPEED_SLOW: i32 = 450;
+        const SLIDER_STOP_TICKS: usize = 16;
+
+        let slider_table = root
+            .get(SLIDER_TABLE_KEY)
+            .ok_or(format!("Key missing: {}", SLIDER_TABLE_KEY))?;
+        if let Value::Object(slider_table) = slider_table {
+            let mut points = Vec::new();
+            let mut was_stop = false;
+            for (_, v) in slider_table {
+                let point: PathPointEntry = serde_json::from_value(v.clone())
+                    .map_err(|e| format!("Malformed slider path entry: {} {}", e, v))?;
+                let is_stop = point.bStop.unwrap();
+                points.push(PathPoint {
+                    pos: Position {
+                        x: point.iX,
+                        y: point.iY,
+                        z: point.iZ,
+                    },
+                    // we go slow if we're approaching or leaving a stop.
+                    speed: if is_stop || was_stop {
+                        SLIDER_SPEED_SLOW
+                    } else {
+                        SLIDER_SPEED
+                    },
+                    stop_ticks: if is_stop { SLIDER_STOP_TICKS } else { 0 },
+                });
+                was_stop = is_stop;
+            }
+            Ok(Path::new(points, true))
+        } else {
+            Err(format!(
+                "Bad slider path data (root.{}): {}",
+                SLIDER_TABLE_KEY, slider_table
+            ))
+        }
+    }
+
+    fn load_npc_paths(
+        root: &Map<std::string::String, Value>,
+    ) -> Result<HashMap<i32, Path>, String> {
+        const NPC_TABLE_KEY: &str = "npc";
+
+        #[derive(Deserialize)]
+        struct NPCPathEntry {
+            aNPCTypes: Vec<i32>,
+            aNPCIDs: Vec<i64>,
+            iBaseSpeed: i32,
+            aPoints: Vec<PathPointEntry>,
+        }
+
+        let npc_table = root
+            .get(NPC_TABLE_KEY)
+            .ok_or(format!("Key missing: {}", NPC_TABLE_KEY))?;
+        if let Value::Object(npc_table) = npc_table {
+            let mut npc_paths = HashMap::new();
+            for (_, v) in npc_table {
+                let npc_path_entry: NPCPathEntry = serde_json::from_value(v.clone())
+                    .map_err(|e| format!("Malformed NPC path entry: {} {}", e, v))?;
+                let mut points = Vec::new();
+                for point in &npc_path_entry.aPoints {
+                    points.push(PathPoint {
+                        pos: Position {
+                            x: point.iX,
+                            y: point.iY,
+                            z: point.iZ,
+                        },
+                        speed: npc_path_entry.iBaseSpeed,
+                        stop_ticks: point.iStopTicks.unwrap(),
+                    });
+                }
+                let npc_path = Path::new(points, true);
+                for npc_type in &npc_path_entry.aNPCTypes {
+                    npc_paths.insert(*npc_type, npc_path.clone());
+                }
+            }
+            Ok(npc_paths)
+        } else {
+            Err(format!(
+                "Bad NPC path data (root.{}): {}",
+                NPC_TABLE_KEY, npc_table
+            ))
+        }
+    }
+
+    let root = load_json("tabledata/paths.json")?;
+    if let Value::Object(root) = root {
+        Ok(PathData {
+            skyway_paths: load_skyway_paths(&root)?,
+            slider_path: load_slider_path(&root)?,
+            npc_paths: load_npc_paths(&root)?,
+        })
+    } else {
+        Err(format!("Malformed path tabledata root: {}", root))
+    }
 }
