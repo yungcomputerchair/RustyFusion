@@ -47,15 +47,23 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
   - [ ] Mob drops
 - [ ] E.G.G.s (the ones on the ground that buff you)
 - [ ] Missions
-- [ ] Entity pathing
+- [ ] ***Entity pathing***
 - [ ] Infected Zone races
 - [x] Guide changing
 - [ ] Admin features
+  - [ ] Built-in admin commands
   - [ ] Custom command system
   - [ ] OpenFusion monitor protocol
 - [x] Time machine
-- [ ] Fuse boss fight
+- [ ] Event system
+  - [ ] Fuse boss fight
+  - [ ] Scripting API (stretch goal)
 - [ ] "Academy" (build 1013) support (currently, only build 104 is supported)
+  - [ ] Struct support
+  - [ ] Patching framework
+  - [ ] Dash skill
+  - [ ] Nano capsules
+  - [ ] Code redemption
 
 Items that are ***highlighted*** are in planning or WIP. Some items have dependencies in other categories, so the list won't get completed in order.
 
