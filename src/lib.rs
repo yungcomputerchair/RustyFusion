@@ -67,6 +67,53 @@ impl Position {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+pub struct PathPoint {
+    pub pos: Position,
+    pub speed: i32, // from previous point
+    pub stop_ticks: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct Path {
+    points: Vec<PathPoint>,
+    cycle: bool,
+    idx: usize,
+    waiting_ticks: usize,
+}
+impl Path {
+    pub fn new(points: Vec<PathPoint>, cycle: bool) -> Self {
+        Self {
+            points,
+            cycle,
+            idx: 0,
+            waiting_ticks: 0,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.idx = 0;
+        self.waiting_ticks = 0;
+    }
+
+    pub fn get_next(&mut self) -> Option<PathPoint> {
+        if self.waiting_ticks > 0 {
+            self.waiting_ticks -= 1;
+            return None;
+        }
+
+        if self.idx == self.points.len() && self.cycle {
+            self.idx = 0;
+        }
+
+        self.points.get(self.idx).map(|point| {
+            self.idx += 1;
+            self.waiting_ticks = point.stop_ticks;
+            *point
+        })
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Item {
     ty: ItemType,
