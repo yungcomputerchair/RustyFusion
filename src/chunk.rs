@@ -101,8 +101,16 @@ pub struct EntityMap {
 }
 
 impl EntityMap {
-    pub fn get_from_id(&mut self, id: EntityID) -> Option<&mut Box<dyn Entity>> {
-        self.registry.get_mut(&id).map(|entry| &mut entry.entity)
+    pub fn get_from_id(&self, id: EntityID) -> Option<&dyn Entity> {
+        self.registry.get(&id).map(|entry| entry.entity.as_ref())
+    }
+
+    pub fn get_from_id_mut(&mut self, id: EntityID) -> Option<&mut dyn Entity> {
+        // compiler doesn't like the use of a closure here
+        match self.registry.get_mut(&id) {
+            Some(entry) => Some(entry.entity.as_mut()),
+            None => None,
+        }
     }
 
     pub fn get_from_ids(
@@ -117,6 +125,10 @@ impl EntityMap {
                 None
             }
         })
+    }
+
+    pub fn get_all_ids(&self) -> impl Iterator<Item = EntityID> + '_ {
+        self.registry.keys().cloned()
     }
 
     pub fn get_around_entity(

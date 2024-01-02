@@ -14,7 +14,7 @@ use crate::{
     npc::NPC,
     player::Player,
     tabledata::tdata_get,
-    Entity, Item, TradeContext,
+    Entity, EntityID, Item, TradeContext,
 };
 
 pub struct ShardServerState {
@@ -127,6 +127,26 @@ impl ShardServerState {
         for pc_id in pc_ids_dismounted {
             let player = self.entity_map.get_player(pc_id).unwrap();
             helpers::broadcast_state(pc_id, player.get_state_bit_flag(), clients, self);
+        }
+    }
+
+    pub fn tick_entities(&mut self, time: SystemTime, clients: &mut ClientMap) {
+        let eids: Vec<EntityID> = self.entity_map.get_all_ids().collect();
+        for eid in eids {
+            match eid {
+                // we copy the entity here so we can mutably borrow the state.
+                // we put it back when we're done.
+                EntityID::Player(pc_id) => {
+                    let mut player = *self.entity_map.get_player_mut(pc_id).unwrap();
+                    player.tick(time, clients, self);
+                    *self.entity_map.get_player_mut(pc_id).unwrap() = player;
+                }
+                EntityID::NPC(npc_id) => {
+                    let mut npc = self.entity_map.get_npc_mut(npc_id).unwrap().clone();
+                    npc.tick(time, clients, self);
+                    *self.entity_map.get_npc_mut(npc_id).unwrap() = npc;
+                }
+            }
         }
     }
 }

@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, time::SystemTime};
 
 use crate::{
     chunk::{ChunkCoords, InstanceID},
@@ -9,7 +9,7 @@ use crate::{
         ClientMap,
     },
     state::shard::ShardServerState,
-    CombatStats, Combatant, Entity, EntityID, Position,
+    CombatStats, Combatant, Entity, EntityID, Path, Position,
 };
 
 #[derive(Debug, Clone)]
@@ -86,6 +86,10 @@ impl Entity for NPC {
     fn send_exit(&self, client: &mut FFClient) -> FFResult<()> {
         let pkt = sP_FE2CL_NPC_EXIT { iNPC_ID: self.id };
         client.send_packet(PacketID::P_FE2CL_NPC_EXIT, &pkt)
+    }
+
+    fn tick(&mut self, _time: SystemTime, _clients: &mut ClientMap, _state: &mut ShardServerState) {
+        // TODO
     }
 
     fn cleanup(&mut self, _clients: &mut ClientMap, _state: &mut ShardServerState) {}

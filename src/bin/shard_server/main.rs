@@ -70,6 +70,14 @@ fn main() -> Result<()> {
         Duration::from_secs(60),
         false,
     );
+    timers.register_timer(
+        |t, srv, st| {
+            st.as_shard().tick_entities(t, &mut srv.get_client_map());
+            Ok(())
+        },
+        Duration::from_millis(200),
+        false,
+    );
 
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();

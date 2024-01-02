@@ -634,6 +634,7 @@ pub trait Entity {
     fn send_enter(&self, client: &mut FFClient) -> FFResult<()>;
     fn send_exit(&self, client: &mut FFClient) -> FFResult<()>;
 
+    fn tick(&mut self, time: SystemTime, clients: &mut ClientMap, state: &mut ShardServerState);
     fn cleanup(&mut self, clients: &mut ClientMap, state: &mut ShardServerState);
 
     fn as_any(&self) -> &dyn Any;

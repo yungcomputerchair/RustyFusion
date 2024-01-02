@@ -1,4 +1,4 @@
-use std::{any::Any, cmp::max, fmt::Display};
+use std::{any::Any, cmp::max, fmt::Display, time::SystemTime};
 
 use crate::{
     chunk::{ChunkCoords, InstanceID},
@@ -871,6 +871,10 @@ impl Entity for Player {
             };
             let _ = client_other.send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL, &pkt_cancel);
         }
+    }
+
+    fn tick(&mut self, _time: SystemTime, _clients: &mut ClientMap, _state: &mut ShardServerState) {
+        // TODO
     }
 
     fn as_any(&self) -> &dyn Any {
