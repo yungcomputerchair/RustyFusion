@@ -131,7 +131,19 @@ impl Path {
         }
     }
 
-    pub fn tick(&mut self, pos: &mut Position) {
+    fn advance(&mut self) {
+        self.idx += 1;
+        if self.idx == self.points.len() {
+            if self.cycle {
+                self.idx = 0;
+            } else {
+                self.idx -= 1; // hold last point as target
+                self.state = PathState::Done;
+            }
+        }
+    }
+
+    pub fn tick(&mut self, pos: &mut Position) -> bool {
         match self.state {
             PathState::Pending => {
                 self.idx = 0;
@@ -145,42 +157,29 @@ impl Path {
                 let delta = vec3_sub(target_pos.into(), source_pos.into());
                 let delta_len = vec3_len(delta);
                 if delta_len <= dist {
+                    // reached target
                     *pos = target_pos;
                     if target_point.stop_ticks > 0 {
                         self.state = PathState::Waiting(target_point.stop_ticks);
                     } else {
-                        self.idx += 1;
-                        if self.idx == self.points.len() {
-                            if self.cycle {
-                                self.idx = 0;
-                            } else {
-                                self.idx -= 1; // hold last point as target
-                                self.state = PathState::Done;
-                            }
-                        }
+                        self.advance();
+                        return true;
                     }
                 } else {
                     *pos = vec3_add(source_pos.into(), vec3_scale(delta, dist / delta_len)).into();
                 }
             }
             PathState::Waiting(ticks_left) => {
-                if ticks_left == 0 {
+                if ticks_left == 1 {
                     self.state = PathState::Moving;
-                    self.idx += 1;
-                    if self.idx == self.points.len() {
-                        if self.cycle {
-                            self.idx = 0;
-                        } else {
-                            self.idx -= 1;
-                            self.state = PathState::Done;
-                        }
-                    }
+                    self.advance();
                 } else {
                     self.state = PathState::Waiting(ticks_left - 1);
                 }
             }
             PathState::Done => {}
-        }
+        };
+        false
     }
 }
 

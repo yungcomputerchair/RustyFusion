@@ -118,7 +118,7 @@ impl Entity for NPC {
                 .entity_map
                 .for_each_around(self.get_id(), clients, |c| {
                     let _ = c.send_packet(PacketID::P_FE2CL_NPC_MOVE, &pkt);
-                })
+                });
         }
     }
 
