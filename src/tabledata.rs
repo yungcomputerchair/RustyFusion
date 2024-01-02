@@ -443,6 +443,10 @@ impl TableData {
             rolled_item_ref.ItemID as i16,
         ))
     }
+
+    pub fn get_npc_path(&self, npc_type: i32) -> Option<Path> {
+        self.path_data.npc_paths.get(&npc_type).cloned()
+    }
 }
 
 pub fn tdata_init() -> &'static TableData {
@@ -1369,7 +1373,15 @@ fn load_path_data() -> Result<PathData, String> {
                         stop_ticks: point.iStopTicks.unwrap(),
                     });
                 }
-                let npc_path = Path::new(points, true);
+                let cycle = if points[0] == points[points.len() - 1] {
+                    // cyclic NPC paths in tdata have the starting point
+                    // duplicated at the end, but this messes up our math.
+                    points.pop();
+                    true
+                } else {
+                    false
+                };
+                let npc_path = Path::new(points, cycle);
                 for npc_type in &npc_path_entry.aNPCTypes {
                     npc_paths.insert(*npc_type, npc_path.clone());
                 }

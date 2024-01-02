@@ -5,7 +5,9 @@ use crate::{
     error::FFResult,
     net::{
         ffclient::FFClient,
-        packet::{sNPCAppearanceData, sP_FE2CL_NPC_ENTER, sP_FE2CL_NPC_EXIT, PacketID},
+        packet::{
+            sNPCAppearanceData, sP_FE2CL_NPC_ENTER, sP_FE2CL_NPC_EXIT, sP_FE2CL_NPC_MOVE, PacketID,
+        },
         ClientMap,
     },
     state::shard::ShardServerState,
@@ -22,6 +24,7 @@ pub struct NPC {
     combat_stats: Option<CombatStats>,
     pub follower_ids: HashSet<i32>,
     pub leader_id: Option<i32>,
+    pub path: Option<Path>,
 }
 impl NPC {
     pub fn new(id: i32, ty: i32, position: Position, angle: i32, instance_id: InstanceID) -> Self {
@@ -34,7 +37,12 @@ impl NPC {
             combat_stats: None,
             follower_ids: HashSet::new(),
             leader_id: None,
+            path: None,
         }
+    }
+
+    pub fn set_path(&mut self, path: Path) {
+        self.path = Some(path);
     }
 
     fn get_appearance_data(&self) -> sNPCAppearanceData {
@@ -88,8 +96,30 @@ impl Entity for NPC {
         client.send_packet(PacketID::P_FE2CL_NPC_EXIT, &pkt)
     }
 
-    fn tick(&mut self, _time: SystemTime, _clients: &mut ClientMap, _state: &mut ShardServerState) {
-        // TODO
+    fn tick(&mut self, _time: SystemTime, clients: &mut ClientMap, state: &mut ShardServerState) {
+        const RUN_SPEED: i32 = 400;
+        if let Some(path) = self.path.as_mut() {
+            path.tick(&mut self.position);
+            let speed = path.get_speed();
+            let chunk_pos = self.get_chunk_coords();
+            state
+                .entity_map
+                .update(self.get_id(), Some(chunk_pos), Some(clients));
+
+            let pkt = sP_FE2CL_NPC_MOVE {
+                iNPC_ID: self.id,
+                iToX: self.position.x,
+                iToY: self.position.y,
+                iToZ: self.position.z,
+                iSpeed: speed,
+                iMoveStyle: if speed > RUN_SPEED { 1 } else { 0 },
+            };
+            state
+                .entity_map
+                .for_each_around(self.get_id(), clients, |c| {
+                    let _ = c.send_packet(PacketID::P_FE2CL_NPC_MOVE, &pkt);
+                })
+        }
     }
 
     fn cleanup(&mut self, _clients: &mut ClientMap, _state: &mut ShardServerState) {}

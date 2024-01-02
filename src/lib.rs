@@ -17,6 +17,7 @@ use net::{
 use player::Player;
 use state::shard::ShardServerState;
 use tabledata::{tdata_get, NanoStats};
+use vecmath::{vec3_add, vec3_len, vec3_scale, vec3_sub, Vector3};
 
 use crate::enums::ItemLocation;
 
@@ -52,7 +53,7 @@ pub mod chunk;
 pub mod npc;
 pub mod player;
 
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
 pub struct Position {
     pub x: i32,
     pub y: i32,
@@ -66,6 +67,20 @@ impl Position {
         ((dx * dx + dy * dy + dz * dz) as f32).sqrt() as u32
     }
 }
+impl From<Vector3<f32>> for Position {
+    fn from(value: Vector3<f32>) -> Self {
+        Self {
+            x: value[0] as i32,
+            y: value[1] as i32,
+            z: value[2] as i32,
+        }
+    }
+}
+impl From<Position> for Vector3<f32> {
+    fn from(value: Position) -> Self {
+        [value.x as f32, value.y as f32, value.z as f32]
+    }
+}
 
 #[derive(Debug, Copy, Clone)]
 pub struct PathPoint {
@@ -73,13 +88,27 @@ pub struct PathPoint {
     pub speed: i32, // from previous point
     pub stop_ticks: usize,
 }
+impl PartialEq for PathPoint {
+    fn eq(&self, other: &Self) -> bool {
+        self.pos == other.pos
+    }
+}
+impl Eq for PathPoint {}
+
+#[derive(Debug, Clone)]
+pub enum PathState {
+    Pending,
+    Moving,
+    Waiting(usize),
+    Done,
+}
 
 #[derive(Debug, Clone)]
 pub struct Path {
     points: Vec<PathPoint>,
     cycle: bool,
     idx: usize,
-    waiting_ticks: usize,
+    state: PathState,
 }
 impl Path {
     pub fn new(points: Vec<PathPoint>, cycle: bool) -> Self {
@@ -87,30 +116,71 @@ impl Path {
             points,
             cycle,
             idx: 0,
-            waiting_ticks: 0,
+            state: PathState::Pending,
         }
     }
 
-    pub fn reset(&mut self) {
-        self.idx = 0;
-        self.waiting_ticks = 0;
+    pub fn get_target_pos(&self) -> Position {
+        self.points[self.idx].pos
     }
 
-    pub fn get_next(&mut self) -> Option<PathPoint> {
-        if self.waiting_ticks > 0 {
-            self.waiting_ticks -= 1;
-            return None;
+    pub fn get_speed(&self) -> i32 {
+        match self.state {
+            PathState::Moving => self.points[self.idx].speed,
+            _ => 0,
         }
+    }
 
-        if self.idx == self.points.len() && self.cycle {
-            self.idx = 0;
+    pub fn tick(&mut self, pos: &mut Position) {
+        match self.state {
+            PathState::Pending => {
+                self.idx = 0;
+                self.state = PathState::Moving;
+            }
+            PathState::Moving => {
+                let dist = self.points[self.idx].speed as f32;
+                let target_point = self.points[self.idx];
+                let target_pos = target_point.pos;
+                let source_pos = *pos;
+                let delta = vec3_sub(target_pos.into(), source_pos.into());
+                let delta_len = vec3_len(delta);
+                if delta_len <= dist {
+                    *pos = target_pos;
+                    if target_point.stop_ticks > 0 {
+                        self.state = PathState::Waiting(target_point.stop_ticks);
+                    } else {
+                        self.idx += 1;
+                        if self.idx == self.points.len() {
+                            if self.cycle {
+                                self.idx = 0;
+                            } else {
+                                self.idx -= 1; // hold last point as target
+                                self.state = PathState::Done;
+                            }
+                        }
+                    }
+                } else {
+                    *pos = vec3_add(source_pos.into(), vec3_scale(delta, dist / delta_len)).into();
+                }
+            }
+            PathState::Waiting(ticks_left) => {
+                if ticks_left == 0 {
+                    self.state = PathState::Moving;
+                    self.idx += 1;
+                    if self.idx == self.points.len() {
+                        if self.cycle {
+                            self.idx = 0;
+                        } else {
+                            self.idx -= 1;
+                            self.state = PathState::Done;
+                        }
+                    }
+                } else {
+                    self.state = PathState::Waiting(ticks_left - 1);
+                }
+            }
+            PathState::Done => {}
         }
-
-        self.points.get(self.idx).map(|point| {
-            self.idx += 1;
-            self.waiting_ticks = point.stop_ticks;
-            *point
-        })
     }
 }
 

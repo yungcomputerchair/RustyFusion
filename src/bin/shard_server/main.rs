@@ -75,7 +75,7 @@ fn main() -> Result<()> {
             st.as_shard().tick_entities(t, &mut srv.get_client_map());
             Ok(())
         },
-        Duration::from_millis(200),
+        Duration::from_secs(1),
         false,
     );
 
