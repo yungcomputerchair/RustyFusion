@@ -357,13 +357,15 @@ impl EntityMap {
             }
         }
 
-        log(
-            Severity::Debug,
-            &match self.registry[&id].chunk {
-                Some(coords) => format!("Moved to {}", coords),
-                None => "Removed".to_string(),
-            },
-        );
+        // if let EntityID::Player(pc_id) = id {
+        //     log(
+        //         Severity::Debug,
+        //         &match self.registry[&id].chunk {
+        //             Some(coords) => format!("Moved {} to {}", pc_id, coords),
+        //             None => format!("Removed {} from map", pc_id),
+        //         },
+        //     );
+        // }
     }
 
     pub fn for_each_around(
