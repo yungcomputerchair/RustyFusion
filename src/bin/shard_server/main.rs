@@ -10,6 +10,7 @@ use std::{
 
 use rusty_fusion::{
     config::{config_get, config_init},
+    database::db_init,
     error::{log, logger_flush, logger_flush_scheduled, logger_init, FFError, FFResult, Severity},
     net::{
         crypto::{gen_key, EncryptionMode},
@@ -24,7 +25,7 @@ use rusty_fusion::{
     state::{shard::ShardServerState, ServerState},
     tabledata::tdata_init,
     timer::TimerMap,
-    unused, Entity, EntityID, database::db_init,
+    unused, Entity, EntityID,
 };
 
 fn main() -> Result<()> {
