@@ -7,6 +7,7 @@ use postgres::{tls, types::ToSql, Client, Row};
 
 use crate::{
     config::config_get,
+    defines::{DB_VERSION, PROTOCOL_VERSION},
     error::{log, Severity},
 };
 
@@ -43,7 +44,7 @@ impl Database {
         }
     }
 
-    pub fn run(&mut self, name: &str, mut params: &[&(dyn ToSql + Sync)]) -> u64 {
+    pub fn exec(&mut self, name: &str, mut params: &[&(dyn ToSql + Sync)]) -> u64 {
         let queries = Self::read_sql(name);
         let queries = queries.split(';');
         let mut tsct = match self.get().transaction() {
@@ -58,7 +59,7 @@ impl Database {
             if query.trim().is_empty() {
                 continue;
             }
-            println!("{}", query);
+            //println!("{}", query);
             let num_params = query.char_indices().filter(|(_, c)| *c == '$').count();
             match tsct.execute(query, &params[..num_params]) {
                 Ok(r) => {
@@ -123,7 +124,7 @@ pub fn db_init() -> MutexGuard<'static, Database> {
             Severity::Info,
             "Meta table missing; initializing database...",
         );
-        db.run("create_meta_table", &[&104_i32, &1_i32]);
+        db.exec("create_tables", &[&PROTOCOL_VERSION, &DB_VERSION]);
     }
 
     db
