@@ -47,6 +47,7 @@ pub mod timer;
 pub mod util;
 
 pub mod config;
+pub mod database;
 pub mod tabledata;
 
 pub mod chunk;

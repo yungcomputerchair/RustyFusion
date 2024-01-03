@@ -24,7 +24,7 @@ use rusty_fusion::{
     state::{shard::ShardServerState, ServerState},
     tabledata::tdata_init,
     timer::TimerMap,
-    unused, Entity, EntityID,
+    unused, Entity, EntityID, database::db_init,
 };
 
 fn main() -> Result<()> {
@@ -32,6 +32,7 @@ fn main() -> Result<()> {
 
     let config = config_init();
     logger_init(config.shard.log_path.get());
+    drop(db_init());
     tdata_init();
 
     let polling_interval = Duration::from_millis(50);

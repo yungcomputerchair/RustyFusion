@@ -10,6 +10,7 @@ use std::{
 
 use rusty_fusion::{
     config::config_init,
+    database::db_init,
     error::{log, logger_flush, logger_flush_scheduled, logger_init, FFError, FFResult, Severity},
     net::{
         crypto::{gen_key, DEFAULT_KEY},
@@ -32,6 +33,7 @@ fn main() -> Result<()> {
 
     let config = config_init();
     logger_init(config.login.log_path.get());
+    drop(db_init());
     tdata_init();
 
     let polling_interval = Duration::from_millis(50);
