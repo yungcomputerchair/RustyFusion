@@ -8,7 +8,10 @@ use postgres::{tls, types::ToSql, Client, Row};
 use crate::{
     config::config_get,
     defines::{DB_VERSION, PROTOCOL_VERSION},
-    error::{log, Severity},
+    error::{log, FFResult, Severity},
+    net::packet::sPCStyle,
+    player::Player,
+    util, Entity, Position,
 };
 
 pub struct Database {
@@ -79,6 +82,42 @@ impl Database {
                 panic!();
             }
         }
+    }
+
+    pub fn load_player(&mut self, row: &Row) -> FFResult<Player> {
+        let pc_uid = row.get("PlayerId");
+        let mut player = Player::new(pc_uid);
+        player.set_position(Position {
+            x: row.get("XCoordinate"),
+            y: row.get("YCoodinate"),
+            z: row.get("ZCoordinate"),
+        });
+        let first_name = row.get("FirstName");
+        let last_name = row.get("LastName");
+        let name_check = row.get("NameCheck");
+        player.set_name(
+            name_check,
+            util::encode_utf16(first_name),
+            util::encode_utf16(last_name),
+        );
+        player.set_level(row.get("Level"));
+        let style = sPCStyle {
+            iPC_UID: todo!(),
+            iNameCheck: todo!(),
+            szFirstName: todo!(),
+            szLastName: todo!(),
+            iGender: todo!(),
+            iFaceStyle: todo!(),
+            iHairStyle: todo!(),
+            iHairColor: todo!(),
+            iSkinColor: todo!(),
+            iEyeColor: todo!(),
+            iHeight: todo!(),
+            iBody: todo!(),
+            iClass: todo!(),
+        };
+
+        Ok(player)
     }
 }
 

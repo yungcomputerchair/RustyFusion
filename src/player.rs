@@ -166,18 +166,6 @@ impl Player {
     pub fn new(uid: i64) -> Self {
         Self {
             uid,
-            client_id: None,
-            combat_stats: CombatStats {
-                max_hp: placeholder!(100),
-                hp: placeholder!(100),
-                level: 1,
-            },
-            position: Position {
-                x: placeholder!(632032),
-                y: placeholder!(187177),
-                z: placeholder!(-5500),
-            },
-            pre_warp_map_num: ID_OVERWORLD,
             ..Default::default()
         }
     }
