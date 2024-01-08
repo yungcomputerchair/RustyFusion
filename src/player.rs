@@ -16,7 +16,7 @@ use crate::{
     },
     state::shard::ShardServerState,
     util::parse_utf16,
-    CombatStats, Combatant, Entity, EntityID, Item, Mission, Nano, Position,
+    Combatant, Entity, EntityID, Item, Mission, Nano, Position,
 };
 
 use num_traits::{clamp, clamp_max, clamp_min};
@@ -147,7 +147,8 @@ pub struct Player {
     flags: PlayerFlags,
     name: PlayerName,
     special_state: i8,
-    combat_stats: CombatStats,
+    level: i16,
+    hp: i32,
     guide_data: GuideData,
     nano_data: Nanocom,
     mission_data: MissionData,
@@ -345,10 +346,10 @@ impl Player {
             iUserLevel: self.perms,
             PCStyle: self.get_style(),
             PCStyle2: self.get_style_2(),
-            iLevel: self.combat_stats.level,
+            iLevel: self.level,
             iMentor: self.guide_data.current_guide as i16,
             iMentorCount: self.guide_data.total_guides as i16,
-            iHP: self.combat_stats.hp,
+            iHP: self.hp,
             iBatteryW: self.weapon_boosts as i32,
             iBatteryN: self.nano_potions as i32,
             iCandy: self.taros as i32,
@@ -411,8 +412,8 @@ impl Player {
             iConditionBitFlag: self.get_condition_bit_flag(),
             iPCState: self.get_state_bit_flag(),
             iSpecialState: self.special_state,
-            iLv: self.combat_stats.level,
-            iHP: self.combat_stats.hp,
+            iLv: self.level,
+            iHP: self.hp,
             iMapNum: self.get_mapnum(),
             iX: self.position.x,
             iY: self.position.y,
@@ -717,13 +718,13 @@ impl Player {
     }
 
     pub fn set_hp(&mut self, hp: i32) -> i32 {
-        self.combat_stats.hp = clamp_min(hp, 0);
-        self.combat_stats.hp
+        self.hp = clamp_min(hp, 0);
+        self.hp
     }
 
     pub fn set_level(&mut self, level: i16) -> i16 {
-        self.combat_stats.level = clamp(level, 1, PC_LEVEL_MAX as i16);
-        self.combat_stats.level
+        self.level = clamp(level, 1, PC_LEVEL_MAX as i16);
+        self.level
     }
 
     pub fn set_fusion_matter(&mut self, fusion_matter: u32) -> u32 {
@@ -786,15 +787,15 @@ impl Combatant for Player {
     }
 
     fn get_level(&self) -> i16 {
-        self.combat_stats.level
+        self.level
     }
 
     fn get_hp(&self) -> i32 {
-        self.combat_stats.hp
+        self.hp
     }
 
     fn get_max_hp(&self) -> i32 {
-        self.combat_stats.max_hp
+        placeholder!(400)
     }
 }
 impl Entity for Player {

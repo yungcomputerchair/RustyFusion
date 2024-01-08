@@ -711,22 +711,6 @@ pub trait Entity {
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
-#[derive(Debug, Copy, Clone)]
-struct CombatStats {
-    level: i16,
-    max_hp: i32,
-    hp: i32,
-}
-impl Default for CombatStats {
-    fn default() -> Self {
-        Self {
-            level: 1,
-            max_hp: 400,
-            hp: 400,
-        }
-    }
-}
-
 pub trait Combatant {
     fn get_condition_bit_flag(&self) -> i32;
     fn get_level(&self) -> i16;

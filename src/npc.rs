@@ -11,7 +11,7 @@ use crate::{
         ClientMap,
     },
     state::shard::ShardServerState,
-    CombatStats, Combatant, Entity, EntityID, Path, Position,
+    Combatant, Entity, EntityID, Path, Position,
 };
 
 #[derive(Debug, Clone)]
@@ -21,7 +21,6 @@ pub struct NPC {
     position: Position,
     rotation: i32,
     pub instance_id: InstanceID,
-    combat_stats: Option<CombatStats>,
     pub follower_ids: HashSet<i32>,
     pub leader_id: Option<i32>,
     pub path: Option<Path>,
@@ -34,7 +33,6 @@ impl NPC {
             position,
             rotation: angle % 360,
             instance_id,
-            combat_stats: None,
             follower_ids: HashSet::new(),
             leader_id: None,
             path: None,
@@ -138,14 +136,14 @@ impl Combatant for NPC {
     }
 
     fn get_level(&self) -> i16 {
-        self.combat_stats.unwrap_or_default().level
+        placeholder!(1)
     }
 
     fn get_hp(&self) -> i32 {
-        self.combat_stats.unwrap_or_default().hp
+        placeholder!(400)
     }
 
     fn get_max_hp(&self) -> i32 {
-        self.combat_stats.unwrap_or_default().max_hp
+        placeholder!(400)
     }
 }
