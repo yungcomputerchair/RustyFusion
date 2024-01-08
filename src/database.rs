@@ -8,7 +8,7 @@ use postgres::{tls, types::ToSql, Client, Row};
 use crate::{
     config::config_get,
     defines::{DB_VERSION, PROTOCOL_VERSION},
-    error::{log, FFResult, Severity},
+    error::{log, Severity},
     player::{Player, PlayerFlags, PlayerStyle},
     util, Entity, Position,
 };
@@ -83,14 +83,20 @@ impl Database {
         }
     }
 
-    pub fn load_player(&mut self, row: &Row) -> FFResult<Player> {
+    pub fn load_player(&mut self, row: &Row) -> Player {
         let pc_uid = row.get("PlayerId");
         let mut player = Player::new(pc_uid);
-        player.set_position(Position {
-            x: row.get("XCoordinate"),
-            y: row.get("YCoodinate"),
-            z: row.get("ZCoordinate"),
-        });
+        player.style = PlayerStyle {
+            gender: row.get("Gender"),
+            face_style: row.get("FaceStyle"),
+            hair_style: row.get("HairStyle"),
+            hair_color: row.get("HairColor"),
+            skin_color: row.get("SkinColor"),
+            eye_color: row.get("EyeColor"),
+            height: row.get("Height"),
+            body: row.get("Body"),
+        };
+
         let first_name = row.get("FirstName");
         let last_name = row.get("LastName");
         let name_check = row.get("NameCheck");
@@ -99,24 +105,44 @@ impl Database {
             util::encode_utf16(first_name),
             util::encode_utf16(last_name),
         );
-        player.set_level(row.get("Level"));
-        let style = sPCStyle {
-            iPC_UID: todo!(),
-            iNameCheck: todo!(),
-            szFirstName: todo!(),
-            szLastName: todo!(),
-            iGender: todo!(),
-            iFaceStyle: todo!(),
-            iHairStyle: todo!(),
-            iHairColor: todo!(),
-            iSkinColor: todo!(),
-            iEyeColor: todo!(),
-            iHeight: todo!(),
-            iBody: todo!(),
-            iClass: todo!(),
-        };
 
-        Ok(player)
+        player.set_position(Position {
+            x: row.get("XCoordinate"),
+            y: row.get("YCoodinate"),
+            z: row.get("ZCoordinate"),
+        });
+        player.set_rotation(row.get("Angle"));
+
+        player.set_taros(row.get("Taros"));
+        player.set_fusion_matter(row.get("FusionMatter"));
+        player.set_level(row.get("Level"));
+        player.set_hp(row.get("HP"));
+        player.set_weapon_boosts(row.get("BatteryW"));
+        player.set_nano_potions(row.get("BatteryN"));
+
+        let nano_col_names = ["Nano1", "Nano2", "Nano3"];
+        for (slot, col_name) in nano_col_names.iter().enumerate() {
+            let nano_id = row.get(col_name);
+            player
+                .change_nano(slot, if nano_id == 0 { None } else { Some(nano_id) })
+                .unwrap();
+        }
+
+        let mut player_flags = PlayerFlags::default();
+        let first_use_bytes: &[u8] = row.get("FirstUseFlag");
+        player_flags.tip_flags = i128::from_le_bytes(first_use_bytes[..16].try_into().unwrap());
+        player_flags.appearance_flag = row.get("AppearanceFlag");
+        player_flags.tutorial_flag = row.get("TutorialFlag");
+        player.flags = player_flags;
+
+        let skyway_bytes: &[u8] = row.get("SkywayLocationFlag");
+        player.set_skyway_flags([
+            i64::from_le_bytes(skyway_bytes[..8].try_into().unwrap()),
+            i64::from_le_bytes(skyway_bytes[8..16].try_into().unwrap()),
+        ]);
+        player.set_scamper_flag(row.get("WarpLocationFlag"));
+
+        player
     }
 }
 
