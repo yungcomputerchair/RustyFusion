@@ -9,8 +9,7 @@ use crate::{
     config::config_get,
     defines::{DB_VERSION, PROTOCOL_VERSION},
     error::{log, FFResult, Severity},
-    net::packet::sPCStyle,
-    player::Player,
+    player::{Player, PlayerFlags, PlayerStyle},
     util, Entity, Position,
 };
 

@@ -26,15 +26,32 @@ use uuid::Uuid;
 pub const TEST_ACC_UID_START: i64 = i64::MAX - 3;
 
 #[derive(Debug, Clone, Copy)]
-struct PlayerStyle {
-    gender: i8,
-    face_style: i8,
-    hair_style: i8,
-    hair_color: i8,
-    skin_color: i8,
-    eye_color: i8,
-    height: i8,
-    body: i8,
+pub struct PlayerStyle {
+    pub gender: i8,
+    pub face_style: i8,
+    pub hair_style: i8,
+    pub hair_color: i8,
+    pub skin_color: i8,
+    pub eye_color: i8,
+    pub height: i8,
+    pub body: i8,
+}
+impl TryFrom<sPCStyle> for PlayerStyle {
+    type Error = FFError;
+
+    fn try_from(style: sPCStyle) -> FFResult<Self> {
+        // TODO style validation
+        Ok(Self {
+            gender: style.iGender,
+            face_style: style.iFaceStyle,
+            hair_style: style.iHairStyle,
+            hair_color: style.iHairColor,
+            skin_color: style.iSkinColor,
+            eye_color: style.iEyeColor,
+            height: style.iHeight,
+            body: style.iBody,
+        })
+    }
 }
 impl Default for PlayerStyle {
     fn default() -> Self {
@@ -52,15 +69,11 @@ impl Default for PlayerStyle {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
-struct PlayerFlags {
-    appearance_flag: bool,
-    tutorial_flag: bool,
-    payzone_flag: bool,
-    tip_flags: i128,
-    scamper_flags: i32,
-    skyway_flags: [i64; WYVERN_LOCATION_FLAG_SIZE as usize],
-    mission_flags: [i64; SIZEOF_QUESTFLAG_NUMBER as usize],
-    repeat_mission_flags: [i64; SIZEOF_REPEAT_QUESTFLAG_NUMBER as usize],
+pub struct PlayerFlags {
+    pub appearance_flag: bool,
+    pub tutorial_flag: bool,
+    pub payzone_flag: bool,
+    pub tip_flags: i128,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -94,6 +107,47 @@ impl Default for GuideData {
     }
 }
 
+#[derive(Debug, Default, Clone, Copy)]
+struct TransportData {
+    pub scamper_flags: i32,
+    pub skyway_flags: [i64; WYVERN_LOCATION_FLAG_SIZE as usize],
+}
+impl TransportData {
+    pub fn set_all(&mut self) {
+        self.scamper_flags = -1;
+        self.skyway_flags = [-1; WYVERN_LOCATION_FLAG_SIZE as usize];
+    }
+
+    pub fn set_scamper_flag(&mut self, bit_offset: i32) -> FFResult<i32> {
+        if !(1..=32).contains(&bit_offset) {
+            Err(FFError::build(
+                Severity::Warning,
+                format!("Scamper flag offset out of range: {}", bit_offset),
+            ))
+        } else {
+            self.scamper_flags |= 1 << (bit_offset - 1);
+            Ok(self.scamper_flags)
+        }
+    }
+
+    pub fn set_skyway_flag(
+        &mut self,
+        bit_offset: i32,
+    ) -> FFResult<[i64; WYVERN_LOCATION_FLAG_SIZE as usize]> {
+        if !(1..=(WYVERN_LOCATION_FLAG_SIZE as i32 * 64)).contains(&bit_offset) {
+            Err(FFError::build(
+                Severity::Warning,
+                format!("Skyway flag offset out of range: {}", bit_offset),
+            ))
+        } else {
+            let idx = if bit_offset > 32 { 1 } else { 0 };
+            let offset = (bit_offset - 1) % 32;
+            self.skyway_flags[idx] = 1 << offset;
+            Ok(self.skyway_flags)
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct Nanocom {
     nano_inventory: [Option<Nano>; SIZEOF_NANO_BANK_SLOT as usize],
@@ -114,6 +168,8 @@ impl Default for Nanocom {
 struct MissionData {
     current_missions: [Option<Mission>; SIZEOF_RQUEST_SLOT as usize],
     active_mission_id: i32,
+    mission_flags: [i64; SIZEOF_QUESTFLAG_NUMBER as usize],
+    repeat_mission_flags: [i64; SIZEOF_REPEAT_QUESTFLAG_NUMBER as usize],
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -143,8 +199,8 @@ pub struct Player {
     position: Position,
     rotation: i32,
     pub instance_id: InstanceID,
-    style: PlayerStyle,
-    flags: PlayerFlags,
+    pub style: PlayerStyle,
+    pub flags: PlayerFlags,
     name: PlayerName,
     special_state: i8,
     level: i16,
@@ -158,6 +214,7 @@ pub struct Player {
     nano_potions: u32,
     weapon_boosts: u32,
     buddy_warp_time: i32,
+    transport_data: TransportData,
     pub trade_id: Option<Uuid>,
     pub trade_offered_to: Option<i32>,
     pub vehicle_speed: Option<i32>,
@@ -199,19 +256,6 @@ impl Player {
             iHeight: self.style.height,
             iBody: self.style.body,
             iClass: unused!(),
-        }
-    }
-
-    pub fn set_style(&mut self, style: sPCStyle) {
-        self.style = PlayerStyle {
-            gender: style.iGender,
-            face_style: style.iFaceStyle,
-            hair_style: style.iHairStyle,
-            hair_color: style.iHairColor,
-            skin_color: style.iSkinColor,
-            eye_color: style.iEyeColor,
-            height: style.iHeight,
-            body: style.iBody,
         }
     }
 
@@ -378,21 +422,21 @@ impl Player {
                 iValue: placeholder!(0),
                 iConfirmNum: placeholder!(0),
             },
-            aQuestFlag: self.flags.mission_flags,
-            aRepeatQuestFlag: self.flags.repeat_mission_flags,
+            aQuestFlag: self.mission_data.mission_flags,
+            aRepeatQuestFlag: self.mission_data.repeat_mission_flags,
             aRunningQuest: self
                 .mission_data
                 .current_missions
                 .map(Option::<Mission>::into),
             iCurrentMissionID: self.mission_data.active_mission_id,
-            iWarpLocationFlag: self.flags.scamper_flags,
-            aWyvernLocationFlag: self.flags.skyway_flags,
+            iWarpLocationFlag: self.transport_data.scamper_flags,
+            aWyvernLocationFlag: self.transport_data.skyway_flags,
             iBuddyWarpTime: self.buddy_warp_time,
             iFatigue: unused!(),
             iFatigue_Level: unused!(),
             iFatigueRate: unused!(),
             iFirstUseFlag1: self.flags.tip_flags as i64,
-            iFirstUseFlag2: (self.flags.tip_flags >> 8) as i64,
+            iFirstUseFlag2: (self.flags.tip_flags >> 64) as i64,
             aiPCSkill: [unused!(); 33],
         }
     }
@@ -640,43 +684,33 @@ impl Player {
     }
 
     pub fn get_scamper_flags(&self) -> i32 {
-        self.flags.scamper_flags
+        self.transport_data.scamper_flags
     }
 
     pub fn get_skyway_flags(&self) -> [i64; WYVERN_LOCATION_FLAG_SIZE as usize] {
-        self.flags.skyway_flags
+        self.transport_data.skyway_flags
+    }
+
+    pub fn set_scamper_flag(&mut self, flags: i32) {
+        self.transport_data.scamper_flags = flags;
+    }
+
+    pub fn set_skyway_flags(&mut self, flags: [i64; WYVERN_LOCATION_FLAG_SIZE as usize]) {
+        self.transport_data.skyway_flags = flags;
     }
 
     pub fn update_scamper_flags(&mut self, bit_offset: i32) -> FFResult<i32> {
-        if !(1..=32).contains(&bit_offset) {
-            Err(FFError::build(
-                Severity::Warning,
-                format!("Scamper flag offset out of range: {}", bit_offset),
-            ))
-        } else {
-            self.flags.scamper_flags |= 1 << (bit_offset - 1);
-            Ok(self.flags.scamper_flags)
-        }
+        self.transport_data.set_scamper_flag(bit_offset)
     }
 
     pub fn update_skyway_flags(
         &mut self,
         bit_offset: i32,
     ) -> FFResult<[i64; WYVERN_LOCATION_FLAG_SIZE as usize]> {
-        if !(1..=(WYVERN_LOCATION_FLAG_SIZE as i32 * 64)).contains(&bit_offset) {
-            Err(FFError::build(
-                Severity::Warning,
-                format!("Skyway flag offset out of range: {}", bit_offset),
-            ))
-        } else {
-            let idx = if bit_offset > 32 { 1 } else { 0 };
-            let offset = (bit_offset - 1) % 32;
-            self.flags.skyway_flags[idx] = 1 << offset;
-            Ok(self.flags.skyway_flags)
-        }
+        self.transport_data.set_skyway_flag(bit_offset)
     }
 
-    pub fn set_appearance_flag(&mut self) {
+    pub fn set_creation_done(&mut self) {
         self.flags.appearance_flag = true;
     }
 
@@ -757,12 +791,10 @@ impl Player {
             self.set_hp(i32::MAX);
             self.set_level(PC_LEVEL_MAX as i16);
             self.set_taros(PC_CANDY_MAX);
-            self.set_appearance_flag();
             self.set_tutorial_done();
             self.set_future_done();
-            self.flags.scamper_flags = -1;
+            self.transport_data.set_all();
             self.flags.tip_flags = -1;
-            self.flags.skyway_flags = [-1; WYVERN_LOCATION_FLAG_SIZE as usize];
 
             // unlock all nanos, tune to first skill
             for i in 1..SIZEOF_NANO_BANK_SLOT as i16 {

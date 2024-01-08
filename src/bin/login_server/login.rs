@@ -136,7 +136,7 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
 
     let pc_uid = pkt.PCStyle.iPC_UID;
     if let Some(player) = state.players.get_mut(&pc_uid) {
-        player.set_style(pkt.PCStyle);
+        player.style = pkt.PCStyle.try_into()?;
         player.set_item(
             ItemLocation::Equip,
             EQUIP_SLOT_UPPERBODY as usize,
