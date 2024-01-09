@@ -42,7 +42,7 @@ pub fn login(
     let account_id: i64 = account.get("AccountID");
     let last_player_slot: i32 = account.get("Selected");
 
-    let chars = db.query("get_char_info", &[&account_id]);
+    let chars = db.query("load_player", &[&account_id]);
     for player_info in &chars {
         let slot_num: i32 = player_info.get("Slot");
         let player = db.load_player(player_info);
@@ -118,7 +118,7 @@ pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> FF
 
     let pc_uid = util::get_uid();
     let slot_num = pkt.iSlotNum as usize;
-    if slot_num > 3 {
+    if !(1..=4).contains(&slot_num) {
         return Err(FFError::build(
             Severity::Warning,
             format!("Bad slot number {}", slot_num),
@@ -169,6 +169,7 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
             EQUIP_SLOT_FOOT as usize,
             Some(Item::new(ItemType::Foot, pkt.sOn_Item.iEquipFootID)),
         )?;
+        db.save_player(player);
 
         let resp = sP_LS2CL_REP_CHAR_CREATE_SUCC {
             iLevel: player.get_level(),

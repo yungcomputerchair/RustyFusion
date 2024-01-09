@@ -276,6 +276,14 @@ impl Player {
         self.instance_id.map_num as i32
     }
 
+    pub fn get_active_mission_id(&self) -> i32 {
+        self.mission_data.active_mission_id
+    }
+
+    pub fn get_mission_flags(&self) -> [i64; SIZEOF_QUESTFLAG_NUMBER as usize] {
+        self.mission_data.mission_flags
+    }
+
     pub fn change_nano(&mut self, slot: usize, nano_id: Option<i16>) -> FFResult<()> {
         if !(0..SIZEOF_NANO_CARRY_SLOT as usize).contains(&slot) {
             return Err(FFError::build(
@@ -390,6 +398,10 @@ impl Player {
         Ok(())
     }
 
+    pub fn get_equipped_nano_ids(&self) -> [u16; SIZEOF_NANO_CARRY_SLOT as usize] {
+        self.nano_data.equipped_ids.map(|id| id.unwrap_or(0) as u16)
+    }
+
     pub fn get_load_data(&self) -> sPCLoadData2CL {
         sPCLoadData2CL {
             iUserLevel: self.perms,
@@ -413,7 +425,7 @@ impl Player {
             aInven: self.inventory.main.map(Option::<Item>::into),
             aQInven: self.inventory.mission.map(Option::<Item>::into),
             aNanoBank: self.nano_data.nano_inventory.map(Option::<Nano>::into),
-            aNanoSlots: self.nano_data.equipped_ids.map(|id| id.unwrap_or(0) as u16),
+            aNanoSlots: self.get_equipped_nano_ids(),
             iActiveNanoSlotNum: match self.nano_data.active_slot {
                 Some(active_slot) => active_slot as i16,
                 None => -1,
@@ -745,6 +757,10 @@ impl Player {
             y: 187177 + rand.gen_range(-range..=range),
             z: -5500,
         }
+    }
+
+    pub fn get_guide(&self) -> PlayerGuide {
+        self.guide_data.current_guide
     }
 
     pub fn update_guide(&mut self, guide: PlayerGuide) -> usize {

@@ -15,6 +15,7 @@ use crate::{
 
 pub struct Database {
     client: Option<Client>,
+    transaction: bool, // explicit transaction
 }
 impl Database {
     fn get(&mut self) -> &mut Client {
@@ -46,15 +47,54 @@ impl Database {
         }
     }
 
+    pub fn begin_transaction(&mut self) {
+        if self.transaction {
+            log(
+                Severity::Fatal,
+                "Tried to begin transaction while already in one",
+            );
+            self.rollback_transaction();
+            panic!();
+        }
+        log(Severity::Debug, "Beginning transaction");
+        self.transaction = true;
+        self.get().execute("BEGIN", &[]).unwrap();
+    }
+
+    pub fn rollback_transaction(&mut self) {
+        if !self.transaction {
+            log(
+                Severity::Fatal,
+                "Tried to rollback transaction while not in one",
+            );
+            panic!();
+        }
+        self.transaction = false;
+        self.get().execute("ROLLBACK", &[]).unwrap();
+        log(Severity::Debug, "Rolled back transaction");
+    }
+
+    pub fn commit_transaction(&mut self) {
+        if !self.transaction {
+            log(
+                Severity::Fatal,
+                "Tried to commit transaction while not in one",
+            );
+            panic!();
+        }
+        self.transaction = false;
+        self.get().execute("COMMIT", &[]).unwrap();
+        log(Severity::Debug, "Committed transaction");
+    }
+
     pub fn exec(&mut self, name: &str, mut params: &[&(dyn ToSql + Sync)]) -> u64 {
         let queries = Self::read_sql(name);
-        let queries = queries.split(';');
-        let mut tsct = match self.get().transaction() {
-            Ok(t) => t,
-            Err(e) => {
-                log(Severity::Fatal, &format!("DB error: {}", e));
-                panic!();
-            }
+        let queries: Vec<&str> = queries.split(';').collect();
+        let implicit_transaction = if self.transaction || queries.len() < 2 {
+            false
+        } else {
+            self.begin_transaction();
+            true
         };
         let mut num_updated = 0;
         for query in queries {
@@ -63,24 +103,24 @@ impl Database {
             }
             //println!("{}", query);
             let num_params = query.char_indices().filter(|(_, c)| *c == '$').count();
-            match tsct.execute(query, &params[..num_params]) {
+            match self.get().execute(query, &params[..num_params]) {
                 Ok(r) => {
                     num_updated += r;
                     params = &params[num_params..];
                 }
                 Err(e) => {
                     log(Severity::Fatal, &format!("DB error: {}", e));
+                    if self.transaction {
+                        self.rollback_transaction();
+                    }
                     panic!();
                 }
             };
         }
-        match tsct.commit() {
-            Ok(_) => num_updated,
-            Err(e) => {
-                log(Severity::Fatal, &format!("DB error: {}", e));
-                panic!();
-            }
+        if implicit_transaction {
+            self.commit_transaction();
         }
+        num_updated
     }
 
     pub fn init_player(&mut self, acc_id: i64, slot: usize, player: &Player) {
@@ -194,9 +234,52 @@ impl Database {
 
         player
     }
+
+    pub fn save_player(&mut self, player: &Player) {
+        let mut skyway_bytes = Vec::new();
+        for sec in player.get_skyway_flags() {
+            skyway_bytes.extend_from_slice(&sec.to_le_bytes());
+        }
+
+        let mut quest_bytes = Vec::new();
+        for sec in player.get_mission_flags() {
+            quest_bytes.extend_from_slice(&sec.to_le_bytes());
+        }
+
+        self.exec(
+            "save_player",
+            &[
+                &player.get_uid(),
+                &(player.get_level() as i32),
+                &(player.get_equipped_nano_ids()[0] as i32),
+                &(player.get_equipped_nano_ids()[1] as i32),
+                &(player.get_equipped_nano_ids()[2] as i32),
+                &(player.flags.tutorial_flag as i32),
+                &(player.flags.payzone_flag as i32),
+                &player.get_position().x,
+                &player.get_position().y,
+                &player.get_position().z,
+                &player.get_rotation(),
+                &player.get_hp(),
+                &(player.get_fusion_matter() as i32),
+                &(player.get_taros() as i32),
+                &(player.get_weapon_boosts() as i32),
+                &(player.get_nano_potions() as i32),
+                &((player.get_guide() as i16) as i32),
+                &player.get_active_mission_id(),
+                &player.get_scamper_flags(),
+                &skyway_bytes,
+                &player.flags.tip_flags.to_le_bytes().as_slice(),
+                &quest_bytes,
+            ],
+        );
+    }
 }
 
-static DATABASE: Mutex<Database> = Mutex::new(Database { client: None });
+static DATABASE: Mutex<Database> = Mutex::new(Database {
+    client: None,
+    transaction: false,
+});
 
 pub fn db_init() -> MutexGuard<'static, Database> {
     const DB_NAME: &str = "rustyfusion";
@@ -221,6 +304,7 @@ pub fn db_init() -> MutexGuard<'static, Database> {
     let mut db = DATABASE.lock().unwrap();
     *db = Database {
         client: Some(db_client.unwrap()),
+        transaction: false,
     };
     log(
         Severity::Info,
