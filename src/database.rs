@@ -7,10 +7,10 @@ use postgres::{tls, types::ToSql, Client, Row};
 
 use crate::{
     config::config_get,
-    defines::{DB_VERSION, PROTOCOL_VERSION},
+    defines::{DB_VERSION, PROTOCOL_VERSION, SIZEOF_QUESTFLAG_NUMBER, WYVERN_LOCATION_FLAG_SIZE},
     error::{log, Severity},
     player::{Player, PlayerFlags, PlayerStyle},
-    util, Entity, Position,
+    util, Combatant, Entity, Position,
 };
 
 pub struct Database {
@@ -83,46 +83,70 @@ impl Database {
         }
     }
 
+    pub fn init_player(&mut self, acc_id: i64, slot: usize, player: &Player) {
+        self.exec(
+            "init_player",
+            &[
+                &player.get_uid(),
+                &acc_id,
+                &player.get_first_name(),
+                &player.get_last_name(),
+                &(player.get_style().iNameCheck as i32),
+                &(slot as i32),
+                &player.get_position().x,
+                &player.get_position().y,
+                &player.get_position().z,
+                &player.get_rotation(),
+                &player.get_hp(),
+                &[0_u8; (64 / 8) * WYVERN_LOCATION_FLAG_SIZE as usize].as_slice(),
+                &[0_u8; 128 / 8].as_slice(),
+                &[0_u8; (32 / 8) * SIZEOF_QUESTFLAG_NUMBER as usize].as_slice(),
+                //
+                &player.get_uid(),
+            ],
+        );
+    }
+
     pub fn load_player(&mut self, row: &Row) -> Player {
         let pc_uid = row.get("PlayerId");
         let mut player = Player::new(pc_uid);
         player.style = PlayerStyle {
-            gender: row.get("Gender"),
-            face_style: row.get("FaceStyle"),
-            hair_style: row.get("HairStyle"),
-            hair_color: row.get("HairColor"),
-            skin_color: row.get("SkinColor"),
-            eye_color: row.get("EyeColor"),
-            height: row.get("Height"),
-            body: row.get("Body"),
+            gender: row.get::<_, i32>("Gender") as i8,
+            face_style: row.get::<_, i32>("FaceStyle") as i8,
+            hair_style: row.get::<_, i32>("HairStyle") as i8,
+            hair_color: row.get::<_, i32>("HairColor") as i8,
+            skin_color: row.get::<_, i32>("SkinColor") as i8,
+            eye_color: row.get::<_, i32>("EyeColor") as i8,
+            height: row.get::<_, i32>("Height") as i8,
+            body: row.get::<_, i32>("Body") as i8,
         };
 
         let first_name = row.get("FirstName");
         let last_name = row.get("LastName");
-        let name_check = row.get("NameCheck");
+        let name_check: i32 = row.get("NameCheck");
         player.set_name(
-            name_check,
+            name_check as i8,
             util::encode_utf16(first_name),
             util::encode_utf16(last_name),
         );
 
         player.set_position(Position {
             x: row.get("XCoordinate"),
-            y: row.get("YCoodinate"),
+            y: row.get("YCoordinate"),
             z: row.get("ZCoordinate"),
         });
         player.set_rotation(row.get("Angle"));
 
-        player.set_taros(row.get("Taros"));
-        player.set_fusion_matter(row.get("FusionMatter"));
-        player.set_level(row.get("Level"));
+        player.set_taros(row.get::<_, i32>("Taros") as u32);
+        player.set_fusion_matter(row.get::<_, i32>("FusionMatter") as u32);
+        player.set_level(row.get::<_, i32>("Level") as i16);
         player.set_hp(row.get("HP"));
-        player.set_weapon_boosts(row.get("BatteryW"));
-        player.set_nano_potions(row.get("BatteryN"));
+        player.set_weapon_boosts(row.get::<_, i32>("BatteryW") as u32);
+        player.set_nano_potions(row.get::<_, i32>("BatteryN") as u32);
 
         let nano_col_names = ["Nano1", "Nano2", "Nano3"];
         for (slot, col_name) in nano_col_names.iter().enumerate() {
-            let nano_id = row.get(col_name);
+            let nano_id = row.get::<_, i32>(col_name) as i16;
             player
                 .change_nano(slot, if nano_id == 0 { None } else { Some(nano_id) })
                 .unwrap();
@@ -131,8 +155,8 @@ impl Database {
         let mut player_flags = PlayerFlags::default();
         let first_use_bytes: &[u8] = row.get("FirstUseFlag");
         player_flags.tip_flags = i128::from_le_bytes(first_use_bytes[..16].try_into().unwrap());
-        player_flags.appearance_flag = row.get("AppearanceFlag");
-        player_flags.tutorial_flag = row.get("TutorialFlag");
+        player_flags.appearance_flag = row.get::<_, i32>("AppearanceFlag") != 0;
+        player_flags.tutorial_flag = row.get::<_, i32>("TutorialFlag") != 0;
         player.flags = player_flags;
 
         let skyway_bytes: &[u8] = row.get("SkywayLocationFlag");

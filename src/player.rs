@@ -475,6 +475,14 @@ impl Player {
         }
     }
 
+    pub fn get_first_name(&self) -> String {
+        parse_utf16(&self.name.first_name)
+    }
+
+    pub fn get_last_name(&self) -> String {
+        parse_utf16(&self.name.last_name)
+    }
+
     pub fn set_name(&mut self, name_check: i8, first_name: [u16; 9], last_name: [u16; 17]) {
         self.name = PlayerName {
             name_check,
@@ -855,6 +863,10 @@ impl Entity for Player {
 
     fn get_position(&self) -> Position {
         self.position
+    }
+
+    fn get_rotation(&self) -> i32 {
+        self.rotation
     }
 
     fn get_chunk_coords(&self) -> ChunkCoords {

@@ -5,13 +5,12 @@ use super::*;
 use rand::random;
 
 use rusty_fusion::{
+    database::db_get,
     defines::*,
     enums::{ItemLocation, ItemType},
     error::{FFError, FFResult, Severity},
     net::{ffclient::ClientType, packet::*},
-    placeholder,
-    player::TEST_ACC_UID_START,
-    unused, util, Combatant, Entity, Item, Position,
+    unused, util, Combatant, Entity, Item,
 };
 
 pub fn login(
@@ -22,42 +21,42 @@ pub fn login(
     // TODO failure
     let pkt: &sP_CL2LS_REQ_LOGIN = client.get_packet(P_CL2LS_REQ_LOGIN)?;
 
-    let mut players = Vec::new();
+    let mut players: [Option<Player>; 4] = [None; 4];
     let mut username = util::parse_utf16(&pkt.szID);
     let mut _password = util::parse_utf16(&pkt.szPassword);
     if username.is_empty() {
         username = util::parse_utf8(&pkt.szCookie_TEGid);
         _password = util::parse_utf8(&pkt.szCookie_authid);
     }
-    if username.eq("test") {
-        let mut player = Player::new(TEST_ACC_UID_START);
-        player.set_name(1, util::encode_utf16("TestF"), util::encode_utf16("TestL"));
-        player.set_god_mode(true);
-        player.set_position(Position {
-            x: 534829,
-            y: 538992,
-            z: -1029,
-        }); // Mt. Blackhead
-        player.set_item(
-            ItemLocation::Equip,
-            EQUIP_SLOT_VEHICLE as usize,
-            Some(Item::new(ItemType::Vehicle, ID_KND_HOVERBOARD)),
-        )?;
-        players.push(player);
 
-        let mut player = Player::new(TEST_ACC_UID_START + 1);
-        player.set_name(1, util::encode_utf16("TestF"), util::encode_utf16("TestL"));
-        players.push(player);
+    let mut db = db_get();
+    let accounts = db.query("find_account", &[&username]);
+    if accounts.is_empty() {
+        return Err(FFError::build(
+            Severity::Warning,
+            format!("Couldn't find account {}", username),
+        ));
+    }
+    let account = accounts.get(0).unwrap();
+    // TODO auth
+    let account_id: i64 = account.get("AccountID");
+    let last_player_slot: i32 = account.get("Selected");
+
+    let chars = db.query("get_char_info", &[&account_id]);
+    for player_info in &chars {
+        let slot_num: i32 = player_info.get("Slot");
+        let player = db.load_player(player_info);
+        players[slot_num as usize] = Some(player);
     }
 
     let resp = sP_LS2CL_REP_LOGIN_SUCC {
-        iCharCount: players.len() as i8,
-        iSlotNum: placeholder!(1),
-        iPaymentFlag: 1,
+        iCharCount: chars.len() as i8,
+        iSlotNum: last_player_slot as i8,
         iTempForPacking4: unused!(),
         uiSvrTime: util::get_timestamp_ms(time),
         szID: pkt.szID,
-        iOpenBetaFlag: 0,
+        iPaymentFlag: 1,  // all accounts have a subscription
+        iOpenBetaFlag: 0, // and we're not in open beta
     };
     let e_base: u64 = resp.uiSvrTime;
     let e_iv1: i32 = (resp.iCharCount + 1) as i32;
@@ -73,27 +72,32 @@ pub fn login(
 
     let serial_key: i64 = random();
     client.client_type = ClientType::GameClient {
+        account_id,
         serial_key,
         pc_id: None,
     };
+    state.set_account(account_id, username, players.into_iter().flatten());
 
     players
-        .into_iter()
+        .iter()
         .enumerate()
-        .try_for_each(|(slot, player)| {
-            let pos = player.get_position();
-            let pkt = sP_LS2CL_REP_CHAR_INFO {
-                iSlot: (slot + 1) as i8,
-                iLevel: player.get_level(),
-                sPC_Style: player.get_style(),
-                sPC_Style2: player.get_style_2(),
-                iX: pos.x,
-                iY: pos.y,
-                iZ: pos.z,
-                aEquip: player.get_equipped().map(Option::<Item>::into),
-            };
-            state.players.insert(pkt.sPC_Style.iPC_UID, player);
-            client.send_packet(P_LS2CL_REP_CHAR_INFO, &pkt)
+        .try_for_each(|(slot_num, player)| {
+            if let Some(player) = player {
+                let pos = player.get_position();
+                let pkt = sP_LS2CL_REP_CHAR_INFO {
+                    iSlot: slot_num as i8,
+                    iLevel: player.get_level(),
+                    sPC_Style: player.get_style(),
+                    sPC_Style2: player.get_style_2(),
+                    iX: pos.x,
+                    iY: pos.y,
+                    iZ: pos.z,
+                    aEquip: player.get_equipped().map(Option::<Item>::into),
+                };
+                client.send_packet(P_LS2CL_REP_CHAR_INFO, &pkt)
+            } else {
+                Ok(())
+            }
         })
 }
 
@@ -109,33 +113,43 @@ pub fn check_char_name(client: &mut FFClient) -> FFResult<()> {
 
 pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
     // TODO failure
+    let acc_id = client.get_account_id()?;
     let pkt: &sP_CL2LS_REQ_SAVE_CHAR_NAME = client.get_packet(P_CL2LS_REQ_SAVE_CHAR_NAME)?;
 
     let pc_uid = util::get_uid();
-    // TODO check with DB if UID is in use and reroll
+    let slot_num = pkt.iSlotNum as usize;
+    if slot_num > 3 {
+        return Err(FFError::build(
+            Severity::Warning,
+            format!("Bad slot number {}", slot_num),
+        ));
+    }
 
     let mut player = Player::new(pc_uid);
     player.set_name(1, pkt.szFirstName, pkt.szLastName);
-    let style = &player.get_style();
+    let mut db = db_get();
+    db.init_player(acc_id, slot_num, &player);
 
+    let style = &player.get_style();
     let resp = sP_LS2CL_REP_SAVE_CHAR_NAME_SUCC {
         iPC_UID: pc_uid,
-        iSlotNum: placeholder!(0),
+        iSlotNum: pkt.iSlotNum,
         iGender: style.iGender,
         szFirstName: style.szFirstName,
         szLastName: style.szLastName,
     };
     client.send_packet(P_LS2CL_REP_SAVE_CHAR_NAME_SUCC, &resp)?;
-    state.players.insert(pc_uid, player);
+    state.get_players_mut(acc_id)?.insert(pc_uid, player);
 
     Ok(())
 }
 
 pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
+    let acc_id = client.get_account_id()?;
     let pkt: &sP_CL2LS_REQ_CHAR_CREATE = client.get_packet(P_CL2LS_REQ_CHAR_CREATE)?;
 
     let pc_uid = pkt.PCStyle.iPC_UID;
-    if let Some(player) = state.players.get_mut(&pc_uid) {
+    if let Some(player) = state.get_players_mut(acc_id)?.get_mut(&pc_uid) {
         player.style = pkt.PCStyle.try_into()?;
         player.set_item(
             ItemLocation::Equip,
@@ -152,6 +166,7 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
             EQUIP_SLOT_FOOT as usize,
             Some(Item::new(ItemType::Foot, pkt.sOn_Item.iEquipFootID)),
         )?;
+        player.flags.appearance_flag = true;
 
         let resp = sP_LS2CL_REP_CHAR_CREATE_SUCC {
             iLevel: player.get_level(),
@@ -170,12 +185,16 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
 }
 
 pub fn save_char_tutor(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
+    let acc_id = client.get_account_id()?;
     let pkt: &sP_CL2LS_REQ_SAVE_CHAR_TUTOR = client.get_packet(P_CL2LS_REQ_SAVE_CHAR_TUTOR)?;
     let pc_uid = pkt.iPC_UID;
-    let player = state.players.get_mut(&pc_uid).ok_or(FFError::build(
-        Severity::Warning,
-        format!("Couldn't get player {}", pc_uid),
-    ))?;
+    let player = state
+        .get_players_mut(acc_id)?
+        .get_mut(&pc_uid)
+        .ok_or(FFError::build(
+            Severity::Warning,
+            format!("Couldn't get player {}", pc_uid),
+        ))?;
     if pkt.iTutorialFlag == 1 {
         player.set_tutorial_done();
         Ok(())
@@ -194,10 +213,16 @@ pub fn char_select(
     time: SystemTime,
 ) -> FFResult<()> {
     let client = clients.get_mut(&client_key).unwrap();
-    if let ClientType::GameClient { serial_key, .. } = client.client_type {
+    if let ClientType::GameClient {
+        serial_key,
+        account_id,
+        ..
+    } = client.client_type
+    {
         let pkt: &sP_CL2LS_REQ_CHAR_SELECT = client.get_packet(P_CL2LS_REQ_CHAR_SELECT)?;
         let pc_uid = pkt.iPC_UID;
-        if !state.players.contains_key(&pc_uid) {
+        let players = state.get_players_mut(account_id)?;
+        if !players.contains_key(&pc_uid) {
             return Err(FFError::build(
                 Severity::Warning,
                 format!("Couldn't get player {}", pc_uid),
@@ -205,11 +230,12 @@ pub fn char_select(
         }
 
         let login_info = sP_LS2FE_REQ_UPDATE_LOGIN_INFO {
+            iAccountID: account_id,
             iEnterSerialKey: serial_key,
             iPC_UID: pc_uid,
             uiFEKey: client.get_fe_key_uint(),
             uiSvrTime: util::get_timestamp_ms(time),
-            player: state.players.remove(&pc_uid).unwrap(),
+            player: *players.get(&pc_uid).unwrap(),
         };
 
         let shard_server = clients

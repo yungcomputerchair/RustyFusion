@@ -70,6 +70,10 @@ impl Entity for NPC {
         self.position
     }
 
+    fn get_rotation(&self) -> i32 {
+        self.rotation
+    }
+
     fn get_chunk_coords(&self) -> ChunkCoords {
         ChunkCoords::from_pos_inst(self.position, self.instance_id)
     }

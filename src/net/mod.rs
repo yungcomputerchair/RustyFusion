@@ -39,6 +39,7 @@ pub type DisconnectCallback = fn(usize, &mut HashMap<usize, FFClient>, &mut Serv
 
 #[allow(non_snake_case)]
 pub struct LoginData {
+    pub iAccountID: i64,
     pub iPC_UID: i64,
     pub uiFEKey: u64,
     pub uiSvrTime: u64,

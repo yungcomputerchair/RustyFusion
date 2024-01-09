@@ -144,10 +144,7 @@ fn handle_packet(
 
 fn send_live_check(client: &mut FFClient) -> FFResult<()> {
     match client.client_type {
-        ClientType::GameClient {
-            serial_key: _,
-            pc_id: _,
-        } => {
+        ClientType::GameClient { .. } => {
             client.live_check_pending = true;
             let pkt = sP_LS2CL_REQ_LIVE_CHECK {
                 iTempValue: unused!(),

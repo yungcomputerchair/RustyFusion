@@ -1,12 +1,11 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use rand::{thread_rng, Rng};
+use rand::Rng;
 
 use crate::{
     defines::*,
     enums::ItemLocation,
     error::{FFError, FFResult, Severity},
-    player::TEST_ACC_UID_START,
 };
 
 pub fn parse_utf16(chars: &[u16]) -> String {
@@ -58,8 +57,7 @@ pub fn get_systime_from_sec(timestamp_sec: u64) -> SystemTime {
 }
 
 pub fn get_uid() -> i64 {
-    let uid: i64 = thread_rng().gen_range(i64::MIN..TEST_ACC_UID_START);
-    uid
+    rand::random()
 }
 
 pub fn slot_num_to_loc_and_slot_num(mut slot_num: usize) -> FFResult<(ItemLocation, usize)> {

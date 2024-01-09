@@ -22,6 +22,7 @@ use super::{
 pub enum ClientType {
     Unknown,
     GameClient {
+        account_id: i64,
         serial_key: i64,    // iEnterSerialKey
         pc_id: Option<i32>, // iPC_ID
     },
@@ -75,6 +76,17 @@ impl FFClient {
 
     pub fn get_fe_key_uint(&self) -> u64 {
         u64::from_le_bytes(self.fe_key)
+    }
+
+    pub fn get_account_id(&self) -> FFResult<i64> {
+        if let ClientType::GameClient { account_id, .. } = self.client_type {
+            Ok(account_id)
+        } else {
+            Err(FFError::build(
+                Severity::Warning,
+                "Couldn't get account ID for client".to_string(),
+            ))
+        }
     }
 
     pub fn get_player_id(&self) -> FFResult<i32> {

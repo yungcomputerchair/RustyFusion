@@ -75,6 +75,7 @@ pub fn login_update_info(server: &mut FFClient, state: &mut ShardServerState) ->
     ld.insert(
         serial_key,
         LoginData {
+            iAccountID: pkt.iAccountID,
             iPC_UID: pkt.iPC_UID,
             uiFEKey: pkt.uiFEKey,
             uiSvrTime: pkt.uiSvrTime,

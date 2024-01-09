@@ -698,6 +698,7 @@ pub trait Entity {
     fn get_id(&self) -> EntityID;
     fn get_client<'a>(&self, client_map: &'a mut ClientMap) -> Option<&'a mut FFClient>;
     fn get_position(&self) -> Position;
+    fn get_rotation(&self) -> i32;
     fn get_chunk_coords(&self) -> ChunkCoords;
     fn set_position(&mut self, pos: Position);
     fn set_rotation(&mut self, angle: i32);

@@ -6529,6 +6529,7 @@ impl FFPacket for sP_LS2FE_REQ_LIVE_CHECK {}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct sP_LS2FE_REQ_UPDATE_LOGIN_INFO {
+    pub iAccountID: i64,
     pub iEnterSerialKey: i64,
     pub iPC_UID: i64,
     pub uiFEKey: u64,

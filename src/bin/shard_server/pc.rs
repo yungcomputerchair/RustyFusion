@@ -33,6 +33,7 @@ pub fn pc_enter(
     };
 
     client.client_type = ClientType::GameClient {
+        account_id: login_data.iAccountID,
         serial_key: pkt.iEnterSerialKey,
         pc_id: Some(pc_id),
     };
