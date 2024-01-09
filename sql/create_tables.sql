@@ -9,15 +9,9 @@ INSERT INTO Meta(Key, Value)
 INSERT INTO Meta(Key, Value)
     VALUES ('DatabaseVersion', $1);
 
-CREATE COLLATION NOCASE (
-    provider = icu,
-    locale = 'UTF8',
-    deterministic = false
-);
-
 CREATE TABLE IF NOT EXISTS Accounts (
-    AccountID    SERIAL PRIMARY KEY NOT NULL,
-    Login        TEXT    NOT NULL UNIQUE COLLATE NOCASE,
+    AccountID    BIGSERIAL PRIMARY KEY NOT NULL,
+    Login        TEXT    NOT NULL UNIQUE,
     Password     TEXT    NOT NULL,
     Selected     INTEGER  DEFAULT 1 NOT NULL,
     AccountLevel INTEGER NOT NULL,
@@ -29,10 +23,10 @@ CREATE TABLE IF NOT EXISTS Accounts (
 );
 
 CREATE TABLE IF NOT EXISTS Players (
-    PlayerID           SERIAL PRIMARY KEY NOT NULL,
-    AccountID          INTEGER NOT NULL,
-    FirstName          TEXT NOT NULL COLLATE NOCASE,
-    LastName           TEXT NOT NULL COLLATE NOCASE,
+    PlayerID           BIGSERIAL PRIMARY KEY NOT NULL,
+    AccountID          BIGINT NOT NULL,
+    FirstName          TEXT NOT NULL,
+    LastName           TEXT NOT NULL,
     NameCheck          INTEGER NOT NULL,
     Slot               INTEGER NOT NULL,
     Created            INTEGER DEFAULT extract(epoch from now()) NOT NULL,
@@ -65,7 +59,7 @@ CREATE TABLE IF NOT EXISTS Players (
 );
 
 CREATE TABLE IF NOT EXISTS Appearances (
-    PlayerID    INTEGER UNIQUE NOT NULL,
+    PlayerID    BIGINT UNIQUE NOT NULL,
     Body        INTEGER DEFAULT 0 NOT NULL,
     EyeColor    INTEGER DEFAULT 1 NOT NULL,
     FaceStyle   INTEGER DEFAULT 1 NOT NULL,
@@ -78,7 +72,7 @@ CREATE TABLE IF NOT EXISTS Appearances (
 );
 
 CREATE TABLE IF NOT EXISTS Inventory (
-    PlayerID    INTEGER NOT NULL,
+    PlayerID    BIGINT NOT NULL,
     Slot        INTEGER NOT NULL,
     ID          INTEGER NOT NULL,
     Type        INTEGER NOT NULL,
@@ -89,7 +83,7 @@ CREATE TABLE IF NOT EXISTS Inventory (
 );
 
 CREATE TABLE IF NOT EXISTS QuestItems (
-    PlayerID    INTEGER NOT NULL,
+    PlayerID    BIGINT NOT NULL,
     Slot        INTEGER NOT NULL,
     ID          INTEGER NOT NULL,
     Opt         INTEGER NOT NULL,
@@ -98,7 +92,7 @@ CREATE TABLE IF NOT EXISTS QuestItems (
 );
 
 CREATE TABLE IF NOT EXISTS Nanos (
-    PlayerID    INTEGER NOT NULL,
+    PlayerID    BIGINT NOT NULL,
     ID          INTEGER NOT NULL,
     Skill       INTEGER NOT NULL,
     Stamina     INTEGER DEFAULT 150 NOT NULL,
@@ -107,7 +101,7 @@ CREATE TABLE IF NOT EXISTS Nanos (
 );
 
 CREATE TABLE IF NOT EXISTS RunningQuests (
-    PlayerID              INTEGER NOT NULL,
+    PlayerID              BIGINT NOT NULL,
     TaskID                INTEGER NOT NULL,
     RemainingNPCCount1    INTEGER NOT NULL,
     RemainingNPCCount2    INTEGER NOT NULL,
@@ -116,27 +110,27 @@ CREATE TABLE IF NOT EXISTS RunningQuests (
 );
 
 CREATE TABLE IF NOT EXISTS Buddyships (
-    PlayerAID    INTEGER NOT NULL,
-    PlayerBID    INTEGER NOT NULL,
+    PlayerAID    BIGINT NOT NULL,
+    PlayerBID    BIGINT NOT NULL,
     FOREIGN KEY(PlayerAID) REFERENCES Players(PlayerID) ON DELETE CASCADE,
     FOREIGN KEY(PlayerBID) REFERENCES Players(PlayerID) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS Blocks (
-    PlayerID           INTEGER NOT NULL,
-    BlockedPlayerID    INTEGER NOT NULL,
+    PlayerID           BIGINT NOT NULL,
+    BlockedPlayerID    BIGINT NOT NULL,
     FOREIGN KEY(PlayerID)        REFERENCES Players(PlayerID) ON DELETE CASCADE,
     FOREIGN KEY(BlockedPlayerID) REFERENCES Players(PlayerID) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS EmailData (
-    PlayerID        INTEGER NOT NULL,
+    PlayerID        BIGINT NOT NULL,
     MsgIndex        INTEGER NOT NULL,
     ReadFlag        INTEGER NOT NULL,
     ItemFlag        INTEGER NOT NULL,
-    SenderID        INTEGER NOT NULL,
-    SenderFirstName TEXT NOT NULL COLLATE NOCASE,
-    SenderLastName  TEXT NOT NULL COLLATE NOCASE,
+    SenderID        BIGINT NOT NULL,
+    SenderFirstName TEXT NOT NULL,
+    SenderLastName  TEXT NOT NULL,
     SubjectLine     TEXT NOT NULL,
     MsgBody         TEXT NOT NULL,
     Taros           INTEGER NOT NULL,
@@ -147,7 +141,7 @@ CREATE TABLE IF NOT EXISTS EmailData (
 );
 
 CREATE TABLE IF NOT EXISTS EmailItems (
-    PlayerID    INTEGER NOT NULL,
+    PlayerID    BIGINT NOT NULL,
     MsgIndex    INTEGER NOT NULL,
     Slot        INTEGER NOT NULL,
     ID          INTEGER NOT NULL,
@@ -159,8 +153,8 @@ CREATE TABLE IF NOT EXISTS EmailItems (
 );
 
 CREATE TABLE IF NOT EXISTS RaceResults(
-    EPID      INTEGER NOT NULL,
-    PlayerID  INTEGER NOT NULL,
+    EPID      BIGINT NOT NULL,
+    PlayerID  BIGINT NOT NULL,
     Score     INTEGER NOT NULL,
     RingCount INTEGER NOT NULL,
     Time      INTEGER NOT NULL,
@@ -169,7 +163,7 @@ CREATE TABLE IF NOT EXISTS RaceResults(
 );
 
 CREATE TABLE IF NOT EXISTS RedeemedCodes(
-    PlayerID    INTEGER NOT NULL,
+    PlayerID    BIGINT NOT NULL,
     Code        TEXT NOT NULL,
     FOREIGN KEY(PlayerID) REFERENCES Players(PlayerID) ON DELETE CASCADE,
     UNIQUE (PlayerID, Code)
