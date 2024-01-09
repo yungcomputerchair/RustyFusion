@@ -107,18 +107,45 @@ impl Database {
         );
     }
 
+    pub fn update_player_appearance(&mut self, player: &Player) {
+        let style = player.style.unwrap_or_default();
+        let apperance_flag: i32 = if player.style.is_some() { 1 } else { 0 };
+        self.exec(
+            "update_appearance",
+            &[
+                &player.get_uid(),
+                &(style.body as i32),
+                &(style.eye_color as i32),
+                &(style.face_style as i32),
+                &(style.gender as i32),
+                &(style.hair_color as i32),
+                &(style.hair_style as i32),
+                &(style.height as i32),
+                &(style.skin_color as i32),
+                //
+                &player.get_uid(),
+                &apperance_flag,
+            ],
+        );
+    }
+
     pub fn load_player(&mut self, row: &Row) -> Player {
         let pc_uid = row.get("PlayerId");
         let mut player = Player::new(pc_uid);
-        player.style = PlayerStyle {
-            gender: row.get::<_, i32>("Gender") as i8,
-            face_style: row.get::<_, i32>("FaceStyle") as i8,
-            hair_style: row.get::<_, i32>("HairStyle") as i8,
-            hair_color: row.get::<_, i32>("HairColor") as i8,
-            skin_color: row.get::<_, i32>("SkinColor") as i8,
-            eye_color: row.get::<_, i32>("EyeColor") as i8,
-            height: row.get::<_, i32>("Height") as i8,
-            body: row.get::<_, i32>("Body") as i8,
+        let appearance_flag: i32 = row.get("AppearanceFlag");
+        player.style = if appearance_flag != 0 {
+            Some(PlayerStyle {
+                gender: row.get::<_, i32>("Gender") as i8,
+                face_style: row.get::<_, i32>("FaceStyle") as i8,
+                hair_style: row.get::<_, i32>("HairStyle") as i8,
+                hair_color: row.get::<_, i32>("HairColor") as i8,
+                skin_color: row.get::<_, i32>("SkinColor") as i8,
+                eye_color: row.get::<_, i32>("EyeColor") as i8,
+                height: row.get::<_, i32>("Height") as i8,
+                body: row.get::<_, i32>("Body") as i8,
+            })
+        } else {
+            None
         };
 
         let first_name = row.get("FirstName");
@@ -155,7 +182,6 @@ impl Database {
         let mut player_flags = PlayerFlags::default();
         let first_use_bytes: &[u8] = row.get("FirstUseFlag");
         player_flags.tip_flags = i128::from_le_bytes(first_use_bytes[..16].try_into().unwrap());
-        player_flags.appearance_flag = row.get::<_, i32>("AppearanceFlag") != 0;
         player_flags.tutorial_flag = row.get::<_, i32>("TutorialFlag") != 0;
         player.flags = player_flags;
 

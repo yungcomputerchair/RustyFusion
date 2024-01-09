@@ -150,7 +150,10 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
 
     let pc_uid = pkt.PCStyle.iPC_UID;
     if let Some(player) = state.get_players_mut(acc_id)?.get_mut(&pc_uid) {
-        player.style = pkt.PCStyle.try_into()?;
+        player.style = Some(pkt.PCStyle.try_into()?);
+        let mut db = db_get();
+        db.update_player_appearance(player);
+
         player.set_item(
             ItemLocation::Equip,
             EQUIP_SLOT_UPPERBODY as usize,
@@ -166,7 +169,6 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
             EQUIP_SLOT_FOOT as usize,
             Some(Item::new(ItemType::Foot, pkt.sOn_Item.iEquipFootID)),
         )?;
-        player.flags.appearance_flag = true;
 
         let resp = sP_LS2CL_REP_CHAR_CREATE_SUCC {
             iLevel: player.get_level(),

@@ -55,21 +55,20 @@ impl TryFrom<sPCStyle> for PlayerStyle {
 impl Default for PlayerStyle {
     fn default() -> Self {
         Self {
-            gender: if rand::random::<bool>() { 1 } else { 2 },
+            gender: 1,
             face_style: 1,
             hair_style: 1,
             hair_color: 1,
             skin_color: 1,
             eye_color: 1,
-            height: 1,
-            body: 1,
+            height: 0,
+            body: 0,
         }
     }
 }
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PlayerFlags {
-    pub appearance_flag: bool,
     pub tutorial_flag: bool,
     pub payzone_flag: bool,
     pub tip_flags: i128,
@@ -198,7 +197,7 @@ pub struct Player {
     position: Position,
     rotation: i32,
     pub instance_id: InstanceID,
-    pub style: PlayerStyle,
+    pub style: Option<PlayerStyle>,
     pub flags: PlayerFlags,
     name: PlayerName,
     special_state: i8,
@@ -247,26 +246,27 @@ impl Player {
     }
 
     pub fn get_style(&self) -> sPCStyle {
+        let style = self.style.unwrap_or_default();
         sPCStyle {
             iPC_UID: self.uid,
             iNameCheck: self.name.name_check,
             szFirstName: self.name.first_name,
             szLastName: self.name.last_name,
-            iGender: self.style.gender,
-            iFaceStyle: self.style.face_style,
-            iHairStyle: self.style.hair_style,
-            iHairColor: self.style.hair_color,
-            iSkinColor: self.style.skin_color,
-            iEyeColor: self.style.eye_color,
-            iHeight: self.style.height,
-            iBody: self.style.body,
+            iGender: style.gender,
+            iFaceStyle: style.face_style,
+            iHairStyle: style.hair_style,
+            iHairColor: style.hair_color,
+            iSkinColor: style.skin_color,
+            iEyeColor: style.eye_color,
+            iHeight: style.height,
+            iBody: style.body,
             iClass: unused!(),
         }
     }
 
     pub fn get_style_2(&self) -> sPCStyle2 {
         sPCStyle2 {
-            iAppearanceFlag: if self.flags.appearance_flag { 1 } else { 0 },
+            iAppearanceFlag: if self.style.is_some() { 1 } else { 0 },
             iTutorialFlag: if self.flags.tutorial_flag { 1 } else { 0 },
             iPayzoneFlag: if self.flags.payzone_flag { 1 } else { 0 },
         }
@@ -721,10 +721,6 @@ impl Player {
         bit_offset: i32,
     ) -> FFResult<[i64; WYVERN_LOCATION_FLAG_SIZE as usize]> {
         self.transport_data.set_skyway_flag(bit_offset)
-    }
-
-    pub fn set_creation_done(&mut self) {
-        self.flags.appearance_flag = true;
     }
 
     pub fn set_tutorial_done(&mut self) {
