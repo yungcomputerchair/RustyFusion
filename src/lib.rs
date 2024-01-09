@@ -1,8 +1,5 @@
 #![allow(clippy::derivable_impls)]
 
-#[macro_use]
-extern crate num_derive;
-
 use std::{any::Any, cmp::min, hash::Hash, time::SystemTime};
 
 use chunk::ChunkCoords;

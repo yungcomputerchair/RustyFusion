@@ -5,8 +5,6 @@ use std::{
     time::SystemTime,
 };
 
-use num_traits::FromPrimitive;
-
 use crate::{
     error::{log, FFError, FFResult, Severity},
     net::{struct_to_bytes, PACKET_BUFFER_SIZE, SILENCED_PACKETS},
@@ -116,11 +114,9 @@ impl FFClient {
             ));
         }
 
-        let id = u32::from_le_bytes(self.in_buf[from..to].try_into().unwrap());
-        PacketID::from_u32(id).ok_or(FFError::build(
-            Severity::Warning,
-            format!("Bad packet ID {id}"),
-        ))
+        let id_ord = u32::from_le_bytes(self.in_buf[from..to].try_into().unwrap());
+        let id: FFResult<PacketID> = id_ord.try_into();
+        id.map_err(|_| FFError::build(Severity::Warning, format!("Bad packet ID: {}", id_ord)))
     }
 
     pub fn get_packet<T: FFPacket>(&mut self, pkt_id: PacketID) -> FFResult<&T> {

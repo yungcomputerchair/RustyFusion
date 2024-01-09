@@ -2,10 +2,13 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
-use crate::player::Player;
+use num_enum::TryFromPrimitive;
+
+use crate::{error::FFError, player::Player};
 
 #[repr(u32)]
-#[derive(Debug, FromPrimitive, ToPrimitive, Clone, Copy, PartialEq)]
+#[derive(Debug, TryFromPrimitive, Clone, Copy, PartialEq)]
+#[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
 pub enum PacketID {
     P_NULL = 0,
 

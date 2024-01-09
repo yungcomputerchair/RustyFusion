@@ -1,30 +1,21 @@
 #![allow(non_camel_case_types)]
 
-use crate::{
-    defines::*,
-    error::{FFError, FFResult, Severity},
-};
-use num_traits::FromPrimitive;
+use num_enum::TryFromPrimitive;
+
+use crate::{defines::*, error::FFError};
 
 #[repr(i32)]
-#[derive(PartialEq, Eq, Hash, FromPrimitive, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
+#[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
 pub enum NanoStyle {
     Adaptium = NANO_STYLE_CRYSTAL as i32,
     Blastons = NANO_STYLE_ENERGY as i32,
     Cosmix = NANO_STYLE_FLUID as i32,
 }
-impl TryFrom<i32> for NanoStyle {
-    type Error = FFError;
-    fn try_from(value: i32) -> FFResult<Self> {
-        Self::from_i32(value).ok_or(FFError::build(
-            Severity::Warning,
-            format!("Invalid NanoStyle value {}", value),
-        ))
-    }
-}
 
 #[repr(i16)]
-#[derive(PartialEq, Eq, Hash, FromPrimitive, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
+#[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
 pub enum PlayerGuide {
     Edd = 1,
     Dexter = 2,
@@ -32,20 +23,12 @@ pub enum PlayerGuide {
     Ben = 4,
     Computress = 5,
 }
-impl TryFrom<i16> for PlayerGuide {
-    type Error = FFError;
-    fn try_from(value: i16) -> FFResult<Self> {
-        Self::from_i16(value).ok_or(FFError::build(
-            Severity::Warning,
-            format!("Invalid PlayerGuide value {}", value),
-        ))
-    }
-}
 
 /* Enums ripped from the client */
 
 #[repr(i32)]
-#[derive(PartialEq, Eq, Hash, FromPrimitive, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
+#[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
 pub enum ItemLocation {
     /*eIL_Equip*/ Equip = 0,
     /*eIL_Inven*/ Inven = 1,
@@ -53,18 +36,10 @@ pub enum ItemLocation {
     /*eIL_Bank*/ Bank = 3,
     /*eIL__End*/
 }
-impl TryFrom<i32> for ItemLocation {
-    type Error = FFError;
-    fn try_from(value: i32) -> FFResult<Self> {
-        Self::from_i32(value).ok_or(FFError::build(
-            Severity::Warning,
-            format!("Invalid ItemLocation value {}", value),
-        ))
-    }
-}
 
 #[repr(i16)]
-#[derive(PartialEq, Eq, Hash, FromPrimitive, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
+#[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
 pub enum ItemType {
     /*eItemType_Hand*/ Hand = 0,
     /*eItemType_UpperBody*/ UpperBody = 1,
@@ -87,31 +62,14 @@ pub enum ItemType {
     /*eItemType_Npc*/ Npc = 30,
     /*eItemType_SkillBuffEffect*/ SkillBuffEffect = 138,
 }
-impl TryFrom<i16> for ItemType {
-    type Error = FFError;
-    fn try_from(value: i16) -> FFResult<Self> {
-        Self::from_i16(value).ok_or(FFError::build(
-            Severity::Warning,
-            format!("Invalid ItemType value {}", value),
-        ))
-    }
-}
 
 #[repr(i32)]
-#[derive(PartialEq, Eq, Hash, FromPrimitive, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
+#[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
 pub enum TransportationType {
     /*eTT_None*/
     /*eTT_Warp*/ Warp = 1,
     /*eTT_Wyvern*/ Wyvern = 2,
     /*eTT_Bus*/ Bus = 3,
     /*eTT__End*/
-}
-impl TryFrom<i32> for TransportationType {
-    type Error = FFError;
-    fn try_from(value: i32) -> FFResult<Self> {
-        Self::from_i32(value).ok_or(FFError::build(
-            Severity::Warning,
-            format!("Invalid TransportationType value {}", value),
-        ))
-    }
 }

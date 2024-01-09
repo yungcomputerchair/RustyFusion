@@ -77,6 +77,14 @@ impl FFError {
         }
     }
 
+    pub fn from_enum_err<T: std::fmt::Debug>(val: T) -> Self {
+        Self {
+            severity: Severity::Warning,
+            msg: format!("Enum error ({:?})", val),
+            should_dc: true,
+        }
+    }
+
     pub fn chain(self, other: FFError) -> Self {
         Self {
             severity: min(self.severity, other.severity),
