@@ -8,6 +8,32 @@ use crate::{
     error::{FFError, FFResult, Severity},
 };
 
+pub fn clamp<T: Ord>(val: T, min: T, max: T) -> T {
+    if val < min {
+        min
+    } else if val > max {
+        max
+    } else {
+        val
+    }
+}
+
+pub fn clamp_min<T: Ord>(val: T, min: T) -> T {
+    if val < min {
+        min
+    } else {
+        val
+    }
+}
+
+pub fn clamp_max<T: Ord>(val: T, max: T) -> T {
+    if val > max {
+        max
+    } else {
+        val
+    }
+}
+
 pub fn parse_utf16(chars: &[u16]) -> String {
     let end_pos: usize = chars.iter().position(|&c| c == 0).unwrap_or(chars.len());
     if let Ok(val) = String::from_utf16(&chars[..end_pos]) {

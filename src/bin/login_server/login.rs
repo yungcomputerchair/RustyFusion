@@ -37,7 +37,7 @@ pub fn login(
             format!("Couldn't find account {}", username),
         ));
     }
-    let account = accounts.get(0).unwrap();
+    let account = accounts.first().unwrap();
     // TODO auth
     let account_id: i64 = account.get("AccountID");
     let last_player_slot: i32 = account.get("Selected");

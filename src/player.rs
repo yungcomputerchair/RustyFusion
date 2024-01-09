@@ -15,11 +15,10 @@ use crate::{
         ClientMap,
     },
     state::shard::ShardServerState,
-    util::parse_utf16,
+    util::{clamp, clamp_max, clamp_min, parse_utf16},
     Combatant, Entity, EntityID, Item, Mission, Nano, Position,
 };
 
-use num_traits::{clamp, clamp_max, clamp_min};
 use rand::Rng;
 use uuid::Uuid;
 
