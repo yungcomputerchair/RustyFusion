@@ -224,8 +224,14 @@ impl Player {
     pub fn new(uid: i64) -> Self {
         Self {
             uid,
+            hp: placeholder!(400),
+            level: 1,
             ..Default::default()
         }
+    }
+
+    pub fn get_uid(&self) -> i64 {
+        self.uid
     }
 
     pub fn get_player_id(&self) -> i32 {
@@ -728,6 +734,14 @@ impl Player {
         )
         .unwrap();
         // TODO delete all active missions
+        // place in Sector V future
+        let mut rand = rand::thread_rng();
+        let range = PC_START_LOCATION_RANDOM_RANGE as i32 / 2;
+        self.position = Position {
+            x: 632032 + rand.gen_range(-range..=range),
+            y: 187177 + rand.gen_range(-range..=range),
+            z: -5500,
+        }
     }
 
     pub fn update_guide(&mut self, guide: PlayerGuide) -> usize {
