@@ -1,3 +1,4 @@
+use core::panic;
 use std::{
     sync::{Mutex, MutexGuard},
     time::Duration,
@@ -9,8 +10,9 @@ use crate::{
     config::config_get,
     defines::{DB_VERSION, PROTOCOL_VERSION, SIZEOF_QUESTFLAG_NUMBER, WYVERN_LOCATION_FLAG_SIZE},
     error::{log, Severity},
+    net::packet::sItemBase,
     player::{Player, PlayerFlags, PlayerStyle},
-    util, Combatant, Entity, Position,
+    util, Combatant, Entity, Item, Position,
 };
 
 pub struct Database {
@@ -85,6 +87,17 @@ impl Database {
         self.transaction = false;
         self.get().execute("COMMIT", &[]).unwrap();
         log(Severity::Debug, "Committed transaction");
+    }
+
+    pub fn prep(&mut self, name: &str) -> postgres::Statement {
+        let query = Self::read_sql(name);
+        match self.get().prepare(&query) {
+            Ok(r) => r,
+            Err(e) => {
+                log(Severity::Fatal, &format!("DB error: {}", e));
+                panic!();
+            }
+        }
     }
 
     pub fn exec(&mut self, name: &str, mut params: &[&(dyn ToSql + Sync)]) -> u64 {
@@ -232,10 +245,29 @@ impl Database {
         ]);
         player.set_scamper_flag(row.get("WarpLocationFlag"));
 
+        let items = self.query("load_items", &[&pc_uid]);
+        for item in items {
+            let slot_num = item.get::<_, i32>("Slot") as usize;
+            let item_raw = sItemBase {
+                iType: item.get::<_, i32>("Type") as i16,
+                iID: item.get::<_, i32>("ID") as i16,
+                iOpt: item.get::<_, i32>("Opt"),
+                iTimeLimit: item.get::<_, i32>("TimeLimit"),
+            };
+            let item: Option<Item> = item_raw.try_into().unwrap();
+            let (loc, slot_num) = util::slot_num_to_loc_and_slot_num(slot_num).unwrap();
+            player.set_item(loc, slot_num, item).unwrap();
+        }
+
         player
     }
 
     pub fn save_player(&mut self, player: &Player) {
+        let save_item = self.prep("save_item");
+        let pc_uid = player.get_uid();
+
+        self.begin_transaction();
+
         let mut skyway_bytes = Vec::new();
         for sec in player.get_skyway_flags() {
             skyway_bytes.extend_from_slice(&sec.to_le_bytes());
@@ -249,7 +281,7 @@ impl Database {
         self.exec(
             "save_player",
             &[
-                &player.get_uid(),
+                &pc_uid,
                 &(player.get_level() as i32),
                 &(player.get_equipped_nano_ids()[0] as i32),
                 &(player.get_equipped_nano_ids()[1] as i32),
@@ -273,6 +305,27 @@ impl Database {
                 &quest_bytes,
             ],
         );
+
+        self.exec("clear_items", &[&pc_uid]);
+        for (slot_num, item) in player.get_item_iter() {
+            let item_raw: sItemBase = Some(*item).into();
+            if let Err(e) = self.get().execute(
+                &save_item,
+                &[
+                    &pc_uid,
+                    &(slot_num as i32),
+                    &(item_raw.iID as i32),
+                    &(item_raw.iType as i32),
+                    &item_raw.iOpt,
+                    &item_raw.iTimeLimit,
+                ],
+            ) {
+                log(Severity::Fatal, &format!("DB error: {}", e));
+                panic!();
+            }
+        }
+
+        self.commit_transaction();
     }
 }
 

@@ -15,7 +15,7 @@ use crate::{
         ClientMap,
     },
     state::shard::ShardServerState,
-    util::{clamp, clamp_max, clamp_min, parse_utf16},
+    util::{self, clamp, clamp_max, clamp_min, parse_utf16},
     Combatant, Entity, EntityID, Item, Mission, Nano, Position,
 };
 
@@ -677,6 +677,17 @@ impl Player {
                 }
             })
             .collect()
+    }
+
+    pub fn get_item_iter(&self) -> impl Iterator<Item = (usize, &Item)> {
+        let inv_slot_max =
+            (SIZEOF_EQUIP_SLOT + SIZEOF_INVEN_SLOT + SIZEOF_BANK_SLOT + SIZEOF_QINVEN_SLOT)
+                as usize;
+        (0..inv_slot_max).filter_map(move |slot_num| {
+            let (loc, slot_num) = util::slot_num_to_loc_and_slot_num(slot_num).unwrap();
+            let item = self.get_item(loc, slot_num).unwrap();
+            item.as_ref().map(|item| (slot_num, item))
+        })
     }
 
     pub fn get_equipped(&self) -> [Option<Item>; 9] {
