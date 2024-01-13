@@ -225,10 +225,15 @@ pub fn char_select(
         let pkt: &sP_CL2LS_REQ_CHAR_SELECT = client.get_packet(P_CL2LS_REQ_CHAR_SELECT)?;
         let pc_uid = pkt.iPC_UID;
         let players = state.get_players_mut(account_id)?;
-        if !players.contains_key(&pc_uid) {
+        let player = players.get(&pc_uid).ok_or(FFError::build(
+            Severity::Warning,
+            format!("Couldn't get player {}", pc_uid),
+        ))?;
+
+        if !player.flags.tutorial_flag {
             return Err(FFError::build(
                 Severity::Warning,
-                format!("Couldn't get player {}", pc_uid),
+                format!("Player {} hasn't completed the tutorial", pc_uid),
             ));
         }
 
@@ -238,7 +243,7 @@ pub fn char_select(
             iPC_UID: pc_uid,
             uiFEKey: client.get_fe_key_uint(),
             uiSvrTime: util::get_timestamp_ms(time),
-            player: *players.get(&pc_uid).unwrap(),
+            player: *player,
         };
 
         let shard_server = clients
