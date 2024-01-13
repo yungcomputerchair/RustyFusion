@@ -50,6 +50,10 @@ impl LoginServerState {
         self.accounts.insert(acc_id, Account { username, players });
     }
 
+    pub fn unset_account(&mut self, acc_id: i64) {
+        self.accounts.remove(&acc_id);
+    }
+
     pub fn get_username(&self, acc_id: i64) -> FFResult<String> {
         let acc = self.get_account(acc_id)?;
         Ok(acc.username.clone())

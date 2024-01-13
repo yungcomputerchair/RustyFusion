@@ -249,6 +249,7 @@ pub fn char_select(
         match shard_server {
             Some(shard) => {
                 let _ = shard.send_packet(P_LS2FE_REQ_UPDATE_LOGIN_INFO, &login_info);
+                state.unset_account(account_id);
                 Ok(())
             }
             None => {
