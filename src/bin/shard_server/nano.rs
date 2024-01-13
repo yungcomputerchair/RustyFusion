@@ -92,7 +92,7 @@ pub fn nano_active(clients: &mut ClientMap, state: &mut ShardServerState) -> FFR
 
     let bcast = sP_FE2CL_NANO_ACTIVE {
         iPC_ID: pc_id,
-        Nano: player.get_active_nano().copied().into(),
+        Nano: player.get_active_nano().cloned().into(),
         iConditionBitFlag: player.get_condition_bit_flag(),
         eCSTB___Add: placeholder!(0),
     };

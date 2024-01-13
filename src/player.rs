@@ -1,4 +1,4 @@
-use std::{any::Any, cmp::max, fmt::Display, time::SystemTime};
+use std::{any::Any, collections::HashMap, fmt::Display, time::SystemTime};
 
 use crate::{
     chunk::{ChunkCoords, InstanceID},
@@ -8,7 +8,7 @@ use crate::{
     net::{
         ffclient::FFClient,
         packet::{
-            sPCAppearanceData, sPCLoadData2CL, sPCStyle, sPCStyle2, sP_FE2CL_PC_EXIT,
+            sNano, sPCAppearanceData, sPCLoadData2CL, sPCStyle, sPCStyle2, sP_FE2CL_PC_EXIT,
             sP_FE2CL_PC_NEW, sP_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL, sTimeBuff,
             PacketID::{self, *},
         },
@@ -146,16 +146,28 @@ impl TransportData {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 struct Nanocom {
-    nano_inventory: [Option<Nano>; SIZEOF_NANO_BANK_SLOT as usize],
+    nano_inventory: HashMap<i16, Nano>,
     equipped_ids: [Option<i16>; SIZEOF_NANO_CARRY_SLOT as usize],
     active_slot: Option<usize>,
+}
+impl Nanocom {
+    pub fn as_bank(&self) -> [sNano; SIZEOF_NANO_BANK_SLOT as usize] {
+        let mut bank = [None.into(); SIZEOF_NANO_BANK_SLOT as usize];
+        for (id, nano) in &self.nano_inventory {
+            let idx = *id as usize;
+            if idx < SIZEOF_NANO_BANK_SLOT as usize {
+                bank[idx] = Some(nano.clone()).into();
+            }
+        }
+        bank
+    }
 }
 impl Default for Nanocom {
     fn default() -> Self {
         Self {
-            nano_inventory: [None; SIZEOF_NANO_BANK_SLOT as usize],
+            nano_inventory: HashMap::new(),
             equipped_ids: [None; SIZEOF_NANO_CARRY_SLOT as usize],
             active_slot: None,
         }
@@ -295,6 +307,10 @@ impl Player {
         Ok(())
     }
 
+    pub fn set_nano(&mut self, nano: Nano) {
+        self.nano_data.nano_inventory.insert(nano.id, nano);
+    }
+
     pub fn get_active_nano_slot(&self) -> Option<usize> {
         self.nano_data.active_slot
     }
@@ -317,7 +333,7 @@ impl Player {
             Some(active_slot) => {
                 let nano_id =
                     self.nano_data.equipped_ids[active_slot].expect("Empty nano equipped");
-                let nano = self.nano_data.nano_inventory[nano_id as usize].as_ref();
+                let nano = self.nano_data.nano_inventory.get(&nano_id);
                 Some(nano.expect("Locked nano equipped"))
             }
             None => None,
@@ -329,7 +345,7 @@ impl Player {
             Some(active_slot) => {
                 let nano_id =
                     self.nano_data.equipped_ids[active_slot].expect("Empty nano equipped");
-                let nano = self.nano_data.nano_inventory[nano_id as usize].as_mut();
+                let nano = self.nano_data.nano_inventory.get_mut(&nano_id);
                 Some(nano.expect("Locked nano equipped"))
             }
             None => None,
@@ -337,29 +353,16 @@ impl Player {
     }
 
     pub fn unlock_nano(&mut self, nano_id: i16) -> FFResult<&mut Nano> {
-        let new_level = max(self.get_level(), nano_id);
-        let nano_id = nano_id as usize;
-        if nano_id >= SIZEOF_NANO_BANK_SLOT as usize {
-            return Err(FFError::build(
-                Severity::Warning,
-                format!("Invalid nano ID: {}", nano_id),
-            ));
-        }
-        self.nano_data.nano_inventory[nano_id] = Some(Nano::new(nano_id as i16));
-        self.set_level(new_level);
-        Ok(self.nano_data.nano_inventory[nano_id].as_mut().unwrap())
+        self.nano_data
+            .nano_inventory
+            .insert(nano_id, Nano::new(nano_id));
+        self.get_nano_mut(nano_id)
     }
 
     pub fn get_nano(&self, nano_id: i16) -> FFResult<&Nano> {
-        let nano_id = nano_id as usize;
-        if nano_id >= SIZEOF_NANO_BANK_SLOT as usize {
-            return Err(FFError::build(
-                Severity::Warning,
-                format!("Invalid nano ID: {}", nano_id),
-            ));
-        }
-        self.nano_data.nano_inventory[nano_id]
-            .as_ref()
+        self.nano_data
+            .nano_inventory
+            .get(&nano_id)
             .ok_or(FFError::build(
                 Severity::Warning,
                 format!("Nano {} is locked", nano_id),
@@ -367,15 +370,9 @@ impl Player {
     }
 
     pub fn get_nano_mut(&mut self, nano_id: i16) -> FFResult<&mut Nano> {
-        let nano_id = nano_id as usize;
-        if nano_id >= SIZEOF_NANO_BANK_SLOT as usize {
-            return Err(FFError::build(
-                Severity::Warning,
-                format!("Invalid nano ID: {}", nano_id),
-            ));
-        }
-        self.nano_data.nano_inventory[nano_id]
-            .as_mut()
+        self.nano_data
+            .nano_inventory
+            .get_mut(&nano_id)
             .ok_or(FFError::build(
                 Severity::Warning,
                 format!("Nano {} is locked", nano_id),
@@ -424,7 +421,7 @@ impl Player {
             aEquip: self.inventory.equipped.map(Option::<Item>::into),
             aInven: self.inventory.main.map(Option::<Item>::into),
             aQInven: self.inventory.mission.map(Option::<Item>::into),
-            aNanoBank: self.nano_data.nano_inventory.map(Option::<Nano>::into),
+            aNanoBank: self.nano_data.as_bank(),
             aNanoSlots: self.get_equipped_nano_ids(),
             iActiveNanoSlotNum: match self.nano_data.active_slot {
                 Some(active_slot) => active_slot as i16,
@@ -481,7 +478,7 @@ impl Player {
             iZ: self.position.z,
             iAngle: self.rotation,
             ItemEquip: self.inventory.equipped.map(Option::<Item>::into),
-            Nano: self.get_active_nano().copied().into(),
+            Nano: self.get_active_nano().cloned().into(),
             eRT: unused!(),
         }
     }

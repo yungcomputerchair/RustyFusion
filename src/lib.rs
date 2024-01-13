@@ -603,7 +603,7 @@ pub struct CrocPotData {
     pub price_multiplier_stats: u32,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct Nano {
     id: i16,
     pub selected_skill: Option<usize>,
@@ -620,6 +620,37 @@ impl Nano {
 
     pub fn get_stats(&self) -> FFResult<&NanoStats> {
         tdata_get().get_nano_stats(self.id)
+    }
+}
+impl TryFrom<sNano> for Option<Nano> {
+    type Error = FFError;
+    fn try_from(value: sNano) -> FFResult<Self> {
+        if value.iID == 0 {
+            return Ok(None);
+        }
+
+        let skill = if value.iSkillID == 0 {
+            None
+        } else {
+            let stats = tdata_get().get_nano_stats(value.iID)?;
+            Some(
+                stats
+                    .skills
+                    .iter()
+                    .position(|&skill| skill == value.iSkillID)
+                    .ok_or(FFError::build(
+                        Severity::Warning,
+                        format!("Skill id {} invalid for nano {}", value.iSkillID, value.iID),
+                    ))?,
+            )
+        };
+
+        let nano = Nano {
+            id: value.iID,
+            selected_skill: skill,
+            stamina: value.iStamina,
+        };
+        Ok(Some(nano))
     }
 }
 impl From<Option<Nano>> for sNano {
