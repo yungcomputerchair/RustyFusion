@@ -195,6 +195,8 @@ pub fn save_char_tutor(client: &mut FFClient, state: &mut LoginServerState) -> F
         ))?;
     if pkt.iTutorialFlag == 1 {
         player.set_tutorial_done();
+        let mut db = db_get();
+        db.save_player(player);
         Ok(())
     } else {
         Err(FFError::build(
