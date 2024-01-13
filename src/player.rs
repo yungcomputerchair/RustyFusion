@@ -399,6 +399,10 @@ impl Player {
         self.nano_data.equipped_ids.map(|id| id.unwrap_or(0) as u16)
     }
 
+    pub fn get_nano_iter(&self) -> impl Iterator<Item = &Nano> {
+        self.nano_data.nano_inventory.values()
+    }
+
     pub fn get_load_data(&self) -> sPCLoadData2CL {
         sPCLoadData2CL {
             iUserLevel: self.perms,

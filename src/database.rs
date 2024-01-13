@@ -10,9 +10,9 @@ use crate::{
     config::config_get,
     defines::{DB_VERSION, PROTOCOL_VERSION, SIZEOF_QUESTFLAG_NUMBER, WYVERN_LOCATION_FLAG_SIZE},
     error::{log, Severity},
-    net::packet::sItemBase,
+    net::packet::{sItemBase, sNano},
     player::{Player, PlayerFlags, PlayerStyle},
-    util, Combatant, Entity, Item, Position,
+    util, Combatant, Entity, Item, Nano, Position,
 };
 
 pub struct Database {
@@ -231,6 +231,16 @@ impl Database {
                 .change_nano(slot, if nano_id == 0 { None } else { Some(nano_id) })
                 .unwrap();
         }
+        let nanos = self.query("load_nanos", &[&pc_uid]);
+        for nano in nanos {
+            let nano_raw = sNano {
+                iID: nano.get::<_, i32>("ID") as i16,
+                iSkillID: nano.get::<_, i32>("Skill") as i16,
+                iStamina: nano.get::<_, i32>("Stamina") as i16,
+            };
+            let nano: Option<Nano> = nano_raw.try_into().unwrap();
+            player.set_nano(nano.unwrap());
+        }
 
         let mut player_flags = PlayerFlags::default();
         let first_use_bytes: &[u8] = row.get("FirstUseFlag");
@@ -285,6 +295,7 @@ impl Database {
 
     pub fn save_player(&mut self, player: &Player) {
         let save_item = self.prep("save_item");
+        let save_nano = self.prep("save_nano");
         let pc_uid = player.get_uid();
 
         self.begin_transaction();
@@ -326,6 +337,23 @@ impl Database {
                 &quest_bytes,
             ],
         );
+
+        self.exec("clear_nanos", &[&pc_uid]);
+        for nano in player.get_nano_iter() {
+            let nano_raw: sNano = Some(nano.clone()).into();
+            if let Err(e) = self.get().execute(
+                &save_nano,
+                &[
+                    &pc_uid,
+                    &(nano_raw.iID as i32),
+                    &(nano_raw.iSkillID as i32),
+                    &(nano_raw.iStamina as i32),
+                ],
+            ) {
+                log(Severity::Fatal, &format!("DB error: {}", e));
+                panic!();
+            }
+        }
 
         self.exec("clear_items", &[&pc_uid]);
         for (slot_num, item) in player.get_item_iter() {
