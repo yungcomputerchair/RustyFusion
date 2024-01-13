@@ -134,7 +134,7 @@ pub fn nano_tune(client: &mut FFClient, state: &mut ShardServerState) -> FFResul
             let mut items = [None.into(); 10];
             let mut quantity_left = tuning.req_item_quantity;
 
-            let mut player_working = *player;
+            let mut player_working = player.clone();
             if player_working
                 .get_nano(pkt.iNanoID)?
                 .selected_skill

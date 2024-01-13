@@ -403,14 +403,17 @@ pub fn trade_confirm(clients: &mut ClientMap, state: &mut ShardServerState) -> F
 
     let player = state.get_player_mut(pc_id).unwrap();
     player.trade_id = None;
-    let mut player = *player;
+    let mut player = player.clone();
 
     let player_other = state.get_player_mut(pc_id_other).unwrap();
     player_other.trade_id = None;
-    let mut player_other = *player_other;
+    let mut player_other = player_other.clone();
 
     let trade = state.ongoing_trades.remove(&trade_id).unwrap();
     if let Ok((items, items_other)) = trade.resolve((&mut player, &mut player_other)) {
+        let player_taros = player.get_taros();
+        let player_other_taros = player_other.get_taros();
+
         // save traded state
         *state.get_player_mut(pc_id).unwrap() = player;
         *state.get_player_mut(pc_id_other).unwrap() = player_other;
@@ -419,14 +422,14 @@ pub fn trade_confirm(clients: &mut ClientMap, state: &mut ShardServerState) -> F
             iID_Request: resp.iID_Request,
             iID_From: resp.iID_From,
             iID_To: resp.iID_To,
-            iCandy: player_other.get_taros() as i32,
+            iCandy: player_other_taros as i32,
             Item: items_other,
             ItemStay: items,
         };
         let _ = client_other.send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM_SUCC, &resp);
 
         let resp = sP_FE2CL_REP_PC_TRADE_CONFIRM_SUCC {
-            iCandy: player.get_taros() as i32,
+            iCandy: player_taros as i32,
             Item: items,
             ItemStay: items_other,
             ..resp

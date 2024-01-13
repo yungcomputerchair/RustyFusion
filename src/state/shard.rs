@@ -140,7 +140,7 @@ impl ShardServerState {
                 // we copy the entity here so we can mutably borrow the state.
                 // we put it back when we're done.
                 EntityID::Player(pc_id) => {
-                    let mut player = *self.entity_map.get_player_mut(pc_id).unwrap();
+                    let mut player = self.entity_map.get_player_mut(pc_id).unwrap().clone();
                     player.tick(time, clients, self);
                     *self.entity_map.get_player_mut(pc_id).unwrap() = player;
                 }

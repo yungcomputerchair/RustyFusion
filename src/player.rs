@@ -188,7 +188,7 @@ impl Default for PlayerInventory {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Player {
     id: Option<i32>,
     uid: i64,

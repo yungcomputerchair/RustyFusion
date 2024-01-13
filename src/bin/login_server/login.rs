@@ -41,7 +41,7 @@ pub fn login(
     let account_id: i64 = account.get("AccountID");
     let last_player_slot: i32 = account.get("Selected");
 
-    let mut players: [Option<Player>; 4] = [None; 4];
+    let mut players: [Option<Player>; 4] = Default::default();
     let count = db.load_players(account_id, &mut players);
 
     let resp = sP_LS2CL_REP_LOGIN_SUCC {
@@ -71,7 +71,7 @@ pub fn login(
         serial_key,
         pc_id: None,
     };
-    state.set_account(account_id, username, players.into_iter().flatten());
+    state.set_account(account_id, username, players.clone().into_iter().flatten());
 
     players
         .iter()
