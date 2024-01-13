@@ -182,7 +182,7 @@ impl Database {
         );
     }
 
-    pub fn load_player(&mut self, row: &Row) -> Player {
+    fn load_player_internal(&mut self, row: &Row) -> (usize, Player) {
         let pc_uid = row.get("PlayerId");
         let mut player = Player::new(pc_uid);
         let appearance_flag: i32 = row.get("AppearanceFlag");
@@ -259,7 +259,28 @@ impl Database {
             player.set_item(loc, slot_num, item).unwrap();
         }
 
-        player
+        let slot_num: i32 = row.get("Slot");
+        (slot_num as usize, player)
+    }
+
+    pub fn load_player(&mut self, acc_id: i64, pc_uid: i64) -> Option<Player> {
+        let rows = self.query("load_players", &[&acc_id]);
+        for row in &rows {
+            if row.get::<_, i64>("PlayerId") == pc_uid {
+                let (_, player) = self.load_player_internal(row);
+                return Some(player);
+            }
+        }
+        None
+    }
+
+    pub fn load_players(&mut self, acc_id: i64, players: &mut [Option<Player>]) -> usize {
+        let chars = self.query("load_players", &[&acc_id]);
+        for row in &chars {
+            let (slot_num, player) = self.load_player_internal(row);
+            players[slot_num] = Some(player);
+        }
+        chars.len()
     }
 
     pub fn save_player(&mut self, player: &Player) {

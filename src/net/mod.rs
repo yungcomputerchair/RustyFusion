@@ -9,12 +9,11 @@ use self::{
 };
 use crate::{
     error::{FFError, FFResult, Severity},
-    player::Player,
     state::ServerState,
 };
 
 pub const CONN_ID_DISCONNECTED: i64 = -1;
-const PACKET_BUFFER_SIZE: usize = 4096 * 3;
+const PACKET_BUFFER_SIZE: usize = 4096;
 const SILENCED_PACKETS: [PacketID; 4] = [
     P_LS2FE_REP_CONNECT_SUCC,
     //
@@ -43,7 +42,6 @@ pub struct LoginData {
     pub iPC_UID: i64,
     pub uiFEKey: u64,
     pub uiSvrTime: u64,
-    pub player: Player,
 }
 
 unsafe fn bytes_to_struct<T: FFPacket>(bytes: &[u8]) -> &T {

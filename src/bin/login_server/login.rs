@@ -21,7 +21,6 @@ pub fn login(
     // TODO failure
     let pkt: &sP_CL2LS_REQ_LOGIN = client.get_packet(P_CL2LS_REQ_LOGIN)?;
 
-    let mut players: [Option<Player>; 4] = [None; 4];
     let mut username = util::parse_utf16(&pkt.szID);
     let mut _password = util::parse_utf16(&pkt.szPassword);
     if username.is_empty() {
@@ -42,15 +41,11 @@ pub fn login(
     let account_id: i64 = account.get("AccountID");
     let last_player_slot: i32 = account.get("Selected");
 
-    let chars = db.query("load_player", &[&account_id]);
-    for player_info in &chars {
-        let slot_num: i32 = player_info.get("Slot");
-        let player = db.load_player(player_info);
-        players[slot_num as usize] = Some(player);
-    }
+    let mut players: [Option<Player>; 4] = [None; 4];
+    let count = db.load_players(account_id, &mut players);
 
     let resp = sP_LS2CL_REP_LOGIN_SUCC {
-        iCharCount: chars.len() as i8,
+        iCharCount: count as i8,
         iSlotNum: last_player_slot as i8,
         iTempForPacking4: unused!(),
         uiSvrTime: util::get_timestamp_ms(time),
@@ -243,7 +238,6 @@ pub fn char_select(
             iPC_UID: pc_uid,
             uiFEKey: client.get_fe_key_uint(),
             uiSvrTime: util::get_timestamp_ms(time),
-            player: *player,
         };
 
         let shard_server = clients

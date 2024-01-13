@@ -79,8 +79,6 @@ pub fn login_update_info(server: &mut FFClient, state: &mut ShardServerState) ->
             iPC_UID: pkt.iPC_UID,
             uiFEKey: pkt.uiFEKey,
             uiSvrTime: pkt.uiSvrTime,
-            // this should ideally be fetched from DB
-            player: pkt.player,
         },
     );
 

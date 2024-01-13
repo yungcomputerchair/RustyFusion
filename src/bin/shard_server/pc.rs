@@ -1,5 +1,6 @@
 use rusty_fusion::{
     chunk::MAP_SQUARE_SIZE,
+    database::db_get,
     defines::{EQUIP_SLOT_VEHICLE, EXIT_CODE_REQ_BY_PC, ID_OVERWORLD},
     enums::ItemLocation,
     error::catch_fail,
@@ -22,7 +23,17 @@ pub fn pc_enter(
     let serial_key: i64 = pkt.iEnterSerialKey;
     let login_data = state.login_data.remove(&serial_key).unwrap();
     let pc_id = state.entity_map.gen_next_pc_id();
-    let mut player = login_data.player;
+
+    let mut db = db_get();
+    let mut player = db
+        .load_player(login_data.iAccountID, login_data.iPC_UID)
+        .ok_or(FFError::build(
+            Severity::Warning,
+            format!(
+                "Player {} not found for account {}",
+                login_data.iPC_UID, login_data.iAccountID
+            ),
+        ))?;
     player.set_player_id(pc_id);
     player.set_client_id(key);
 

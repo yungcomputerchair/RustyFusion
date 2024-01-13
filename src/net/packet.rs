@@ -4,7 +4,7 @@
 
 use num_enum::TryFromPrimitive;
 
-use crate::{error::FFError, player::Player};
+use crate::error::FFError;
 
 #[repr(u32)]
 #[derive(Debug, TryFromPrimitive, Clone, Copy, PartialEq)]
@@ -6537,7 +6537,6 @@ pub struct sP_LS2FE_REQ_UPDATE_LOGIN_INFO {
     pub iPC_UID: i64,
     pub uiFEKey: u64,
     pub uiSvrTime: u64,
-    pub player: Player,
 }
 impl FFPacket for sP_LS2FE_REQ_UPDATE_LOGIN_INFO {}
 
