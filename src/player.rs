@@ -204,6 +204,7 @@ impl Default for PlayerInventory {
 #[derive(Debug, Clone, Default)]
 pub struct Player {
     id: Option<i32>,
+    slot_num: usize,
     uid: i64,
     client_id: Option<usize>,
     perms: i16,
@@ -232,9 +233,10 @@ pub struct Player {
     pub pre_warp_map_num: u32,
 }
 impl Player {
-    pub fn new(uid: i64) -> Self {
+    pub fn new(uid: i64, slot_num: usize) -> Self {
         Self {
             uid,
+            slot_num,
             hp: placeholder!(400),
             level: 1,
             ..Default::default()
@@ -243,6 +245,10 @@ impl Player {
 
     pub fn get_uid(&self) -> i64 {
         self.uid
+    }
+
+    pub fn get_slot_num(&self) -> usize {
+        self.slot_num
     }
 
     pub fn get_player_id(&self) -> i32 {

@@ -120,10 +120,10 @@ pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> FF
         ));
     }
 
-    let mut player = Player::new(pc_uid);
+    let mut player = Player::new(pc_uid, slot_num);
     player.set_name(1, pkt.szFirstName, pkt.szLastName);
     let mut db = db_get();
-    db.init_player(acc_id, slot_num, &player);
+    db.init_player(acc_id, &player);
 
     let style = &player.get_style();
     let resp = sP_LS2CL_REP_SAVE_CHAR_NAME_SUCC {

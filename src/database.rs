@@ -136,7 +136,7 @@ impl Database {
         num_updated
     }
 
-    pub fn init_player(&mut self, acc_id: i64, slot: usize, player: &Player) {
+    pub fn init_player(&mut self, acc_id: i64, player: &Player) {
         self.exec(
             "init_player",
             &[
@@ -145,7 +145,7 @@ impl Database {
                 &player.get_first_name(),
                 &player.get_last_name(),
                 &(player.get_style().iNameCheck as i32),
-                &(slot as i32),
+                &(player.get_slot_num() as i32),
                 &player.get_position().x,
                 &player.get_position().y,
                 &player.get_position().z,
@@ -182,9 +182,10 @@ impl Database {
         );
     }
 
-    fn load_player_internal(&mut self, row: &Row) -> (usize, Player) {
+    fn load_player_internal(&mut self, row: &Row) -> Player {
         let pc_uid = row.get("PlayerId");
-        let mut player = Player::new(pc_uid);
+        let slot_num: i32 = row.get("Slot");
+        let mut player = Player::new(pc_uid, slot_num as usize);
         let appearance_flag: i32 = row.get("AppearanceFlag");
         player.style = if appearance_flag != 0 {
             Some(PlayerStyle {
@@ -269,15 +270,14 @@ impl Database {
             player.set_item(loc, slot_num, item).unwrap();
         }
 
-        let slot_num: i32 = row.get("Slot");
-        (slot_num as usize, player)
+        player
     }
 
     pub fn load_player(&mut self, acc_id: i64, pc_uid: i64) -> Option<Player> {
         let rows = self.query("load_players", &[&acc_id]);
         for row in &rows {
             if row.get::<_, i64>("PlayerId") == pc_uid {
-                let (_, player) = self.load_player_internal(row);
+                let player = self.load_player_internal(row);
                 return Some(player);
             }
         }
@@ -287,7 +287,8 @@ impl Database {
     pub fn load_players(&mut self, acc_id: i64, players: &mut [Option<Player>]) -> usize {
         let chars = self.query("load_players", &[&acc_id]);
         for row in &chars {
-            let (slot_num, player) = self.load_player_internal(row);
+            let player = self.load_player_internal(row);
+            let slot_num = player.get_slot_num();
             players[slot_num] = Some(player);
         }
         chars.len()
