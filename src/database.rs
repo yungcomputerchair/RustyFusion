@@ -7,7 +7,7 @@ use std::{
 use postgres::{tls, types::ToSql, Client, Row};
 
 use crate::{
-    config::config_get,
+    config::{config_get, GeneralConfig},
     defines::{DB_VERSION, PROTOCOL_VERSION, SIZEOF_QUESTFLAG_NUMBER, WYVERN_LOCATION_FLAG_SIZE},
     error::{log, Severity},
     net::packet::{sItemBase, sNano},
@@ -383,10 +383,9 @@ static DATABASE: Mutex<Database> = Mutex::new(Database {
     transaction: false,
 });
 
-pub fn db_init() -> MutexGuard<'static, Database> {
+fn db_connect(config: &GeneralConfig) -> Database {
     const DB_NAME: &str = "rustyfusion";
 
-    let config = &config_get().general;
     let mut db_config = Client::configure();
     db_config
         .host(&config.db_host.get())
@@ -403,11 +402,27 @@ pub fn db_init() -> MutexGuard<'static, Database> {
         );
         panic!();
     }
-    let mut db = DATABASE.lock().unwrap();
-    *db = Database {
+    let mut db = Database {
         client: Some(db_client.unwrap()),
         transaction: false,
     };
+
+    let meta_table_exists: bool = db.query("meta_table_exists", &[])[0].get(0);
+    if !meta_table_exists {
+        log(
+            Severity::Info,
+            "Meta table missing; initializing database...",
+        );
+        db.exec("create_tables", &[&PROTOCOL_VERSION, &DB_VERSION]);
+    }
+
+    db
+}
+
+pub fn db_init() -> MutexGuard<'static, Database> {
+    let mut db = DATABASE.lock().unwrap();
+    let config = &config_get().general;
+    *db = db_connect(config);
     log(
         Severity::Info,
         &format!(
@@ -417,16 +432,6 @@ pub fn db_init() -> MutexGuard<'static, Database> {
             config.db_port.get()
         ),
     );
-
-    let meta_table_exists: &bool = &db.query("meta_table_exists", &[])[0].get(0);
-    if !meta_table_exists {
-        log(
-            Severity::Info,
-            "Meta table missing; initializing database...",
-        );
-        db.exec("create_tables", &[&PROTOCOL_VERSION, &DB_VERSION]);
-    }
-
     db
 }
 
