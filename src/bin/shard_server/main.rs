@@ -22,6 +22,7 @@ use rusty_fusion::{
         },
         ClientMap, LoginData, CONN_ID_DISCONNECTED,
     },
+    player::Player,
     state::{shard::ShardServerState, ServerState},
     tabledata::tdata_init,
     timer::TimerMap,
@@ -132,14 +133,8 @@ fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>, state: 
         ClientType::GameClient {
             pc_id: Some(pc_id), ..
         } => {
-            let player = state.get_player(pc_id).unwrap();
-            log(Severity::Info, &format!("{} left", player));
-
-            let id = EntityID::Player(pc_id);
-            let entity_map = &mut state.entity_map;
-            entity_map.update(id, None, Some(&mut clients));
-            let mut player = entity_map.untrack(id);
-            player.cleanup(&mut clients, state);
+            // dirty exit; clean exit happens in P_CL2FE_REQ_PC_EXIT handler
+            Player::disconnect(pc_id, state, &mut clients);
         }
         _ => (),
     }
@@ -180,7 +175,7 @@ fn handle_packet(
         P_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH => pc::pc_special_state_switch(&mut clients, state),
         P_CL2FE_REQ_PC_FIRST_USE_FLAG_SET => pc::pc_first_use_flag_set(clients.get_self(), state),
         P_CL2FE_REQ_PC_CHANGE_MENTOR => pc::pc_change_mentor(clients.get_self(), state),
-        P_CL2FE_REQ_PC_EXIT => pc::pc_exit(clients.get_self()),
+        P_CL2FE_REQ_PC_EXIT => pc::pc_exit(&mut clients, state),
         //
         P_CL2FE_REQ_PC_GIVE_ITEM => gm::gm_pc_give_item(clients.get_self(), state),
         P_CL2FE_GM_REQ_PC_SET_VALUE => gm::gm_pc_set_value(clients.get_self(), state),

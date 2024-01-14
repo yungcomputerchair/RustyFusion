@@ -2,9 +2,10 @@ use std::{any::Any, collections::HashMap, fmt::Display, time::SystemTime};
 
 use crate::{
     chunk::{ChunkCoords, InstanceID},
+    database::db_get,
     defines::*,
     enums::{ItemLocation, ItemType, PlayerGuide},
-    error::{FFError, FFResult, Severity},
+    error::{log, FFError, FFResult, Severity},
     net::{
         ffclient::FFClient,
         packet::{
@@ -856,6 +857,19 @@ impl Player {
                 }
             }
         } // TODO GM special state
+    }
+
+    pub fn disconnect(pc_id: i32, state: &mut ShardServerState, clients: &mut ClientMap) {
+        let player = state.get_player(pc_id).unwrap();
+        let mut db = db_get();
+        db.save_player(player);
+        log(Severity::Info, &format!("{} left", player));
+
+        let id = EntityID::Player(pc_id);
+        let entity_map = &mut state.entity_map;
+        entity_map.update(id, None, Some(clients));
+        let mut player = entity_map.untrack(id);
+        player.cleanup(clients, state);
     }
 }
 impl Combatant for Player {

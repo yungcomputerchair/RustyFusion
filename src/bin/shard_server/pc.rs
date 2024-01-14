@@ -61,12 +61,17 @@ pub fn pc_enter(
     client.send_packet(P_FE2CL_REP_PC_ENTER_SUCC, &resp)
 }
 
-pub fn pc_exit(client: &mut FFClient) -> FFResult<()> {
+pub fn pc_exit(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let client = clients.get_self();
+    let pc_id = client.clear_player_id()?;
+    Player::disconnect(pc_id, state, clients);
     let resp = sP_FE2CL_REP_PC_EXIT_SUCC {
-        iID: client.get_player_id()?,
+        iID: pc_id,
         iExitCode: EXIT_CODE_REQ_BY_PC as i32,
     };
-    client.send_packet(P_FE2CL_REP_PC_EXIT_SUCC, &resp)
+    clients
+        .get_self()
+        .send_packet(P_FE2CL_REP_PC_EXIT_SUCC, &resp)
 }
 
 pub fn pc_loading_complete(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {

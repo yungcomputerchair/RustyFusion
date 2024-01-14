@@ -101,6 +101,14 @@ impl FFClient {
         }
     }
 
+    pub fn clear_player_id(&mut self) -> FFResult<i32> {
+        let pc_id = self.get_player_id()?;
+        if let ClientType::GameClient { pc_id, .. } = &mut self.client_type {
+            *pc_id = None;
+        }
+        Ok(pc_id)
+    }
+
     pub fn peek_packet_id(&self) -> FFResult<PacketID> {
         let from = self.in_buf_ptr;
         let to = from + 4;
