@@ -955,3 +955,17 @@ impl Entity for Player {
         self
     }
 }
+impl Display for Player {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let title = match self.perms {
+            0 => Some("GM"),
+            1 => Some("Mod"),
+            _ => None,
+        };
+        let title = match title {
+            Some(title) => format!("({}) ", title),
+            None => String::new(),
+        };
+        write!(f, "{}{} ({})", title, self.name, self.get_uid(),)
+    }
+}

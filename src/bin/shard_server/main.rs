@@ -132,6 +132,9 @@ fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>, state: 
         ClientType::GameClient {
             pc_id: Some(pc_id), ..
         } => {
+            let player = state.get_player(pc_id).unwrap();
+            log(Severity::Info, &format!("{} left", player));
+
             let id = EntityID::Player(pc_id);
             let entity_map = &mut state.entity_map;
             entity_map.update(id, None, Some(&mut clients));

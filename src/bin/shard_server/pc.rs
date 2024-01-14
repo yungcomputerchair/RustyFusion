@@ -55,6 +55,7 @@ pub fn pc_enter(
     client.fe_key = login_data.uiFEKey.to_le_bytes();
     client.enc_mode = EncryptionMode::FEKey;
 
+    log(Severity::Info, &format!("{} joined", player));
     state.entity_map.track(Box::new(player));
 
     client.send_packet(P_FE2CL_REP_PC_ENTER_SUCC, &resp)
