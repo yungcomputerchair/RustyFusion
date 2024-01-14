@@ -114,6 +114,7 @@ fn main() -> Result<()> {
     }
 
     log(Severity::Info, "Shard server shutting down...");
+    do_autosave(SystemTime::now(), state.as_shard());
     Ok(())
 }
 
