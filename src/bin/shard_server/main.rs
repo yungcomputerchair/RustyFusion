@@ -10,7 +10,7 @@ use std::{
 
 use rusty_fusion::{
     config::{config_get, config_init},
-    database::db_init,
+    database::{db_get, db_init},
     error::{log, logger_flush, logger_flush_scheduled, logger_init, FFError, FFResult, Severity},
     net::{
         crypto::{gen_key, EncryptionMode},
@@ -79,6 +79,14 @@ fn main() -> Result<()> {
             Ok(())
         },
         Duration::from_secs(1),
+        false,
+    );
+    timers.register_timer(
+        |t, _, st| {
+            do_autosave(t, st.as_shard());
+            Ok(())
+        },
+        Duration::from_secs(config.shard.autosave_interval.get() * 60),
         false,
     );
 
@@ -282,4 +290,21 @@ fn send_live_check(client: &mut FFClient) -> FFResult<()> {
         }
         _ => Ok(()),
     }
+}
+
+fn do_autosave(time: SystemTime, state: &mut ShardServerState) {
+    log(Severity::Info, "Autosaving...");
+    let mut db = db_get();
+    db.begin_transaction();
+    for pc_id in state.entity_map.get_player_ids() {
+        let player = state.get_player(pc_id).unwrap();
+        db.save_player(player, true);
+    }
+    db.commit_transaction();
+    let time_now = SystemTime::now();
+    let save_time = time_now.duration_since(time).unwrap();
+    log(
+        Severity::Info,
+        &format!("Autosave complete ({}ms)", save_time.as_millis()),
+    );
 }

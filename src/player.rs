@@ -862,7 +862,7 @@ impl Player {
     pub fn disconnect(pc_id: i32, state: &mut ShardServerState, clients: &mut ClientMap) {
         let player = state.get_player(pc_id).unwrap();
         let mut db = db_get();
-        db.save_player(player);
+        db.save_player(player, false);
         log(Severity::Info, &format!("{} left", player));
 
         let id = EntityID::Player(pc_id);

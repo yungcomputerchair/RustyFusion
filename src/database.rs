@@ -293,12 +293,14 @@ impl Database {
         chars.len()
     }
 
-    pub fn save_player(&mut self, player: &Player) {
+    pub fn save_player(&mut self, player: &Player, transacted: bool) {
         let save_item = self.prep("save_item");
         let save_nano = self.prep("save_nano");
         let pc_uid = player.get_uid();
 
-        self.begin_transaction();
+        if !transacted {
+            self.begin_transaction();
+        }
 
         let mut skyway_bytes = Vec::new();
         for sec in player.get_skyway_flags() {
@@ -374,7 +376,9 @@ impl Database {
             }
         }
 
-        self.commit_transaction();
+        if !transacted {
+            self.commit_transaction();
+        }
     }
 }
 
