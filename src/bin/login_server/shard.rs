@@ -12,15 +12,15 @@ pub fn connect(
     state: &mut LoginServerState,
     time: SystemTime,
 ) -> FFResult<()> {
-    let conn_id = state.get_next_shard_id();
-    server.client_type = ClientType::ShardServer(conn_id);
+    let shard_id = state.get_next_shard_id();
+    server.client_type = ClientType::ShardServer(shard_id);
     let resp = sP_LS2FE_REP_CONNECT_SUCC {
         uiSvrTime: util::get_timestamp_ms(time),
-        iConn_UID: conn_id,
+        iLS_UID: state.get_id(),
     };
     server.send_packet(P_LS2FE_REP_CONNECT_SUCC, &resp)?;
 
-    let iv1: i32 = (conn_id + 1) as i32;
+    let iv1: i32 = (resp.iLS_UID + 1) as i32;
     let iv2: i32 = 69;
     server.e_key = gen_key(resp.uiSvrTime, iv1, iv2);
 
@@ -28,7 +28,7 @@ pub fn connect(
         Severity::Info,
         &format!(
             "Connected to shard server #{} ({})",
-            conn_id,
+            shard_id,
             server.get_addr()
         ),
     );

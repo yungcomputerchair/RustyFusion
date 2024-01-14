@@ -11,12 +11,14 @@ struct Account {
 }
 
 pub struct LoginServerState {
-    next_shard_id: i64,
+    server_id: i64,
+    next_shard_id: usize,
     accounts: HashMap<i64, Account>,
 }
 impl Default for LoginServerState {
     fn default() -> Self {
         Self {
+            server_id: rand::random(),
             next_shard_id: 1,
             accounts: HashMap::new(),
         }
@@ -35,6 +37,10 @@ impl LoginServerState {
             Severity::Warning,
             format!("Account {} not logged in", acc_id),
         ))
+    }
+
+    pub fn get_id(&self) -> i64 {
+        self.server_id
     }
 
     pub fn set_account(
@@ -64,7 +70,7 @@ impl LoginServerState {
         Ok(&mut acc.players)
     }
 
-    pub fn get_next_shard_id(&mut self) -> i64 {
+    pub fn get_next_shard_id(&mut self) -> usize {
         let next = self.next_shard_id;
         self.next_shard_id += 1;
         next

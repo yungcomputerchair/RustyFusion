@@ -9,7 +9,7 @@ use crate::{
     helpers,
     net::{
         packet::{PacketID::*, *},
-        ClientMap, LoginData, CONN_ID_DISCONNECTED,
+        ClientMap, LoginData,
     },
     npc::NPC,
     player::Player,
@@ -18,7 +18,7 @@ use crate::{
 };
 
 pub struct ShardServerState {
-    login_server_conn_id: i64,
+    pub login_server_conn_id: Option<i64>,
     pub login_data: HashMap<i64, LoginData>,
     pub entity_map: EntityMap,
     pub buyback_lists: HashMap<i32, Vec<Item>>,
@@ -28,7 +28,7 @@ pub struct ShardServerState {
 impl Default for ShardServerState {
     fn default() -> Self {
         let mut state = Self {
-            login_server_conn_id: CONN_ID_DISCONNECTED,
+            login_server_conn_id: None,
             login_data: HashMap::new(),
             entity_map: EntityMap::default(),
             buyback_lists: HashMap::new(),
@@ -47,14 +47,6 @@ impl Default for ShardServerState {
     }
 }
 impl ShardServerState {
-    pub fn get_login_server_conn_id(&self) -> i64 {
-        self.login_server_conn_id
-    }
-
-    pub fn set_login_server_conn_id(&mut self, conn_id: i64) {
-        self.login_server_conn_id = conn_id;
-    }
-
     pub fn find_npc_by_type(&self, npc_type: i32) -> Option<&NPC> {
         let id = self.entity_map.find_npc(|npc| npc.ty == npc_type);
         if let Some(npc_id) = id {

@@ -68,7 +68,11 @@ fn main() -> Result<()> {
 
     log(
         Severity::Info,
-        &format!("Login server listening on {}", server.get_endpoint()),
+        &format!(
+            "Login server listening on {} (ID: {})",
+            server.get_endpoint(),
+            state.as_login().get_id()
+        ),
     );
     while running.load(Ordering::SeqCst) {
         timers

@@ -20,7 +20,7 @@ use rusty_fusion::{
             PacketID::{self, *},
             *,
         },
-        ClientMap, LoginData, CONN_ID_DISCONNECTED,
+        ClientMap, LoginData,
     },
     player::Player,
     state::{shard::ShardServerState, ServerState},
@@ -137,7 +137,7 @@ fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>, state: 
                 Severity::Info,
                 &format!("Login server ({}) disconnected", client.get_addr()),
             );
-            state.set_login_server_conn_id(CONN_ID_DISCONNECTED);
+            state.login_server_conn_id = None;
         }
         ClientType::GameClient {
             pc_id: Some(pc_id), ..
@@ -277,7 +277,7 @@ fn connect_to_login_server(
 }
 
 fn is_login_server_connected(state: &ShardServerState) -> bool {
-    state.get_login_server_conn_id() != CONN_ID_DISCONNECTED
+    state.login_server_conn_id.is_some()
 }
 
 fn send_live_check(client: &mut FFClient) -> FFResult<()> {

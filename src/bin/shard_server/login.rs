@@ -16,17 +16,21 @@ pub fn login_connect_req(server: &mut FFClient) {
 
 pub fn login_connect_succ(server: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
     let pkt: &sP_LS2FE_REP_CONNECT_SUCC = server.get_packet(P_LS2FE_REP_CONNECT_SUCC)?;
-    let conn_id: i64 = pkt.iConn_UID;
+    let login_server_id: i64 = pkt.iLS_UID;
     let conn_time: u64 = pkt.uiSvrTime;
 
-    let iv1: i32 = (conn_id + 1) as i32;
+    let iv1: i32 = (login_server_id + 1) as i32;
     let iv2: i32 = 69;
     server.e_key = gen_key(conn_time, iv1, iv2);
 
-    state.set_login_server_conn_id(conn_id);
+    state.login_server_conn_id = Some(login_server_id);
     log(
         Severity::Info,
-        &format!("Connected to login server ({})", server.get_addr()),
+        &format!(
+            "Connected to login server #{} ({})",
+            login_server_id,
+            server.get_addr()
+        ),
     );
     Ok(())
 }
