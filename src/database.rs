@@ -284,14 +284,12 @@ impl Database {
         None
     }
 
-    pub fn load_players(&mut self, acc_id: i64, players: &mut [Option<Player>]) -> usize {
+    pub fn load_players(&mut self, acc_id: i64) -> Vec<Player> {
         let chars = self.query("load_players", &[&acc_id]);
-        for row in &chars {
-            let player = self.load_player_internal(row);
-            let slot_num = player.get_slot_num();
-            players[slot_num] = Some(player);
-        }
-        chars.len()
+        chars
+            .iter()
+            .map(|row| self.load_player_internal(row))
+            .collect()
     }
 
     pub fn save_player(&mut self, player: &Player, transacted: bool) {

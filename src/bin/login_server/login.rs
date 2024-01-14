@@ -41,11 +41,10 @@ pub fn login(
     let account_id: i64 = account.get("AccountID");
     let last_player_slot: i32 = account.get("Selected");
 
-    let mut players: [Option<Player>; 4] = Default::default();
-    let count = db.load_players(account_id, &mut players);
+    let players = db.load_players(account_id);
 
     let resp = sP_LS2CL_REP_LOGIN_SUCC {
-        iCharCount: count as i8,
+        iCharCount: players.len() as i8,
         iSlotNum: last_player_slot as i8,
         iTempForPacking4: unused!(),
         uiSvrTime: util::get_timestamp_ms(time),
@@ -71,29 +70,22 @@ pub fn login(
         serial_key,
         pc_id: None,
     };
-    state.set_account(account_id, username, players.clone().into_iter().flatten());
+    state.set_account(account_id, username, players.clone().iter().cloned());
 
-    players
-        .iter()
-        .enumerate()
-        .try_for_each(|(slot_num, player)| {
-            if let Some(player) = player {
-                let pos = player.get_position();
-                let pkt = sP_LS2CL_REP_CHAR_INFO {
-                    iSlot: slot_num as i8,
-                    iLevel: player.get_level(),
-                    sPC_Style: player.get_style(),
-                    sPC_Style2: player.get_style_2(),
-                    iX: pos.x,
-                    iY: pos.y,
-                    iZ: pos.z,
-                    aEquip: player.get_equipped().map(Option::<Item>::into),
-                };
-                client.send_packet(P_LS2CL_REP_CHAR_INFO, &pkt)
-            } else {
-                Ok(())
-            }
-        })
+    players.iter().try_for_each(|player| {
+        let pos = player.get_position();
+        let pkt = sP_LS2CL_REP_CHAR_INFO {
+            iSlot: player.get_slot_num() as i8,
+            iLevel: player.get_level(),
+            sPC_Style: player.get_style(),
+            sPC_Style2: player.get_style_2(),
+            iX: pos.x,
+            iY: pos.y,
+            iZ: pos.z,
+            aEquip: player.get_equipped().map(Option::<Item>::into),
+        };
+        client.send_packet(P_LS2CL_REP_CHAR_INFO, &pkt)
+    })
 }
 
 pub fn check_char_name(client: &mut FFClient) -> FFResult<()> {
@@ -124,6 +116,7 @@ pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> FF
     player.set_name(1, pkt.szFirstName, pkt.szLastName);
     let mut db = db_get();
     db.init_player(acc_id, &player);
+    db.exec("update_selected", &[&acc_id, &(slot_num as i32)]);
 
     let style = &player.get_style();
     let resp = sP_LS2CL_REP_SAVE_CHAR_NAME_SUCC {
@@ -233,6 +226,12 @@ pub fn char_select(
                 format!("Player {} hasn't completed the tutorial", pc_uid),
             ));
         }
+
+        let mut db = db_get();
+        db.exec(
+            "update_selected",
+            &[&account_id, &(player.get_slot_num() as i32)],
+        );
 
         let login_info = sP_LS2FE_REQ_UPDATE_LOGIN_INFO {
             iAccountID: account_id,
