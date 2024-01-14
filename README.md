@@ -11,7 +11,7 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
 - [x] Barebones login server functionality (connection and character creation)
 - [x] Barebones "land walker" shard server functionality (connection, basic GM commands, seeing other players & NPCs, etc)
 - [x] Config and tabledata frameworks
-- [ ] ***Database (account system and player persistence)***
+- [x] Database (account system and player persistence)
 - [x] Chunking
   - [x] Framework
   - [x] Instancing (infected zones + other private instances)
