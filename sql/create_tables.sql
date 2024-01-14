@@ -3,11 +3,23 @@ CREATE TABLE Meta(
     Value INTEGER NOT NULL
 );
 
-INSERT INTO Meta(Key, Value)
-    VALUES ('ProtocolVersion', $1);
+INSERT INTO Meta(
+    Key,
+    Value
+)
+VALUES (
+    'ProtocolVersion',
+    $1
+);
 
-INSERT INTO Meta(Key, Value)
-    VALUES ('DatabaseVersion', $1);
+INSERT INTO Meta(
+    Key,
+    Value
+)
+VALUES (
+    'DatabaseVersion',
+    $1
+);
 
 CREATE TABLE IF NOT EXISTS Accounts (
     AccountID    BIGSERIAL PRIMARY KEY NOT NULL,
