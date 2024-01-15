@@ -1,7 +1,7 @@
 use rusty_fusion::{
     chunk::MAP_SQUARE_SIZE,
     database::db_get,
-    defines::{EQUIP_SLOT_VEHICLE, EXIT_CODE_REQ_BY_PC, ID_OVERWORLD},
+    defines::{self, EQUIP_SLOT_VEHICLE, EXIT_CODE_REQ_BY_PC, ID_OVERWORLD},
     enums::{ItemLocation, PlayerShardStatus},
     error::catch_fail,
     placeholder,
@@ -411,14 +411,37 @@ pub fn pc_special_state_switch(
         client.get_packet(P_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH)?;
 
     let player = state.get_player_mut(pc_id)?;
-    let special_state = player.update_special_state(pkt.iSpecialStateFlag);
+
+    match pkt.iSpecialStateFlag as u32 {
+        defines::CN_SPECIAL_STATE_FLAG__FULL_UI => {
+            player.in_menu = !player.in_menu;
+        }
+        _ => {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "P_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH: invalid special state flag: {}",
+                    pkt.iSpecialStateFlag
+                ),
+            ));
+        }
+    }
+
+    let special_state_flags = player.get_special_state_bit_flag();
 
     let resp = sP_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC {
         iPC_ID: pkt.iPC_ID,
         iReqSpecialStateFlag: pkt.iSpecialStateFlag,
-        iSpecialState: special_state,
+        iSpecialState: special_state_flags,
     };
-    client.send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp)
+    state
+        .entity_map
+        .for_each_around(EntityID::Player(pkt.iPC_ID), clients, |c| {
+            let _ = c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
+        });
+    clients
+        .get_self()
+        .send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp)
 }
 
 pub fn pc_first_use_flag_set(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {

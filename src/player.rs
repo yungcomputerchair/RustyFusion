@@ -207,13 +207,17 @@ pub struct Player {
     uid: i64,
     client_id: Option<usize>,
     perms: i16,
+    pub show_gm_marker: bool,
+    pub invisible: bool,
+    pub invulnerable: bool,
+    pub in_menu: bool,
+    pub freechat_muted: bool,
     position: Position,
     rotation: i32,
     pub instance_id: InstanceID,
     pub style: Option<PlayerStyle>,
     pub flags: PlayerFlags,
     name: PlayerName,
-    special_state: i8,
     level: i16,
     hp: i32,
     guide_data: GuideData,
@@ -422,7 +426,7 @@ impl Player {
             iBatteryN: self.nano_potions as i32,
             iCandy: self.taros as i32,
             iFusionMatter: self.fusion_matter as i32,
-            iSpecialState: self.special_state,
+            iSpecialState: self.get_special_state_bit_flag(),
             iMapNum: self.get_mapnum(),
             iX: self.position.x,
             iY: self.position.y,
@@ -473,13 +477,34 @@ impl Player {
         flags
     }
 
+    pub fn get_special_state_bit_flag(&self) -> i8 {
+        let mut flags = 0;
+        if self.show_gm_marker {
+            flags |= CN_SPECIAL_STATE_FLAG__PRINT_GM;
+        }
+        if self.invulnerable {
+            flags |= CN_SPECIAL_STATE_FLAG__INVULNERABLE;
+        }
+        if self.invisible {
+            flags |= CN_SPECIAL_STATE_FLAG__INVISIBLE;
+        }
+        if self.in_menu {
+            flags |= CN_SPECIAL_STATE_FLAG__FULL_UI;
+        }
+        // TODO combat flag
+        if self.freechat_muted {
+            flags |= CN_SPECIAL_STATE_FLAG__MUTE_FREECHAT;
+        }
+        flags as i8
+    }
+
     pub fn get_appearance_data(&self) -> sPCAppearanceData {
         sPCAppearanceData {
             iID: self.id.unwrap_or_default(),
             PCStyle: self.get_style(),
             iConditionBitFlag: self.get_condition_bit_flag(),
             iPCState: self.get_state_bit_flag(),
-            iSpecialState: self.special_state,
+            iSpecialState: self.get_special_state_bit_flag(),
             iLv: self.level,
             iHP: self.hp,
             iMapNum: self.get_mapnum(),
@@ -707,11 +732,6 @@ impl Player {
 
     pub fn get_fusion_matter(&self) -> u32 {
         self.fusion_matter
-    }
-
-    pub fn update_special_state(&mut self, flags: i8) -> i8 {
-        self.special_state ^= flags;
-        self.special_state
     }
 
     pub fn update_first_use_flag(&mut self, bit_offset: i32) -> FFResult<i128> {
