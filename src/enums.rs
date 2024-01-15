@@ -24,6 +24,14 @@ pub enum PlayerGuide {
     Computress = 5,
 }
 
+#[repr(i8)]
+#[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
+#[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
+pub enum PlayerShardStatus {
+    Entered = 0,
+    Exited = 1,
+}
+
 /* Enums ripped from the client */
 
 #[repr(i32)]

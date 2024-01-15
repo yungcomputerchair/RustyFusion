@@ -174,7 +174,7 @@ fn handle_packet(
         //
         P_CL2LS_REQ_LOGIN => wrong_server(clients.get_self()),
         //
-        P_CL2FE_REQ_PC_ENTER => pc::pc_enter(clients.get_self(), key, state, time),
+        P_CL2FE_REQ_PC_ENTER => pc::pc_enter(&mut clients, key, state, time),
         P_CL2FE_REQ_PC_LOADING_COMPLETE => pc::pc_loading_complete(&mut clients, state),
         P_CL2FE_REQ_PC_MOVE => pc::pc_move(&mut clients, state, time),
         P_CL2FE_REQ_PC_JUMP => pc::pc_jump(&mut clients, state, time),

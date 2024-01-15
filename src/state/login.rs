@@ -14,6 +14,7 @@ pub struct LoginServerState {
     server_id: i64,
     next_shard_id: usize,
     accounts: HashMap<i64, Account>,
+    pub player_shards: HashMap<i64, usize>,
 }
 impl Default for LoginServerState {
     fn default() -> Self {
@@ -21,6 +22,7 @@ impl Default for LoginServerState {
             server_id: rand::random(),
             next_shard_id: 1,
             accounts: HashMap::new(),
+            player_shards: HashMap::new(),
         }
     }
 }

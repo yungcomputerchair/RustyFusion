@@ -531,6 +531,7 @@ pub enum PacketID {
     P_FE2LS_REP_LIVE_CHECK = 0x32000002,             // 838860802
     P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC = 0x32000003, // 838860803
     P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL = 0x32000004, // 838860804
+    P_FE2LS_UPDATE_PC_SHARD = 0x32000005,            // 838860805
 }
 
 pub trait FFPacket: std::fmt::Debug {}
@@ -6574,3 +6575,12 @@ pub struct sP_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL {
     pub iErrorCode: i32,
 }
 impl FFPacket for sP_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_UPDATE_PC_SHARD {
+    pub iPC_UID: i64,
+    pub ePSS: i8,
+}
+impl FFPacket for sP_FE2LS_UPDATE_PC_SHARD {}

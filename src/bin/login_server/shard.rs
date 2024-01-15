@@ -3,6 +3,7 @@ use std::time::SystemTime;
 use super::*;
 
 use rusty_fusion::{
+    enums::PlayerShardStatus,
     net::{ffclient::ClientType, packet::*},
     util,
 };
@@ -89,4 +90,46 @@ pub fn update_login_info_fail(
     client.send_packet(P_LS2CL_REP_CHAR_SELECT_FAIL, &resp)?;
 
     Ok(())
+}
+
+pub fn update_pc_shard(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
+    let pkt: sP_FE2LS_UPDATE_PC_SHARD = *client.get_packet(P_FE2LS_UPDATE_PC_SHARD)?;
+    if let ClientType::ShardServer(shard_id) = client.client_type {
+        let pc_uid = pkt.iPC_UID;
+        let status: PlayerShardStatus = pkt.ePSS.try_into()?;
+        log(
+            Severity::Debug,
+            &format!("Player {} moved (shard {}, {:?})", pc_uid, shard_id, status),
+        );
+
+        let player_shards = &mut state.player_shards;
+        match status {
+            PlayerShardStatus::Entered => {
+                let old = player_shards.insert(pc_uid, shard_id);
+                if let Some(old_shard_id) = old {
+                    log(
+                        Severity::Warning,
+                        &format!(
+                            "Player {} was already tracked in shard {}",
+                            pc_uid, old_shard_id
+                        ),
+                    );
+                }
+            }
+            PlayerShardStatus::Exited => {
+                if player_shards.remove(&pc_uid).is_none() {
+                    log(
+                        Severity::Warning,
+                        &format!("Player {} was untracked in shard {}", pc_uid, shard_id),
+                    );
+                }
+            }
+        };
+        Ok(())
+    } else {
+        Err(FFError::build(
+            Severity::Warning,
+            "P_FE2LS_UPDATE_PC_SHARD: Client is not a shard server".to_string(),
+        ))
+    }
 }

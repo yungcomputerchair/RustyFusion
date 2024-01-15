@@ -85,4 +85,10 @@ impl<'a> ClientMap<'a> {
             .find(|c| matches!(c.client_type, ClientType::GameClient { pc_id: Some(pid), .. } if pid == pc_id))
             .ok_or(FFError::build(Severity::Warning, format!("Couldn't find player with ID {}", pc_id)))
     }
+
+    pub fn get_login_server(&mut self) -> Option<&mut FFClient> {
+        self.clients
+            .values_mut()
+            .find(|c| matches!(c.client_type, ClientType::LoginServer))
+    }
 }

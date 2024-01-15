@@ -130,6 +130,7 @@ fn handle_packet(
         P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC => shard::update_login_info_succ(key, clients),
         P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL => shard::update_login_info_fail(key, clients),
         P_FE2LS_REP_LIVE_CHECK => Ok(()),
+        P_FE2LS_UPDATE_PC_SHARD => shard::update_pc_shard(client, state),
         //
         P_CL2LS_REQ_LOGIN => login::login(client, state, time),
         P_CL2LS_REQ_CHECK_CHAR_NAME => login::check_char_name(client),

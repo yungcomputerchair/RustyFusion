@@ -4,13 +4,14 @@ use crate::{
     chunk::{ChunkCoords, InstanceID},
     database::db_get,
     defines::*,
-    enums::{ItemLocation, ItemType, PlayerGuide},
+    enums::{ItemLocation, ItemType, PlayerGuide, PlayerShardStatus},
     error::{log, FFError, FFResult, Severity},
     net::{
         ffclient::FFClient,
         packet::{
             sNano, sPCAppearanceData, sPCLoadData2CL, sPCStyle, sPCStyle2, sP_FE2CL_PC_EXIT,
-            sP_FE2CL_PC_NEW, sP_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL, sTimeBuff,
+            sP_FE2CL_PC_NEW, sP_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL, sP_FE2LS_UPDATE_PC_SHARD,
+            sTimeBuff,
             PacketID::{self, *},
         },
         ClientMap,
@@ -867,6 +868,7 @@ impl Player {
 
     pub fn disconnect(pc_id: i32, state: &mut ShardServerState, clients: &mut ClientMap) {
         let player = state.get_player(pc_id).unwrap();
+        let pc_uid = player.get_uid();
         let mut db = db_get();
         db.save_player(player, false);
         log(Severity::Info, &format!("{} left", player));
@@ -876,6 +878,22 @@ impl Player {
         entity_map.update(id, None, Some(clients));
         let mut player = entity_map.untrack(id);
         player.cleanup(clients, state);
+
+        let pkt = sP_FE2LS_UPDATE_PC_SHARD {
+            iPC_UID: pc_uid,
+            ePSS: PlayerShardStatus::Exited as i8,
+        };
+        match clients.get_login_server() {
+            Some(login_server) => {
+                let _ = login_server.send_packet(P_FE2LS_UPDATE_PC_SHARD, &pkt);
+            }
+            None => {
+                log(
+                    Severity::Warning,
+                    "Player::disconnect: No login server connected! Things may break.",
+                );
+            }
+        }
     }
 }
 impl Combatant for Player {

@@ -2,7 +2,7 @@ use rusty_fusion::{
     chunk::MAP_SQUARE_SIZE,
     database::db_get,
     defines::{EQUIP_SLOT_VEHICLE, EXIT_CODE_REQ_BY_PC, ID_OVERWORLD},
-    enums::ItemLocation,
+    enums::{ItemLocation, PlayerShardStatus},
     error::catch_fail,
     placeholder,
     tabledata::tdata_get,
@@ -14,11 +14,12 @@ use super::*;
 use crate::ShardServerState;
 
 pub fn pc_enter(
-    client: &mut FFClient,
+    clients: &mut ClientMap,
     key: usize,
     state: &mut ShardServerState,
     time: SystemTime,
 ) -> FFResult<()> {
+    let client = clients.get_self();
     let pkt: &sP_CL2FE_REQ_PC_ENTER = client.get_packet(P_CL2FE_REQ_PC_ENTER)?;
     let serial_key: i64 = pkt.iEnterSerialKey;
     let login_data = state.login_data.remove(&serial_key).unwrap();
@@ -55,10 +56,28 @@ pub fn pc_enter(
     client.fe_key = login_data.uiFEKey.to_le_bytes();
     client.enc_mode = EncryptionMode::FEKey;
 
+    let pkt = sP_FE2LS_UPDATE_PC_SHARD {
+        iPC_UID: player.get_uid(),
+        ePSS: PlayerShardStatus::Entered as i8,
+    };
+    match clients.get_login_server() {
+        Some(login_server) => {
+            let _ = login_server.send_packet(P_FE2LS_UPDATE_PC_SHARD, &pkt);
+        }
+        None => {
+            log(
+                Severity::Warning,
+                "P_CL2FE_REQ_PC_ENTER: No login server connected! Things may break.",
+            );
+        }
+    }
+
     log(Severity::Info, &format!("{} joined", player));
     state.entity_map.track(Box::new(player));
 
-    client.send_packet(P_FE2CL_REP_PC_ENTER_SUCC, &resp)
+    clients
+        .get_self()
+        .send_packet(P_FE2CL_REP_PC_ENTER_SUCC, &resp)
 }
 
 pub fn pc_exit(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
