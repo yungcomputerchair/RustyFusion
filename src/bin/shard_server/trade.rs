@@ -414,6 +414,13 @@ pub fn trade_confirm(clients: &mut ClientMap, state: &mut ShardServerState) -> F
         let player_taros = player.get_taros();
         let player_other_taros = player_other.get_taros();
 
+        // commit players to db
+        let mut db = db_get();
+        db.begin_transaction();
+        db.save_player(&player, true);
+        db.save_player(&player_other, true);
+        db.commit_transaction();
+
         // save traded state
         *state.get_player_mut(pc_id).unwrap() = player;
         *state.get_player_mut(pc_id_other).unwrap() = player_other;
