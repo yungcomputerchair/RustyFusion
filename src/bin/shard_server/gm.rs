@@ -151,3 +151,52 @@ pub fn gm_pc_goto(clients: &mut ClientMap, state: &mut ShardServerState) -> FFRe
         .get_self()
         .send_packet(P_FE2CL_REP_PC_GOTO_SUCC, &resp)
 }
+
+pub fn gm_pc_special_state_switch(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let client = clients.get_self();
+    let pc_id = client.get_player_id()?;
+    let pkt: &sP_CL2FE_GM_REQ_PC_SPECIAL_STATE_SWITCH =
+        client.get_packet(P_CL2FE_GM_REQ_PC_SPECIAL_STATE_SWITCH)?;
+
+    let player = state.get_player_mut(pc_id)?;
+
+    match pkt.iSpecialStateFlag as u32 {
+        defines::CN_SPECIAL_STATE_FLAG__PRINT_GM => {
+            player.show_gm_marker = !player.show_gm_marker;
+        }
+        defines::CN_SPECIAL_STATE_FLAG__INVISIBLE => {
+            player.invisible = !player.invisible;
+        }
+        defines::CN_SPECIAL_STATE_FLAG__INVULNERABLE => {
+            player.invulnerable = !player.invulnerable;
+        }
+        _ => {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "P_CL2FE_GM_REQ_PC_SPECIAL_STATE_SWITCH: invalid special state flag: {}",
+                    pkt.iSpecialStateFlag
+                ),
+            ));
+        }
+    }
+
+    let special_state_flags = player.get_special_state_bit_flag();
+
+    let resp = sP_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC {
+        iPC_ID: pkt.iPC_ID,
+        iReqSpecialStateFlag: pkt.iSpecialStateFlag,
+        iSpecialState: special_state_flags,
+    };
+    state
+        .entity_map
+        .for_each_around(EntityID::Player(pkt.iPC_ID), clients, |c| {
+            let _ = c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
+        });
+    clients
+        .get_self()
+        .send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp)
+}

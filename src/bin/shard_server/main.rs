@@ -190,6 +190,9 @@ fn handle_packet(
         P_CL2FE_GM_REQ_PC_SET_VALUE => gm::gm_pc_set_value(clients.get_self(), state),
         P_CL2FE_REQ_PC_GIVE_NANO => gm::gm_pc_give_nano(&mut clients, state),
         P_CL2FE_REQ_PC_GOTO => gm::gm_pc_goto(&mut clients, state),
+        P_CL2FE_GM_REQ_PC_SPECIAL_STATE_SWITCH => {
+            gm::gm_pc_special_state_switch(&mut clients, state)
+        }
         //
         P_CL2FE_REQ_SEND_FREECHAT_MESSAGE => chat::send_freechat_message(&mut clients, state),
         P_CL2FE_REQ_SEND_MENUCHAT_MESSAGE => chat::send_menuchat_message(&mut clients, state),
