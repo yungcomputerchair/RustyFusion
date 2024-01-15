@@ -21,6 +21,7 @@ use crate::{
 pub struct ShardServerState {
     pub login_server_conn_id: Option<i64>,
     pub login_data: HashMap<i64, LoginData>,
+    next_channel_num: usize,
     pub entity_map: EntityMap,
     pub buyback_lists: HashMap<i32, Vec<Item>>,
     pub ongoing_trades: HashMap<Uuid, TradeContext>,
@@ -31,6 +32,7 @@ impl Default for ShardServerState {
         let mut state = Self {
             login_server_conn_id: None,
             login_data: HashMap::new(),
+            next_channel_num: 1,
             entity_map: EntityMap::default(),
             buyback_lists: HashMap::new(),
             ongoing_trades: HashMap::new(),
@@ -51,6 +53,16 @@ impl Default for ShardServerState {
     }
 }
 impl ShardServerState {
+    pub fn get_next_channel_num(&mut self) -> usize {
+        let num_channels = config_get().shard.num_channels.get();
+        let channel_num = self.next_channel_num;
+        self.next_channel_num += 1;
+        if self.next_channel_num > num_channels {
+            self.next_channel_num = 1;
+        }
+        channel_num
+    }
+
     pub fn find_npc_by_type(&self, npc_type: i32) -> Option<&NPC> {
         let id = self.entity_map.find_npc(|npc| npc.ty == npc_type);
         if let Some(npc_id) = id {

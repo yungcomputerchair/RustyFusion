@@ -26,7 +26,7 @@ pub struct InstanceID {
 impl Default for InstanceID {
     fn default() -> Self {
         Self {
-            channel_num: 0,
+            channel_num: 1,
             map_num: ID_OVERWORLD,
             instance_num: None,
         }

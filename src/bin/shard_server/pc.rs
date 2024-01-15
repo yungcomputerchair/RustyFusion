@@ -37,6 +37,7 @@ pub fn pc_enter(
         ))?;
     player.set_player_id(pc_id);
     player.set_client_id(key);
+    player.instance_id.channel_num = state.get_next_channel_num();
 
     let resp = sP_FE2CL_REP_PC_ENTER_SUCC {
         iID: pc_id,
