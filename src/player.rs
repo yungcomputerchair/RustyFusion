@@ -971,7 +971,7 @@ impl Entity for Player {
             let pc_id_other = trade.get_other_id(pc_id);
             let player_other = state.get_player_mut(pc_id_other).unwrap();
             player_other.trade_id = None;
-            let client_other = clients.get_from_player_id(pc_id_other).unwrap();
+            let client_other = player_other.get_client(clients).unwrap();
             let pkt_cancel = sP_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL {
                 iID_Request: pc_id,
                 iID_From: trade.get_id_from(),

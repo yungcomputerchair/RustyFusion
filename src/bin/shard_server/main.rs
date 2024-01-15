@@ -214,7 +214,7 @@ fn handle_packet(
         P_CL2FE_REQ_NANO_TUNE => nano::nano_tune(clients.get_self(), state),
         //
         P_CL2FE_REQ_PC_TRADE_OFFER => trade::trade_offer(&mut clients, state),
-        P_CL2FE_REQ_PC_TRADE_OFFER_REFUSAL => trade::trade_offer_refusal(&mut clients),
+        P_CL2FE_REQ_PC_TRADE_OFFER_REFUSAL => trade::trade_offer_refusal(&mut clients, state),
         P_CL2FE_REQ_PC_TRADE_OFFER_ACCEPT => trade::trade_offer_accept(&mut clients, state),
         P_CL2FE_REQ_PC_TRADE_OFFER_CANCEL => trade::trade_offer_cancel(&mut clients, state),
         P_CL2FE_REQ_PC_TRADE_CASH_REGISTER => trade::trade_cash_register(&mut clients, state),
@@ -222,7 +222,7 @@ fn handle_packet(
         P_CL2FE_REQ_PC_TRADE_ITEM_UNREGISTER => trade::trade_item_unregister(&mut clients, state),
         P_CL2FE_REQ_PC_TRADE_CONFIRM_CANCEL => trade::trade_confirm_cancel(&mut clients, state),
         P_CL2FE_REQ_PC_TRADE_CONFIRM => trade::trade_confirm(&mut clients, state),
-        P_CL2FE_REQ_PC_TRADE_EMOTES_CHAT => trade::trade_emotes_chat(&mut clients),
+        P_CL2FE_REQ_PC_TRADE_EMOTES_CHAT => trade::trade_emotes_chat(&mut clients, state),
         //
         P_CL2FE_REQ_REGIST_TRANSPORTATION_LOCATION => {
             transport::regist_transportation_location(clients.get_self(), state)
