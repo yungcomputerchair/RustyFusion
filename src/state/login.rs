@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     error::{FFError, FFResult, Severity},
@@ -10,19 +10,30 @@ struct Account {
     players: HashMap<i64, Player>,
 }
 
+struct ShardServerInfo {
+    player_uids: HashSet<i64>,
+}
+impl Default for ShardServerInfo {
+    fn default() -> Self {
+        Self {
+            player_uids: HashSet::new(),
+        }
+    }
+}
+
 pub struct LoginServerState {
-    server_id: i64,
-    next_shard_id: usize,
+    pub server_id: i64,
     accounts: HashMap<i64, Account>,
-    pub player_shards: HashMap<i64, usize>,
+    next_shard_id: usize,
+    shards: HashMap<usize, ShardServerInfo>,
 }
 impl Default for LoginServerState {
     fn default() -> Self {
         Self {
             server_id: rand::random(),
-            next_shard_id: 1,
             accounts: HashMap::new(),
-            player_shards: HashMap::new(),
+            next_shard_id: 1,
+            shards: HashMap::new(),
         }
     }
 }
@@ -39,10 +50,6 @@ impl LoginServerState {
             Severity::Warning,
             format!("Account {} not logged in", acc_id),
         ))
-    }
-
-    pub fn get_id(&self) -> i64 {
-        self.server_id
     }
 
     pub fn set_account(
@@ -76,5 +83,29 @@ impl LoginServerState {
         let next = self.next_shard_id;
         self.next_shard_id += 1;
         next
+    }
+
+    pub fn register_shard(&mut self, shard_id: usize) {
+        self.shards.insert(shard_id, ShardServerInfo::default());
+    }
+
+    pub fn unregister_shard(&mut self, shard_id: usize) {
+        self.shards.remove(&shard_id);
+    }
+
+    pub fn unset_player_shard(&mut self, player_uid: i64) -> Option<usize> {
+        for (shard_id, shard) in self.shards.iter_mut() {
+            if shard.player_uids.remove(&player_uid) {
+                return Some(*shard_id);
+            }
+        }
+        None
+    }
+
+    pub fn set_player_shard(&mut self, player_uid: i64, shard_id: usize) -> Option<usize> {
+        let old_shard_id = self.unset_player_shard(player_uid);
+        let shard = self.shards.get_mut(&shard_id).unwrap();
+        shard.player_uids.insert(player_uid);
+        old_shard_id
     }
 }

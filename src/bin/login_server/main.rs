@@ -71,7 +71,7 @@ fn main() -> Result<()> {
         &format!(
             "Login server listening on {} (ID: {})",
             server.get_endpoint(),
-            state.as_login().get_id()
+            state.as_login().server_id
         ),
     );
     while running.load(Ordering::SeqCst) {
@@ -100,9 +100,10 @@ impl Drop for Cleanup {
 }
 
 fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>, state: &mut ServerState) {
-    let _state = state.as_login();
+    let state = state.as_login();
     let client = clients.get_mut(&key).unwrap();
     if let ClientType::ShardServer(shard_id) = client.client_type {
+        state.unregister_shard(shard_id);
         log(
             Severity::Info,
             &format!(

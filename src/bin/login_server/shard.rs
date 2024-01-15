@@ -15,9 +15,10 @@ pub fn connect(
 ) -> FFResult<()> {
     let shard_id = state.get_next_shard_id();
     server.client_type = ClientType::ShardServer(shard_id);
+    state.register_shard(shard_id);
     let resp = sP_LS2FE_REP_CONNECT_SUCC {
         uiSvrTime: util::get_timestamp_ms(time),
-        iLS_UID: state.get_id(),
+        iLS_UID: state.server_id,
     };
     server.send_packet(P_LS2FE_REP_CONNECT_SUCC, &resp)?;
 
@@ -102,10 +103,9 @@ pub fn update_pc_shard(client: &mut FFClient, state: &mut LoginServerState) -> F
             &format!("Player {} moved (shard {}, {:?})", pc_uid, shard_id, status),
         );
 
-        let player_shards = &mut state.player_shards;
         match status {
             PlayerShardStatus::Entered => {
-                let old = player_shards.insert(pc_uid, shard_id);
+                let old = state.set_player_shard(pc_uid, shard_id);
                 if let Some(old_shard_id) = old {
                     log(
                         Severity::Warning,
@@ -117,7 +117,7 @@ pub fn update_pc_shard(client: &mut FFClient, state: &mut LoginServerState) -> F
                 }
             }
             PlayerShardStatus::Exited => {
-                if player_shards.remove(&pc_uid).is_none() {
+                if state.unset_player_shard(pc_uid).is_none() {
                     log(
                         Severity::Warning,
                         &format!("Player {} was untracked in shard {}", pc_uid, shard_id),
