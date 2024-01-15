@@ -24,8 +24,6 @@ use crate::{
 use rand::Rng;
 use uuid::Uuid;
 
-pub const TEST_ACC_UID_START: i64 = i64::MAX - 3;
-
 #[derive(Debug, Clone, Copy)]
 pub struct PlayerStyle {
     pub gender: i8,
