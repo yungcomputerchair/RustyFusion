@@ -68,6 +68,8 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
 Items that are ***highlighted*** are in planning or WIP. Some items have dependencies in other categories, so the list won't get completed in order.
 
 ## Developing
+**RustyFusion requires a PostgreSQL instance to connect to for database operations.** You can manually configure an instance and set the connection parameters in `config.toml` or use `docker compose` to spawn a container with the default parameters.
+
 Cargo (Rust's package manager) makes working with Rust projects extremely easy to setup. Just clone the repo (recursively, to grab critical tabledata), build, and run:
 ```
 git clone --recurse-submodules https://github.com/gsemaj/RustyFusion
