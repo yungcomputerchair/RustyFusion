@@ -869,7 +869,13 @@ impl Player {
         let pc_uid = player.get_uid();
         let mut db = db_get();
         db.save_player(player, false);
-        log(Severity::Info, &format!("{} left", player));
+        log(
+            Severity::Info,
+            &format!(
+                "{} left (channel {})",
+                player, player.instance_id.channel_num
+            ),
+        );
 
         let id = EntityID::Player(pc_id);
         let entity_map = &mut state.entity_map;

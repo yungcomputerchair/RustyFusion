@@ -73,7 +73,13 @@ pub fn pc_enter(
         }
     }
 
-    log(Severity::Info, &format!("{} joined", player));
+    log(
+        Severity::Info,
+        &format!(
+            "{} joined (channel {})",
+            player, player.instance_id.channel_num
+        ),
+    );
     state.entity_map.track(Box::new(player));
 
     clients
