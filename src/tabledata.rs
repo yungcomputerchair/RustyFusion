@@ -300,7 +300,7 @@ impl TableData {
             ))
     }
 
-    pub fn get_npcs(&self, entity_map: &mut EntityMap) -> Vec<NPC> {
+    pub fn get_npcs(&self, entity_map: &mut EntityMap, channel_num: usize) -> Vec<NPC> {
         let mut npcs = Vec::new();
         for dat in &self.npc_data {
             let mut npc = NPC::new(
@@ -313,6 +313,7 @@ impl TableData {
                 },
                 dat.angle,
                 InstanceID {
+                    channel_num,
                     map_num: dat.map_num.unwrap_or(ID_OVERWORLD),
                     instance_num: None,
                 },
@@ -329,6 +330,7 @@ impl TableData {
                     },
                     dat.angle,
                     InstanceID {
+                        channel_num,
                         map_num: dat.map_num.unwrap_or(ID_OVERWORLD),
                         instance_num: None,
                     },

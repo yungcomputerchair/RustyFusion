@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 use crate::{
     chunk::EntityMap,
+    config::config_get,
     enums::ItemType,
     error::{log, FFError, FFResult, Severity},
     helpers,
@@ -34,14 +35,17 @@ impl Default for ShardServerState {
             buyback_lists: HashMap::new(),
             ongoing_trades: HashMap::new(),
         };
-        for mut npc in tdata_get().get_npcs(&mut state.entity_map) {
-            if let Some(path) = tdata_get().get_npc_path(npc.ty) {
-                npc.set_path(path);
+        let num_channels = config_get().shard.num_channels.get();
+        for channel_num in 1..=(num_channels + 1) {
+            for mut npc in tdata_get().get_npcs(&mut state.entity_map, channel_num) {
+                if let Some(path) = tdata_get().get_npc_path(npc.ty) {
+                    npc.set_path(path);
+                }
+                let chunk_pos = npc.get_chunk_coords();
+                let entity_map = &mut state.entity_map;
+                let id = entity_map.track(Box::new(npc));
+                entity_map.update(id, Some(chunk_pos), None);
             }
-            let chunk_pos = npc.get_chunk_coords();
-            let entity_map = &mut state.entity_map;
-            let id = entity_map.track(Box::new(npc));
-            entity_map.update(id, Some(chunk_pos), None);
         }
         state
     }

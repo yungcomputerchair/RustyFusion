@@ -25,6 +25,11 @@ listen_addr = "127.0.0.1:23001" # address to bind to
 external_addr = "127.0.0.1:23001" # address for clients to connect to
 login_server_addr = "127.0.0.1:23000" # address of login server
 login_server_conn_interval = 10 # how long (seconds) to wait before retrying login server connection
+num_channels = 1 # how many channels or "worlds" to host on this shard.
+                 # only bump this up if you have an absurd amount of players
+                 # and all of your shards are getting crowded.
+                 # players will be distributed by round-robin.
+                 # be warned: memory usage multiplies with this number
 visibility_range = 1 # how far (chunks) game clients can see entities
 autosave_interval = 5 # how often (minutes) to save all players to the database
 vehicle_duration = 10_080  # how long (minutes) after a vehicle is bought before it expires

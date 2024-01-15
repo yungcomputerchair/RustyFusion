@@ -19,12 +19,14 @@ use crate::{
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct InstanceID {
+    pub channel_num: usize,
     pub map_num: u32,
     pub instance_num: Option<Uuid>,
 }
 impl Default for InstanceID {
     fn default() -> Self {
         Self {
+            channel_num: 0,
             map_num: ID_OVERWORLD,
             instance_num: None,
         }
@@ -34,7 +36,8 @@ impl Display for InstanceID {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}:{}",
+            "{}/{}:{}",
+            self.channel_num,
             self.map_num,
             self.instance_num
                 .map(|id| id.to_string())
@@ -96,8 +99,8 @@ impl ChunkMap {
 pub struct EntityMap {
     registry: HashMap<EntityID, RegistryEntry>,
     chunk_maps: HashMap<InstanceID, ChunkMap>,
-    next_pc_id: i32,
-    next_npc_id: i32,
+    next_pc_id: u32,
+    next_npc_id: u32,
 }
 
 impl EntityMap {
@@ -226,10 +229,13 @@ impl EntityMap {
     }
 
     pub fn validate_proximity(&self, ids: &[EntityID], range: u32) -> FFResult<()> {
-        let mut positions = Vec::with_capacity(ids.len());
+        let mut locations = Vec::with_capacity(ids.len());
         for id in ids {
-            if let Some(entity) = self.registry.get(id) {
-                positions.push(entity.entity.get_position());
+            if let Some(entry) = self.registry.get(id) {
+                locations.push((
+                    entry.entity.get_position(),
+                    entry.entity.get_chunk_coords().i,
+                ));
             } else {
                 return Err(FFError::build(
                     Severity::Warning,
@@ -238,10 +244,22 @@ impl EntityMap {
             }
         }
 
-        for i in 0..positions.len() {
-            for j in (i + 1)..positions.len() {
-                let pos1 = positions[i];
-                let pos2 = positions[j];
+        for i in 0..locations.len() {
+            for j in (i + 1)..locations.len() {
+                let inst1 = locations[i].1;
+                let inst2 = locations[j].1;
+                if inst1 != inst2 {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!(
+                            "Entity with ID {:?} is in a different instance than entity with ID {:?} ({} != {})",
+                            ids[i], ids[j], inst1, inst2
+                        ),
+                    ));
+                }
+
+                let pos1 = locations[i].0;
+                let pos2 = locations[j].0;
                 let distance = pos1.distance_to(&pos2);
                 if distance > range {
                     return Err(FFError::build(
@@ -259,14 +277,22 @@ impl EntityMap {
 
     pub fn gen_next_pc_id(&mut self) -> i32 {
         let id = self.next_pc_id;
+        if id == u32::MAX {
+            log(Severity::Fatal, "Ran out of PC IDs");
+            panic!();
+        }
         self.next_pc_id += 1;
-        id
+        id as i32
     }
 
     pub fn gen_next_npc_id(&mut self) -> i32 {
         let id = self.next_npc_id;
+        if id == u32::MAX {
+            log(Severity::Fatal, "Ran out of NPC IDs");
+            panic!();
+        }
         self.next_npc_id += 1;
-        id
+        id as i32
     }
 
     pub fn track(&mut self, entity: Box<dyn Entity>) -> EntityID {
@@ -464,6 +490,7 @@ impl EntityMap {
         });
         if instance_id.instance_num.is_some() && new {
             let main_instance = InstanceID {
+                channel_num: instance_id.channel_num,
                 map_num: instance_id.map_num,
                 instance_num: None,
             };

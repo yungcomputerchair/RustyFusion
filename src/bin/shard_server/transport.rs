@@ -360,6 +360,7 @@ mod helpers {
         player.set_taros(player.get_taros() - warp_data.cost);
         player.set_position(warp_data.pos);
         let instance_id = InstanceID {
+            channel_num: player.instance_id.channel_num,
             map_num: warp_data.map_num,
             instance_num: if warp_data.is_instance {
                 Some(Uuid::new_v4())
