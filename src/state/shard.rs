@@ -13,7 +13,7 @@ use crate::{
         ClientMap, LoginData,
     },
     npc::NPC,
-    player::Player,
+    player::{Player, PlayerSearchQuery},
     tabledata::tdata_get,
     Entity, EntityID, Item, TradeContext,
 };
@@ -98,6 +98,27 @@ impl ShardServerState {
             Severity::Warning,
             format!("Player with ID {} doesn't exist", pc_id),
         ))
+    }
+
+    pub fn find_player_id(&self, query: PlayerSearchQuery) -> Option<i32> {
+        match query {
+            PlayerSearchQuery::ByID(pc_id) => {
+                if self.entity_map.get_player(pc_id).is_some() {
+                    Some(pc_id)
+                } else {
+                    None
+                }
+            }
+            PlayerSearchQuery::ByUID(pc_uid) => self
+                .entity_map
+                .find_player(|player| player.get_uid() == pc_uid),
+            PlayerSearchQuery::ByName(first_name, last_name) => {
+                self.entity_map.find_player(|player| {
+                    player.get_first_name().eq_ignore_ascii_case(&first_name)
+                        && player.get_last_name().eq_ignore_ascii_case(&last_name)
+                })
+            }
+        }
     }
 
     pub fn check_for_expired_vehicles(&mut self, time: SystemTime, clients: &mut ClientMap) {

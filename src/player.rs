@@ -1031,3 +1031,10 @@ impl Display for Player {
         write!(f, "{}{} ({})", title, self.name, self.get_uid(),)
     }
 }
+
+#[derive(Debug)]
+pub enum PlayerSearchQuery {
+    ByID(i32),
+    ByUID(i64),
+    ByName(String, String),
+}
