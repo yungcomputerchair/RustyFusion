@@ -417,6 +417,13 @@ impl EntityMap {
             .sum()
     }
 
+    pub fn get_min_pop_channel_num(&self) -> usize {
+        let num_channels = config_get().shard.num_channels.get();
+        (1..=num_channels)
+            .min_by_key(|channel_num| self.get_channel_population(*channel_num))
+            .unwrap()
+    }
+
     fn remove_from_chunk(&mut self, id: EntityID) -> HashSet<EntityID> {
         let mut affected = HashSet::new();
         let entry = self.registry.get_mut(&id).unwrap();

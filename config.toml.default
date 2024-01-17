@@ -28,7 +28,7 @@ login_server_conn_interval = 10 # how long (seconds) to wait before retrying log
 num_channels = 1 # how many channels or "worlds" to host on this shard.
                  # only bump this up if you have an absurd amount of players
                  # and all of your shards are getting crowded.
-                 # players will be distributed by round-robin.
+                 # players will be put in the channel with the lowest population.
                  # be warned: memory usage multiplies with this number
 visibility_range = 1 # how far (chunks) game clients can see entities
 autosave_interval = 5 # how often (minutes) to save all players to the database
