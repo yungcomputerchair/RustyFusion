@@ -30,6 +30,10 @@ num_channels = 1 # how many channels or "worlds" to host on this shard.
                  # and all of your shards are getting crowded.
                  # players will be put in the channel with the lowest population.
                  # be warned: memory usage multiplies with this number
+max_channel_pop = 100 # how many players are allowed per channel.
+                      # note that this won't stop players from loading in if all
+                      # channels are full, but will deny explicit requests to
+                      # warp to a channel that is full.
 visibility_range = 1 # how far (chunks) game clients can see entities
 autosave_interval = 5 # how often (minutes) to save all players to the database
 vehicle_duration = 10_080  # how long (minutes) after a vehicle is bought before it expires

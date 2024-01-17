@@ -525,7 +525,8 @@ pub fn pc_warp_channel(clients: &mut ClientMap, state: &mut ShardServerState) ->
                 ));
             }
 
-            if state.entity_map.get_channel_population(channel_num) >= placeholder!(100) {
+            let max_channel_pop = config_get().shard.max_channel_pop.get();
+            if state.entity_map.get_channel_population(channel_num) >= max_channel_pop {
                 error_code = 4; // "the channel is full."
                 return Err(FFError::build(
                     Severity::Warning,
