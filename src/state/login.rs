@@ -8,6 +8,7 @@ use crate::{
 struct Account {
     username: String,
     players: HashMap<i64, Player>,
+    selected_player_uid: Option<i64>,
 }
 
 struct ShardServerInfo {
@@ -62,21 +63,38 @@ impl LoginServerState {
         for player in player_it {
             players.insert(player.get_uid(), player);
         }
-        self.accounts.insert(acc_id, Account { username, players });
+        self.accounts.insert(
+            acc_id,
+            Account {
+                username,
+                players,
+                selected_player_uid: None,
+            },
+        );
     }
 
     pub fn unset_account(&mut self, acc_id: i64) {
         self.accounts.remove(&acc_id);
     }
 
-    pub fn get_username(&self, acc_id: i64) -> FFResult<String> {
-        let acc = self.get_account(acc_id)?;
-        Ok(acc.username.clone())
+    pub fn set_selected_player_id(&mut self, acc_id: i64, player_uid: i64) {
+        let acc = self.accounts.get_mut(&acc_id).unwrap();
+        acc.selected_player_uid = Some(player_uid);
     }
 
-    pub fn get_players_mut(&mut self, acc_id: i64) -> FFResult<&mut HashMap<i64, Player>> {
-        let acc = self.get_account_mut(acc_id)?;
-        Ok(&mut acc.players)
+    pub fn get_selected_player_id(&self, acc_id: i64) -> Option<i64> {
+        let acc = self.get_account(acc_id).unwrap();
+        acc.selected_player_uid
+    }
+
+    pub fn get_username(&self, acc_id: i64) -> String {
+        let acc = self.get_account(acc_id).unwrap();
+        acc.username.clone()
+    }
+
+    pub fn get_players_mut(&mut self, acc_id: i64) -> &mut HashMap<i64, Player> {
+        let acc = self.get_account_mut(acc_id).unwrap();
+        &mut acc.players
     }
 
     pub fn get_next_shard_id(&mut self) -> usize {

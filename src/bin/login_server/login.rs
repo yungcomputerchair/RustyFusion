@@ -8,7 +8,7 @@ use rusty_fusion::{
     database::db_get,
     defines::*,
     enums::{ItemLocation, ItemType},
-    error::{FFError, FFResult, Severity},
+    error::{catch_fail, FFError, FFResult, Severity},
     net::{ffclient::ClientType, packet::*},
     unused, util, Combatant, Entity, Item,
 };
@@ -127,7 +127,7 @@ pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> FF
         szLastName: style.szLastName,
     };
     client.send_packet(P_LS2CL_REP_SAVE_CHAR_NAME_SUCC, &resp)?;
-    state.get_players_mut(acc_id)?.insert(pc_uid, player);
+    state.get_players_mut(acc_id).insert(pc_uid, player);
 
     Ok(())
 }
@@ -137,7 +137,7 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
     let pkt: &sP_CL2LS_REQ_CHAR_CREATE = client.get_packet(P_CL2LS_REQ_CHAR_CREATE)?;
 
     let pc_uid = pkt.PCStyle.iPC_UID;
-    if let Some(player) = state.get_players_mut(acc_id)?.get_mut(&pc_uid) {
+    if let Some(player) = state.get_players_mut(acc_id).get_mut(&pc_uid) {
         player.style = Some(pkt.PCStyle.try_into()?);
         let mut db = db_get();
         db.update_player_appearance(player);
@@ -180,7 +180,7 @@ pub fn save_char_tutor(client: &mut FFClient, state: &mut LoginServerState) -> F
     let pkt: &sP_CL2LS_REQ_SAVE_CHAR_TUTOR = client.get_packet(P_CL2LS_REQ_SAVE_CHAR_TUTOR)?;
     let pc_uid = pkt.iPC_UID;
     let player = state
-        .get_players_mut(acc_id)?
+        .get_players_mut(acc_id)
         .get_mut(&pc_uid)
         .ok_or(FFError::build(
             Severity::Warning,
@@ -203,22 +203,17 @@ pub fn char_select(
     client_key: usize,
     clients: &mut HashMap<usize, FFClient>,
     state: &mut LoginServerState,
-    time: SystemTime,
 ) -> FFResult<()> {
     let client = clients.get_mut(&client_key).unwrap();
-    if let ClientType::GameClient {
-        serial_key,
-        account_id,
-        ..
-    } = client.client_type
-    {
+    if let ClientType::GameClient { account_id, .. } = client.client_type {
         let pkt: &sP_CL2LS_REQ_CHAR_SELECT = client.get_packet(P_CL2LS_REQ_CHAR_SELECT)?;
         let pc_uid = pkt.iPC_UID;
-        let players = state.get_players_mut(account_id)?;
+        let players = state.get_players_mut(account_id);
         let player = players.get(&pc_uid).ok_or(FFError::build(
             Severity::Warning,
             format!("Couldn't get player {}", pc_uid),
         ))?;
+        let slot_num = player.get_slot_num();
 
         if !player.flags.tutorial_flag {
             return Err(FFError::build(
@@ -227,37 +222,111 @@ pub fn char_select(
             ));
         }
 
+        state.set_selected_player_id(account_id, pc_uid);
+
         let mut db = db_get();
-        db.exec(
-            "update_selected",
-            &[&account_id, &(player.get_slot_num() as i32)],
-        );
+        db.exec("update_selected", &[&account_id, &(slot_num as i32)]);
 
-        let login_info = sP_LS2FE_REQ_UPDATE_LOGIN_INFO {
-            iAccountID: account_id,
-            iEnterSerialKey: serial_key,
-            iPC_UID: pc_uid,
-            uiFEKey: client.get_fe_key_uint(),
-            uiSvrTime: util::get_timestamp_ms(time),
-        };
+        let pkt = sP_LS2CL_REP_CHAR_SELECT_SUCC { UNUSED: unused!() };
+        client.send_packet(P_LS2CL_REP_CHAR_SELECT_SUCC, &pkt)
+    } else {
+        Err(FFError::build(
+            Severity::Warning,
+            format!("Client is not a game client ({:?})", client.client_type),
+        ))
+    }
+}
 
-        let shard_server = clients
-            .values_mut()
-            .find(|c| matches!(c.client_type, ClientType::ShardServer(_)));
+pub fn shard_select(
+    client_key: usize,
+    clients: &mut HashMap<usize, FFClient>,
+    state: &mut LoginServerState,
+    time: SystemTime,
+) -> FFResult<()> {
+    let client = clients.get_mut(&client_key).unwrap();
+    let pkt: sP_CL2LS_REQ_SHARD_SELECT = *client.get_packet(P_CL2LS_REQ_SHARD_SELECT)?;
+    let req_shard_id = pkt.ShardNum as usize;
+    if let ClientType::GameClient {
+        account_id,
+        serial_key,
+        ..
+    } = client.client_type
+    {
+        let mut error_code = -1;
+        catch_fail(
+            (|| {
+                let client = clients.get_mut(&client_key).unwrap();
+                let fe_key = client.get_fe_key_uint();
+                let pc_uid = match state.get_selected_player_id(account_id) {
+                    Some(pc_uid) => pc_uid,
+                    None => {
+                        error_code = 2; // "Selected character error"
+                        return Err(FFError::build(
+                            Severity::Warning,
+                            format!("No selected player for account {}", account_id),
+                        ));
+                    }
+                };
 
-        match shard_server {
-            Some(shard) => {
-                let _ = shard.send_packet(P_LS2FE_REQ_UPDATE_LOGIN_INFO, &login_info);
-                state.unset_account(account_id);
+                let shard_server = if req_shard_id == 0 {
+                    // pick a shard server
+                    match clients
+                        .values_mut()
+                        .find(|c| matches!(c.client_type, ClientType::ShardServer(_)))
+                    {
+                        Some(shard) => shard,
+                        None => {
+                            error_code = 1; // "Shard connection error"
+                            return Err(FFError::build(
+                                Severity::Warning,
+                                "No shard servers connected".to_string(),
+                            ));
+                        }
+                    }
+                } else {
+                    match clients
+                        .values_mut()
+                        .find(|c| matches!(c.client_type, ClientType::ShardServer(shard_id) if shard_id == req_shard_id))
+                    {
+                        Some(shard) => shard,
+                        None => {
+                            error_code = 0; // "Shard number error"
+                            return Err(FFError::build(
+                                Severity::Warning,
+                                format!("Couldn't find shard server with ID {}", req_shard_id),
+                            ));
+                        }
+                    }
+                };
+
+                let login_info = sP_LS2FE_REQ_UPDATE_LOGIN_INFO {
+                    iAccountID: account_id,
+                    iEnterSerialKey: serial_key,
+                    iPC_UID: pc_uid,
+                    uiFEKey: fe_key,
+                    uiSvrTime: util::get_timestamp_ms(time),
+                };
+                if shard_server
+                    .send_packet(P_LS2FE_REQ_UPDATE_LOGIN_INFO, &login_info)
+                    .is_err()
+                {
+                    error_code = 1; // "Shard connection error"
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!("Couldn't send login info to shard server {}", req_shard_id),
+                    ));
+                }
+
                 Ok(())
-            }
-            None => {
-                log(Severity::Warning, "No shard servers available");
-                let resp = sP_LS2CL_REP_CHAR_SELECT_FAIL { iErrorCode: 1 };
-                let client: &mut FFClient = clients.get_mut(&client_key).unwrap();
-                client.send_packet(P_LS2CL_REP_CHAR_SELECT_FAIL, &resp)
-            }
-        }
+            })(),
+            || {
+                let client = clients.get_mut(&client_key).unwrap();
+                let resp = sP_LS2CL_REP_SHARD_SELECT_FAIL {
+                    iErrorCode: error_code,
+                };
+                client.send_packet(P_LS2CL_REP_SHARD_SELECT_FAIL, &resp)
+            },
+        )
     } else {
         Err(FFError::build(
             Severity::Warning,
