@@ -409,6 +409,14 @@ impl EntityMap {
         }
     }
 
+    pub fn get_channel_population(&self, channel_num: usize) -> usize {
+        self.chunk_maps
+            .iter()
+            .filter(|(instance_id, _)| instance_id.channel_num == channel_num)
+            .map(|(_, chunk_map)| chunk_map.player_count)
+            .sum()
+    }
+
     fn remove_from_chunk(&mut self, id: EntityID) -> HashSet<EntityID> {
         let mut affected = HashSet::new();
         let entry = self.registry.get_mut(&id).unwrap();

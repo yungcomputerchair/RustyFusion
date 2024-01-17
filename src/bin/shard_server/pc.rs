@@ -477,3 +477,89 @@ pub fn pc_change_mentor(client: &mut FFClient, state: &mut ShardServerState) -> 
         },
     )
 }
+
+pub fn pc_channel_num(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+    let player = state.get_player(client.get_player_id()?)?;
+    let resp = sP_FE2CL_REP_PC_CHANNEL_NUM {
+        iChannelNum: player.instance_id.channel_num as i32,
+    };
+    client.send_packet(P_FE2CL_REP_PC_CHANNEL_NUM, &resp)
+}
+
+pub fn pc_channel_info(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+    let player = state.get_player(client.get_player_id()?)?;
+    let channel_num = player.instance_id.channel_num;
+    let num_channels = config_get().shard.num_channels.get();
+    let resp = sP_FE2CL_REP_CHANNEL_INFO {
+        iCurrChannelNum: channel_num as i32,
+        iChannelCnt: num_channels as i32,
+    };
+    client.queue_packet(P_FE2CL_REP_CHANNEL_INFO, &resp);
+    for channel_num in 1..=num_channels {
+        let channel_info = sChannelInfo {
+            iChannelNum: channel_num as i32,
+            iCurrentUserCnt: state.entity_map.get_channel_population(channel_num) as i32,
+        };
+        client.queue_struct(&channel_info); // will panic if you have more than 127 channels :)
+    }
+    client.flush()
+}
+
+pub fn pc_warp_channel(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let pkt: sP_CL2FE_REQ_PC_WARP_CHANNEL =
+        *clients.get_self().get_packet(P_CL2FE_REQ_PC_WARP_CHANNEL)?;
+    let mut error_code = 0;
+    catch_fail(
+        (|| {
+            let pc_id = clients.get_self().get_player_id()?;
+            let channel_num = pkt.iChannelNum as usize;
+            let num_channels = config_get().shard.num_channels.get();
+
+            if channel_num == 0 || channel_num > num_channels {
+                error_code = 3; // "the channel number is invalid."
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!("Invalid channel number: {}", channel_num),
+                ));
+            }
+
+            if state.entity_map.get_channel_population(channel_num) >= placeholder!(100) {
+                error_code = 4; // "the channel is full."
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!("Channel {} is full", channel_num),
+                ));
+            }
+
+            let player = state.get_player_mut(pc_id)?;
+            if player.instance_id.channel_num == channel_num {
+                error_code = 2; // "you're already in the channel."
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!("Player {} is already in channel {}", pc_id, channel_num),
+                ));
+            }
+
+            player.instance_id.channel_num = channel_num;
+            let chunk_coords = player.get_chunk_coords();
+
+            let resp = sP_FE2CL_REP_PC_WARP_CHANNEL_SUCC { UNUSED: unused!() };
+            clients
+                .get_self()
+                .send_packet(P_FE2CL_REP_PC_WARP_CHANNEL_SUCC, &resp)?;
+
+            state
+                .entity_map
+                .update(EntityID::Player(pc_id), Some(chunk_coords), Some(clients));
+            Ok(())
+        })(),
+        || {
+            let resp = sP_FE2CL_REP_PC_WARP_CHANNEL_FAIL {
+                iErrorCode: error_code,
+            };
+            clients
+                .get_self()
+                .send_packet(P_FE2CL_REP_PC_WARP_CHANNEL_FAIL, &resp)
+        },
+    )
+}
