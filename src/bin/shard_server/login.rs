@@ -23,6 +23,11 @@ pub fn login_connect_succ(server: &mut FFClient, state: &mut ShardServerState) -
     let iv2: i32 = 69;
     server.e_key = gen_key(conn_time, iv1, iv2);
 
+    let pkt = sP_FE2LS_UPDATE_CHANNEL_STATUSES {
+        aChannelStatus: state.entity_map.get_channel_statuses().map(|s| s as u8),
+    };
+    server.send_packet(P_FE2LS_UPDATE_CHANNEL_STATUSES, &pkt)?;
+
     state.login_server_conn_id = Some(login_server_id);
     log(
         Severity::Info,
