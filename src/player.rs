@@ -111,11 +111,6 @@ struct TransportData {
     pub skyway_flags: [i64; WYVERN_LOCATION_FLAG_SIZE as usize],
 }
 impl TransportData {
-    pub fn set_all(&mut self) {
-        self.scamper_flags = -1;
-        self.skyway_flags = [-1; WYVERN_LOCATION_FLAG_SIZE as usize];
-    }
-
     pub fn set_scamper_flag(&mut self, bit_offset: i32) -> FFResult<i32> {
         if !(1..=32).contains(&bit_offset) {
             Err(FFError::build(
@@ -853,35 +848,6 @@ impl Player {
     pub fn set_nano_potions(&mut self, nano_potions: u32) -> u32 {
         self.nano_potions = clamp(nano_potions, 0, PC_BATTERY_MAX);
         self.nano_potions
-    }
-
-    pub fn set_god_mode(&mut self, god_mode: bool) {
-        if god_mode {
-            // max stats
-            self.set_fusion_matter(PC_FUSIONMATTER_MAX);
-            self.set_hp(i32::MAX);
-            self.set_level(PC_LEVEL_MAX as i16);
-            self.set_taros(PC_CANDY_MAX);
-            self.set_tutorial_done();
-            self.set_future_done();
-            self.transport_data.set_all();
-            self.flags.tip_flags = -1;
-
-            // unlock all nanos, tune to first skill
-            for i in 1..SIZEOF_NANO_BANK_SLOT as i16 {
-                self.unlock_nano(i).unwrap();
-                self.tune_nano(i, Some(0)).unwrap();
-            }
-
-            // fill empty nanocom slots with random nanos
-            let mut rng = rand::thread_rng();
-            for i in 0..SIZEOF_NANO_CARRY_SLOT as usize {
-                if self.nano_data.equipped_ids[i].is_none() {
-                    let nano_id = rng.gen_range(1..SIZEOF_NANO_BANK_SLOT as i16);
-                    self.nano_data.equipped_ids[i] = Some(nano_id);
-                }
-            }
-        } // TODO GM special state
     }
 
     pub fn disconnect(pc_id: i32, state: &mut ShardServerState, clients: &mut ClientMap) {
