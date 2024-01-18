@@ -5,6 +5,7 @@ use uuid::Uuid;
 use crate::{
     chunk::EntityMap,
     config::config_get,
+    defines::MAX_NUM_CHANNELS,
     enums::ItemType,
     error::{log, FFError, FFResult, Severity},
     helpers,
@@ -36,6 +37,10 @@ impl Default for ShardServerState {
             ongoing_trades: HashMap::new(),
         };
         let num_channels = config_get().shard.num_channels.get();
+        if num_channels == 0 || num_channels > MAX_NUM_CHANNELS {
+            log(Severity::Fatal, "Invalid number of channels");
+            panic!();
+        }
         for channel_num in 1..=num_channels {
             for mut npc in tdata_get().get_npcs(&mut state.entity_map, channel_num) {
                 if let Some(path) = tdata_get().get_npc_path(npc.ty) {

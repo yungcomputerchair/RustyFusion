@@ -3,6 +3,8 @@
 pub const PROTOCOL_VERSION: i32 = 104;
 pub const DB_VERSION: i32 = 4;
 
+pub const MAX_NUM_CHANNELS: usize = 26;
+
 pub const SIZEOF_NANO_SKILLS: usize = 3;
 
 pub const NANO_STAMINA_MAX: i16 = 150;
