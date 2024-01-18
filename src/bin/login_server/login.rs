@@ -237,6 +237,18 @@ pub fn char_select(
     }
 }
 
+pub fn shard_list_info(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
+    // client is hardcoded to shard 1 for this at the time of writing
+    let shard_id = 1; // pkt.iShardNum some day?
+    let mut statuses = [0; MAX_NUM_CHANNELS + 1];
+    statuses[0] = unused!();
+    statuses[1..].copy_from_slice(&state.get_shard_channel_statuses(shard_id).map(|s| s as u8));
+    let resp = sP_LS2CL_REP_SHARD_LIST_INFO_SUCC {
+        aShardConnectFlag: statuses,
+    };
+    client.send_packet(P_LS2CL_REP_SHARD_LIST_INFO_SUCC, &resp)
+}
+
 pub fn shard_select(
     client_key: usize,
     clients: &mut HashMap<usize, FFClient>,

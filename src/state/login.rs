@@ -131,6 +131,14 @@ impl LoginServerState {
         old_shard_id
     }
 
+    pub fn get_shard_channel_statuses(
+        &self,
+        shard_id: usize,
+    ) -> [ShardChannelStatus; MAX_NUM_CHANNELS] {
+        let shard = self.shards.get(&shard_id).unwrap();
+        shard.channel_statuses
+    }
+
     pub fn update_shard_channel_statuses(
         &mut self,
         shard_id: usize,

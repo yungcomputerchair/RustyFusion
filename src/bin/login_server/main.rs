@@ -135,6 +135,7 @@ fn handle_packet(
         P_FE2LS_UPDATE_CHANNEL_STATUSES => shard::update_channel_statuses(client, state),
         //
         P_CL2LS_REQ_LOGIN => login::login(client, state, time),
+        P_CL2LS_REQ_SHARD_LIST_INFO => login::shard_list_info(client, state),
         P_CL2LS_REQ_CHECK_CHAR_NAME => login::check_char_name(client),
         P_CL2LS_REQ_SAVE_CHAR_NAME => login::save_char_name(client, state),
         P_CL2LS_REQ_CHAR_CREATE => login::char_create(client, state),
