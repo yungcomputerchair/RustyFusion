@@ -3,7 +3,8 @@ use std::time::SystemTime;
 use super::*;
 
 use rusty_fusion::{
-    enums::PlayerShardStatus,
+    defines::MAX_NUM_CHANNELS,
+    enums::{PlayerShardStatus, ShardChannelStatus},
     net::{ffclient::ClientType, packet::*},
     util,
 };
@@ -130,6 +131,28 @@ pub fn update_pc_shard(client: &mut FFClient, state: &mut LoginServerState) -> F
         Err(FFError::build(
             Severity::Warning,
             "P_FE2LS_UPDATE_PC_SHARD: Client is not a shard server".to_string(),
+        ))
+    }
+}
+
+pub fn update_channel_statuses(
+    client: &mut FFClient,
+    state: &mut LoginServerState,
+) -> FFResult<()> {
+    let pkt: sP_FE2LS_UPDATE_CHANNEL_STATUSES =
+        *client.get_packet(P_FE2LS_UPDATE_CHANNEL_STATUSES)?;
+    if let ClientType::ShardServer(shard_id) = client.client_type {
+        let mut statuses = [ShardChannelStatus::Closed; MAX_NUM_CHANNELS];
+        for (channel_num, status_raw) in pkt.aChannelStatus.iter().enumerate() {
+            let status: ShardChannelStatus = (*status_raw).try_into()?;
+            statuses[channel_num] = status;
+        }
+        state.update_shard_channel_statuses(shard_id, statuses);
+        Ok(())
+    } else {
+        Err(FFError::build(
+            Severity::Warning,
+            "P_FE2LS_UPDATE_CHANNEL_STATUSES: Client is not a shard server".to_string(),
         ))
     }
 }

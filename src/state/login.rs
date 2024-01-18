@@ -1,6 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
+    defines::MAX_NUM_CHANNELS,
+    enums::ShardChannelStatus,
     error::{FFError, FFResult, Severity},
     player::Player,
 };
@@ -13,11 +15,13 @@ struct Account {
 
 struct ShardServerInfo {
     player_uids: HashSet<i64>,
+    channel_statuses: [ShardChannelStatus; MAX_NUM_CHANNELS],
 }
 impl Default for ShardServerInfo {
     fn default() -> Self {
         Self {
             player_uids: HashSet::new(),
+            channel_statuses: [ShardChannelStatus::Closed; MAX_NUM_CHANNELS],
         }
     }
 }
@@ -125,5 +129,16 @@ impl LoginServerState {
         let shard = self.shards.get_mut(&shard_id).unwrap();
         shard.player_uids.insert(player_uid);
         old_shard_id
+    }
+
+    pub fn update_shard_channel_statuses(
+        &mut self,
+        shard_id: usize,
+        statuses: [ShardChannelStatus; MAX_NUM_CHANNELS],
+    ) {
+        let shard = self.shards.get_mut(&shard_id).unwrap();
+        for (i, status) in statuses.iter().enumerate() {
+            shard.channel_statuses[i] = *status;
+        }
     }
 }

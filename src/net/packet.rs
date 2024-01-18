@@ -4,7 +4,7 @@
 
 use num_enum::TryFromPrimitive;
 
-use crate::error::FFError;
+use crate::{defines::MAX_NUM_CHANNELS, error::FFError};
 
 #[repr(u32)]
 #[derive(Debug, TryFromPrimitive, Clone, Copy, PartialEq)]
@@ -532,6 +532,7 @@ pub enum PacketID {
     P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC = 0x32000003, // 838860803
     P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL = 0x32000004, // 838860804
     P_FE2LS_UPDATE_PC_SHARD = 0x32000005,            // 838860805
+    P_FE2LS_UPDATE_CHANNEL_STATUSES = 0x32000006,    // 838860806
 }
 
 pub trait FFPacket: std::fmt::Debug {}
@@ -6584,3 +6585,11 @@ pub struct sP_FE2LS_UPDATE_PC_SHARD {
     pub ePSS: i8,
 }
 impl FFPacket for sP_FE2LS_UPDATE_PC_SHARD {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_UPDATE_CHANNEL_STATUSES {
+    pub aChannelStatus: [u8; MAX_NUM_CHANNELS],
+}
+impl FFPacket for sP_FE2LS_UPDATE_CHANNEL_STATUSES {}

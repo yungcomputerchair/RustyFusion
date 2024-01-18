@@ -10,8 +10,8 @@ use crate::{
         ffclient::FFClient,
         packet::{
             sNano, sPCAppearanceData, sPCLoadData2CL, sPCStyle, sPCStyle2, sP_FE2CL_PC_EXIT,
-            sP_FE2CL_PC_NEW, sP_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL, sP_FE2LS_UPDATE_PC_SHARD,
-            sTimeBuff,
+            sP_FE2CL_PC_NEW, sP_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL,
+            sP_FE2LS_UPDATE_CHANNEL_STATUSES, sP_FE2LS_UPDATE_PC_SHARD, sTimeBuff,
             PacketID::{self, *},
         },
         ClientMap,
@@ -903,13 +903,17 @@ impl Player {
         let mut player = entity_map.untrack(id);
         player.cleanup(clients, state);
 
-        let pkt = sP_FE2LS_UPDATE_PC_SHARD {
+        let pkt_pc = sP_FE2LS_UPDATE_PC_SHARD {
             iPC_UID: pc_uid,
             ePSS: PlayerShardStatus::Exited as i8,
         };
+        let pkt_chan = sP_FE2LS_UPDATE_CHANNEL_STATUSES {
+            aChannelStatus: state.entity_map.get_channel_statuses().map(|s| s as u8),
+        };
         match clients.get_login_server() {
             Some(login_server) => {
-                let _ = login_server.send_packet(P_FE2LS_UPDATE_PC_SHARD, &pkt);
+                let _ = login_server.send_packet(P_FE2LS_UPDATE_PC_SHARD, &pkt_pc);
+                let _ = login_server.send_packet(P_FE2LS_UPDATE_CHANNEL_STATUSES, &pkt_chan);
             }
             None => {
                 log(
