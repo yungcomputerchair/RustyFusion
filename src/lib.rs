@@ -59,10 +59,12 @@ pub struct Position {
 }
 impl Position {
     pub fn distance_to(&self, other: &Position) -> u32 {
-        let dx = self.x.abs_diff(other.x);
-        let dy = self.y.abs_diff(other.y);
-        let dz = self.z.abs_diff(other.z);
-        ((dx * dx + dy * dy + dz * dz) as f32).sqrt() as u32
+        // scaling down for the multiplication helps to avoid overflow here
+        const DIST_MATH_SCALE: f32 = 100.0;
+        let dx = self.x.abs_diff(other.x) as f32 / DIST_MATH_SCALE;
+        let dy = self.y.abs_diff(other.y) as f32 / DIST_MATH_SCALE;
+        let dz = self.z.abs_diff(other.z) as f32 / DIST_MATH_SCALE;
+        ((dx * dx + dy * dy + dz * dz).sqrt() * DIST_MATH_SCALE) as u32
     }
 }
 impl From<Vector3<f32>> for Position {
