@@ -280,34 +280,23 @@ pub fn shard_select(
                     }
                 };
 
-                let shard_server = if req_shard_id == 0 {
-                    // pick a shard server
-                    match clients
-                        .values_mut()
-                        .find(|c| matches!(c.client_type, ClientType::ShardServer(_)))
-                    {
-                        Some(shard) => shard,
-                        None => {
-                            error_code = 1; // "Shard connection error"
-                            return Err(FFError::build(
-                                Severity::Warning,
-                                "No shard servers connected".to_string(),
-                            ));
-                        }
-                    }
+                let shard_id = if req_shard_id == 0 {
+                    // pick the shard with the lowest population
+                    state.get_lowest_pop_shard_id()
                 } else {
-                    match clients
-                        .values_mut()
-                        .find(|c| matches!(c.client_type, ClientType::ShardServer(shard_id) if shard_id == req_shard_id))
-                    {
-                        Some(shard) => shard,
-                        None => {
-                            error_code = 0; // "Shard number error"
-                            return Err(FFError::build(
-                                Severity::Warning,
-                                format!("Couldn't find shard server with ID {}", req_shard_id),
-                            ));
-                        }
+                    req_shard_id
+                };
+
+                let shard_server = match clients.values_mut().find(
+                    |c| matches!(c.client_type, ClientType::ShardServer(sid) if sid == shard_id),
+                ) {
+                    Some(shard) => shard,
+                    None => {
+                        error_code = 0; // "Shard number error"
+                        return Err(FFError::build(
+                            Severity::Warning,
+                            format!("Couldn't find shard server with ID {}", shard_id),
+                        ));
                     }
                 };
 

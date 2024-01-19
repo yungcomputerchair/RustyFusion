@@ -107,6 +107,15 @@ impl LoginServerState {
         next
     }
 
+    pub fn get_lowest_pop_shard_id(&mut self) -> usize {
+        *self
+            .shards
+            .iter()
+            .min_by_key(|(_, shard)| shard.player_uids.len())
+            .unwrap()
+            .0
+    }
+
     pub fn register_shard(&mut self, shard_id: usize) {
         self.shards.insert(shard_id, ShardServerInfo::default());
     }
