@@ -42,12 +42,31 @@ impl Display for Severity {
         write!(f, "{}", s)
     }
 }
+impl Severity {
+    pub fn get_label(&self, colored: bool) -> String {
+        if colored {
+            format!(
+                "\x1b[{}m[{}]\x1b[0m",
+                match self {
+                    Severity::Debug => "36",
+                    Severity::Info => "32",
+                    Severity::Warning => "33",
+                    Severity::Fatal => "31",
+                },
+                self
+            )
+        } else {
+            format!("[{}]", self)
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct FFError {
     severity: Severity,
     msg: String,
     should_dc: bool,
+    parent: Option<Box<FFError>>,
 }
 impl FFError {
     fn new(severity: Severity, msg: String, should_dc: bool) -> Self {
@@ -55,6 +74,7 @@ impl FFError {
             severity,
             msg,
             should_dc,
+            parent: None,
         }
     }
 
@@ -74,6 +94,7 @@ impl FFError {
             },
             msg: format!("I/O error ({:?})", error.kind()),
             should_dc: true,
+            parent: None,
         }
     }
 
@@ -82,19 +103,25 @@ impl FFError {
             severity: Severity::Warning,
             msg: format!("Enum error ({:?})", val),
             should_dc: true,
+            parent: None,
         }
     }
 
     pub fn chain(self, other: FFError) -> Self {
         Self {
-            severity: min(self.severity, other.severity),
-            msg: format!("{}\nfrom [{}] {}", self.msg, other.severity, other.msg),
-            should_dc: self.should_dc || other.should_dc,
+            parent: Some(Box::new(other)),
+            ..self
         }
     }
 
     pub fn get_severity(&self) -> Severity {
-        self.severity
+        let mut sev = self.severity;
+        if let Some(parent) = self.parent.as_ref() {
+            // Recursively get the lowest value severity,
+            // which is the most severe
+            sev = min(sev, parent.get_severity());
+        }
+        sev
     }
 
     pub fn get_msg(&self) -> &str {
@@ -102,7 +129,23 @@ impl FFError {
     }
 
     pub fn should_dc(&self) -> bool {
-        self.should_dc
+        // Any DC error in the chain should cause a DC.
+        // Recursive short-circuiting.
+        match self.should_dc {
+            true => true,
+            false => match self.parent.as_ref() {
+                Some(parent) => parent.should_dc(),
+                None => false,
+            },
+        }
+    }
+
+    pub fn get_formatted(&self, colored: bool) -> String {
+        let mut msg = format!("{} {}", self.severity.get_label(colored), self.msg);
+        if let Some(parent) = self.parent.as_ref() {
+            msg.push_str(&format!("\nfrom {}", parent.get_formatted(colored)));
+        }
+        msg
     }
 }
 
@@ -147,17 +190,32 @@ pub fn logger_flush_scheduled(
 }
 
 pub fn log(severity: Severity, msg: &str) {
-    let val = severity as usize;
-    let threshold = config_get().general.logging_level.get();
+    let err = FFError::build(severity, msg.to_string());
+    log_error(&err);
+}
 
-    if val > threshold {
+pub fn log_error(err: &FFError) {
+    let severity = err.get_severity();
+
+    let threshold = config_get().general.logging_level.get();
+    if severity as usize > threshold {
         return;
     }
 
-    let s = format!("[{}] {}", severity, msg);
-    println!("{}", s);
+    // Log to console, colored output
+    let msg = err.get_formatted(true);
+    if severity == Severity::Fatal {
+        // Print to stderr instead
+        eprintln!("{}", msg);
+    } else {
+        println!("{}", msg);
+    }
+
+    // Log to file
+    let msg = err.get_formatted(false);
     if let Some(logger) = LOGGER.get() {
-        if writeln!(logger.lock().unwrap(), "{}", s).is_err() {
+        let mut logger = logger.lock().unwrap();
+        if writeln!(logger, "{}", msg).is_err() {
             println!("Couldn't write to log file!");
         }
     }
