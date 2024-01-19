@@ -711,8 +711,8 @@ impl Player {
             (SIZEOF_EQUIP_SLOT + SIZEOF_INVEN_SLOT + SIZEOF_BANK_SLOT + SIZEOF_QINVEN_SLOT)
                 as usize;
         (0..inv_slot_max).filter_map(move |slot_num| {
-            let (loc, slot_num) = util::slot_num_to_loc_and_slot_num(slot_num).unwrap();
-            let item = self.get_item(loc, slot_num).unwrap();
+            let (loc, slot_num_loc) = util::slot_num_to_loc_and_slot_num(slot_num).unwrap();
+            let item = self.get_item(loc, slot_num_loc).unwrap();
             item.as_ref().map(|item| (slot_num, item))
         })
     }
