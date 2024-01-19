@@ -299,7 +299,7 @@ pub fn vendor_start(client: &mut FFClient, state: &mut ShardServerState) -> FFRe
     let pkt: sP_CL2FE_REQ_PC_VENDOR_START = *client.get_packet(P_CL2FE_REQ_PC_VENDOR_START)?;
     catch_fail(
         (|| {
-            helpers::validate_vendor(client, state, pkt.iVendorID)?;
+            helpers::validate_vendor(client, state, pkt.iNPC_ID, pkt.iVendorID)?;
             let resp = sP_FE2CL_REP_PC_VENDOR_START_SUCC {
                 iNPC_ID: pkt.iNPC_ID,
                 iVendorID: pkt.iVendorID,
@@ -344,7 +344,7 @@ pub fn vendor_item_buy(
         (|| {
             let pkt: sP_CL2FE_REQ_PC_VENDOR_ITEM_BUY =
                 *client.get_packet(P_CL2FE_REQ_PC_VENDOR_ITEM_BUY)?;
-            helpers::validate_vendor(client, state, pkt.iVendorID)?;
+            helpers::validate_vendor(client, state, pkt.iNPC_ID, pkt.iVendorID)?;
 
             // sanitize the item
             let item: Option<Item> = pkt.Item.try_into()?;
@@ -471,7 +471,7 @@ pub fn vendor_item_restore_buy(
             let pc_id = client.get_player_id()?;
             let pkt: sP_CL2FE_REQ_PC_VENDOR_ITEM_RESTORE_BUY =
                 *client.get_packet(P_CL2FE_REQ_PC_VENDOR_ITEM_RESTORE_BUY)?;
-            helpers::validate_vendor(client, state, pkt.iVendorID)?;
+            helpers::validate_vendor(client, state, pkt.iNPC_ID, pkt.iVendorID)?;
 
             let item: Option<Item> = pkt.Item.try_into()?;
             let item: Item = item.ok_or(FFError::build(
@@ -540,7 +540,7 @@ pub fn vendor_battery_buy(client: &mut FFClient, state: &mut ShardServerState) -
         (|| {
             let pkt: sP_CL2FE_REQ_PC_VENDOR_BATTERY_BUY =
                 *client.get_packet(P_CL2FE_REQ_PC_VENDOR_BATTERY_BUY)?;
-            helpers::validate_vendor(client, state, pkt.iVendorID)?;
+            helpers::validate_vendor(client, state, pkt.iNPC_ID, pkt.iVendorID)?;
 
             let battery_type = pkt.Item.iID;
             let mut quantity = pkt.Item.iOpt as u32 * 100;
@@ -613,21 +613,51 @@ mod helpers {
     pub fn validate_vendor(
         client: &mut FFClient,
         state: &mut ShardServerState,
+        npc_id: i32,
         vendor_id: i32,
     ) -> FFResult<()> {
-        /*
-         * due to a client bug where the iNPC_ID field in vendor packets is incorrectly
-         * set to the same value as iVendorID, we need to lookup the NPC by its type
-         * instead (which is equal to iVendorID for whatever reason)
-         */
-        let npc = state.find_npc_by_type(vendor_id).ok_or(FFError::build(
-            Severity::Warning,
-            format!("NPC with type {} doesn't exist", vendor_id),
-        ))?;
-
         let pc_id = client.get_player_id()?;
-        state
-            .entity_map
-            .validate_proximity(&[EntityID::Player(pc_id), npc.get_id()], RANGE_INTERACT)
+        if npc_id == vendor_id {
+            /*
+             * due to a client bug where the iNPC_ID field in vendor packets is incorrectly
+             * set to the same value as iVendorID, we need to lookup the NPC by its type
+             * instead (which is equal to iVendorID for whatever reason).
+             * On top of that, there may exist multiple NPCs with the same type... so if
+             * one of them is close enough, we'll accept it.
+             */
+            let npc_ids = state.entity_map.find_npcs(|n| n.ty == vendor_id);
+            if npc_ids.is_empty() {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!("No NPCs with type {} doesn't exist", vendor_id),
+                ));
+            }
+            for npc_id in npc_ids {
+                let close_enough = state.entity_map.validate_proximity(
+                    &[EntityID::Player(pc_id), EntityID::NPC(npc_id)],
+                    RANGE_INTERACT,
+                )?;
+                if close_enough {
+                    return Ok(());
+                }
+            }
+            Err(FFError::build(
+                Severity::Warning,
+                "No matching NPCs close enough".to_string(),
+            ))
+        } else {
+            let close_enough = state.entity_map.validate_proximity(
+                &[EntityID::Player(pc_id), EntityID::NPC(npc_id)],
+                RANGE_INTERACT,
+            )?;
+            if close_enough {
+                Ok(())
+            } else {
+                Err(FFError::build(
+                    Severity::Warning,
+                    format!("NPC {} not close enough", npc_id),
+                ))
+            }
+        }
     }
 }

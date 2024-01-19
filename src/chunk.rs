@@ -216,20 +216,23 @@ impl EntityMap {
         })
     }
 
-    pub fn find_npc(&self, f: impl Fn(&NPC) -> bool) -> Option<i32> {
-        self.registry.values().find_map(|entry| {
-            let entity_id = entry.entity.get_id();
-            if let EntityID::NPC(npc_id) = entity_id {
-                let npc = self.get_npc(npc_id).unwrap();
-                if f(npc) {
-                    return Some(npc_id);
+    pub fn find_npcs(&self, f: impl Fn(&NPC) -> bool) -> Vec<i32> {
+        self.registry
+            .values()
+            .filter_map(|entry| {
+                let entity_id = entry.entity.get_id();
+                if let EntityID::NPC(npc_id) = entity_id {
+                    let npc = self.get_npc(npc_id).unwrap();
+                    if f(npc) {
+                        return Some(npc_id);
+                    }
                 }
-            }
-            None
-        })
+                None
+            })
+            .collect()
     }
 
-    pub fn validate_proximity(&self, ids: &[EntityID], range: u32) -> FFResult<()> {
+    pub fn validate_proximity(&self, ids: &[EntityID], range: u32) -> FFResult<bool> {
         let mut locations = Vec::with_capacity(ids.len());
         for id in ids {
             if let Some(entry) = self.registry.get(id) {
@@ -250,30 +253,32 @@ impl EntityMap {
                 let inst1 = locations[i].1;
                 let inst2 = locations[j].1;
                 if inst1 != inst2 {
-                    return Err(FFError::build(
+                    log(
                         Severity::Warning,
-                        format!(
+                        &format!(
                             "Entity with ID {:?} is in a different instance than entity with ID {:?} ({} != {})",
                             ids[i], ids[j], inst1, inst2
                         ),
-                    ));
+                    );
+                    return Ok(false);
                 }
 
                 let pos1 = locations[i].0;
                 let pos2 = locations[j].0;
                 let distance = pos1.distance_to(&pos2);
                 if distance > range {
-                    return Err(FFError::build(
+                    log(
                         Severity::Warning,
-                        format!(
+                        &format!(
                             "Entity with ID {:?} is too far from entity with ID {:?} ({} > {})",
                             ids[i], ids[j], distance, range
                         ),
-                    ));
+                    );
+                    return Ok(false);
                 }
             }
         }
-        Ok(())
+        Ok(true)
     }
 
     pub fn gen_next_pc_id(&mut self) -> i32 {

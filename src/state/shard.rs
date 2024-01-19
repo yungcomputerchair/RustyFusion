@@ -56,15 +56,6 @@ impl Default for ShardServerState {
     }
 }
 impl ShardServerState {
-    pub fn find_npc_by_type(&self, npc_type: i32) -> Option<&NPC> {
-        let id = self.entity_map.find_npc(|npc| npc.ty == npc_type);
-        if let Some(npc_id) = id {
-            Some(self.entity_map.get_npc(npc_id).unwrap())
-        } else {
-            None
-        }
-    }
-
     pub fn get_npc(&self, npc_id: i32) -> FFResult<&NPC> {
         self.entity_map.get_npc(npc_id).ok_or(FFError::build(
             Severity::Warning,
