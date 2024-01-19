@@ -8,12 +8,26 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
 - **Reliability:** RustyFusion comes after years of writing, refactoring, and evaluating OpenFusion code. There were a handful of cut corners and bad design decisions made in the development of OF that this project aims to avoid. Some already implemented examples include the increased usage of high-level types, a proper logging system, strict error-handling, and stricter packet validation ("anti-cheat"). These changes should lead to a cleaner codebase with less bugs.
 
 ## What's Done and Left To Do (Roughly)
-- [x] Barebones login server functionality (connection and character creation)
-- [x] Barebones "land walker" shard server functionality (connection, basic GM commands, seeing other players & NPCs, etc)
+- [ ] Core login server functionality
+  - [x] Client connection
+  - [x] Shard connection
+  - [x] Character creation
+  - [ ] ***Character deletion***
+  - [x] Character selection
+  - [x] Shard selection
+  - [x] Shard querying (channel + player info)
+- [x] Core shard server functionality
+  - [x] Login server connection
+  - [x] Client connection
+  - [x] Channels
 - [x] Config and tabledata frameworks
-- [x] Database (account system and player persistence)
+- [x] Core database functionality
+  - [x] Framework
+  - [x] Account loading
+  - [x] Player loading + saving
 - [x] Chunking
   - [x] Framework
+  - [x] Entity tracking
   - [x] Instancing (infected zones + other private instances)
 - [ ] Travel
   - [x] S.C.A.M.P.E.R. (fast-travel)
@@ -57,13 +71,14 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
 - [x] Time machine
 - [ ] Event system
   - [ ] Fuse boss fight
-  - [ ] Scripting API (stretch goal)
+  - [ ] Scripting API (bonus)
 - [ ] "Academy" (build 1013) support (currently, only build 104 is supported)
   - [ ] Struct support
   - [ ] Patching framework
   - [ ] Dash skill
   - [ ] Nano capsules
   - [ ] Code redemption
+- [ ] Interactive terminal (bonus)
 
 Items that are ***highlighted*** are in planning or WIP. Some items have dependencies in other categories, so the list won't get completed in order.
 
