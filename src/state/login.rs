@@ -107,13 +107,11 @@ impl LoginServerState {
         next
     }
 
-    pub fn get_lowest_pop_shard_id(&mut self) -> usize {
-        *self
-            .shards
+    pub fn get_lowest_pop_shard_id(&mut self) -> Option<usize> {
+        self.shards
             .iter()
             .min_by_key(|(_, shard)| shard.player_uids.len())
-            .unwrap()
-            .0
+            .map(|(shard_id, _)| *shard_id)
     }
 
     pub fn register_shard(&mut self, shard_id: usize) {

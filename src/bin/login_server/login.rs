@@ -282,7 +282,16 @@ pub fn shard_select(
 
                 let shard_id = if req_shard_id == 0 {
                     // pick the shard with the lowest population
-                    state.get_lowest_pop_shard_id()
+                    match state.get_lowest_pop_shard_id() {
+                        Some(shard_id) => shard_id,
+                        None => {
+                            error_code = 1; // "Shard connection error"
+                            return Err(FFError::build(
+                                Severity::Warning,
+                                "No shard servers available".to_string(),
+                            ));
+                        }
+                    }
                 } else {
                     req_shard_id
                 };
