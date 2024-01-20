@@ -2,3 +2,4 @@
 .vscode/settings.json
 config.toml
 *.log*
+motd.txt*

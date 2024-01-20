@@ -3,6 +3,7 @@ use std::time::SystemTime;
 use super::*;
 
 use rusty_fusion::{
+    config::config_get,
     defines::MAX_NUM_CHANNELS,
     enums::{PlayerShardStatus, ShardChannelStatus},
     net::{ffclient::ClientType, packet::*},
@@ -160,10 +161,35 @@ pub fn update_channel_statuses(
 pub fn motd(client: &mut FFClient) -> FFResult<()> {
     let pkt: &sP_FE2LS_REQ_MOTD = client.get_packet(P_FE2LS_REQ_MOTD)?;
 
-    let motd = "Welcome to RustyFusion!";
+    // load the MOTD from the MOTD file
+    let motd_path = config_get().login.motd_path.get();
+    let motd = if let Ok(motd) = std::fs::read_to_string(motd_path.clone()) {
+        motd.trim().to_string()
+    } else {
+        log(
+            Severity::Warning,
+            &format!("MOTD file {} not found, using default MOTD", motd_path),
+        );
+        "Welcome to RustyFusion!".to_string()
+    };
     let resp = sP_LS2FE_REP_MOTD {
         iPC_ID: pkt.iPC_ID,
-        szMessage: util::encode_utf16(motd),
+        szMessage: util::encode_utf16(&motd),
     };
     client.send_packet(P_LS2FE_REP_MOTD, &resp)
+}
+
+pub fn motd_register(client: &mut FFClient) -> FFResult<()> {
+    let pkt: &sP_FE2LS_MOTD_REGISTER = client.get_packet(P_FE2LS_MOTD_REGISTER)?;
+    let motd = util::parse_utf16(&pkt.szMessage);
+    let motd_path = config_get().login.motd_path.get();
+    if std::fs::write(motd_path.clone(), motd.as_bytes()).is_err() {
+        log(
+            Severity::Warning,
+            &format!("Failed to write MOTD to {}", motd_path),
+        );
+    } else {
+        log(Severity::Info, &format!("MOTD updated:\n{}", motd));
+    }
+    Ok(())
 }

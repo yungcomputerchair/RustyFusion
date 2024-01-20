@@ -535,6 +535,7 @@ pub enum PacketID {
     P_FE2LS_UPDATE_PC_SHARD = 0x32000005,            // 838860805
     P_FE2LS_UPDATE_CHANNEL_STATUSES = 0x32000006,    // 838860806
     P_FE2LS_REQ_MOTD = 0x32000007,                   // 838860807
+    P_FE2LS_MOTD_REGISTER = 0x32000008,              // 838860808
 }
 
 pub trait FFPacket: std::fmt::Debug {}
@@ -6612,3 +6613,11 @@ pub struct sP_FE2LS_REQ_MOTD {
     pub iPC_ID: i32,
 }
 impl FFPacket for sP_FE2LS_REQ_MOTD {}
+
+#[repr(packed(2))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_MOTD_REGISTER {
+    pub szMessage: [u16; 512],
+}
+impl FFPacket for sP_FE2LS_MOTD_REGISTER {}

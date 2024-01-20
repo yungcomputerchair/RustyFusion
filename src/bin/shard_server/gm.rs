@@ -200,3 +200,17 @@ pub fn gm_pc_special_state_switch(
         .get_self()
         .send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp)
 }
+
+pub fn gm_pc_motd_register(clients: &mut ClientMap) -> FFResult<()> {
+    let pkt: &sP_CL2FE_GM_REQ_PC_MOTD_REGISTER = clients
+        .get_self()
+        .get_packet(P_CL2FE_GM_REQ_PC_MOTD_REGISTER)?;
+    let pkt = sP_FE2LS_MOTD_REGISTER {
+        szMessage: pkt.szSystemMsg,
+    };
+    if let Some(login_server) = clients.get_login_server() {
+        login_server.send_packet(P_FE2LS_MOTD_REGISTER, &pkt)
+    } else {
+        Ok(())
+    }
+}
