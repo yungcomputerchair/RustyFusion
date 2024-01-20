@@ -200,6 +200,25 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
     }
 }
 
+pub fn char_delete(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
+    let acc_id = client.get_account_id()?;
+    let pkt: &sP_CL2LS_REQ_CHAR_DELETE = client.get_packet(P_CL2LS_REQ_CHAR_DELETE)?;
+    let pc_uid = pkt.iPC_UID;
+    let player = state
+        .get_players_mut(acc_id)
+        .remove(&pc_uid)
+        .ok_or(FFError::build(
+            Severity::Warning,
+            format!("Couldn't get player {}", pc_uid),
+        ))?;
+    let mut db = db_get();
+    db.exec("delete_player", &[&pc_uid]);
+    let resp = sP_LS2CL_REP_CHAR_DELETE_SUCC {
+        iSlotNum: player.get_slot_num() as i8,
+    };
+    client.send_packet(P_LS2CL_REP_CHAR_DELETE_SUCC, &resp)
+}
+
 pub fn save_char_tutor(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
     let acc_id = client.get_account_id()?;
     let pkt: &sP_CL2LS_REQ_SAVE_CHAR_TUTOR = client.get_packet(P_CL2LS_REQ_SAVE_CHAR_TUTOR)?;
