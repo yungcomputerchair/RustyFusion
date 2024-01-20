@@ -19,7 +19,7 @@ db_port = 5432 # port used by postgres server
 log_path = "login.log" # path to log file, or blank for console logging only
 listen_addr = "127.0.0.1:23000" # address to bind to
 auto_create_accounts = true # whether an account be created automatically if one isn't found
-motd_path = "motd.txt" # path to the MOTD file
+motd_path = "motd.txt" # path to the MOTD file. the MOTD is sent to each shard
 
 [shard]
 log_path = "shard.log" # path to log file, or blank for console logging only
