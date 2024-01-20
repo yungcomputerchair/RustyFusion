@@ -8,18 +8,20 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
 - **Reliability:** RustyFusion comes after years of writing, refactoring, and evaluating OpenFusion code. There were a handful of cut corners and bad design decisions made in the development of OF that this project aims to avoid. Some already implemented examples include the increased usage of high-level types, a proper logging system, strict error-handling, and stricter packet validation ("anti-cheat"). These changes should lead to a cleaner codebase with less bugs.
 
 ## What's Done and Left To Do (Roughly)
-- [ ] Core login server functionality
+- [x] Core login server functionality
   - [x] Client connection
   - [x] Shard connection
+  - [x] Auto account creation
   - [x] Character creation
-  - [ ] ***Character deletion***
+  - [x] Character deletion
   - [x] Character selection
   - [x] Shard selection
   - [x] Shard querying (channel + player info)
-- [x] Core shard server functionality
+- [ ] Core shard server functionality
   - [x] Login server connection
   - [x] Client connection
   - [x] Channels
+  - [ ] MOTD
 - [x] Config and tabledata frameworks
 - [x] Core database functionality
   - [x] Framework
