@@ -527,6 +527,7 @@ pub enum PacketID {
     P_LS2FE_REQ_LIVE_CHECK = 0x23000003,        // 587202563
     P_LS2FE_REQ_UPDATE_LOGIN_INFO = 0x23000004, // 587202564
     P_LS2FE_REP_MOTD = 0x23000005,              // 587202565
+    P_LS2FE_ANNOUNCE_MSG = 0x23000006,          // 587202566
 
     P_FE2LS_REQ_CONNECT = 0x32000001,                // 838860801
     P_FE2LS_REP_LIVE_CHECK = 0x32000002,             // 838860802
@@ -536,6 +537,7 @@ pub enum PacketID {
     P_FE2LS_UPDATE_CHANNEL_STATUSES = 0x32000006,    // 838860806
     P_FE2LS_REQ_MOTD = 0x32000007,                   // 838860807
     P_FE2LS_MOTD_REGISTER = 0x32000008,              // 838860808
+    P_FE2LS_ANNOUNCE_MSG = 0x32000009,               // 838860809
 }
 
 pub trait FFPacket: std::fmt::Debug {}
@@ -6557,6 +6559,16 @@ impl FFPacket for sP_LS2FE_REP_MOTD {}
 #[repr(packed(4))]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
+pub struct sP_LS2FE_ANNOUNCE_MSG {
+    pub iAnnounceType: i8,
+    pub iDuringTime: i32,
+    pub szAnnounceMsg: [u16; 512],
+}
+impl FFPacket for sP_LS2FE_ANNOUNCE_MSG {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2LS_REQ_CONNECT {
     pub iTempValue: i32,
 }
@@ -6621,3 +6633,13 @@ pub struct sP_FE2LS_MOTD_REGISTER {
     pub szMessage: [u16; 512],
 }
 impl FFPacket for sP_FE2LS_MOTD_REGISTER {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_ANNOUNCE_MSG {
+    pub iAnnounceType: i8,
+    pub iDuringTime: i32,
+    pub szAnnounceMsg: [u16; 512],
+}
+impl FFPacket for sP_FE2LS_ANNOUNCE_MSG {}

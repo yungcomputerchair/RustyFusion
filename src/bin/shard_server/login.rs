@@ -115,3 +115,11 @@ pub fn login_motd(clients: &mut ClientMap, state: &mut ShardServerState) -> FFRe
         Ok(())
     }
 }
+
+pub fn login_announce_msg(clients: &mut ClientMap) -> FFResult<()> {
+    let pkt: sP_LS2FE_ANNOUNCE_MSG = *clients.get_self().get_packet(P_LS2FE_ANNOUNCE_MSG)?;
+    clients.get_all_gameclient().for_each(|c| {
+        let _ = c.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
+    });
+    Ok(())
+}

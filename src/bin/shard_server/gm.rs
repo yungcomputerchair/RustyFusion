@@ -253,7 +253,11 @@ pub fn gm_pc_announce(clients: &mut ClientMap, state: &mut ShardServerState) -> 
                 let client = player.get_client(clients).unwrap();
                 let _ = client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
             }),
-        AreaType::Global => todo!(),
+        AreaType::Global => {
+            if let Some(login_server) = clients.get_login_server() {
+                let _ = login_server.send_packet(P_FE2LS_ANNOUNCE_MSG, &pkt);
+            }
+        }
     }
     Ok(())
 }

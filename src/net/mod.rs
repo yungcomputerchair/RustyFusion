@@ -7,7 +7,10 @@ use self::{
         PacketID::{self, *},
     },
 };
-use crate::{error::FFResult, state::ServerState};
+use crate::{
+    error::{log, FFResult, Severity},
+    state::ServerState,
+};
 
 const PACKET_BUFFER_SIZE: usize = 4096;
 const SILENCED_PACKETS: [PacketID; 4] = [
@@ -77,8 +80,13 @@ impl<'a> ClientMap<'a> {
     }
 
     pub fn get_login_server(&mut self) -> Option<&mut FFClient> {
-        self.clients
+        let login_server = self
+            .clients
             .values_mut()
-            .find(|c| matches!(c.client_type, ClientType::LoginServer))
+            .find(|c| matches!(c.client_type, ClientType::LoginServer));
+        if login_server.is_none() {
+            log(Severity::Warning, "No login server connected");
+        }
+        login_server
     }
 }

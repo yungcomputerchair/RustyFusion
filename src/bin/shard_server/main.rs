@@ -172,6 +172,7 @@ fn handle_packet(
         P_LS2FE_REQ_UPDATE_LOGIN_INFO => login::login_update_info(clients.get_self(), state),
         P_LS2FE_REQ_LIVE_CHECK => login::login_live_check(clients.get_self()),
         P_LS2FE_REP_MOTD => login::login_motd(&mut clients, state),
+        P_LS2FE_ANNOUNCE_MSG => login::login_announce_msg(&mut clients),
         //
         P_CL2LS_REQ_LOGIN => wrong_server(clients.get_self()),
         //

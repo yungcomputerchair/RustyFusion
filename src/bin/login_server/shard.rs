@@ -193,3 +193,14 @@ pub fn motd_register(client: &mut FFClient) -> FFResult<()> {
     }
     Ok(())
 }
+
+pub fn announce_msg(shard_key: usize, clients: &mut HashMap<usize, FFClient>) -> FFResult<()> {
+    let server = clients.get_mut(&shard_key).unwrap();
+    let pkt: sP_FE2LS_ANNOUNCE_MSG = *server.get_packet(P_FE2LS_ANNOUNCE_MSG)?;
+    clients.iter_mut().for_each(|(_, client)| {
+        if let ClientType::ShardServer(_) = client.client_type {
+            let _ = client.send_packet(P_LS2FE_ANNOUNCE_MSG, &pkt);
+        }
+    });
+    Ok(())
+}
