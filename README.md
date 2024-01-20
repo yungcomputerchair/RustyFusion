@@ -17,11 +17,11 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
   - [x] Character selection
   - [x] Shard selection
   - [x] Shard querying (channel + player info)
-- [ ] Core shard server functionality
+- [x] Core shard server functionality
   - [x] Login server connection
   - [x] Client connection
   - [x] Channels
-  - [ ] MOTD
+  - [x] MOTD
 - [x] Config and tabledata frameworks
 - [x] Core database functionality
   - [x] Framework
