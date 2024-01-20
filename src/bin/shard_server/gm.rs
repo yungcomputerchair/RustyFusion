@@ -3,6 +3,7 @@ use std::cmp::max;
 use rusty_fusion::{
     chunk::InstanceID,
     defines,
+    enums::AreaType,
     error::{catch_fail, FFError, Severity},
     placeholder, Combatant, Item, Position,
 };
@@ -213,4 +214,46 @@ pub fn gm_pc_motd_register(clients: &mut ClientMap) -> FFResult<()> {
     } else {
         Ok(())
     }
+}
+
+pub fn gm_pc_announce(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let pkt: &sP_CL2FE_GM_REQ_PC_ANNOUNCE =
+        clients.get_self().get_packet(P_CL2FE_GM_REQ_PC_ANNOUNCE)?;
+    let area_type: AreaType = pkt.iAreaType.try_into()?;
+    let pkt = sP_FE2CL_ANNOUNCE_MSG {
+        iAnnounceType: pkt.iAnnounceType,
+        iDuringTime: pkt.iDuringTime,
+        szAnnounceMsg: pkt.szAnnounceMsg,
+    };
+    let pc_id = clients.get_self().get_player_id()?;
+    let player = state.get_player(pc_id)?;
+    match area_type {
+        AreaType::Local => {
+            state
+                .entity_map
+                .for_each_around(EntityID::Player(pc_id), clients, |c| {
+                    let _ = c.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
+                });
+        }
+        AreaType::Channel => state
+            .entity_map
+            .find_players(|p| p.instance_id.channel_num == player.instance_id.channel_num)
+            .iter()
+            .for_each(|pc_id| {
+                let player = state.get_player(*pc_id).unwrap();
+                let client = player.get_client(clients).unwrap();
+                let _ = client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
+            }),
+        AreaType::Shard => state
+            .entity_map
+            .find_players(|_| true)
+            .iter()
+            .for_each(|pc_id| {
+                let player = state.get_player(*pc_id).unwrap();
+                let client = player.get_client(clients).unwrap();
+                let _ = client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
+            }),
+        AreaType::Global => todo!(),
+    }
+    Ok(())
 }

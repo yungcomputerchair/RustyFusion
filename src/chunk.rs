@@ -175,17 +175,20 @@ impl EntityMap {
         })
     }
 
-    pub fn find_player(&self, f: impl Fn(&Player) -> bool) -> Option<i32> {
-        self.registry.values().find_map(|entry| {
-            let entity_id = entry.entity.get_id();
-            if let EntityID::Player(pc_id) = entity_id {
-                let pc = self.get_player(pc_id).unwrap();
-                if f(pc) {
-                    return Some(pc_id);
+    pub fn find_players(&self, f: impl Fn(&Player) -> bool) -> Vec<i32> {
+        self.registry
+            .values()
+            .filter_map(|entry| {
+                let entity_id = entry.entity.get_id();
+                if let EntityID::Player(pc_id) = entity_id {
+                    let pc = self.get_player(pc_id).unwrap();
+                    if f(pc) {
+                        return Some(pc_id);
+                    }
                 }
-            }
-            None
-        })
+                None
+            })
+            .collect()
     }
 
     pub fn get_npc(&self, npc_id: i32) -> Option<&NPC> {

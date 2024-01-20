@@ -42,6 +42,16 @@ pub enum ShardChannelStatus {
     Busy = 3,
 }
 
+#[repr(i8)]
+#[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
+#[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
+pub enum AreaType {
+    Local = 0,
+    Channel = 1,
+    Shard = 2,
+    Global = 3,
+}
+
 /* Enums ripped from the client */
 
 #[repr(i32)]

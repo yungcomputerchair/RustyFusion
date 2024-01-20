@@ -198,6 +198,7 @@ fn handle_packet(
             gm::gm_pc_special_state_switch(&mut clients, state)
         }
         P_CL2FE_GM_REQ_PC_MOTD_REGISTER => gm::gm_pc_motd_register(&mut clients),
+        P_CL2FE_GM_REQ_PC_ANNOUNCE => gm::gm_pc_announce(&mut clients, state),
         //
         P_CL2FE_REQ_SEND_FREECHAT_MESSAGE => chat::send_freechat_message(&mut clients, state),
         P_CL2FE_REQ_SEND_MENUCHAT_MESSAGE => chat::send_menuchat_message(&mut clients, state),

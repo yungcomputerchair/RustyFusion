@@ -95,13 +95,17 @@ impl ShardServerState {
             }
             PlayerSearchQuery::ByUID(pc_uid) => self
                 .entity_map
-                .find_player(|player| player.get_uid() == pc_uid),
-            PlayerSearchQuery::ByName(first_name, last_name) => {
-                self.entity_map.find_player(|player| {
+                .find_players(|player| player.get_uid() == pc_uid)
+                .first()
+                .copied(),
+            PlayerSearchQuery::ByName(first_name, last_name) => self
+                .entity_map
+                .find_players(|player| {
                     player.get_first_name().eq_ignore_ascii_case(&first_name)
                         && player.get_last_name().eq_ignore_ascii_case(&last_name)
                 })
-            }
+                .first()
+                .copied(),
         }
     }
 
