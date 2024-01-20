@@ -5,6 +5,7 @@ use super::*;
 use rand::random;
 
 use rusty_fusion::{
+    config::config_get,
     database::db_get,
     defines::*,
     enums::{ItemLocation, ItemType},
@@ -18,74 +19,98 @@ pub fn login(
     state: &mut LoginServerState,
     time: SystemTime,
 ) -> FFResult<()> {
-    // TODO failure
-    let pkt: &sP_CL2LS_REQ_LOGIN = client.get_packet(P_CL2LS_REQ_LOGIN)?;
+    let pkt: sP_CL2LS_REQ_LOGIN = *client.get_packet(P_CL2LS_REQ_LOGIN)?;
+    let mut error_code = 0;
+    catch_fail(
+        (|| {
+            let mut username = util::parse_utf16(&pkt.szID);
+            let mut password = util::parse_utf16(&pkt.szPassword);
+            if username.is_empty() {
+                username = util::parse_utf8(&pkt.szCookie_TEGid);
+                password = util::parse_utf8(&pkt.szCookie_authid);
+            }
+            // TODO password hashing
 
-    let mut username = util::parse_utf16(&pkt.szID);
-    let mut _password = util::parse_utf16(&pkt.szPassword);
-    if username.is_empty() {
-        username = util::parse_utf8(&pkt.szCookie_TEGid);
-        _password = util::parse_utf8(&pkt.szCookie_authid);
-    }
+            let mut db = db_get();
+            let mut accounts = db.query("find_account", &[&username]);
+            assert!(accounts.len() <= 1);
+            if accounts.is_empty() {
+                if config_get().login.auto_create_accounts.get() {
+                    // automatically create the account with the supplied credentials
+                    db.exec("create_account", &[&username, &password]);
+                    accounts = db.query("find_account", &[&username]);
+                    let new_acc_id: i64 = accounts.first().unwrap().get("AccountID");
+                    log(
+                        Severity::Info,
+                        &format!("Created account {} (id: {})", username, new_acc_id),
+                    );
+                } else {
+                    error_code = 1; // "Login fail: login ID error"
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!("Couldn't find account {}", username),
+                    ));
+                }
+            }
+            let account = accounts.first().unwrap();
+            // TODO auth
+            let account_id: i64 = account.get("AccountID");
+            let last_player_slot: i32 = account.get("Selected");
 
-    let mut db = db_get();
-    let accounts = db.query("find_account", &[&username]);
-    if accounts.is_empty() {
-        return Err(FFError::build(
-            Severity::Warning,
-            format!("Couldn't find account {}", username),
-        ));
-    }
-    let account = accounts.first().unwrap();
-    // TODO auth
-    let account_id: i64 = account.get("AccountID");
-    let last_player_slot: i32 = account.get("Selected");
+            let players = db.load_players(account_id);
 
-    let players = db.load_players(account_id);
+            let resp = sP_LS2CL_REP_LOGIN_SUCC {
+                iCharCount: players.len() as i8,
+                iSlotNum: last_player_slot as i8,
+                iTempForPacking4: unused!(),
+                uiSvrTime: util::get_timestamp_ms(time),
+                szID: pkt.szID,
+                iPaymentFlag: 1,  // all accounts have a subscription
+                iOpenBetaFlag: 0, // and we're not in open beta
+            };
+            let e_base: u64 = resp.uiSvrTime;
+            let e_iv1: i32 = (resp.iCharCount + 1) as i32;
+            let e_iv2: i32 = (resp.iSlotNum + 1) as i32;
+            let fe_base: u64 = u64::from_le_bytes(DEFAULT_KEY.try_into().unwrap());
+            let fe_iv1: i32 = pkt.iClientVerC;
+            let fe_iv2: i32 = 1;
 
-    let resp = sP_LS2CL_REP_LOGIN_SUCC {
-        iCharCount: players.len() as i8,
-        iSlotNum: last_player_slot as i8,
-        iTempForPacking4: unused!(),
-        uiSvrTime: util::get_timestamp_ms(time),
-        szID: pkt.szID,
-        iPaymentFlag: 1,  // all accounts have a subscription
-        iOpenBetaFlag: 0, // and we're not in open beta
-    };
-    let e_base: u64 = resp.uiSvrTime;
-    let e_iv1: i32 = (resp.iCharCount + 1) as i32;
-    let e_iv2: i32 = (resp.iSlotNum + 1) as i32;
-    let fe_base: u64 = u64::from_le_bytes(DEFAULT_KEY.try_into().unwrap());
-    let fe_iv1: i32 = pkt.iClientVerC;
-    let fe_iv2: i32 = 1;
+            client.send_packet(P_LS2CL_REP_LOGIN_SUCC, &resp)?;
 
-    client.send_packet(P_LS2CL_REP_LOGIN_SUCC, &resp)?;
+            client.e_key = gen_key(e_base, e_iv1, e_iv2);
+            client.fe_key = gen_key(fe_base, fe_iv1, fe_iv2);
 
-    client.e_key = gen_key(e_base, e_iv1, e_iv2);
-    client.fe_key = gen_key(fe_base, fe_iv1, fe_iv2);
+            let serial_key: i64 = random();
+            client.client_type = ClientType::GameClient {
+                account_id,
+                serial_key,
+                pc_id: None,
+            };
+            state.set_account(account_id, username, players.clone().iter().cloned());
 
-    let serial_key: i64 = random();
-    client.client_type = ClientType::GameClient {
-        account_id,
-        serial_key,
-        pc_id: None,
-    };
-    state.set_account(account_id, username, players.clone().iter().cloned());
-
-    players.iter().try_for_each(|player| {
-        let pos = player.get_position();
-        let pkt = sP_LS2CL_REP_CHAR_INFO {
-            iSlot: player.get_slot_num() as i8,
-            iLevel: player.get_level(),
-            sPC_Style: player.get_style(),
-            sPC_Style2: player.get_style_2(),
-            iX: pos.x,
-            iY: pos.y,
-            iZ: pos.z,
-            aEquip: player.get_equipped().map(Option::<Item>::into),
-        };
-        client.send_packet(P_LS2CL_REP_CHAR_INFO, &pkt)
-    })
+            players.iter().try_for_each(|player| {
+                let pos = player.get_position();
+                let pkt = sP_LS2CL_REP_CHAR_INFO {
+                    iSlot: player.get_slot_num() as i8,
+                    iLevel: player.get_level(),
+                    sPC_Style: player.get_style(),
+                    sPC_Style2: player.get_style_2(),
+                    iX: pos.x,
+                    iY: pos.y,
+                    iZ: pos.z,
+                    aEquip: player.get_equipped().map(Option::<Item>::into),
+                };
+                client.send_packet(P_LS2CL_REP_CHAR_INFO, &pkt)
+            })
+        })(),
+        || {
+            let resp = sP_LS2CL_REP_LOGIN_FAIL {
+                iErrorCode: error_code,
+                szID: pkt.szID,
+            };
+            client.send_packet(P_LS2CL_REP_LOGIN_FAIL, &resp)
+        },
+    )
 }
 
 pub fn check_char_name(client: &mut FFClient) -> FFResult<()> {

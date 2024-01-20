@@ -6,5 +6,5 @@ INSERT INTO accounts (
 VALUES (
     $1,
     $2,
-    $3
+    99
 );
