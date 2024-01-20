@@ -133,6 +133,7 @@ fn handle_packet(
         P_FE2LS_REP_LIVE_CHECK => Ok(()),
         P_FE2LS_UPDATE_PC_SHARD => shard::update_pc_shard(client, state),
         P_FE2LS_UPDATE_CHANNEL_STATUSES => shard::update_channel_statuses(client, state),
+        P_FE2LS_REQ_MOTD => shard::motd(client),
         //
         P_CL2LS_REQ_LOGIN => login::login(client, state, time),
         P_CL2LS_REQ_SHARD_LIST_INFO => login::shard_list_info(client, state),

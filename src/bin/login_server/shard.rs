@@ -156,3 +156,14 @@ pub fn update_channel_statuses(
         ))
     }
 }
+
+pub fn motd(client: &mut FFClient) -> FFResult<()> {
+    let pkt: &sP_FE2LS_REQ_MOTD = client.get_packet(P_FE2LS_REQ_MOTD)?;
+
+    let motd = "Welcome to RustyFusion!";
+    let resp = sP_LS2FE_REP_MOTD {
+        iPC_ID: pkt.iPC_ID,
+        szMessage: util::encode_utf16(motd),
+    };
+    client.send_packet(P_LS2FE_REP_MOTD, &resp)
+}

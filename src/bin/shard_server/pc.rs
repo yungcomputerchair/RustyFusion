@@ -66,10 +66,12 @@ pub fn pc_enter(
     let pkt_chan = sP_FE2LS_UPDATE_CHANNEL_STATUSES {
         aChannelStatus: state.entity_map.get_channel_statuses().map(|s| s as u8),
     };
+    let pkt_motd = sP_FE2LS_REQ_MOTD { iPC_ID: pc_id };
     match clients.get_login_server() {
         Some(login_server) => {
             let _ = login_server.send_packet(P_FE2LS_UPDATE_PC_SHARD, &pkt_pc);
             let _ = login_server.send_packet(P_FE2LS_UPDATE_CHANNEL_STATUSES, &pkt_chan);
+            let _ = login_server.send_packet(P_FE2LS_REQ_MOTD, &pkt_motd);
         }
         None => {
             log(

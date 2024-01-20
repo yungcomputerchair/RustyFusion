@@ -526,6 +526,7 @@ pub enum PacketID {
     P_LS2FE_REP_CONNECT_FAIL = 0x23000002,      // 587202562
     P_LS2FE_REQ_LIVE_CHECK = 0x23000003,        // 587202563
     P_LS2FE_REQ_UPDATE_LOGIN_INFO = 0x23000004, // 587202564
+    P_LS2FE_REP_MOTD = 0x23000005,              // 587202565
 
     P_FE2LS_REQ_CONNECT = 0x32000001,                // 838860801
     P_FE2LS_REP_LIVE_CHECK = 0x32000002,             // 838860802
@@ -533,6 +534,7 @@ pub enum PacketID {
     P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL = 0x32000004, // 838860804
     P_FE2LS_UPDATE_PC_SHARD = 0x32000005,            // 838860805
     P_FE2LS_UPDATE_CHANNEL_STATUSES = 0x32000006,    // 838860806
+    P_FE2LS_REQ_MOTD = 0x32000007,                   // 838860807
 }
 
 pub trait FFPacket: std::fmt::Debug {}
@@ -6545,6 +6547,15 @@ impl FFPacket for sP_LS2FE_REQ_UPDATE_LOGIN_INFO {}
 #[repr(packed(4))]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
+pub struct sP_LS2FE_REP_MOTD {
+    pub iPC_ID: i32,
+    pub szMessage: [u16; 512],
+}
+impl FFPacket for sP_LS2FE_REP_MOTD {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2LS_REQ_CONNECT {
     pub iTempValue: i32,
 }
@@ -6593,3 +6604,11 @@ pub struct sP_FE2LS_UPDATE_CHANNEL_STATUSES {
     pub aChannelStatus: [u8; MAX_NUM_CHANNELS],
 }
 impl FFPacket for sP_FE2LS_UPDATE_CHANNEL_STATUSES {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_REQ_MOTD {
+    pub iPC_ID: i32,
+}
+impl FFPacket for sP_FE2LS_REQ_MOTD {}

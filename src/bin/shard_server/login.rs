@@ -101,3 +101,17 @@ pub fn login_live_check(client: &mut FFClient) -> FFResult<()> {
     client.send_packet(P_FE2LS_REP_LIVE_CHECK, &resp)?;
     Ok(())
 }
+
+pub fn login_motd(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let pkt: &sP_LS2FE_REP_MOTD = clients.get_self().get_packet(P_LS2FE_REP_MOTD)?;
+    let player = state.get_player(pkt.iPC_ID)?;
+    let pkt = sP_FE2CL_PC_MOTD_LOGIN {
+        iType: unused!(),
+        szSystemMsg: pkt.szMessage,
+    };
+    if let Some(client) = player.get_client(clients) {
+        client.send_packet(P_FE2CL_PC_MOTD_LOGIN, &pkt)
+    } else {
+        Ok(())
+    }
+}
