@@ -86,31 +86,6 @@ impl ShardServerState {
         ))
     }
 
-    pub fn find_player_id(&self, query: PlayerSearchQuery) -> Option<i32> {
-        match query {
-            PlayerSearchQuery::ByID(pc_id) => {
-                if self.entity_map.get_player(pc_id).is_some() {
-                    Some(pc_id)
-                } else {
-                    None
-                }
-            }
-            PlayerSearchQuery::ByUID(pc_uid) => self
-                .entity_map
-                .find_players(|player| player.get_uid() == pc_uid)
-                .first()
-                .copied(),
-            PlayerSearchQuery::ByName(first_name, last_name) => self
-                .entity_map
-                .find_players(|player| {
-                    player.get_first_name().eq_ignore_ascii_case(&first_name)
-                        && player.get_last_name().eq_ignore_ascii_case(&last_name)
-                })
-                .first()
-                .copied(),
-        }
-    }
-
     pub fn check_for_expired_vehicles(&mut self, time: SystemTime, clients: &mut ClientMap) {
         log(Severity::Debug, "Checking for expired vehicles");
         let pc_ids: Vec<i32> = self.entity_map.get_player_ids().collect();

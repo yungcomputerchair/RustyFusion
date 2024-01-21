@@ -22,6 +22,8 @@ pub const RANGE_INTERACT: u32 = 800;
 
 pub const FLAG_PC_STATE_VEHICLE: i8 = 8;
 
+pub const MSG_BOX_DURATION_DEFAULT: i32 = 3;
+
 /* Constants ripped from the client */
 
 pub const SUCC: u32 = 1;

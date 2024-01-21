@@ -2,10 +2,12 @@ use std::cmp::max;
 
 use rusty_fusion::{
     chunk::InstanceID,
-    defines,
-    enums::AreaType,
+    defines::{self, MSG_BOX_DURATION_DEFAULT},
+    enums::{AreaType, TargetSearchBy},
     error::{catch_fail, FFError, Severity},
-    placeholder, Combatant, Item, Position,
+    placeholder,
+    player::PlayerSearchQuery,
+    util, Combatant, Item, Position,
 };
 
 use super::*;
@@ -260,4 +262,48 @@ pub fn gm_pc_announce(clients: &mut ClientMap, state: &mut ShardServerState) -> 
         }
     }
     Ok(())
+}
+
+pub fn gm_pc_location(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+    let pkt: &sP_CL2FE_GM_REQ_PC_LOCATION = client.get_packet(P_CL2FE_GM_REQ_PC_LOCATION)?;
+    let search_mode: TargetSearchBy = pkt.eTargetSearchBy.try_into()?;
+    let search_query = match search_mode {
+        TargetSearchBy::PlayerID => PlayerSearchQuery::ByID(pkt.iTargetPC_ID),
+        TargetSearchBy::PlayerName => PlayerSearchQuery::ByName(
+            util::parse_utf16(&pkt.szTargetPC_FirstName),
+            util::parse_utf16(&pkt.szTargetPC_LastName),
+        ),
+        TargetSearchBy::PlayerUID => PlayerSearchQuery::ByUID(pkt.iTargetPC_UID),
+    };
+    if let Some(pc_id) = search_query.execute(state) {
+        let player = state.get_player(pc_id)?;
+        let pos = player.get_position();
+        let resp = sP_FE2CL_GM_REP_PC_LOCATION {
+            iTargetPC_UID: player.get_uid(),
+            iTargetPC_ID: pc_id,
+            iShardID: state.shard_id.unwrap(),
+            iMapType: if player.instance_id.instance_num.is_some() {
+                1 // instance
+            } else {
+                0 // non-instance
+            },
+            iMapID: player.instance_id.instance_num.unwrap_or(0) as i32,
+            iMapNum: player.instance_id.map_num as i32,
+            iX: pos.x,
+            iY: pos.y,
+            iZ: pos.z,
+            szTargetPC_FirstName: util::encode_utf16(&player.get_first_name()),
+            szTargetPC_LastName: util::encode_utf16(&player.get_last_name()),
+        };
+        client.send_packet(P_FE2CL_GM_REP_PC_LOCATION, &resp)
+    } else {
+        let err_msg = format!("Player not found: {:?}", search_query);
+        let pkt = sP_FE2CL_ANNOUNCE_MSG {
+            iAnnounceType: unused!(),
+            iDuringTime: MSG_BOX_DURATION_DEFAULT,
+            szAnnounceMsg: util::encode_utf16(&err_msg),
+        };
+        let _ = client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
+        Err(FFError::build(Severity::Warning, err_msg))
+    }
 }

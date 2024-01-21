@@ -1008,3 +1008,29 @@ pub enum PlayerSearchQuery {
     ByUID(i64),
     ByName(String, String),
 }
+impl PlayerSearchQuery {
+    pub fn execute(&self, state: &ShardServerState) -> Option<i32> {
+        match self {
+            PlayerSearchQuery::ByID(pc_id) => {
+                if state.entity_map.get_player(*pc_id).is_some() {
+                    Some(*pc_id)
+                } else {
+                    None
+                }
+            }
+            PlayerSearchQuery::ByUID(pc_uid) => state
+                .entity_map
+                .find_players(|player| player.get_uid() == *pc_uid)
+                .first()
+                .copied(),
+            PlayerSearchQuery::ByName(first_name, last_name) => state
+                .entity_map
+                .find_players(|player| {
+                    player.get_first_name().eq_ignore_ascii_case(first_name)
+                        && player.get_last_name().eq_ignore_ascii_case(last_name)
+                })
+                .first()
+                .copied(),
+        }
+    }
+}
