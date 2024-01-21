@@ -1,4 +1,4 @@
-use std::time::SystemTime;
+use std::{collections::HashSet, time::SystemTime};
 
 use super::*;
 
@@ -6,7 +6,9 @@ use rusty_fusion::{
     config::config_get,
     defines::MAX_NUM_CHANNELS,
     enums::{PlayerShardStatus, ShardChannelStatus},
+    error::codes::PlayerSearchReqErr,
     net::{ffclient::ClientType, packet::*},
+    state::login::PlayerSearchRequest,
     util,
 };
 
@@ -215,5 +217,129 @@ pub fn announce_msg(shard_key: usize, clients: &mut HashMap<usize, FFClient>) ->
             let _ = client.send_packet(P_LS2FE_ANNOUNCE_MSG, &pkt);
         }
     });
+    Ok(())
+}
+
+pub fn pc_location(
+    shard_key: usize,
+    clients: &mut HashMap<usize, FFClient>,
+    state: &mut LoginServerState,
+) -> FFResult<()> {
+    let server = clients.get_mut(&shard_key).unwrap();
+    let pkt: sP_FE2LS_REQ_PC_LOCATION = *server.get_packet(P_FE2LS_REQ_PC_LOCATION)?;
+    if state.player_search_reqeust.is_some() {
+        let resp = sP_LS2FE_REP_PC_LOCATION_FAIL {
+            iPC_ID: pkt.iPC_ID,
+            sReq: pkt.sReq,
+            iErrorCode: PlayerSearchReqErr::SearchInProgress as i32,
+        };
+        server.send_packet(P_LS2FE_REP_PC_LOCATION_FAIL, &resp)?;
+        return Err(FFError::build(
+            Severity::Warning,
+            "Player search request already in progress".to_string(),
+        ));
+    }
+
+    // search all shards except the one that requested the search
+    let req_shard_id = server.get_shard_id()?;
+    let search_shard_ids: HashSet<i32> = state
+        .get_shard_ids()
+        .into_iter()
+        .filter(|id| *id != req_shard_id)
+        .collect();
+    state.player_search_reqeust = Some(PlayerSearchRequest {
+        requesting_shard_id: req_shard_id,
+        searching_shard_ids: search_shard_ids,
+    });
+
+    clients.iter_mut().for_each(|(_, client)| {
+        if let ClientType::ShardServer(shard_id) = client.client_type {
+            if shard_id == req_shard_id {
+                return;
+            }
+            let _ = client.send_packet(P_LS2FE_REQ_PC_LOCATION, &pkt);
+        }
+    });
+    Ok(())
+}
+
+pub fn pc_location_succ(
+    shard_key: usize,
+    clients: &mut HashMap<usize, FFClient>,
+    state: &mut LoginServerState,
+) -> FFResult<()> {
+    let server = clients.get_mut(&shard_key).unwrap();
+    let pkt: sP_FE2LS_REP_PC_LOCATION_SUCC = *server.get_packet(P_FE2LS_REP_PC_LOCATION_SUCC)?;
+
+    let search = state.player_search_reqeust.take().ok_or(FFError::build(
+        Severity::Warning,
+        "No player search request in progress".to_string(),
+    ))?;
+
+    // find the shard that requested the search and forward the results
+    let requesting_shard_id = search.requesting_shard_id;
+    let client = clients
+        .values_mut()
+        .find(|c| match c.client_type {
+            ClientType::ShardServer(shard_id) => shard_id == requesting_shard_id,
+            _ => false,
+        })
+        .ok_or(FFError::build(
+            Severity::Warning,
+            format!(
+                "Shard {}, which initiated the player search, not found",
+                requesting_shard_id
+            ),
+        ))?;
+
+    let resp = sP_LS2FE_REP_PC_LOCATION_SUCC {
+        iPC_ID: pkt.iPC_ID,
+        sResp: pkt.sResp,
+    };
+    let _ = client.send_packet(P_LS2FE_REP_PC_LOCATION_SUCC, &resp);
+    Ok(())
+}
+
+pub fn pc_location_fail(
+    shard_key: usize,
+    clients: &mut HashMap<usize, FFClient>,
+    state: &mut LoginServerState,
+) -> FFResult<()> {
+    let server = clients.get_mut(&shard_key).unwrap();
+    let pkt: sP_FE2LS_REP_PC_LOCATION_FAIL = *server.get_packet(P_FE2LS_REP_PC_LOCATION_FAIL)?;
+
+    let search = match state.player_search_reqeust.as_mut() {
+        Some(search) => search,
+        None => {
+            return Ok(()); // search completed already
+        }
+    };
+
+    let shard_id = server.get_shard_id()?;
+    search.searching_shard_ids.remove(&shard_id);
+    if search.searching_shard_ids.is_empty() {
+        // every shard got back to us with a failure, so return not found
+        let req_shard_id = search.requesting_shard_id;
+        state.player_search_reqeust = None;
+        let resp = sP_LS2FE_REP_PC_LOCATION_FAIL {
+            iPC_ID: pkt.iPC_ID,
+            sReq: pkt.sReq,
+            iErrorCode: PlayerSearchReqErr::NotFound as i32,
+        };
+        let shard = clients
+            .values_mut()
+            .find(|c| match c.client_type {
+                ClientType::ShardServer(shard_id) => shard_id == req_shard_id,
+                _ => false,
+            })
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Shard {}, which initiated the player search, not found",
+                    req_shard_id
+                ),
+            ))?;
+        let _ = shard.send_packet(P_LS2FE_REP_PC_LOCATION_FAIL, &resp);
+    }
     Ok(())
 }

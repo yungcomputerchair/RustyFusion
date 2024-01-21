@@ -136,6 +136,9 @@ fn handle_packet(
         P_FE2LS_REQ_MOTD => shard::motd(client),
         P_FE2LS_MOTD_REGISTER => shard::motd_register(client),
         P_FE2LS_ANNOUNCE_MSG => shard::announce_msg(key, clients),
+        P_FE2LS_REQ_PC_LOCATION => shard::pc_location(key, clients, state),
+        P_FE2LS_REP_PC_LOCATION_SUCC => shard::pc_location_succ(key, clients, state),
+        P_FE2LS_REP_PC_LOCATION_FAIL => shard::pc_location_fail(key, clients, state),
         //
         P_CL2LS_REQ_LOGIN => login::login(client, state, time),
         P_CL2LS_REQ_SHARD_LIST_INFO => login::shard_list_info(client, state),

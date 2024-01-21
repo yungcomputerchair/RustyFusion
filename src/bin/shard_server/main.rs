@@ -173,6 +173,9 @@ fn handle_packet(
         P_LS2FE_REQ_LIVE_CHECK => login::login_live_check(clients.get_self()),
         P_LS2FE_REP_MOTD => login::login_motd(&mut clients, state),
         P_LS2FE_ANNOUNCE_MSG => login::login_announce_msg(&mut clients),
+        P_LS2FE_REQ_PC_LOCATION => login::login_pc_location(&mut clients, state),
+        P_LS2FE_REP_PC_LOCATION_SUCC => login::login_pc_location_succ(&mut clients, state),
+        P_LS2FE_REP_PC_LOCATION_FAIL => login::login_pc_location_fail(&mut clients, state),
         //
         P_CL2LS_REQ_LOGIN => wrong_server(clients.get_self()),
         //
@@ -200,7 +203,7 @@ fn handle_packet(
         }
         P_CL2FE_GM_REQ_PC_MOTD_REGISTER => gm::gm_pc_motd_register(&mut clients),
         P_CL2FE_GM_REQ_PC_ANNOUNCE => gm::gm_pc_announce(&mut clients, state),
-        P_CL2FE_GM_REQ_PC_LOCATION => gm::gm_pc_location(clients.get_self(), state),
+        P_CL2FE_GM_REQ_PC_LOCATION => gm::gm_pc_location(&mut clients, state),
         //
         P_CL2FE_REQ_SEND_FREECHAT_MESSAGE => chat::send_freechat_message(&mut clients, state),
         P_CL2FE_REQ_SEND_MENUCHAT_MESSAGE => chat::send_menuchat_message(&mut clients, state),

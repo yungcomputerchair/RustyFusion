@@ -26,11 +26,17 @@ impl Default for ShardServerInfo {
     }
 }
 
+pub struct PlayerSearchRequest {
+    pub requesting_shard_id: i32,
+    pub searching_shard_ids: HashSet<i32>,
+}
+
 pub struct LoginServerState {
     pub server_id: i64,
     accounts: HashMap<i64, Account>,
     shard_id_pool: Vec<i32>,
     shards: HashMap<i32, ShardServerInfo>,
+    pub player_search_reqeust: Option<PlayerSearchRequest>,
 }
 impl Default for LoginServerState {
     fn default() -> Self {
@@ -39,6 +45,7 @@ impl Default for LoginServerState {
             accounts: HashMap::new(),
             shard_id_pool: (1..=MAX_NUM_SHARDS as i32).collect(),
             shards: HashMap::new(),
+            player_search_reqeust: None,
         }
     }
 }
@@ -121,6 +128,10 @@ impl LoginServerState {
     pub fn unregister_shard(&mut self, shard_id: i32) {
         self.shards.remove(&shard_id);
         self.shard_id_pool.push(shard_id);
+    }
+
+    pub fn get_shard_ids(&self) -> Vec<i32> {
+        self.shards.keys().copied().collect()
     }
 
     pub fn unset_player_shard(&mut self, player_uid: i64) -> Option<i32> {

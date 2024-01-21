@@ -220,3 +220,16 @@ pub fn log_error(err: &FFError) {
         }
     }
 }
+
+pub mod codes {
+    use super::*;
+    use num_enum::TryFromPrimitive;
+
+    #[repr(i32)]
+    #[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
+    #[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
+    pub enum PlayerSearchReqErr {
+        NotFound = 0,
+        SearchInProgress = 1,
+    }
+}

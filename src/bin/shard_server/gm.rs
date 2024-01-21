@@ -264,8 +264,9 @@ pub fn gm_pc_announce(clients: &mut ClientMap, state: &mut ShardServerState) -> 
     Ok(())
 }
 
-pub fn gm_pc_location(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
-    let pkt: &sP_CL2FE_GM_REQ_PC_LOCATION = client.get_packet(P_CL2FE_GM_REQ_PC_LOCATION)?;
+pub fn gm_pc_location(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let pkt: sP_CL2FE_GM_REQ_PC_LOCATION =
+        *clients.get_self().get_packet(P_CL2FE_GM_REQ_PC_LOCATION)?;
     let search_mode: TargetSearchBy = pkt.eTargetSearchBy.try_into()?;
     let search_query = match search_mode {
         TargetSearchBy::PlayerID => PlayerSearchQuery::ByID(pkt.iTargetPC_ID),
@@ -295,7 +296,19 @@ pub fn gm_pc_location(client: &mut FFClient, state: &mut ShardServerState) -> FF
             szTargetPC_FirstName: util::encode_utf16(&player.get_first_name()),
             szTargetPC_LastName: util::encode_utf16(&player.get_last_name()),
         };
-        client.send_packet(P_FE2CL_GM_REP_PC_LOCATION, &resp)
+        clients
+            .get_self()
+            .send_packet(P_FE2CL_GM_REP_PC_LOCATION, &resp)
+    } else if search_mode != TargetSearchBy::PlayerID && clients.get_login_server().is_some() {
+        // for name or UID search, we can ask the login server,
+        // which will ask all the other shards
+        let pkt = sP_FE2LS_REQ_PC_LOCATION {
+            iPC_ID: clients.get_self().get_player_id()?,
+            sReq: pkt,
+        };
+        let login_server = clients.get_login_server().unwrap();
+        let _ = login_server.send_packet(P_FE2LS_REQ_PC_LOCATION, &pkt);
+        Ok(())
     } else {
         let err_msg = format!("Player not found: {:?}", search_query);
         let pkt = sP_FE2CL_ANNOUNCE_MSG {
@@ -303,7 +316,7 @@ pub fn gm_pc_location(client: &mut FFClient, state: &mut ShardServerState) -> FF
             iDuringTime: MSG_BOX_DURATION_DEFAULT,
             szAnnounceMsg: util::encode_utf16(&err_msg),
         };
-        let _ = client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
+        let _ = clients.get_self().send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
         Err(FFError::build(Severity::Warning, err_msg))
     }
 }

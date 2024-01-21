@@ -1,6 +1,9 @@
 use rusty_fusion::{
-    error::{FFError, Severity},
-    unused,
+    defines::MSG_BOX_DURATION_DEFAULT,
+    enums::TargetSearchBy,
+    error::{codes::PlayerSearchReqErr, FFError, Severity},
+    player::PlayerSearchQuery,
+    unused, util,
 };
 
 use super::*;
@@ -124,5 +127,108 @@ pub fn login_announce_msg(clients: &mut ClientMap) -> FFResult<()> {
     clients.get_all_gameclient().for_each(|c| {
         let _ = c.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
     });
+    Ok(())
+}
+
+pub fn login_pc_location(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let pkt: sP_LS2FE_REQ_PC_LOCATION = *clients.get_self().get_packet(P_LS2FE_REQ_PC_LOCATION)?;
+    let req = pkt.sReq;
+    let search_mode: TargetSearchBy = req.eTargetSearchBy.try_into()?;
+    let search_query = match search_mode {
+        TargetSearchBy::PlayerID => PlayerSearchQuery::ByID(req.iTargetPC_ID),
+        TargetSearchBy::PlayerName => PlayerSearchQuery::ByName(
+            util::parse_utf16(&req.szTargetPC_FirstName),
+            util::parse_utf16(&req.szTargetPC_LastName),
+        ),
+        TargetSearchBy::PlayerUID => PlayerSearchQuery::ByUID(req.iTargetPC_UID),
+    };
+    if let Some(pc_id) = search_query.execute(state) {
+        let player = state.get_player(pc_id)?;
+        let pos = player.get_position();
+        let resp = sP_FE2CL_GM_REP_PC_LOCATION {
+            iTargetPC_UID: player.get_uid(),
+            iTargetPC_ID: pc_id,
+            iShardID: state.shard_id.unwrap(),
+            iMapType: if player.instance_id.instance_num.is_some() {
+                1 // instance
+            } else {
+                0 // non-instance
+            },
+            iMapID: player.instance_id.instance_num.unwrap_or(0) as i32,
+            iMapNum: player.instance_id.map_num as i32,
+            iX: pos.x,
+            iY: pos.y,
+            iZ: pos.z,
+            szTargetPC_FirstName: util::encode_utf16(&player.get_first_name()),
+            szTargetPC_LastName: util::encode_utf16(&player.get_last_name()),
+        };
+        if let Some(login_server) = clients.get_login_server() {
+            let resp = sP_FE2LS_REP_PC_LOCATION_SUCC {
+                iPC_ID: pkt.iPC_ID,
+                sResp: resp,
+            };
+            let _ = login_server.send_packet(P_FE2LS_REP_PC_LOCATION_SUCC, &resp);
+        }
+    } else if let Some(login_server) = clients.get_login_server() {
+        let resp = sP_FE2LS_REP_PC_LOCATION_FAIL {
+            iPC_ID: pkt.iPC_ID,
+            sReq: pkt.sReq,
+            iErrorCode: PlayerSearchReqErr::NotFound as i32,
+        };
+        let _ = login_server.send_packet(P_FE2LS_REP_PC_LOCATION_FAIL, &resp);
+    }
+    Ok(())
+}
+
+pub fn login_pc_location_succ(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let pkt: &sP_LS2FE_REP_PC_LOCATION_SUCC = clients
+        .get_self()
+        .get_packet(P_LS2FE_REP_PC_LOCATION_SUCC)?;
+    let resp = pkt.sResp;
+    let player = state.get_player(pkt.iPC_ID)?;
+    let client = player.get_client(clients).unwrap();
+    let _ = client.send_packet(P_FE2CL_GM_REP_PC_LOCATION, &resp);
+    Ok(())
+}
+
+pub fn login_pc_location_fail(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let pkt: &sP_LS2FE_REP_PC_LOCATION_FAIL = clients
+        .get_self()
+        .get_packet(P_LS2FE_REP_PC_LOCATION_FAIL)?;
+    let err_code: PlayerSearchReqErr = pkt.iErrorCode.try_into()?;
+    let err_msg = match err_code {
+        PlayerSearchReqErr::NotFound => {
+            let req = pkt.sReq;
+            let search_mode: TargetSearchBy = req.eTargetSearchBy.try_into()?;
+            let search_query = match search_mode {
+                TargetSearchBy::PlayerID => PlayerSearchQuery::ByID(req.iTargetPC_ID),
+                TargetSearchBy::PlayerName => PlayerSearchQuery::ByName(
+                    util::parse_utf16(&req.szTargetPC_FirstName),
+                    util::parse_utf16(&req.szTargetPC_LastName),
+                ),
+                TargetSearchBy::PlayerUID => PlayerSearchQuery::ByUID(req.iTargetPC_UID),
+            };
+            format!("Player not found: {:?}", search_query)
+        }
+        PlayerSearchReqErr::SearchInProgress => {
+            "A search is already in progress, please try again".to_string()
+        }
+    };
+
+    // let the GM know the search failed
+    let player = state.get_player(pkt.iPC_ID)?;
+    let client = player.get_client(clients).unwrap();
+    let pkt = sP_FE2CL_ANNOUNCE_MSG {
+        iAnnounceType: unused!(),
+        iDuringTime: MSG_BOX_DURATION_DEFAULT,
+        szAnnounceMsg: util::encode_utf16(&err_msg),
+    };
+    let _ = client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
     Ok(())
 }

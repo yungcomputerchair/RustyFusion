@@ -528,6 +528,9 @@ pub enum PacketID {
     P_LS2FE_REQ_UPDATE_LOGIN_INFO = 0x23000004, // 587202564
     P_LS2FE_REP_MOTD = 0x23000005,              // 587202565
     P_LS2FE_ANNOUNCE_MSG = 0x23000006,          // 587202566
+    P_LS2FE_REP_PC_LOCATION_SUCC = 0x23000007,  // 587202567
+    P_LS2FE_REP_PC_LOCATION_FAIL = 0x23000008,  // 587202568
+    P_LS2FE_REQ_PC_LOCATION = 0x23000009,       // 587202569
 
     P_FE2LS_REQ_CONNECT = 0x32000001,                // 838860801
     P_FE2LS_REP_LIVE_CHECK = 0x32000002,             // 838860802
@@ -538,6 +541,9 @@ pub enum PacketID {
     P_FE2LS_REQ_MOTD = 0x32000007,                   // 838860807
     P_FE2LS_MOTD_REGISTER = 0x32000008,              // 838860808
     P_FE2LS_ANNOUNCE_MSG = 0x32000009,               // 838860809
+    P_FE2LS_REQ_PC_LOCATION = 0x3200000a,            // 838860810
+    P_FE2LS_REP_PC_LOCATION_SUCC = 0x3200000b,       // 838860811
+    P_FE2LS_REP_PC_LOCATION_FAIL = 0x3200000c,       // 838860812
 }
 
 pub trait FFPacket: std::fmt::Debug {}
@@ -6570,6 +6576,34 @@ impl FFPacket for sP_LS2FE_ANNOUNCE_MSG {}
 #[repr(packed(4))]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
+pub struct sP_LS2FE_REP_PC_LOCATION_SUCC {
+    pub iPC_ID: i32,
+    pub sResp: sP_FE2CL_GM_REP_PC_LOCATION,
+}
+impl FFPacket for sP_LS2FE_REP_PC_LOCATION_SUCC {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_LS2FE_REP_PC_LOCATION_FAIL {
+    pub iPC_ID: i32,
+    pub sReq: sP_CL2FE_GM_REQ_PC_LOCATION,
+    pub iErrorCode: i32,
+}
+impl FFPacket for sP_LS2FE_REP_PC_LOCATION_FAIL {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_LS2FE_REQ_PC_LOCATION {
+    pub iPC_ID: i32,
+    pub sReq: sP_CL2FE_GM_REQ_PC_LOCATION,
+}
+impl FFPacket for sP_LS2FE_REQ_PC_LOCATION {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2LS_REQ_CONNECT {
     pub iTempValue: i32,
 }
@@ -6644,3 +6678,31 @@ pub struct sP_FE2LS_ANNOUNCE_MSG {
     pub szAnnounceMsg: [u16; 512],
 }
 impl FFPacket for sP_FE2LS_ANNOUNCE_MSG {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_REQ_PC_LOCATION {
+    pub iPC_ID: i32,
+    pub sReq: sP_CL2FE_GM_REQ_PC_LOCATION,
+}
+impl FFPacket for sP_FE2LS_REQ_PC_LOCATION {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_REP_PC_LOCATION_SUCC {
+    pub iPC_ID: i32,
+    pub sResp: sP_FE2CL_GM_REP_PC_LOCATION,
+}
+impl FFPacket for sP_FE2LS_REP_PC_LOCATION_SUCC {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_REP_PC_LOCATION_FAIL {
+    pub iPC_ID: i32,
+    pub sReq: sP_CL2FE_GM_REQ_PC_LOCATION,
+    pub iErrorCode: i32,
+}
+impl FFPacket for sP_FE2LS_REP_PC_LOCATION_FAIL {}

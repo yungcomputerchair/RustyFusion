@@ -101,6 +101,17 @@ impl FFClient {
         }
     }
 
+    pub fn get_shard_id(&self) -> FFResult<i32> {
+        if let ClientType::ShardServer(shard_id) = self.client_type {
+            Ok(shard_id)
+        } else {
+            Err(FFError::build(
+                Severity::Warning,
+                "Couldn't get shard ID for client".to_string(),
+            ))
+        }
+    }
+
     pub fn clear_player_id(&mut self) -> FFResult<i32> {
         let pc_id = self.get_player_id()?;
         if let ClientType::GameClient { pc_id, .. } = &mut self.client_type {
