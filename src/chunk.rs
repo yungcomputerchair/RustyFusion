@@ -5,8 +5,6 @@ use std::{
     fmt::{Display, Formatter},
 };
 
-use uuid::Uuid;
-
 use crate::{
     config::config_get,
     defines::{ID_OVERWORLD, MAX_NUM_CHANNELS},
@@ -22,7 +20,7 @@ use crate::{
 pub struct InstanceID {
     pub channel_num: usize,
     pub map_num: u32,
-    pub instance_num: Option<Uuid>,
+    pub instance_num: Option<u32>,
 }
 impl Default for InstanceID {
     fn default() -> Self {

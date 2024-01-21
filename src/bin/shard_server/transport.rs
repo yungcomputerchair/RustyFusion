@@ -248,7 +248,6 @@ mod helpers {
     #![allow(clippy::too_many_arguments)]
 
     use rusty_fusion::{chunk::InstanceID, defines::TYPE_TIME_MACHINE};
-    use uuid::Uuid;
 
     use super::*;
 
@@ -363,7 +362,7 @@ mod helpers {
             channel_num: player.instance_id.channel_num,
             map_num: warp_data.map_num,
             instance_num: if warp_data.is_instance {
-                Some(Uuid::new_v4())
+                Some(rand::random())
             } else {
                 None
             },
