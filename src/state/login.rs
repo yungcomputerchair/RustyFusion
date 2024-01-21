@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    defines::MAX_NUM_CHANNELS,
+    defines::{MAX_NUM_CHANNELS, MAX_NUM_SHARDS},
     enums::ShardChannelStatus,
     error::{FFError, FFResult, Severity},
     player::Player,
@@ -29,15 +29,15 @@ impl Default for ShardServerInfo {
 pub struct LoginServerState {
     pub server_id: i64,
     accounts: HashMap<i64, Account>,
-    next_shard_id: usize,
-    shards: HashMap<usize, ShardServerInfo>,
+    shard_id_pool: Vec<i32>,
+    shards: HashMap<i32, ShardServerInfo>,
 }
 impl Default for LoginServerState {
     fn default() -> Self {
         Self {
             server_id: rand::random(),
             accounts: HashMap::new(),
-            next_shard_id: 1,
+            shard_id_pool: (1..=MAX_NUM_SHARDS as i32).collect(),
             shards: HashMap::new(),
         }
     }
@@ -101,28 +101,29 @@ impl LoginServerState {
         &mut acc.players
     }
 
-    pub fn get_next_shard_id(&mut self) -> usize {
-        let next = self.next_shard_id;
-        self.next_shard_id += 1;
-        next
-    }
-
-    pub fn get_lowest_pop_shard_id(&mut self) -> Option<usize> {
+    pub fn get_lowest_pop_shard_id(&mut self) -> Option<i32> {
         self.shards
             .iter()
             .min_by_key(|(_, shard)| shard.player_uids.len())
             .map(|(shard_id, _)| *shard_id)
     }
 
-    pub fn register_shard(&mut self, shard_id: usize) {
-        self.shards.insert(shard_id, ShardServerInfo::default());
+    pub fn register_shard(&mut self) -> Option<i32> {
+        if self.shard_id_pool.is_empty() {
+            None
+        } else {
+            let shard_id = self.shard_id_pool.remove(0);
+            self.shards.insert(shard_id, ShardServerInfo::default());
+            Some(shard_id)
+        }
     }
 
-    pub fn unregister_shard(&mut self, shard_id: usize) {
+    pub fn unregister_shard(&mut self, shard_id: i32) {
         self.shards.remove(&shard_id);
+        self.shard_id_pool.push(shard_id);
     }
 
-    pub fn unset_player_shard(&mut self, player_uid: i64) -> Option<usize> {
+    pub fn unset_player_shard(&mut self, player_uid: i64) -> Option<i32> {
         for (shard_id, shard) in self.shards.iter_mut() {
             if shard.player_uids.remove(&player_uid) {
                 return Some(*shard_id);
@@ -131,7 +132,7 @@ impl LoginServerState {
         None
     }
 
-    pub fn set_player_shard(&mut self, player_uid: i64, shard_id: usize) -> Option<usize> {
+    pub fn set_player_shard(&mut self, player_uid: i64, shard_id: i32) -> Option<i32> {
         let old_shard_id = self.unset_player_shard(player_uid);
         let shard = self.shards.get_mut(&shard_id).unwrap();
         shard.player_uids.insert(player_uid);
@@ -140,7 +141,7 @@ impl LoginServerState {
 
     pub fn get_shard_channel_statuses(
         &self,
-        shard_id: usize,
+        shard_id: i32,
     ) -> [ShardChannelStatus; MAX_NUM_CHANNELS] {
         let shard = self.shards.get(&shard_id).unwrap();
         shard.channel_statuses
@@ -148,7 +149,7 @@ impl LoginServerState {
 
     pub fn update_shard_channel_statuses(
         &mut self,
-        shard_id: usize,
+        shard_id: i32,
         statuses: [ShardChannelStatus; MAX_NUM_CHANNELS],
     ) {
         let shard = self.shards.get_mut(&shard_id).unwrap();

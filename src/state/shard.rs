@@ -14,13 +14,14 @@ use crate::{
         ClientMap, LoginData,
     },
     npc::NPC,
-    player::{Player, PlayerSearchQuery},
+    player::Player,
     tabledata::tdata_get,
     Entity, EntityID, Item, TradeContext,
 };
 
 pub struct ShardServerState {
     pub login_server_conn_id: Option<i64>,
+    pub shard_id: Option<i32>,
     pub login_data: HashMap<i64, LoginData>,
     pub entity_map: EntityMap,
     pub buyback_lists: HashMap<i32, Vec<Item>>,
@@ -31,6 +32,7 @@ impl Default for ShardServerState {
     fn default() -> Self {
         let mut state = Self {
             login_server_conn_id: None,
+            shard_id: None,
             login_data: HashMap::new(),
             entity_map: EntityMap::default(),
             buyback_lists: HashMap::new(),

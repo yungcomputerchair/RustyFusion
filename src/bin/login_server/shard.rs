@@ -15,17 +15,30 @@ pub fn connect(
     state: &mut LoginServerState,
     time: SystemTime,
 ) -> FFResult<()> {
-    let shard_id = state.get_next_shard_id();
+    let shard_id = match state.register_shard() {
+        Some(id) => id,
+        None => {
+            let resp = sP_LS2FE_REP_CONNECT_FAIL { iErrorCode: 0 };
+            let _ = server.send_packet(P_LS2FE_REP_CONNECT_FAIL, &resp);
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Shard server {} tried to connect, but no shard IDs are available",
+                    server.get_addr()
+                ),
+            ));
+        }
+    };
     server.client_type = ClientType::ShardServer(shard_id);
-    state.register_shard(shard_id);
     let resp = sP_LS2FE_REP_CONNECT_SUCC {
         uiSvrTime: util::get_timestamp_ms(time),
         iLS_UID: state.server_id,
+        iFE_ID: shard_id,
     };
     server.send_packet(P_LS2FE_REP_CONNECT_SUCC, &resp)?;
 
     let iv1: i32 = (resp.iLS_UID + 1) as i32;
-    let iv2: i32 = 69;
+    let iv2: i32 = shard_id + 1;
     server.e_key = gen_key(resp.uiSvrTime, iv1, iv2);
 
     log(

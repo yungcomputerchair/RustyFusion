@@ -301,7 +301,7 @@ pub fn shard_select(
 ) -> FFResult<()> {
     let client = clients.get_mut(&client_key).unwrap();
     let pkt: sP_CL2LS_REQ_SHARD_SELECT = *client.get_packet(P_CL2LS_REQ_SHARD_SELECT)?;
-    let req_shard_id = pkt.ShardNum as usize;
+    let req_shard_id = pkt.ShardNum as i32;
     if let ClientType::GameClient {
         account_id,
         serial_key,

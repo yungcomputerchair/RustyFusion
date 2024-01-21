@@ -25,7 +25,7 @@ pub enum ClientType {
         pc_id: Option<i32>, // iPC_ID
     },
     LoginServer,
-    ShardServer(usize),
+    ShardServer(i32),
 }
 
 pub struct FFClient {

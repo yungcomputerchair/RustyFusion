@@ -3,6 +3,7 @@
 pub const PROTOCOL_VERSION: i32 = 104;
 pub const DB_VERSION: i32 = 4;
 
+pub const MAX_NUM_SHARDS: usize = 9;
 pub const MAX_NUM_CHANNELS: usize = 25;
 
 pub const SIZEOF_NANO_SKILLS: usize = 3;
