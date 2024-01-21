@@ -626,18 +626,8 @@ mod helpers {
              * one of them is close enough, we'll accept it.
              */
             let npc_ids = state.entity_map.find_npcs(|n| n.ty == vendor_id);
-            if npc_ids.is_empty() {
-                return Err(FFError::build(
-                    Severity::Warning,
-                    format!("No NPCs with type {} doesn't exist", vendor_id),
-                ));
-            }
             for npc_id in npc_ids {
-                let close_enough = state.entity_map.validate_proximity(
-                    &[EntityID::Player(pc_id), EntityID::NPC(npc_id)],
-                    RANGE_INTERACT,
-                )?;
-                if close_enough {
+                if validate_vendor(client, state, npc_id, vendor_id).is_ok() {
                     return Ok(());
                 }
             }
@@ -646,6 +636,16 @@ mod helpers {
                 "No matching NPCs close enough".to_string(),
             ))
         } else {
+            let npc = state.get_npc(npc_id)?;
+            if npc.ty != vendor_id {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!(
+                        "Vendor {} has type {} instead of {}",
+                        npc_id, npc.ty, vendor_id
+                    ),
+                ));
+            }
             let close_enough = state.entity_map.validate_proximity(
                 &[EntityID::Player(pc_id), EntityID::NPC(npc_id)],
                 RANGE_INTERACT,
@@ -655,7 +655,7 @@ mod helpers {
             } else {
                 Err(FFError::build(
                     Severity::Warning,
-                    format!("NPC {} not close enough", npc_id),
+                    format!("Vendor {} not close enough", npc_id),
                 ))
             }
         }
