@@ -4,6 +4,66 @@ use rusty_fusion::{
 
 use super::*;
 
+pub fn nano_give(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let pkt: sP_CL2FE_REQ_PC_GIVE_NANO =
+        *clients.get_self().get_packet(P_CL2FE_REQ_PC_GIVE_NANO)?;
+    catch_fail(
+        (|| {
+            let client = clients.get_self();
+            let pc_id = client.get_player_id()?;
+            let nano_id = pkt.iNanoID;
+
+            let bcast = sP_FE2CL_REP_PC_NANO_CREATE {
+                iPC_ID: pc_id,
+                iNanoID: pkt.iNanoID,
+            };
+            state
+                .entity_map
+                .for_each_around(EntityID::Player(pc_id), clients, |c| {
+                    let _ = c.send_packet(P_FE2CL_REP_PC_NANO_CREATE, &bcast);
+                });
+
+            let player = state.get_player_mut(pc_id)?;
+            if player.get_perms() > 0 {
+                // TODO validate nano mission completed
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!(
+                        "Player {} tried to obtain nano without finishing mission",
+                        pc_id
+                    ),
+                ));
+            }
+
+            let new_level = std::cmp::max(player.get_level(), nano_id);
+            player.set_level(new_level);
+            let nano = player.unlock_nano(nano_id)?.clone();
+
+            let resp = sP_FE2CL_REP_PC_NANO_CREATE_SUCC {
+                iPC_FusionMatter: player.get_fusion_matter() as i32,
+                iQuestItemSlotNum: 0,
+                QuestItem: None.into(),
+                Nano: Some(nano).into(),
+                iPC_Level: player.get_level(),
+            };
+
+            clients
+                .get_self()
+                .send_packet(P_FE2CL_REP_PC_NANO_CREATE_SUCC, &resp)
+        })(),
+        || {
+            let client = clients.get_self();
+            let resp = sP_FE2CL_REP_PC_NANO_CREATE_FAIL {
+                iPC_ID: client.get_player_id()?,
+                iErrorCode: unused!(),
+            };
+            clients
+                .get_self()
+                .send_packet(P_FE2CL_REP_PC_NANO_CREATE_FAIL, &resp)
+        },
+    )
+}
+
 pub fn nano_equip(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
     let pc_id = client.get_player_id()?;
