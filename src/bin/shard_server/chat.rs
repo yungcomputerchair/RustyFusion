@@ -13,6 +13,13 @@ pub fn send_freechat_message(
         (|| {
             let client = clients.get_self();
             let pc_id = client.get_player_id()?;
+            let player = state.get_player(pc_id)?;
+            if player.freechat_muted {
+                return Err(FFError::build_dc(
+                    Severity::Warning,
+                    "Muted player sent freechat packet".to_string(),
+                ));
+            }
 
             let resp = sP_FE2CL_REP_SEND_FREECHAT_MESSAGE_SUCC {
                 iPC_ID: pc_id,
