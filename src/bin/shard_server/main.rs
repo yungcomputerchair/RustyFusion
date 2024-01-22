@@ -201,7 +201,7 @@ fn handle_packet(
         P_CL2FE_GM_REQ_PC_SPECIAL_STATE_SWITCH => {
             gm::gm_pc_special_state_switch(&mut clients, state)
         }
-        P_CL2FE_GM_REQ_PC_MOTD_REGISTER => gm::gm_pc_motd_register(&mut clients),
+        P_CL2FE_GM_REQ_PC_MOTD_REGISTER => gm::gm_pc_motd_register(&mut clients, state),
         P_CL2FE_GM_REQ_PC_ANNOUNCE => gm::gm_pc_announce(&mut clients, state),
         P_CL2FE_GM_REQ_PC_LOCATION => gm::gm_pc_location(&mut clients, state),
         P_CL2FE_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF => {

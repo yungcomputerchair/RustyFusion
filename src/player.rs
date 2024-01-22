@@ -249,6 +249,10 @@ impl Player {
         self.slot_num
     }
 
+    pub fn get_perms(&self) -> i16 {
+        self.perms
+    }
+
     pub fn get_player_id(&self) -> i32 {
         self.id
             .unwrap_or_else(|| panic!("Player with UID {} has no ID", self.uid))

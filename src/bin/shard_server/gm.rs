@@ -12,9 +12,9 @@ use rusty_fusion::{
 
 use super::*;
 
-// TODO anticheat
-
 pub fn gm_pc_set_value(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+    helpers::validate_gm(client, state)?;
+
     let pkt: sP_CL2FE_GM_REQ_PC_SET_VALUE = *client.get_packet(P_CL2FE_GM_REQ_PC_SET_VALUE)?;
     let pc_id = pkt.iPC_ID;
     let value = pkt.iSetValue;
@@ -52,6 +52,7 @@ pub fn gm_pc_set_value(client: &mut FFClient, state: &mut ShardServerState) -> F
 pub fn gm_pc_give_item(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
     catch_fail(
         (|| {
+            helpers::validate_gm(client, state)?;
             let pc_id = client.get_player_id()?;
             let pkt: &sP_CL2FE_REQ_PC_GIVE_ITEM = client.get_packet(P_CL2FE_REQ_PC_GIVE_ITEM)?;
             let player = state.get_player_mut(pc_id)?;
@@ -128,6 +129,7 @@ pub fn gm_pc_give_nano(clients: &mut ClientMap, state: &mut ShardServerState) ->
 }
 
 pub fn gm_pc_goto(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    helpers::validate_gm(clients.get_self(), state)?;
     let client = clients.get_self();
     let pkt: &sP_CL2FE_REQ_PC_GOTO = client.get_packet(P_CL2FE_REQ_PC_GOTO)?;
     let new_pos = Position {
@@ -160,6 +162,7 @@ pub fn gm_pc_special_state_switch(
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let client = clients.get_self();
+    helpers::validate_gm(client, state)?;
     let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_GM_REQ_PC_SPECIAL_STATE_SWITCH =
         client.get_packet(P_CL2FE_GM_REQ_PC_SPECIAL_STATE_SWITCH)?;
@@ -204,10 +207,11 @@ pub fn gm_pc_special_state_switch(
         .send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp)
 }
 
-pub fn gm_pc_motd_register(clients: &mut ClientMap) -> FFResult<()> {
-    let pkt: &sP_CL2FE_GM_REQ_PC_MOTD_REGISTER = clients
-        .get_self()
-        .get_packet(P_CL2FE_GM_REQ_PC_MOTD_REGISTER)?;
+pub fn gm_pc_motd_register(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let client = clients.get_self();
+    helpers::validate_gm(client, state)?;
+    let pkt: &sP_CL2FE_GM_REQ_PC_MOTD_REGISTER =
+        client.get_packet(P_CL2FE_GM_REQ_PC_MOTD_REGISTER)?;
     let pkt = sP_FE2LS_MOTD_REGISTER {
         szMessage: pkt.szSystemMsg,
     };
@@ -219,15 +223,16 @@ pub fn gm_pc_motd_register(clients: &mut ClientMap) -> FFResult<()> {
 }
 
 pub fn gm_pc_announce(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
-    let pkt: &sP_CL2FE_GM_REQ_PC_ANNOUNCE =
-        clients.get_self().get_packet(P_CL2FE_GM_REQ_PC_ANNOUNCE)?;
+    let client = clients.get_self();
+    helpers::validate_gm(client, state)?;
+    let pkt: &sP_CL2FE_GM_REQ_PC_ANNOUNCE = client.get_packet(P_CL2FE_GM_REQ_PC_ANNOUNCE)?;
     let area_type: AreaType = pkt.iAreaType.try_into()?;
     let pkt = sP_FE2CL_ANNOUNCE_MSG {
         iAnnounceType: pkt.iAnnounceType,
         iDuringTime: pkt.iDuringTime,
         szAnnounceMsg: pkt.szAnnounceMsg,
     };
-    let pc_id = clients.get_self().get_player_id()?;
+    let pc_id = client.get_player_id()?;
     let player = state.get_player(pc_id)?;
     match area_type {
         AreaType::Local => {
@@ -265,8 +270,9 @@ pub fn gm_pc_announce(clients: &mut ClientMap, state: &mut ShardServerState) -> 
 }
 
 pub fn gm_pc_location(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
-    let pkt: sP_CL2FE_GM_REQ_PC_LOCATION =
-        *clients.get_self().get_packet(P_CL2FE_GM_REQ_PC_LOCATION)?;
+    let client = clients.get_self();
+    helpers::validate_gm(client, state)?;
+    let pkt: sP_CL2FE_GM_REQ_PC_LOCATION = *client.get_packet(P_CL2FE_GM_REQ_PC_LOCATION)?;
     let search_mode: TargetSearchBy = pkt.eTargetSearchBy.try_into()?;
     let search_query = match search_mode {
         TargetSearchBy::PlayerID => PlayerSearchQuery::ByID(pkt.iTargetPC_ID),
@@ -326,6 +332,7 @@ pub fn gm_target_pc_special_state_onoff(
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let client = clients.get_self();
+    helpers::validate_gm(client, state)?;
     let pkt: &sP_CL2FE_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF =
         client.get_packet(P_CL2FE_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF)?;
 
@@ -376,4 +383,23 @@ pub fn gm_target_pc_special_state_onoff(
     clients
         .get_self()
         .send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp)
+}
+
+mod helpers {
+    use super::*;
+
+    pub fn validate_gm(client: &mut FFClient, state: &ShardServerState) -> FFResult<()> {
+        let user_pc_id = client.get_player_id()?;
+        let perms = state.get_player(user_pc_id)?.get_perms();
+        if perms > 0 {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Player {} tried to use GM commands without sufficient perms {}",
+                    user_pc_id, perms
+                ),
+            ));
+        }
+        Ok(())
+    }
 }
