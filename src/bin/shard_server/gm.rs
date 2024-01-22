@@ -1,3 +1,5 @@
+use std::cmp::max;
+
 use rusty_fusion::{
     chunk::InstanceID,
     defines::{self, MSG_BOX_DURATION_DEFAULT},
@@ -5,7 +7,7 @@ use rusty_fusion::{
     error::{catch_fail, FFError, Severity},
     placeholder,
     player::PlayerSearchQuery,
-    util, Item, Position,
+    util, Combatant, Item, Position,
 };
 
 use super::*;
@@ -73,6 +75,56 @@ pub fn gm_pc_give_item(client: &mut FFClient, state: &mut ShardServerState) -> F
                 iErrorCode: unused!(),
             };
             client.send_packet(P_FE2CL_REP_PC_GIVE_ITEM_FAIL, &resp)
+        },
+    )
+}
+
+pub fn gm_pc_give_nano(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let pkt: sP_CL2FE_REQ_PC_GIVE_NANO =
+        *clients.get_self().get_packet(P_CL2FE_REQ_PC_GIVE_NANO)?;
+    catch_fail(
+        (|| {
+            let client = clients.get_self();
+            helpers::validate_gm(client, state)?;
+            let pc_id = client.get_player_id()?;
+            let nano_id = pkt.iNanoID;
+
+            let bcast = sP_FE2CL_REP_PC_NANO_CREATE {
+                iPC_ID: pc_id,
+                iNanoID: pkt.iNanoID,
+            };
+            state
+                .entity_map
+                .for_each_around(EntityID::Player(pc_id), clients, |c| {
+                    let _ = c.send_packet(P_FE2CL_REP_PC_NANO_CREATE, &bcast);
+                });
+
+            let player = state.get_player_mut(pc_id)?;
+            let new_level = max(player.get_level(), nano_id);
+            player.set_level(new_level);
+            let nano = player.unlock_nano(nano_id)?.clone();
+
+            let resp = sP_FE2CL_REP_PC_NANO_CREATE_SUCC {
+                iPC_FusionMatter: player.get_fusion_matter() as i32,
+                iQuestItemSlotNum: 0,
+                QuestItem: None.into(),
+                Nano: Some(nano).into(),
+                iPC_Level: player.get_level(),
+            };
+
+            clients
+                .get_self()
+                .send_packet(P_FE2CL_REP_PC_NANO_CREATE_SUCC, &resp)
+        })(),
+        || {
+            let client = clients.get_self();
+            let resp = sP_FE2CL_REP_PC_NANO_CREATE_FAIL {
+                iPC_ID: client.get_player_id()?,
+                iErrorCode: unused!(),
+            };
+            clients
+                .get_self()
+                .send_packet(P_FE2CL_REP_PC_NANO_CREATE_FAIL, &resp)
         },
     )
 }

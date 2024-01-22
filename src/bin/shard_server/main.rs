@@ -196,6 +196,7 @@ fn handle_packet(
         //
         P_CL2FE_REQ_PC_GIVE_ITEM => gm::gm_pc_give_item(clients.get_self(), state),
         P_CL2FE_GM_REQ_PC_SET_VALUE => gm::gm_pc_set_value(clients.get_self(), state),
+        P_CL2FE_REQ_PC_GIVE_NANO => gm::gm_pc_give_nano(&mut clients, state),
         P_CL2FE_REQ_PC_GOTO => gm::gm_pc_goto(&mut clients, state),
         P_CL2FE_GM_REQ_PC_SPECIAL_STATE_SWITCH => {
             gm::gm_pc_special_state_switch(&mut clients, state)
@@ -225,7 +226,7 @@ fn handle_packet(
         P_CL2FE_REQ_PC_VENDOR_BATTERY_BUY => item::vendor_battery_buy(clients.get_self(), state),
         P_CL2FE_PC_STREETSTALL_REQ_CANCEL => item::streetstall_cancel(clients.get_self()),
         //
-        P_CL2FE_REQ_PC_GIVE_NANO => nano::nano_give(&mut clients, state),
+        P_CL2FE_REQ_PC_NANO_CREATE => nano::nano_create(&mut clients, state),
         P_CL2FE_REQ_NANO_EQUIP => nano::nano_equip(&mut clients, state),
         P_CL2FE_REQ_NANO_UNEQUIP => nano::nano_unequip(&mut clients, state),
         P_CL2FE_REQ_NANO_ACTIVE => nano::nano_active(&mut clients, state),

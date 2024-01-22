@@ -4,36 +4,17 @@ use rusty_fusion::{
 
 use super::*;
 
-pub fn nano_give(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
-    let pkt: sP_CL2FE_REQ_PC_GIVE_NANO =
-        *clients.get_self().get_packet(P_CL2FE_REQ_PC_GIVE_NANO)?;
+pub fn nano_create(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let pkt: sP_CL2FE_REQ_PC_NANO_CREATE =
+        *clients.get_self().get_packet(P_CL2FE_REQ_PC_NANO_CREATE)?;
     catch_fail(
         (|| {
             let client = clients.get_self();
             let pc_id = client.get_player_id()?;
             let nano_id = pkt.iNanoID;
 
-            let bcast = sP_FE2CL_REP_PC_NANO_CREATE {
-                iPC_ID: pc_id,
-                iNanoID: pkt.iNanoID,
-            };
-            state
-                .entity_map
-                .for_each_around(EntityID::Player(pc_id), clients, |c| {
-                    let _ = c.send_packet(P_FE2CL_REP_PC_NANO_CREATE, &bcast);
-                });
-
             let player = state.get_player_mut(pc_id)?;
-            if player.get_perms() > 0 {
-                // TODO validate nano mission completed
-                return Err(FFError::build(
-                    Severity::Warning,
-                    format!(
-                        "Player {} tried to obtain nano without finishing mission",
-                        pc_id
-                    ),
-                ));
-            }
+            // TODO validate player has nano item
 
             let new_level = std::cmp::max(player.get_level(), nano_id);
             player.set_level(new_level);
@@ -46,10 +27,20 @@ pub fn nano_give(clients: &mut ClientMap, state: &mut ShardServerState) -> FFRes
                 Nano: Some(nano).into(),
                 iPC_Level: player.get_level(),
             };
-
             clients
                 .get_self()
-                .send_packet(P_FE2CL_REP_PC_NANO_CREATE_SUCC, &resp)
+                .send_packet(P_FE2CL_REP_PC_NANO_CREATE_SUCC, &resp)?;
+
+            let bcast = sP_FE2CL_REP_PC_NANO_CREATE {
+                iPC_ID: pc_id,
+                iNanoID: pkt.iNanoID,
+            };
+            state
+                .entity_map
+                .for_each_around(EntityID::Player(pc_id), clients, |c| {
+                    let _ = c.send_packet(P_FE2CL_REP_PC_NANO_CREATE, &bcast);
+                });
+            Ok(())
         })(),
         || {
             let client = clients.get_self();
