@@ -607,6 +607,16 @@ pub fn vendor_battery_buy(client: &mut FFClient, state: &mut ShardServerState) -
     )
 }
 
+pub fn streetstall_cancel(client: &mut FFClient) -> FFResult<()> {
+    // streetstalls are scrapped, but the client still sends this packet
+    // if the UI is brought up with /Store and then closed. it gets
+    // softlocked if we don't respond
+    let resp = sP_FE2CL_PC_STREETSTALL_REP_CANCEL_SUCC {
+        iPCCharState: unused!(),
+    };
+    client.send_packet(P_FE2CL_PC_STREETSTALL_REP_CANCEL_SUCC, &resp)
+}
+
 mod helpers {
     use super::*;
 

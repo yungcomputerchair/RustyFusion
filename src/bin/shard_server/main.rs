@@ -224,6 +224,7 @@ fn handle_packet(
             item::vendor_item_restore_buy(clients.get_self(), state)
         }
         P_CL2FE_REQ_PC_VENDOR_BATTERY_BUY => item::vendor_battery_buy(clients.get_self(), state),
+        P_CL2FE_PC_STREETSTALL_REQ_CANCEL => item::streetstall_cancel(clients.get_self()),
         //
         P_CL2FE_REQ_NANO_EQUIP => nano::nano_equip(&mut clients, state),
         P_CL2FE_REQ_NANO_UNEQUIP => nano::nano_unequip(&mut clients, state),
