@@ -320,3 +320,60 @@ pub fn gm_pc_location(clients: &mut ClientMap, state: &mut ShardServerState) -> 
         Err(FFError::build(Severity::Warning, err_msg))
     }
 }
+
+pub fn gm_target_pc_special_state_onoff(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let client = clients.get_self();
+    let pkt: &sP_CL2FE_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF =
+        client.get_packet(P_CL2FE_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF)?;
+
+    let search_mode: TargetSearchBy = pkt.eTargetSearchBy.try_into()?;
+    let search_query = match search_mode {
+        TargetSearchBy::PlayerID => PlayerSearchQuery::ByID(pkt.iTargetPC_ID),
+        TargetSearchBy::PlayerName => PlayerSearchQuery::ByName(
+            util::parse_utf16(&pkt.szTargetPC_FirstName),
+            util::parse_utf16(&pkt.szTargetPC_LastName),
+        ),
+        TargetSearchBy::PlayerUID => PlayerSearchQuery::ByUID(pkt.iTargetPC_UID),
+    };
+    let pc_id = search_query.execute(state).ok_or(FFError::build(
+        Severity::Warning,
+        format!("Player not found: {:?}", search_query),
+    ))?;
+    let player = state.get_player_mut(pc_id)?;
+
+    let new_flag = pkt.iONOFF != 0;
+    match pkt.iSpecialStateFlag as u32 {
+        // this packet is only used for /mute
+        defines::CN_SPECIAL_STATE_FLAG__MUTE_FREECHAT => {
+            player.freechat_muted = new_flag;
+        }
+        _ => {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "P_CL2FE_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF: invalid special state flag: {}",
+                    pkt.iSpecialStateFlag
+                ),
+            ));
+        }
+    }
+
+    let special_state_flags = player.get_special_state_bit_flag();
+
+    let resp = sP_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC {
+        iPC_ID: pc_id,
+        iReqSpecialStateFlag: pkt.iSpecialStateFlag,
+        iSpecialState: special_state_flags,
+    };
+    state
+        .entity_map
+        .for_each_around(EntityID::Player(pc_id), clients, |c| {
+            let _ = c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
+        });
+    clients
+        .get_self()
+        .send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp)
+}
