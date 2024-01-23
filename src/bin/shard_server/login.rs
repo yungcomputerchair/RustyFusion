@@ -5,6 +5,7 @@ use rusty_fusion::{
     player::PlayerSearchQuery,
     unused, util,
 };
+use uuid::Uuid;
 
 use super::*;
 
@@ -19,11 +20,11 @@ pub fn login_connect_req(server: &mut FFClient) {
 
 pub fn login_connect_succ(server: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
     let pkt: &sP_LS2FE_REP_CONNECT_SUCC = server.get_packet(P_LS2FE_REP_CONNECT_SUCC)?;
-    let login_server_id: i64 = pkt.iLS_UID;
+    let login_server_id = Uuid::from_bytes_le(pkt.aLS_UID);
     let shard_id = pkt.iFE_ID;
     let conn_time: u64 = pkt.uiSvrTime;
 
-    let iv1: i32 = (login_server_id + 1) as i32;
+    let iv1: i32 = pkt.aLS_UID.into_iter().reduce(|a, b| a ^ b).unwrap() as i32;
     let iv2: i32 = shard_id + 1;
     server.e_key = gen_key(conn_time, iv1, iv2);
 
@@ -37,7 +38,7 @@ pub fn login_connect_succ(server: &mut FFClient, state: &mut ShardServerState) -
     log(
         Severity::Info,
         &format!(
-            "Connected to login server #{} ({}) as shard #{}",
+            "Connected to login server {} ({}) as shard #{}",
             login_server_id,
             server.get_addr(),
             shard_id

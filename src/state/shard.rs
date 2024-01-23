@@ -20,7 +20,7 @@ use crate::{
 };
 
 pub struct ShardServerState {
-    pub login_server_conn_id: Option<i64>,
+    pub login_server_conn_id: Option<Uuid>,
     pub shard_id: Option<i32>,
     pub login_data: HashMap<i64, LoginData>,
     pub entity_map: EntityMap,

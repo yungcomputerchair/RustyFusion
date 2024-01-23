@@ -34,12 +34,12 @@ pub fn connect(
     server.client_type = ClientType::ShardServer(shard_id);
     let resp = sP_LS2FE_REP_CONNECT_SUCC {
         uiSvrTime: util::get_timestamp_ms(time),
-        iLS_UID: state.server_id,
+        aLS_UID: state.server_id.to_bytes_le(),
         iFE_ID: shard_id,
     };
     server.send_packet(P_LS2FE_REP_CONNECT_SUCC, &resp)?;
 
-    let iv1: i32 = (resp.iLS_UID + 1) as i32;
+    let iv1: i32 = resp.aLS_UID.into_iter().reduce(|a, b| a ^ b).unwrap() as i32;
     let iv2: i32 = shard_id + 1;
     server.e_key = gen_key(resp.uiSvrTime, iv1, iv2);
 

@@ -6521,7 +6521,7 @@ impl FFPacket for sP_LS2CL_REP_SHARD_LIST_INFO_SUCC {}
 #[derive(Debug, Copy, Clone)]
 pub struct sP_LS2FE_REP_CONNECT_SUCC {
     pub uiSvrTime: u64,
-    pub iLS_UID: i64,
+    pub aLS_UID: [u8; 16],
     pub iFE_ID: i32,
 }
 impl FFPacket for sP_LS2FE_REP_CONNECT_SUCC {}

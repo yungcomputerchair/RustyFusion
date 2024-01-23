@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
+use uuid::Uuid;
+
 use crate::{
     defines::{MAX_NUM_CHANNELS, MAX_NUM_SHARDS},
     enums::ShardChannelStatus,
@@ -32,7 +34,7 @@ pub struct PlayerSearchRequest {
 }
 
 pub struct LoginServerState {
-    pub server_id: i64,
+    pub server_id: Uuid,
     accounts: HashMap<i64, Account>,
     shard_id_pool: Vec<i32>,
     shards: HashMap<i32, ShardServerInfo>,
@@ -41,7 +43,7 @@ pub struct LoginServerState {
 impl Default for LoginServerState {
     fn default() -> Self {
         Self {
-            server_id: rand::random(),
+            server_id: Uuid::new_v4(),
             accounts: HashMap::new(),
             shard_id_pool: (1..=MAX_NUM_SHARDS as i32).collect(),
             shards: HashMap::new(),
