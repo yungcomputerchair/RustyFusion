@@ -52,8 +52,7 @@ pub fn gm_pc_set_value(client: &mut FFClient, state: &mut ShardServerState) -> F
 pub fn gm_pc_give_item(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
     catch_fail(
         (|| {
-            helpers::validate_gm(client, state)?;
-            let pc_id = client.get_player_id()?;
+            let pc_id = helpers::validate_gm(client, state)?;
             let pkt: &sP_CL2FE_REQ_PC_GIVE_ITEM = client.get_packet(P_CL2FE_REQ_PC_GIVE_ITEM)?;
             let player = state.get_player_mut(pc_id)?;
             let slot_number = pkt.iSlotNum as usize;
@@ -85,8 +84,7 @@ pub fn gm_pc_give_nano(clients: &mut ClientMap, state: &mut ShardServerState) ->
     catch_fail(
         (|| {
             let client = clients.get_self();
-            helpers::validate_gm(client, state)?;
-            let pc_id = client.get_player_id()?;
+            let pc_id = helpers::validate_gm(client, state)?;
             let nano_id = pkt.iNanoID;
 
             let bcast = sP_FE2CL_REP_PC_NANO_CREATE {
@@ -130,17 +128,15 @@ pub fn gm_pc_give_nano(clients: &mut ClientMap, state: &mut ShardServerState) ->
 }
 
 pub fn gm_pc_goto(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
-    helpers::validate_gm(clients.get_self(), state)?;
     let client = clients.get_self();
+    let pc_id = helpers::validate_gm(client, state)?;
     let pkt: &sP_CL2FE_REQ_PC_GOTO = client.get_packet(P_CL2FE_REQ_PC_GOTO)?;
     let new_pos = Position {
         x: pkt.iToX,
         y: pkt.iToY,
         z: pkt.iToZ,
     };
-    let pc_id = client.get_player_id()?;
     let player = state.get_player_mut(pc_id)?;
-
     player.set_position(new_pos);
     player.instance_id = InstanceID::default();
 
@@ -163,8 +159,7 @@ pub fn gm_pc_special_state_switch(
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let client = clients.get_self();
-    helpers::validate_gm(client, state)?;
-    let pc_id = client.get_player_id()?;
+    let pc_id = helpers::validate_gm(client, state)?;
     let pkt: &sP_CL2FE_GM_REQ_PC_SPECIAL_STATE_SWITCH =
         client.get_packet(P_CL2FE_GM_REQ_PC_SPECIAL_STATE_SWITCH)?;
 
@@ -225,7 +220,7 @@ pub fn gm_pc_motd_register(clients: &mut ClientMap, state: &mut ShardServerState
 
 pub fn gm_pc_announce(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
-    helpers::validate_gm(client, state)?;
+    let pc_id = helpers::validate_gm(client, state)?;
     let pkt: &sP_CL2FE_GM_REQ_PC_ANNOUNCE = client.get_packet(P_CL2FE_GM_REQ_PC_ANNOUNCE)?;
     let area_type: AreaType = pkt.iAreaType.try_into()?;
     let pkt = sP_FE2CL_ANNOUNCE_MSG {
@@ -233,8 +228,7 @@ pub fn gm_pc_announce(clients: &mut ClientMap, state: &mut ShardServerState) -> 
         iDuringTime: pkt.iDuringTime,
         szAnnounceMsg: pkt.szAnnounceMsg,
     };
-    let pc_id = client.get_player_id()?;
-    let player = state.get_player(pc_id)?;
+    let player = state.get_player(pc_id).unwrap();
     match area_type {
         AreaType::Local => {
             state
@@ -272,7 +266,7 @@ pub fn gm_pc_announce(clients: &mut ClientMap, state: &mut ShardServerState) -> 
 
 pub fn gm_pc_location(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
-    helpers::validate_gm(client, state)?;
+    let gm_pc_id = helpers::validate_gm(client, state)?;
     let pkt: sP_CL2FE_GM_REQ_PC_LOCATION = *client.get_packet(P_CL2FE_GM_REQ_PC_LOCATION)?;
     let search_mode: TargetSearchBy = pkt.eTargetSearchBy.try_into()?;
     let search_query = match search_mode {
@@ -310,7 +304,7 @@ pub fn gm_pc_location(clients: &mut ClientMap, state: &mut ShardServerState) -> 
         // for name or UID search, we can ask the login server,
         // which will ask all the other shards
         let pkt = sP_FE2LS_REQ_PC_LOCATION {
-            iPC_ID: clients.get_self().get_player_id()?,
+            iPC_ID: gm_pc_id,
             sReq: pkt,
         };
         let login_server = clients.get_login_server().unwrap();
@@ -383,7 +377,7 @@ pub fn gm_target_pc_teleport(
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let client = clients.get_self();
-    helpers::validate_gm(client, state)?;
+    let gm_pc_id = helpers::validate_gm(client, state)?;
     let pkt: sP_CL2FE_GM_REQ_TARGET_PC_TELEPORT =
         *client.get_packet(P_CL2FE_GM_REQ_TARGET_PC_TELEPORT)?;
 
@@ -428,7 +422,7 @@ pub fn gm_target_pc_teleport(
             },
         ),
         TeleportType::MyLocation => {
-            let my_player = state.get_player(client.get_player_id().unwrap()).unwrap();
+            let my_player = state.get_player(gm_pc_id).unwrap();
             (my_player.get_position(), my_player.instance_id)
         }
         TeleportType::SomeoneLocation => {
@@ -509,8 +503,7 @@ pub fn gm_kick_player(clients: &mut ClientMap, state: &mut ShardServerState) -> 
 }
 
 pub fn gm_reward_rate(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
-    helpers::validate_gm(client, state)?;
-    let pc_id = client.get_player_id()?;
+    let pc_id = helpers::validate_gm(client, state)?;
     let pkt: &sP_CL2FE_GM_REQ_REWARD_RATE = client.get_packet(P_CL2FE_GM_REQ_REWARD_RATE)?;
     let player = state.get_player_mut(pc_id)?;
 
@@ -539,7 +532,7 @@ pub fn gm_reward_rate(client: &mut FFClient, state: &mut ShardServerState) -> FF
 mod helpers {
     use super::*;
 
-    pub fn validate_gm(client: &mut FFClient, state: &ShardServerState) -> FFResult<()> {
+    pub fn validate_gm(client: &mut FFClient, state: &ShardServerState) -> FFResult<i32> {
         let user_pc_id = client.get_player_id()?;
         let perms = state.get_player(user_pc_id)?.get_perms();
         if perms > 0 {
@@ -551,7 +544,7 @@ mod helpers {
                 ),
             ));
         }
-        Ok(())
+        Ok(user_pc_id)
     }
 
     pub fn send_search_fail(client: &mut FFClient, query: PlayerSearchQuery) -> FFError {
