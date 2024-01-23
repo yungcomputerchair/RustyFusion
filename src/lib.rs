@@ -66,6 +66,16 @@ impl Position {
         let dz = self.z.abs_diff(other.z) as f32 / DIST_MATH_SCALE;
         ((dx * dx + dy * dy + dz * dz).sqrt() * DIST_MATH_SCALE) as u32
     }
+
+    pub fn get_unstuck(&self) -> Position {
+        const UNSTICK_XY_RANGE: i32 = 200;
+        const UNSTICK_Z_BUMP: i32 = 80;
+        Position {
+            x: self.x + util::rand_range_inclusive(-UNSTICK_XY_RANGE, UNSTICK_XY_RANGE),
+            y: self.y + util::rand_range_inclusive(-UNSTICK_XY_RANGE, UNSTICK_XY_RANGE),
+            z: self.z + UNSTICK_Z_BUMP,
+        }
+    }
 }
 impl From<Vector3<f32>> for Position {
     fn from(value: Vector3<f32>) -> Self {

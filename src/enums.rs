@@ -67,37 +67,42 @@ pub enum TargetSearchBy {
 #[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
 #[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
 pub enum ItemLocation {
-    /*eIL_Equip*/ Equip = 0,
-    /*eIL_Inven*/ Inven = 1,
-    /*eIL_QInven*/ QInven = 2,
-    /*eIL_Bank*/ Bank = 3,
-    /*eIL__End*/
+    Equip = 0,  /*eIL_Equip*/
+    Inven = 1,  /*eIL_Inven*/
+    QInven = 2, /*eIL_QInven*/
+    Bank = 3,   /*eIL_Bank*/
+                /*eIL__End*/
+}
+impl ItemLocation {
+    pub fn end() -> i32 {
+        4
+    }
 }
 
 #[repr(i16)]
 #[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
 #[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
 pub enum ItemType {
-    /*eItemType_Hand*/ Hand = 0,
-    /*eItemType_UpperBody*/ UpperBody = 1,
-    /*eItemType_LowerBody*/ LowerBody = 2,
-    /*eItemType_Foot*/ Foot = 3,
-    /*eItemType_Head*/ Head = 4,
-    /*eItemType_Face*/ Face = 5,
-    /*eItemType_Back*/ Back = 6,
-    /*eItemType_General*/ General = 7,
-    /*eItemType_Quest*/ Quest = 8,
-    /*eItemType_Chest*/ Chest = 9,
-    /*eItemType_Vehicle*/ Vehicle = 10,
-    /*eItemType_GMKey*/ GMKey = 11,
-    /*eItemType_FMatter*/ FMatter = 12,
-    /*eItemType_Hair*/ Hair = 13,
-    /*eItemType_SkinFace*/ SkinFace = 14,
-    /*eItemType_Nano*/ Nano = 19,
-    /*eItemType_NanoTune*/ NanoTune = 24,
-    /*eItemType_Skill*/ Skill = 27,
-    /*eItemType_Npc*/ Npc = 30,
-    /*eItemType_SkillBuffEffect*/ SkillBuffEffect = 138,
+    Hand = 0,              /*eItemType_Hand*/
+    UpperBody = 1,         /*eItemType_UpperBody*/
+    LowerBody = 2,         /*eItemType_LowerBody*/
+    Foot = 3,              /*eItemType_Foot*/
+    Head = 4,              /*eItemType_Head*/
+    Face = 5,              /*eItemType_Face*/
+    Back = 6,              /*eItemType_Back*/
+    General = 7,           /*eItemType_General*/
+    Quest = 8,             /*eItemType_Quest*/
+    Chest = 9,             /*eItemType_Chest*/
+    Vehicle = 10,          /*eItemType_Vehicle*/
+    GMKey = 11,            /*eItemType_GMKey*/
+    FMatter = 12,          /*eItemType_FMatter*/
+    Hair = 13,             /*eItemType_Hair*/
+    SkinFace = 14,         /*eItemType_SkinFace*/
+    Nano = 19,             /*eItemType_Nano*/
+    NanoTune = 24,         /*eItemType_NanoTune*/
+    Skill = 27,            /*eItemType_Skill*/
+    Npc = 30,              /*eItemType_Npc*/
+    SkillBuffEffect = 138, /*eItemType_SkillBuffEffect*/
 }
 
 #[repr(i32)]
@@ -105,8 +110,19 @@ pub enum ItemType {
 #[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
 pub enum TransportationType {
     /*eTT_None*/
-    /*eTT_Warp*/ Warp = 1,
-    /*eTT_Wyvern*/ Wyvern = 2,
-    /*eTT_Bus*/ Bus = 3,
-    /*eTT__End*/
+    Warp = 1,   /*eTT_Warp*/
+    Wyvern = 2, /*eTT_Wyvern*/
+    Bus = 3,    /*eTT_Bus*/
+                /*eTT__End*/
+}
+
+#[repr(i32)]
+#[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
+#[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
+pub enum TeleportType {
+    XYZ = 0,             /*eCN_GM_TeleportMapType__XYZ*/
+    MapXYZ = 1,          /*eCN_GM_TeleportMapType__MapXYZ*/
+    MyLocation = 2,      /*eCN_GM_TeleportMapType__MyLocation*/
+    SomeoneLocation = 3, /*eCN_GM_TeleportMapType__SomeoneLocation*/
+    Unstick = 4,         /*eCN_GM_TeleportMapType__Unstick*/
 }

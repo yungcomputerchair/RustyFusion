@@ -1,6 +1,6 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use rand::Rng;
+use rand::{distributions::uniform::SampleUniform, Rng};
 
 use crate::{
     defines::*,
@@ -123,4 +123,12 @@ pub fn weighted_rand(weights: &[i32]) -> usize {
         }
     }
     weights.len() - 1
+}
+
+pub fn rand_range_inclusive<T: SampleUniform + Ord>(min: T, max: T) -> T {
+    rand::thread_rng().gen_range(min..=max)
+}
+
+pub fn rand_range_exclusive<T: SampleUniform + Ord>(min: T, max: T) -> T {
+    rand::thread_rng().gen_range(min..max)
 }

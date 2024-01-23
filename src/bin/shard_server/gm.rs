@@ -3,7 +3,7 @@ use std::cmp::max;
 use rusty_fusion::{
     chunk::InstanceID,
     defines::{self, MSG_BOX_DURATION_DEFAULT},
-    enums::{AreaType, TargetSearchBy},
+    enums::{AreaType, ItemLocation, TargetSearchBy, TeleportType},
     error::{catch_fail, FFError, Severity},
     placeholder,
     player::PlayerSearchQuery,
@@ -317,14 +317,7 @@ pub fn gm_pc_location(clients: &mut ClientMap, state: &mut ShardServerState) -> 
         let _ = login_server.send_packet(P_FE2LS_REQ_PC_LOCATION, &pkt);
         Ok(())
     } else {
-        let err_msg = format!("Player not found: {:?}", search_query);
-        let pkt = sP_FE2CL_ANNOUNCE_MSG {
-            iAnnounceType: unused!(),
-            iDuringTime: MSG_BOX_DURATION_DEFAULT,
-            szAnnounceMsg: util::encode_utf16(&err_msg),
-        };
-        let _ = clients.get_self().send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
-        Err(FFError::build(Severity::Warning, err_msg))
+        Err(helpers::send_search_fail(clients.get_self(), search_query))
     }
 }
 
@@ -334,8 +327,8 @@ pub fn gm_target_pc_special_state_onoff(
 ) -> FFResult<()> {
     let client = clients.get_self();
     helpers::validate_gm(client, state)?;
-    let pkt: &sP_CL2FE_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF =
-        client.get_packet(P_CL2FE_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF)?;
+    let pkt: sP_CL2FE_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF =
+        *client.get_packet(P_CL2FE_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF)?;
 
     let search_mode: TargetSearchBy = pkt.eTargetSearchBy.try_into()?;
     let search_query = match search_mode {
@@ -346,10 +339,9 @@ pub fn gm_target_pc_special_state_onoff(
         ),
         TargetSearchBy::PlayerUID => PlayerSearchQuery::ByUID(pkt.iTargetPC_UID),
     };
-    let pc_id = search_query.execute(state).ok_or(FFError::build(
-        Severity::Warning,
-        format!("Player not found: {:?}", search_query),
-    ))?;
+    let pc_id = search_query
+        .execute(state)
+        .ok_or_else(|| helpers::send_search_fail(client, search_query))?;
     let player = state.get_player_mut(pc_id)?;
 
     let new_flag = pkt.iONOFF != 0;
@@ -386,6 +378,102 @@ pub fn gm_target_pc_special_state_onoff(
         .send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp)
 }
 
+pub fn gm_target_pc_teleport(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let client = clients.get_self();
+    helpers::validate_gm(client, state)?;
+    let pkt: sP_CL2FE_GM_REQ_TARGET_PC_TELEPORT =
+        *client.get_packet(P_CL2FE_GM_REQ_TARGET_PC_TELEPORT)?;
+
+    // the "target PC" is the player being teleported
+    let search_mode: TargetSearchBy = pkt.eTargetPCSearchBy.try_into()?;
+    let search_query = match search_mode {
+        TargetSearchBy::PlayerID => PlayerSearchQuery::ByID(pkt.iTargetPC_ID),
+        TargetSearchBy::PlayerName => PlayerSearchQuery::ByName(
+            util::parse_utf16(&pkt.szTargetPC_FirstName),
+            util::parse_utf16(&pkt.szTargetPC_LastName),
+        ),
+        TargetSearchBy::PlayerUID => PlayerSearchQuery::ByUID(pkt.iTargetPC_UID),
+    };
+    let target_pc_id = search_query
+        .execute(state)
+        .ok_or_else(|| helpers::send_search_fail(client, search_query))?;
+    let target_player = state.get_player(target_pc_id).unwrap();
+    let teleport_type: TeleportType = pkt.eTeleportType.try_into()?;
+    let (dest_pos, dest_inst_id) = match teleport_type {
+        TeleportType::XYZ => (
+            Position {
+                x: pkt.iToX,
+                y: pkt.iToY,
+                z: pkt.iToZ,
+            },
+            target_player.instance_id,
+        ),
+        TeleportType::MapXYZ => (
+            Position {
+                x: pkt.iToX,
+                y: pkt.iToY,
+                z: pkt.iToZ,
+            },
+            InstanceID {
+                // player needs to be in the same map as the instance they want to teleport to
+                instance_num: Some(pkt.iToMap as u32),
+                ..target_player.instance_id
+            },
+        ),
+        TeleportType::MyLocation => {
+            let my_player = state.get_player(client.get_player_id().unwrap()).unwrap();
+            (my_player.get_position(), my_player.instance_id)
+        }
+        TeleportType::SomeoneLocation => {
+            // the "goal PC" is the player being teleported to
+            let search_mode: TargetSearchBy = pkt.eGoalPCSearchBy.try_into()?;
+            let search_query = match search_mode {
+                TargetSearchBy::PlayerID => PlayerSearchQuery::ByID(pkt.iGoalPC_ID),
+                TargetSearchBy::PlayerName => PlayerSearchQuery::ByName(
+                    util::parse_utf16(&pkt.szGoalPC_FirstName),
+                    util::parse_utf16(&pkt.szGoalPC_LastName),
+                ),
+                TargetSearchBy::PlayerUID => PlayerSearchQuery::ByUID(pkt.iGoalPC_UID),
+            };
+            let goal_pc_id = search_query
+                .execute(state)
+                .ok_or_else(|| helpers::send_search_fail(client, search_query))?;
+            let goal_player = state.get_player(goal_pc_id).unwrap();
+            (goal_player.get_position(), goal_player.instance_id)
+        }
+        TeleportType::Unstick => (
+            target_player.get_position().get_unstuck(),
+            target_player.instance_id,
+        ),
+    };
+
+    let player = state.get_player_mut(target_pc_id).unwrap();
+    player.set_position(dest_pos);
+    player.pre_warp_map_num = player.instance_id.map_num; // for tracking EP warps
+    player.instance_id = dest_inst_id;
+
+    let resp = sP_FE2CL_REP_PC_WARP_USE_NPC_SUCC {
+        iX: dest_pos.x,
+        iY: dest_pos.y,
+        iZ: dest_pos.z,
+        eIL: ItemLocation::end(),
+        iItemSlotNum: unused!(),
+        Item: unused!(),
+        iCandy: player.get_taros() as i32,
+    };
+    let client = player.get_client(clients).unwrap();
+    let _ = client.send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp);
+
+    // see transport::helpers::do_warp to see why we use None for the chunk here
+    state
+        .entity_map
+        .update(EntityID::Player(target_pc_id), None, Some(clients));
+    Ok(())
+}
+
 mod helpers {
     use super::*;
 
@@ -402,5 +490,16 @@ mod helpers {
             ));
         }
         Ok(())
+    }
+
+    pub fn send_search_fail(client: &mut FFClient, query: PlayerSearchQuery) -> FFError {
+        let err_msg = format!("Player not found: {:?}", query);
+        let pkt = sP_FE2CL_ANNOUNCE_MSG {
+            iAnnounceType: unused!(),
+            iDuringTime: MSG_BOX_DURATION_DEFAULT,
+            szAnnounceMsg: util::encode_utf16(&err_msg),
+        };
+        let _ = client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
+        FFError::build(Severity::Warning, err_msg)
     }
 }
