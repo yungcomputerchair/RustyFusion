@@ -208,6 +208,7 @@ fn handle_packet(
             gm::gm_target_pc_special_state_onoff(&mut clients, state)
         }
         P_CL2FE_GM_REQ_TARGET_PC_TELEPORT => gm::gm_target_pc_teleport(&mut clients, state),
+        P_CL2FE_GM_REQ_KICK_PLAYER => gm::gm_kick_player(&mut clients, state),
         //
         P_CL2FE_REQ_SEND_FREECHAT_MESSAGE => chat::send_freechat_message(&mut clients, state),
         P_CL2FE_REQ_SEND_MENUCHAT_MESSAGE => chat::send_menuchat_message(&mut clients, state),

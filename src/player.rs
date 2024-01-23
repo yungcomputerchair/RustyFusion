@@ -872,6 +872,7 @@ impl Player {
         entity_map.update(id, None, Some(clients));
         let mut player = entity_map.untrack(id);
         player.cleanup(clients, state);
+        player.get_client(clients).unwrap().should_dc = true;
 
         let pkt_pc = sP_FE2LS_UPDATE_PC_SHARD {
             iPC_UID: pc_uid,

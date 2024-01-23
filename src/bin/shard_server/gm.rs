@@ -2,7 +2,7 @@ use std::cmp::max;
 
 use rusty_fusion::{
     chunk::InstanceID,
-    defines::{self, MSG_BOX_DURATION_DEFAULT},
+    defines::{self, EXIT_CODE_REQ_BY_GM, MSG_BOX_DURATION_DEFAULT},
     enums::{AreaType, ItemLocation, TargetSearchBy, TeleportType},
     error::{catch_fail, FFError, Severity},
     placeholder,
@@ -475,6 +475,36 @@ pub fn gm_target_pc_teleport(
     state
         .entity_map
         .update(EntityID::Player(target_pc_id), None, Some(clients));
+    Ok(())
+}
+
+pub fn gm_kick_player(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let client = clients.get_self();
+    helpers::validate_gm(client, state)?;
+    let pkt: sP_CL2FE_GM_REQ_KICK_PLAYER = *client.get_packet(P_CL2FE_GM_REQ_KICK_PLAYER)?;
+    let search_mode: TargetSearchBy = pkt.eTargetSearchBy.try_into()?;
+    let search_query = match search_mode {
+        TargetSearchBy::PlayerID => PlayerSearchQuery::ByID(pkt.iTargetPC_ID),
+        TargetSearchBy::PlayerName => PlayerSearchQuery::ByName(
+            util::parse_utf16(&pkt.szTargetPC_FirstName),
+            util::parse_utf16(&pkt.szTargetPC_LastName),
+        ),
+        TargetSearchBy::PlayerUID => PlayerSearchQuery::ByUID(pkt.iTargetPC_UID),
+    };
+    let pc_id = search_query
+        .execute(state)
+        .ok_or_else(|| helpers::send_search_fail(clients.get_self(), search_query))?;
+    let client = state
+        .get_player(pc_id)
+        .unwrap()
+        .get_client(clients)
+        .unwrap();
+    let pkt = sP_FE2CL_REP_PC_EXIT_SUCC {
+        iID: pc_id,
+        iExitCode: EXIT_CODE_REQ_BY_GM as i32,
+    };
+    let _ = client.send_packet(P_FE2CL_REP_PC_EXIT_SUCC, &pkt);
+    client.should_dc = true;
     Ok(())
 }
 
