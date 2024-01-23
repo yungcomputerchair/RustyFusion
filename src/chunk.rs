@@ -568,10 +568,9 @@ impl EntityMap {
                             }
                             npc.leader_id = None;
 
-                            let chunk =
-                                &mut self.chunk_maps.get_mut(&instance_id).unwrap().chunks[x][y];
-                            chunk.insert(npc.get_id());
-                            self.track(Box::new(npc));
+                            let chunk_pos = npc.get_chunk_coords();
+                            let new_npc_id = self.track(Box::new(npc));
+                            self.update(new_npc_id, Some(chunk_pos), None);
                             npc_count += 1;
                         }
                     }
