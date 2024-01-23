@@ -61,6 +61,14 @@ pub enum TargetSearchBy {
     PlayerUID = 2,
 }
 
+#[repr(i32)]
+#[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
+#[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
+pub enum RewardType {
+    Taros = 0,
+    FusionMatter = 1,
+}
+
 /* Enums ripped from the client */
 
 #[repr(i32)]

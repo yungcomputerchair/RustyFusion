@@ -3,7 +3,7 @@ use std::cmp::max;
 use rusty_fusion::{
     chunk::InstanceID,
     defines::{self, EXIT_CODE_REQ_BY_GM, MSG_BOX_DURATION_DEFAULT},
-    enums::{AreaType, ItemLocation, TargetSearchBy, TeleportType},
+    enums::{AreaType, ItemLocation, RewardType, TargetSearchBy, TeleportType},
     error::{catch_fail, FFError, Severity},
     placeholder,
     player::PlayerSearchQuery,
@@ -506,6 +506,34 @@ pub fn gm_kick_player(clients: &mut ClientMap, state: &mut ShardServerState) -> 
     let _ = client.send_packet(P_FE2CL_REP_PC_EXIT_SUCC, &pkt);
     client.should_dc = true;
     Ok(())
+}
+
+pub fn gm_reward_rate(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+    helpers::validate_gm(client, state)?;
+    let pc_id = client.get_player_id()?;
+    let pkt: &sP_CL2FE_GM_REQ_REWARD_RATE = client.get_packet(P_CL2FE_GM_REQ_REWARD_RATE)?;
+    let player = state.get_player_mut(pc_id)?;
+
+    let mut set_res = Ok(());
+    if pkt.iGetSet != 0 {
+        let reward_type: RewardType = pkt.iRewardType.try_into()?;
+        let rate_percent = pkt.iSetRateValue as f32;
+        let idx = pkt.iRewardRateIndex as usize;
+        set_res = player
+            .reward_data
+            .set_reward_rate(reward_type, idx, rate_percent);
+    }
+
+    let resp = sP_FE2CL_GM_REP_REWARD_RATE_SUCC {
+        afRewardRate_Taros: player.reward_data.get_rates_as_array(RewardType::Taros),
+        afRewardRate_FusionMatter: player
+            .reward_data
+            .get_rates_as_array(RewardType::FusionMatter),
+    };
+    client.send_packet(P_FE2CL_GM_REP_REWARD_RATE_SUCC, &resp)?;
+
+    // we defer the error so the client can still see the current rates
+    set_res
 }
 
 mod helpers {

@@ -4,7 +4,7 @@ use crate::{
     chunk::{ChunkCoords, InstanceID},
     database::db_get,
     defines::*,
-    enums::{ItemLocation, ItemType, PlayerGuide, PlayerShardStatus},
+    enums::{ItemLocation, ItemType, PlayerGuide, PlayerShardStatus, RewardType},
     error::{log, FFError, FFResult, Severity},
     net::{
         ffclient::FFClient,
@@ -195,6 +195,92 @@ impl Default for PlayerInventory {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct RewardRates {
+    combat: f32,
+    missions: f32,
+    eggs: f32,
+    racing: f32,
+}
+impl Default for RewardRates {
+    fn default() -> Self {
+        Self {
+            combat: 1.0,
+            missions: 1.0,
+            eggs: 1.0,
+            racing: 1.0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct RewardData {
+    taros: RewardRates,
+    fusion_matter: RewardRates,
+}
+impl RewardData {
+    pub fn set_reward_rate(
+        &mut self,
+        reward_type: RewardType,
+        idx: usize,
+        val: f32,
+    ) -> FFResult<()> {
+        let reward_rates = match reward_type {
+            RewardType::Taros => &mut self.taros,
+            RewardType::FusionMatter => &mut self.fusion_matter,
+        };
+        let rate = match idx {
+            1 => Ok(&mut reward_rates.combat),
+            2 => Ok(&mut reward_rates.missions),
+            3 => Ok(&mut reward_rates.eggs),
+            4 => Ok(&mut reward_rates.racing),
+            0 => {
+                for idx in 1..5 {
+                    self.set_reward_rate(reward_type, idx, val).unwrap();
+                }
+                return Ok(());
+            }
+            _ => Err(FFError::build(
+                Severity::Warning,
+                format!("Invalid reward rate index: {}", idx),
+            )),
+        }?;
+        *rate = val / 100.0; // val is in percent
+        Ok(())
+    }
+
+    pub fn get_reward_rate(&self, reward_type: RewardType, idx: usize) -> FFResult<f32> {
+        let reward_rates = match reward_type {
+            RewardType::Taros => &self.taros,
+            RewardType::FusionMatter => &self.fusion_matter,
+        };
+        match idx {
+            1 => Ok(reward_rates.combat),
+            2 => Ok(reward_rates.missions),
+            3 => Ok(reward_rates.eggs),
+            4 => Ok(reward_rates.racing),
+            _ => Err(FFError::build(
+                Severity::Warning,
+                format!("Invalid reward rate index: {}", idx),
+            )),
+        }
+    }
+
+    pub fn get_rates_as_array(&self, reward_type: RewardType) -> [f32; 5] {
+        let reward_rates = match reward_type {
+            RewardType::Taros => &self.taros,
+            RewardType::FusionMatter => &self.fusion_matter,
+        };
+        [
+            unused!(),
+            reward_rates.combat,
+            reward_rates.missions,
+            reward_rates.eggs,
+            reward_rates.racing,
+        ]
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Player {
     id: Option<i32>,
@@ -207,6 +293,7 @@ pub struct Player {
     pub invulnerable: bool,
     pub in_menu: bool,
     pub freechat_muted: bool,
+    pub reward_data: RewardData,
     position: Position,
     rotation: i32,
     pub instance_id: InstanceID,
