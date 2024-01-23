@@ -419,7 +419,11 @@ pub fn gm_target_pc_teleport(
             },
             InstanceID {
                 // player needs to be in the same map as the instance they want to teleport to
-                instance_num: Some(pkt.iToMap as u32),
+                instance_num: if pkt.iToMap == 0 {
+                    None
+                } else {
+                    Some(pkt.iToMap as u32)
+                },
                 ..target_player.instance_id
             },
         ),

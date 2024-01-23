@@ -247,7 +247,7 @@ pub fn time_to_go_warp(clients: &mut ClientMap, state: &mut ShardServerState) ->
 mod helpers {
     #![allow(clippy::too_many_arguments)]
 
-    use rusty_fusion::{chunk::InstanceID, defines::TYPE_TIME_MACHINE};
+    use rusty_fusion::{chunk::InstanceID, defines::TYPE_TIME_MACHINE, util};
 
     use super::*;
 
@@ -362,7 +362,9 @@ mod helpers {
             channel_num: player.instance_id.channel_num,
             map_num: warp_data.map_num,
             instance_num: if warp_data.is_instance {
-                Some(rand::random())
+                // basically impossible to get 0, but we'll make sure anyway
+                // since an instance ID of 0 represents no instance
+                Some(util::rand_range_inclusive(1, u32::MAX))
             } else {
                 None
             },
