@@ -29,7 +29,7 @@ pub enum ClientType {
 }
 
 pub struct FFClient {
-    sock: TcpStream,
+    pub sock: TcpStream,
     addr: SocketAddr,
     in_buf: [u8; PACKET_BUFFER_SIZE],
     in_buf_ptr: usize,
@@ -42,6 +42,7 @@ pub struct FFClient {
     pub client_type: ClientType,
     pub last_heartbeat: SystemTime,
     pub live_check_pending: bool,
+    pub should_dc: bool,
 }
 
 impl FFClient {
@@ -61,11 +62,8 @@ impl FFClient {
             client_type: ClientType::Unknown,
             last_heartbeat: SystemTime::now(),
             live_check_pending: false,
+            should_dc: false,
         }
-    }
-
-    pub fn get_sock(&self) -> &TcpStream {
-        &self.sock
     }
 
     pub fn get_addr(&self) -> String {

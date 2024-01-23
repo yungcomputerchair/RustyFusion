@@ -69,6 +69,15 @@ impl FFServer {
     }
 
     pub fn poll(&mut self, state: &mut ServerState) -> Result<()> {
+        let client_keys: Vec<usize> = self.clients.keys().copied().collect();
+        for key in client_keys {
+            let client = self.clients.get_mut(&key).unwrap();
+            if client.should_dc {
+                self.disconnect_client(key, state)?;
+            }
+            // TODO move live checks here maybe
+        }
+
         let time_now = SystemTime::now();
         let mut events: Vec<Event> = Vec::new();
         if let Err(e) = self.poller.wait(&mut events, self.poll_timeout) {
@@ -89,8 +98,12 @@ impl FFServer {
                 );
                 self.register_client(conn_data)?;
             } else {
-                let clients: &mut HashMap<usize, FFClient> = &mut self.clients;
-                let client: &mut FFClient = clients.get_mut(&ev.key).unwrap();
+                let client = match self.clients.get_mut(&ev.key) {
+                    Some(client) => client,
+                    None => {
+                        continue;
+                    }
+                };
                 let addr = client.get_addr();
 
                 let res = (|clients: &mut HashMap<usize, FFClient>| {
@@ -98,7 +111,7 @@ impl FFServer {
                     client.read_payload()?;
                     let pkt_id = client.peek_packet_id()?;
                     (self.pkt_handler)(ev.key, clients, pkt_id, state, time_now)
-                })(clients);
+                })(&mut self.clients);
 
                 if let Err(e) = res {
                     log(e.get_severity(), &format!("{} ({})", e.get_msg(), addr));
@@ -124,11 +137,7 @@ impl FFServer {
         ClientMap::new(0, &mut self.clients)
     }
 
-    pub fn disconnect_client(
-        &mut self,
-        client_key: usize,
-        state: &mut ServerState,
-    ) -> Result<FFClient> {
+    pub fn disconnect_client(&mut self, client_key: usize, state: &mut ServerState) -> Result<()> {
         if let Some(callback) = self.dc_handler {
             callback(client_key, &mut self.clients, state);
         };
@@ -149,10 +158,10 @@ impl FFServer {
         Ok(key)
     }
 
-    fn unregister_client(&mut self, key: usize) -> Result<FFClient> {
-        let client: &FFClient = self.clients.get(&key).unwrap();
-        self.poller.delete(client.get_sock())?;
-        Ok(self.clients.remove(&key).unwrap())
+    fn unregister_client(&mut self, key: usize) -> Result<()> {
+        let client = self.clients.remove(&key).unwrap();
+        self.poller.delete(&client.sock)?;
+        Ok(()) // client is dropped
     }
 
     pub fn do_live_checks(
