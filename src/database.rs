@@ -311,6 +311,12 @@ impl Database {
             quest_bytes.extend_from_slice(&sec.to_le_bytes());
         }
 
+        let position = if player.instance_id.instance_num.is_some() {
+            player.get_pre_warp().position
+        } else {
+            player.get_position()
+        };
+
         self.exec(
             "save_player",
             &[
@@ -321,9 +327,9 @@ impl Database {
                 &(player.get_equipped_nano_ids()[2] as i32),
                 &(player.flags.tutorial_flag as i32),
                 &(player.flags.payzone_flag as i32),
-                &player.get_position().x,
-                &player.get_position().y,
-                &player.get_position().z,
+                &position.x,
+                &position.y,
+                &position.z,
                 &player.get_rotation(),
                 &player.get_hp(),
                 &(player.get_fusion_matter() as i32),

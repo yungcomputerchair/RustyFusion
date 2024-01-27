@@ -117,7 +117,8 @@ pub fn pc_loading_complete(clients: &mut ClientMap, state: &mut ShardServerState
         (|| {
             let player = state.get_player(clients.get_self().get_player_id()?)?;
             let chunk = player.get_chunk_coords();
-            let instance_id = if player.pre_warp_map_num != player.instance_id.map_num
+            let instance_id = if player.get_pre_warp().instance_id.map_num
+                != player.instance_id.map_num
                 && player.instance_id.map_num != ID_OVERWORLD
             {
                 Some(player.instance_id)

@@ -449,8 +449,8 @@ pub fn gm_target_pc_teleport(
     };
 
     let player = state.get_player_mut(target_pc_id).unwrap();
+    player.set_pre_warp();
     player.set_position(dest_pos);
-    player.pre_warp_map_num = player.instance_id.map_num; // for tracking EP warps
     player.instance_id = dest_inst_id;
 
     let resp = sP_FE2CL_REP_PC_WARP_USE_NPC_SUCC {

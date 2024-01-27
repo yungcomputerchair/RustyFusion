@@ -282,6 +282,12 @@ impl RewardData {
 }
 
 #[derive(Debug, Clone, Default)]
+pub struct PreWarpData {
+    pub instance_id: InstanceID,
+    pub position: Position,
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct Player {
     id: Option<i32>,
     slot_num: usize,
@@ -315,7 +321,7 @@ pub struct Player {
     pub trade_id: Option<Uuid>,
     pub trade_offered_to: Option<i32>,
     pub vehicle_speed: Option<i32>,
-    pub pre_warp_map_num: u32,
+    pre_warp_data: PreWarpData,
 }
 impl Player {
     pub fn new(uid: i64, slot_num: usize) -> Self {
@@ -939,6 +945,17 @@ impl Player {
     pub fn set_nano_potions(&mut self, nano_potions: u32) -> u32 {
         self.nano_potions = clamp(nano_potions, 0, PC_BATTERY_MAX);
         self.nano_potions
+    }
+
+    pub fn set_pre_warp(&mut self) {
+        self.pre_warp_data = PreWarpData {
+            instance_id: self.instance_id,
+            position: self.position,
+        }
+    }
+
+    pub fn get_pre_warp(&self) -> &PreWarpData {
+        &self.pre_warp_data
     }
 
     pub fn disconnect(pc_id: i32, state: &mut ShardServerState, clients: &mut ClientMap) {

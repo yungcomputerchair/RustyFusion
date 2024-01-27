@@ -357,6 +357,7 @@ mod helpers {
         }
 
         player.set_taros(player.get_taros() - warp_data.cost);
+        player.set_pre_warp();
         player.set_position(warp_data.pos);
         let instance_id = InstanceID {
             channel_num: player.instance_id.channel_num,
@@ -369,7 +370,6 @@ mod helpers {
                 None
             },
         };
-        player.pre_warp_map_num = player.instance_id.map_num; // for tracking EP warps
         player.instance_id = instance_id;
 
         // force vehicle dismount
