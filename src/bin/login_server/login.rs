@@ -38,7 +38,12 @@ pub fn login(
                 None => {
                     if config_get().login.auto_create_accounts.get() {
                         // automatically create the account with the supplied credentials
-                        db.create_account(&username, &password_hashed)?
+                        let new_acc_id = db.create_account(&username, &password_hashed)?;
+                        log(
+                            Severity::Info,
+                            &format!("Created account {} with ID {}", username, new_acc_id),
+                        );
+                        new_acc_id
                     } else {
                         error_code = 1; // "Login fail: login ID error"
                         return Err(FFError::build(
