@@ -1,6 +1,13 @@
+use std::time::SystemTime;
+
+use mongodb::{
+    bson::doc,
+    sync::{Client, ClientSession},
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    defines::{CN_ACCOUNT_LEVEL__USER, DB_VERSION, PROTOCOL_VERSION},
     net::packet::{sItemBase, sNano, sPCStyle},
     player::{PlayerFlags, PlayerStyle},
     util, Combatant, Entity, Item, Nano, Position,
@@ -9,12 +16,18 @@ use crate::{
 use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+struct DbMeta {
+    db_version: Int,
+    protocol_version: Int,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct DbAccount {
     #[serde(rename = "_id")]
     account_id: BigInt,
     username: Text,
     password_hash: Text,
-    player_uids: [BigInt; 4], // references to player collection
+    player_uids: Vec<BigInt>, // references to player collection
     selected_slot: Int,
     account_level: Int,
     creation_time: Int,
@@ -142,6 +155,7 @@ struct DbPlayer {
     #[serde(rename = "_id")]
     uid: BigInt,
     account_id: BigInt, // reference to account collection
+    slot_number: Int,
     first_name: String,
     last_name: String,
     name_check: Int,
@@ -195,6 +209,7 @@ impl From<(BigInt, &Player)> for DbPlayer {
         Self {
             uid: player.get_uid(),
             account_id,
+            slot_number: player.get_slot_num() as Int,
             first_name: player.get_first_name(),
             last_name: player.get_last_name(),
             name_check: placeholder!(1) as Int,
@@ -222,13 +237,11 @@ impl From<(BigInt, &Player)> for DbPlayer {
         }
     }
 }
-impl TryFrom<(usize, DbPlayer)> for Player {
+impl TryFrom<DbPlayer> for Player {
     type Error = FFError;
 
-    fn try_from(values: (usize, DbPlayer)) -> FFResult<Self> {
-        let (slot_num, db_player) = values;
-
-        let mut player = Player::new(db_player.uid, slot_num);
+    fn try_from(db_player: DbPlayer) -> FFResult<Self> {
+        let mut player = Player::new(db_player.uid, db_player.slot_number as usize);
         player.style = if let Some(style) = db_player.style {
             Some(style.try_into()?)
         } else {
@@ -309,5 +322,319 @@ impl TryFrom<(usize, DbPlayer)> for Player {
         }
 
         Ok(player)
+    }
+}
+
+impl FFError {
+    fn from_db_error(e: mongodb::error::Error) -> Self {
+        FFError::build(Severity::Warning, format!("Database error: {}", e))
+    }
+}
+
+pub struct MongoDatabase {
+    db: mongodb::sync::Database,
+    client: mongodb::sync::Client,
+    conn_str: String,
+}
+impl std::fmt::Debug for MongoDatabase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Mongo Database ({})", self.conn_str)
+    }
+}
+impl MongoDatabase {
+    pub fn connect(config: &GeneralConfig) -> FFResult<Box<dyn Database>> {
+        match Self::connect_internal(config, true) {
+            Ok(db) => Ok(db),
+            Err(e) => {
+                log_error(&e);
+                log(
+                    Severity::Info,
+                    "Attempting connection without authentication...",
+                );
+                Self::connect_internal(config, false)
+            }
+        }
+    }
+
+    fn connect_internal(config: &GeneralConfig, do_auth: bool) -> FFResult<Box<dyn Database>> {
+        let conn_str = if do_auth {
+            format!(
+                "mongodb://{}:{}@{}:{}",
+                config.db_username.get(),
+                config.db_password.get(),
+                config.db_host.get(),
+                config.db_port.get(),
+            )
+        } else {
+            format!(
+                "mongodb://{}:{}",
+                config.db_host.get(),
+                config.db_port.get(),
+            )
+        };
+        let client = Client::with_uri_str(&conn_str).map_err(FFError::from_db_error)?;
+
+        // check if the meta table exists and create it if it doesn't
+        let db = client.database(DB_NAME);
+        let meta = db.collection::<DbMeta>("meta");
+        if meta
+            .find_one(None, None)
+            .map_err(FFError::from_db_error)?
+            .is_none()
+        {
+            log(
+                Severity::Info,
+                "Meta table missing; initializing database...",
+            );
+            meta.insert_one(
+                DbMeta {
+                    db_version: DB_VERSION,
+                    protocol_version: PROTOCOL_VERSION,
+                },
+                None,
+            )
+            .map_err(FFError::from_db_error)?;
+        }
+
+        Ok(Box::new(Self {
+            db,
+            client,
+            conn_str,
+        }))
+    }
+
+    fn save_player_internal(&mut self, player: &Player, tsct: &mut ClientSession) -> FFResult<()> {
+        let pc_uid = player.get_uid();
+        // find the existing player so we can grab the account ID
+        let existing_player = self
+            .db
+            .collection::<DbPlayer>("players")
+            .find_one_with_session(doc! { "_id": pc_uid }, None, tsct)
+            .map_err(FFError::from_db_error)?
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Player with UID {} not found in database", pc_uid),
+            ))?;
+
+        let player: DbPlayer = (existing_player.account_id, player).into();
+        self.db
+            .collection::<DbPlayer>("players")
+            .replace_one_with_session(doc! { "_id": player.uid }, player, None, tsct)
+            .map_err(FFError::from_db_error)?;
+        Ok(())
+    }
+}
+impl Database for MongoDatabase {
+    fn find_account(&mut self, username: &Text) -> FFResult<Option<BigInt>> {
+        let result = self
+            .db
+            .collection::<DbAccount>("accounts")
+            .find_one(doc! { "username": username }, None)
+            .map_err(FFError::from_db_error)?
+            .map(|acc| acc.account_id);
+        Ok(result)
+    }
+
+    fn create_account(&mut self, username: &Text, password_hashed: &Text) -> FFResult<BigInt> {
+        let account_id = util::get_uid();
+        let timestamp_now = util::get_timestamp_sec(SystemTime::now()) as Int;
+        let account = DbAccount {
+            account_id,
+            username: username.clone(),
+            password_hash: password_hashed.clone(),
+            player_uids: Vec::new(),
+            selected_slot: 1,
+            account_level: CN_ACCOUNT_LEVEL__USER as Int,
+            creation_time: timestamp_now,
+            last_login_time: timestamp_now,
+            banned_until_time: 0,
+            banned_since_time: 0,
+            ban_reason: String::new(),
+        };
+        self.db
+            .collection::<DbAccount>("accounts")
+            .insert_one(account, None)
+            .map_err(FFError::from_db_error)?;
+        Ok(account_id)
+    }
+
+    fn init_player(&mut self, acc_id: BigInt, player: &Player) -> FFResult<()> {
+        let mut tsct = self
+            .client
+            .start_session(None)
+            .map_err(FFError::from_db_error)?;
+        tsct.start_transaction(None)
+            .map_err(FFError::from_db_error)?;
+
+        // first add the player document
+        let player: DbPlayer = (acc_id, player).into();
+        let pc_uid = player.uid;
+        self.db
+            .collection::<DbPlayer>("players")
+            .insert_one_with_session(player, None, &mut tsct)
+            .map_err(FFError::from_db_error)?;
+
+        // then update the account document
+        self.db
+            .collection::<DbAccount>("accounts")
+            .update_one_with_session(
+                doc! { "_id": acc_id },
+                doc! { "$push": { "player_uids": pc_uid } },
+                None,
+                &mut tsct,
+            )
+            .map_err(FFError::from_db_error)?;
+
+        tsct.commit_transaction().map_err(FFError::from_db_error)
+    }
+
+    fn update_player_appearance(&mut self, player: &Player) -> FFResult<()> {
+        self.save_player(player)
+    }
+
+    fn update_selected_player(&mut self, acc_id: BigInt, slot_num: Int) -> FFResult<()> {
+        let result = self
+            .db
+            .collection::<DbAccount>("accounts")
+            .update_one(
+                doc! { "_id": acc_id },
+                doc! { "$set": { "selected_slot": slot_num } },
+                None,
+            )
+            .map_err(FFError::from_db_error)?;
+        if result.matched_count == 0 {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Account with ID {} not found in database", acc_id),
+            ));
+        }
+        Ok(())
+    }
+
+    fn save_player(&mut self, player: &Player) -> FFResult<()> {
+        let mut tsct = self
+            .client
+            .start_session(None)
+            .map_err(FFError::from_db_error)?;
+        tsct.start_transaction(None)
+            .map_err(FFError::from_db_error)?;
+        self.save_player_internal(player, &mut tsct)?;
+        tsct.commit_transaction().map_err(FFError::from_db_error)
+    }
+
+    fn save_players(&mut self, players: &[&Player]) -> FFResult<()> {
+        let mut tsct = self
+            .client
+            .start_session(None)
+            .map_err(FFError::from_db_error)?;
+        tsct.start_transaction(None)
+            .map_err(FFError::from_db_error)?;
+        for player in players {
+            self.save_player_internal(player, &mut tsct)?;
+        }
+        tsct.commit_transaction().map_err(FFError::from_db_error)
+    }
+
+    fn load_player(&mut self, acc_id: BigInt, pc_uid: BigInt) -> FFResult<Player> {
+        // get the player from the player collection
+        let db_player = self
+            .db
+            .collection::<DbPlayer>("players")
+            .find_one(doc! { "_id": pc_uid }, None)
+            .map_err(FFError::from_db_error)?
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Player with UID {} not found in database", pc_uid),
+            ))?;
+
+        if db_player.account_id != acc_id {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Player with UID {} does not belong to account with ID {}",
+                    pc_uid, acc_id
+                ),
+            ));
+        }
+
+        db_player.try_into()
+    }
+
+    fn load_players(&mut self, acc_id: BigInt) -> FFResult<Vec<Player>> {
+        // get the player uids from the account
+        let player_uids = self
+            .db
+            .collection::<DbAccount>("accounts")
+            .find_one(doc! { "_id": acc_id }, None)
+            .map_err(FFError::from_db_error)?
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Account with ID {} not found in database", acc_id),
+            ))?
+            .player_uids;
+
+        // get the players from the player collection
+        let mut players = Vec::with_capacity(4);
+        for pc_uid in player_uids.iter() {
+            if *pc_uid == 0 {
+                continue;
+            }
+            let player: DbPlayer = self
+                .db
+                .collection::<DbPlayer>("players")
+                .find_one(doc! { "_id": pc_uid }, None)
+                .map_err(FFError::from_db_error)?
+                .ok_or(FFError::build(
+                    Severity::Warning,
+                    format!("Player with UID {} not found in database", pc_uid),
+                ))?;
+            let player: FFResult<Player> = player.try_into();
+            if let Err(e) = player {
+                log_error(&e);
+                continue;
+            }
+            players.push(player.unwrap());
+        }
+        Ok(players)
+    }
+
+    fn delete_player(&mut self, pc_uid: BigInt) -> FFResult<()> {
+        // first find the account that owns the player
+        let acc_id = self
+            .db
+            .collection::<DbPlayer>("players")
+            .find_one(doc! { "_id": pc_uid }, None)
+            .map_err(FFError::from_db_error)?
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Player with UID {} not found in database", pc_uid),
+            ))?
+            .account_id;
+
+        let mut tsct = self
+            .client
+            .start_session(None)
+            .map_err(FFError::from_db_error)?;
+        tsct.start_transaction(None)
+            .map_err(FFError::from_db_error)?;
+
+        // then remove the player from the player collection
+        self.db
+            .collection::<DbPlayer>("players")
+            .delete_one_with_session(doc! { "_id": pc_uid }, None, &mut tsct)
+            .map_err(FFError::from_db_error)?;
+
+        // then remove the player UID from the account
+        self.db
+            .collection::<DbAccount>("accounts")
+            .update_one_with_session(
+                doc! { "_id": acc_id },
+                doc! { "$pull": { "player_uids": pc_uid } },
+                None,
+                &mut tsct,
+            )
+            .map_err(FFError::from_db_error)?;
+
+        tsct.commit_transaction().map_err(FFError::from_db_error)
     }
 }

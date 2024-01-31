@@ -27,9 +27,7 @@ impl std::fmt::Debug for PostgresDatabase {
     }
 }
 impl PostgresDatabase {
-    pub fn connect(config: &GeneralConfig) -> Box<dyn Database> {
-        const DB_NAME: &str = "rustyfusion";
-
+    pub fn connect(config: &GeneralConfig) -> FFResult<Box<dyn Database>> {
         let mut db_config = postgres::Client::configure();
         db_config
             .host(&config.db_host.get())
@@ -38,31 +36,28 @@ impl PostgresDatabase {
             .password(config.db_password.get())
             .dbname(DB_NAME)
             .connect_timeout(Duration::from_secs(5));
-        let mut db_client = match db_config.connect(tls::NoTls) {
-            Ok(c) => c,
-            Err(e) => {
-                panic_log(&format!("Couldn't connect to database: {}", e));
-            }
-        };
+        let mut db_client = db_config
+            .connect(tls::NoTls)
+            .map_err(FFError::from_db_err)?;
 
         let meta_table_exists: bool =
-            panic_if_failed(Self::query(&mut db_client, "meta_table_exists", &[]))[0].get(0);
+            Self::query(&mut db_client, "meta_table_exists", &[])?[0].get(0);
         if !meta_table_exists {
             log(
                 Severity::Info,
                 "Meta table missing; initializing database...",
             );
-            panic_if_failed(Self::exec(
+            Self::exec(
                 &mut db_client,
                 "create_tables",
                 &[&PROTOCOL_VERSION, &DB_VERSION],
-            ));
+            )?;
         }
 
-        Box::new(Self {
+        Ok(Box::new(Self {
             client: db_client,
             config: db_config,
-        })
+        }))
     }
 
     fn read_sql(name: &str) -> String {

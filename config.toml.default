@@ -10,10 +10,10 @@ logging_level = 2 # how verbose logging should be.
 log_write_interval = 60 # how long (seconds) between log file writes
 live_check_time = 60 # how much network silence (minimum, seconds) before sending a live check.
                      # the live check timer will run at twice this frequency
-db_username = "admin" # what username to connect to postgres with
-db_password = "mypassword" # CHANGE ME; what password to connect to postgres with
-db_host = "localhost" # hostname/address of postgres server to connect to
-db_port = 5432 # port used by postgres server
+db_username = "admin" # what username to connect to database with
+db_password = "mypassword" # CHANGE ME; what password to connect to database with
+db_host = "localhost" # hostname/address of database server to connect to
+db_port = 5432 # port used by database server
 
 [login]
 log_path = "login.log" # path to log file, or blank for console logging only
