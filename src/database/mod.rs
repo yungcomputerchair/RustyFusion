@@ -9,6 +9,8 @@ use crate::player::Player;
 #[cfg(feature = "postgres")]
 mod postgresql;
 
+mod mongo;
+
 type Int = i32;
 type BigInt = i64;
 type Text = String;
