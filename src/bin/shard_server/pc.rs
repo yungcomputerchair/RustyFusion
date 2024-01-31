@@ -3,7 +3,7 @@ use rusty_fusion::{
     database::db_get,
     defines::{self, EQUIP_SLOT_VEHICLE, EXIT_CODE_REQ_BY_PC, ID_OVERWORLD},
     enums::{ItemLocation, PlayerShardStatus},
-    error::catch_fail,
+    error::{catch_fail, log_if_failed},
     placeholder,
     tabledata::tdata_get,
     util, Position,
@@ -69,9 +69,9 @@ pub fn pc_enter(
     let pkt_motd = sP_FE2LS_REQ_MOTD { iPC_ID: pc_id };
     match clients.get_login_server() {
         Some(login_server) => {
-            let _ = login_server.send_packet(P_FE2LS_UPDATE_PC_SHARD, &pkt_pc);
-            let _ = login_server.send_packet(P_FE2LS_UPDATE_CHANNEL_STATUSES, &pkt_chan);
-            let _ = login_server.send_packet(P_FE2LS_REQ_MOTD, &pkt_motd);
+            log_if_failed(login_server.send_packet(P_FE2LS_UPDATE_PC_SHARD, &pkt_pc));
+            log_if_failed(login_server.send_packet(P_FE2LS_UPDATE_CHANNEL_STATUSES, &pkt_chan));
+            log_if_failed(login_server.send_packet(P_FE2LS_REQ_MOTD, &pkt_motd));
         }
         None => {
             log(
@@ -217,7 +217,7 @@ pub fn pc_move(
     state
         .entity_map
         .for_each_around(EntityID::Player(pc_id), clients, |client| {
-            let _ = client.send_packet(P_FE2CL_PC_MOVE, &resp);
+            client.send_packet(P_FE2CL_PC_MOVE, &resp)
         });
 
     let player = state.get_player_mut(pc_id)?;
@@ -267,7 +267,7 @@ pub fn pc_jump(
     state
         .entity_map
         .for_each_around(EntityID::Player(pc_id), clients, |client| {
-            let _ = client.send_packet(P_FE2CL_PC_JUMP, &resp);
+            client.send_packet(P_FE2CL_PC_JUMP, &resp)
         });
 
     let player = state.get_player_mut(pc_id)?;
@@ -310,7 +310,7 @@ pub fn pc_stop(
     state
         .entity_map
         .for_each_around(EntityID::Player(pc_id), clients, |client| {
-            let _ = client.send_packet(P_FE2CL_PC_STOP, &resp);
+            client.send_packet(P_FE2CL_PC_STOP, &resp)
         });
 
     let player = state.get_player_mut(pc_id)?;
@@ -350,11 +350,7 @@ pub fn pc_vehicle_on(clients: &mut ClientMap, state: &mut ShardServerState) -> F
             if let Some(vehicle_speed) = vehicle.get_stats()?.speed {
                 player.vehicle_speed = Some(vehicle_speed);
             } else {
-                log(
-                    Severity::Fatal,
-                    &format!("Vehicle has no speed: {:?}", vehicle),
-                );
-                panic!();
+                panic_log(&format!("Vehicle has no speed: {:?}", vehicle));
             }
             rusty_fusion::helpers::broadcast_state(
                 pc_id,
@@ -446,7 +442,7 @@ pub fn pc_special_state_switch(
     state
         .entity_map
         .for_each_around(EntityID::Player(pkt.iPC_ID), clients, |c| {
-            let _ = c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
+            c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp)
         });
     clients
         .get_self()
@@ -566,7 +562,7 @@ pub fn pc_warp_channel(clients: &mut ClientMap, state: &mut ShardServerState) ->
                 let pkt_chan = sP_FE2LS_UPDATE_CHANNEL_STATUSES {
                     aChannelStatus: state.entity_map.get_channel_statuses().map(|s| s as u8),
                 };
-                let _ = login_server.send_packet(P_FE2LS_UPDATE_CHANNEL_STATUSES, &pkt_chan);
+                log_if_failed(login_server.send_packet(P_FE2LS_UPDATE_CHANNEL_STATUSES, &pkt_chan));
             }
             Ok(())
         })(),

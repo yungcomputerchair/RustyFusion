@@ -5,7 +5,7 @@ use crate::{
     database::db_get,
     defines::*,
     enums::{ItemLocation, ItemType, PlayerGuide, PlayerShardStatus, RewardType},
-    error::{log, FFError, FFResult, Severity},
+    error::{log, log_if_failed, panic_log, FFError, FFResult, Severity},
     net::{
         ffclient::FFClient,
         packet::{
@@ -348,7 +348,7 @@ impl Player {
 
     pub fn get_player_id(&self) -> i32 {
         self.id
-            .unwrap_or_else(|| panic!("Player with UID {} has no ID", self.uid))
+            .unwrap_or_else(|| panic_log(&format!("Player with UID {} has no ID", self.uid)))
     }
 
     pub fn set_player_id(&mut self, pc_id: i32) {
@@ -987,8 +987,8 @@ impl Player {
         };
         match clients.get_login_server() {
             Some(login_server) => {
-                let _ = login_server.send_packet(P_FE2LS_UPDATE_PC_SHARD, &pkt_pc);
-                let _ = login_server.send_packet(P_FE2LS_UPDATE_CHANNEL_STATUSES, &pkt_chan);
+                log_if_failed(login_server.send_packet(P_FE2LS_UPDATE_PC_SHARD, &pkt_pc));
+                log_if_failed(login_server.send_packet(P_FE2LS_UPDATE_CHANNEL_STATUSES, &pkt_chan));
             }
             None => {
                 log(
@@ -1080,7 +1080,9 @@ impl Entity for Player {
                 iID_From: trade.get_id_from(),
                 iID_To: trade.get_id_to(),
             };
-            let _ = client_other.send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL, &pkt_cancel);
+            log_if_failed(
+                client_other.send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL, &pkt_cancel),
+            );
         }
     }
 

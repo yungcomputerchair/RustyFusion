@@ -4,7 +4,7 @@ use rusty_fusion::{
     chunk::InstanceID,
     defines::{self, EXIT_CODE_REQ_BY_GM, MSG_BOX_DURATION_DEFAULT},
     enums::{AreaType, ItemLocation, RewardType, TargetSearchBy, TeleportType},
-    error::{catch_fail, FFError, Severity},
+    error::{catch_fail, log_if_failed, FFError, Severity},
     placeholder,
     player::PlayerSearchQuery,
     util, Combatant, Item, Position,
@@ -94,7 +94,7 @@ pub fn gm_pc_give_nano(clients: &mut ClientMap, state: &mut ShardServerState) ->
             state
                 .entity_map
                 .for_each_around(EntityID::Player(pc_id), clients, |c| {
-                    let _ = c.send_packet(P_FE2CL_REP_PC_NANO_CREATE, &bcast);
+                    c.send_packet(P_FE2CL_REP_PC_NANO_CREATE, &bcast)
                 });
 
             let player = state.get_player_mut(pc_id)?;
@@ -196,7 +196,7 @@ pub fn gm_pc_special_state_switch(
     state
         .entity_map
         .for_each_around(EntityID::Player(pkt.iPC_ID), clients, |c| {
-            let _ = c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
+            c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp)
         });
     clients
         .get_self()
@@ -234,7 +234,7 @@ pub fn gm_pc_announce(clients: &mut ClientMap, state: &mut ShardServerState) -> 
             state
                 .entity_map
                 .for_each_around(EntityID::Player(pc_id), clients, |c| {
-                    let _ = c.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
+                    c.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt)
                 });
         }
         AreaType::Channel => state
@@ -244,7 +244,7 @@ pub fn gm_pc_announce(clients: &mut ClientMap, state: &mut ShardServerState) -> 
             .for_each(|pc_id| {
                 let player = state.get_player(*pc_id).unwrap();
                 let client = player.get_client(clients).unwrap();
-                let _ = client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
+                log_if_failed(client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt));
             }),
         AreaType::Shard => state
             .entity_map
@@ -253,11 +253,11 @@ pub fn gm_pc_announce(clients: &mut ClientMap, state: &mut ShardServerState) -> 
             .for_each(|pc_id| {
                 let player = state.get_player(*pc_id).unwrap();
                 let client = player.get_client(clients).unwrap();
-                let _ = client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
+                log_if_failed(client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt));
             }),
         AreaType::Global => {
             if let Some(login_server) = clients.get_login_server() {
-                let _ = login_server.send_packet(P_FE2LS_ANNOUNCE_MSG, &pkt);
+                log_if_failed(login_server.send_packet(P_FE2LS_ANNOUNCE_MSG, &pkt));
             }
         }
     }
@@ -308,7 +308,7 @@ pub fn gm_pc_location(clients: &mut ClientMap, state: &mut ShardServerState) -> 
             sReq: pkt,
         };
         let login_server = clients.get_login_server().unwrap();
-        let _ = login_server.send_packet(P_FE2LS_REQ_PC_LOCATION, &pkt);
+        log_if_failed(login_server.send_packet(P_FE2LS_REQ_PC_LOCATION, &pkt));
         Ok(())
     } else {
         Err(helpers::send_search_fail(clients.get_self(), search_query))
@@ -365,7 +365,7 @@ pub fn gm_target_pc_special_state_onoff(
     state
         .entity_map
         .for_each_around(EntityID::Player(pc_id), clients, |c| {
-            let _ = c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
+            c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp)
         });
     clients
         .get_self()
@@ -463,7 +463,7 @@ pub fn gm_target_pc_teleport(
         iCandy: player.get_taros() as i32,
     };
     let client = player.get_client(clients).unwrap();
-    let _ = client.send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp);
+    log_if_failed(client.send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp));
 
     // see transport::helpers::do_warp to see why we use None for the chunk here
     state
@@ -497,7 +497,7 @@ pub fn gm_kick_player(clients: &mut ClientMap, state: &mut ShardServerState) -> 
         iID: pc_id,
         iExitCode: EXIT_CODE_REQ_BY_GM as i32,
     };
-    let _ = client.send_packet(P_FE2CL_REP_PC_EXIT_SUCC, &pkt);
+    log_if_failed(client.send_packet(P_FE2CL_REP_PC_EXIT_SUCC, &pkt));
     client.should_dc = true;
     Ok(())
 }
@@ -554,7 +554,7 @@ mod helpers {
             iDuringTime: MSG_BOX_DURATION_DEFAULT,
             szAnnounceMsg: util::encode_utf16(&err_msg),
         };
-        let _ = client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
+        log_if_failed(client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt));
         FFError::build(Severity::Warning, err_msg)
     }
 }

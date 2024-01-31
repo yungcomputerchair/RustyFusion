@@ -1,4 +1,3 @@
-use core::panic;
 use std::{
     sync::{Mutex, MutexGuard},
     time::Duration,
@@ -9,7 +8,7 @@ use postgres::{tls, types::ToSql, Client, Row};
 use crate::{
     config::{config_get, GeneralConfig},
     defines::{DB_VERSION, PROTOCOL_VERSION, SIZEOF_QUESTFLAG_NUMBER, WYVERN_LOCATION_FLAG_SIZE},
-    error::{log, Severity},
+    error::{log, panic_log, Severity},
     net::packet::{sItemBase, sNano},
     player::{Player, PlayerFlags, PlayerStyle},
     util, Combatant, Entity, Item, Nano, Position,
@@ -29,11 +28,7 @@ impl Database {
         match std::fs::read_to_string(&path) {
             Ok(s) => s,
             Err(e) => {
-                log(
-                    Severity::Fatal,
-                    &format!("Couldn't read SQL file {}: {}", path, e),
-                );
-                panic!();
+                panic_log(&format!("Couldn't read SQL file {}: {}", path, e));
             }
         }
     }
@@ -43,20 +38,15 @@ impl Database {
         match self.get().query(&query, params) {
             Ok(r) => r,
             Err(e) => {
-                log(Severity::Fatal, &format!("DB error: {}", e));
-                panic!();
+                panic_log(&format!("DB error: {}", e));
             }
         }
     }
 
     pub fn begin_transaction(&mut self) {
         if self.transaction {
-            log(
-                Severity::Fatal,
-                "Tried to begin transaction while already in one",
-            );
             self.rollback_transaction();
-            panic!();
+            panic_log("Tried to begin transaction while already in one");
         }
         log(Severity::Debug, "Beginning transaction");
         self.transaction = true;
@@ -65,11 +55,7 @@ impl Database {
 
     pub fn rollback_transaction(&mut self) {
         if !self.transaction {
-            log(
-                Severity::Fatal,
-                "Tried to rollback transaction while not in one",
-            );
-            panic!();
+            panic_log("Tried to rollback transaction while not in one");
         }
         self.transaction = false;
         self.get().execute("ROLLBACK", &[]).unwrap();
@@ -78,11 +64,7 @@ impl Database {
 
     pub fn commit_transaction(&mut self) {
         if !self.transaction {
-            log(
-                Severity::Fatal,
-                "Tried to commit transaction while not in one",
-            );
-            panic!();
+            panic_log("Tried to commit transaction while not in one");
         }
         self.transaction = false;
         self.get().execute("COMMIT", &[]).unwrap();
@@ -94,8 +76,7 @@ impl Database {
         match self.get().prepare(&query) {
             Ok(r) => r,
             Err(e) => {
-                log(Severity::Fatal, &format!("DB error: {}", e));
-                panic!();
+                panic_log(&format!("DB error: {}", e));
             }
         }
     }
@@ -122,11 +103,10 @@ impl Database {
                     params = &params[num_params..];
                 }
                 Err(e) => {
-                    log(Severity::Fatal, &format!("DB error: {}", e));
                     if self.transaction {
                         self.rollback_transaction();
                     }
-                    panic!();
+                    panic_log(&format!("DB error: {}", e));
                 }
             };
         }
@@ -357,8 +337,7 @@ impl Database {
                     &(nano_raw.iStamina as i32),
                 ],
             ) {
-                log(Severity::Fatal, &format!("DB error: {}", e));
-                panic!();
+                panic_log(&format!("DB error: {}", e));
             }
         }
 
@@ -376,8 +355,7 @@ impl Database {
                     &item_raw.iTimeLimit,
                 ],
             ) {
-                log(Severity::Fatal, &format!("DB error: {}", e));
-                panic!();
+                panic_log(&format!("DB error: {}", e));
             }
         }
 
@@ -405,11 +383,7 @@ fn db_connect(config: &GeneralConfig) -> Database {
         .connect_timeout(Duration::from_secs(5));
     let db_client = db_config.connect(tls::NoTls);
     if let Err(e) = db_client {
-        log(
-            Severity::Fatal,
-            &format!("Couldn't connect to database: {}", e),
-        );
-        panic!();
+        panic_log(&format!("Couldn't connect to database: {}", e));
     }
     let mut db = Database {
         client: Some(db_client.unwrap()),

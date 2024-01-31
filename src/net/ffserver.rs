@@ -9,7 +9,7 @@ use std::{
 
 use crate::{
     config::config_get,
-    error::{log, FFError, FFResult, Severity},
+    error::{log, log_if_failed, FFError, FFResult, Severity},
     state::ServerState,
 };
 
@@ -184,7 +184,7 @@ impl FFServer {
                     dc_keys.push(*key);
                     continue;
                 }
-                let _ = live_check_handler(client);
+                log_if_failed(live_check_handler(client));
             }
         }
 

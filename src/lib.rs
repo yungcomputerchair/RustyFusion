@@ -5,7 +5,7 @@ use std::{any::Any, cmp::min, hash::Hash, time::SystemTime};
 use chunk::ChunkCoords;
 use defines::{NANO_STAMINA_MAX, SIZEOF_TRADE_SLOT, SIZEOF_VENDOR_TABLE_SLOT};
 use enums::ItemType;
-use error::{FFError, FFResult, Severity};
+use error::{panic_log, FFError, FFResult, Severity};
 use net::{
     ffclient::FFClient,
     packet::{sItemBase, sItemTrade, sItemVendor, sNano, sRunningQuest},
@@ -495,7 +495,7 @@ impl TradeContext {
                 return id;
             }
         }
-        panic!("Bad trade state");
+        panic_log("Bad trade state");
     }
 
     fn get_offer_mut(&mut self, pc_id: i32) -> FFResult<&mut TradeOffer> {

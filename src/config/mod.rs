@@ -35,15 +35,13 @@ impl Config {
                 log(Severity::Warning, "No config.toml, using default config");
                 return None;
             } else {
-                log(Severity::Fatal, &format!("Can't open config.toml: {}", e));
-                panic!();
+                panic_log(&format!("Can't open config.toml: {}", e));
             }
         }
 
         let file_contents = file_read.unwrap();
         let parsed: ConfigLayout = toml::from_str(&file_contents).unwrap_or_else(|e| {
-            log(Severity::Fatal, &format!("Malformed config.toml: {}", e));
-            panic!();
+            panic_log(&format!("Malformed config.toml: {}", e));
         });
 
         Some(Config {
@@ -58,7 +56,7 @@ pub fn config_init() -> &'static Config {
     assert!(CONFIG.get().is_none());
     if let Some(loaded_config) = Config::load() {
         if CONFIG.set(loaded_config).is_err() {
-            panic!("Couldn't initialize config");
+            panic_log("Couldn't initialize config");
         }
         log(Severity::Info, "Loaded config");
     }

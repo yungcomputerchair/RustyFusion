@@ -6,7 +6,7 @@ use rusty_fusion::{
     config::config_get,
     defines::MAX_NUM_CHANNELS,
     enums::{PlayerShardStatus, ShardChannelStatus},
-    error::codes::PlayerSearchReqErr,
+    error::{codes::PlayerSearchReqErr, log_if_failed},
     net::{ffclient::ClientType, packet::*},
     state::login::PlayerSearchRequest,
     util,
@@ -21,7 +21,7 @@ pub fn connect(
         Some(id) => id,
         None => {
             let resp = sP_LS2FE_REP_CONNECT_FAIL { iErrorCode: 0 };
-            let _ = server.send_packet(P_LS2FE_REP_CONNECT_FAIL, &resp);
+            log_if_failed(server.send_packet(P_LS2FE_REP_CONNECT_FAIL, &resp));
             return Err(FFError::build(
                 Severity::Warning,
                 format!(
@@ -214,7 +214,7 @@ pub fn announce_msg(shard_key: usize, clients: &mut HashMap<usize, FFClient>) ->
     let pkt: sP_FE2LS_ANNOUNCE_MSG = *server.get_packet(P_FE2LS_ANNOUNCE_MSG)?;
     clients.iter_mut().for_each(|(_, client)| {
         if let ClientType::ShardServer(_) = client.client_type {
-            let _ = client.send_packet(P_LS2FE_ANNOUNCE_MSG, &pkt);
+            log_if_failed(client.send_packet(P_LS2FE_ANNOUNCE_MSG, &pkt));
         }
     });
     Ok(())
@@ -257,7 +257,7 @@ pub fn pc_location(
             if shard_id == req_shard_id {
                 return;
             }
-            let _ = client.send_packet(P_LS2FE_REQ_PC_LOCATION, &pkt);
+            log_if_failed(client.send_packet(P_LS2FE_REQ_PC_LOCATION, &pkt));
         }
     });
     Ok(())
@@ -296,7 +296,7 @@ pub fn pc_location_succ(
         iPC_ID: pkt.iPC_ID,
         sResp: pkt.sResp,
     };
-    let _ = client.send_packet(P_LS2FE_REP_PC_LOCATION_SUCC, &resp);
+    log_if_failed(client.send_packet(P_LS2FE_REP_PC_LOCATION_SUCC, &resp));
     Ok(())
 }
 
@@ -339,7 +339,7 @@ pub fn pc_location_fail(
                     req_shard_id
                 ),
             ))?;
-        let _ = shard.send_packet(P_LS2FE_REP_PC_LOCATION_FAIL, &resp);
+        log_if_failed(shard.send_packet(P_LS2FE_REP_PC_LOCATION_FAIL, &resp));
     }
     Ok(())
 }

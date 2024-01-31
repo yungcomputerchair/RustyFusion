@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    error::{log, FFError, FFResult, Severity},
+    error::{log, panic_log, FFError, FFResult, Severity},
     net::{struct_to_bytes, PACKET_BUFFER_SIZE, SILENCED_PACKETS},
 };
 
@@ -268,14 +268,10 @@ impl FFClient {
         let from = self.out_buf_ptr;
         let to = from + sz;
         if to > PACKET_BUFFER_SIZE {
-            log(
-                Severity::Fatal,
-                &format!(
-                    "Payload too big for output ({} > {})",
-                    sz, PACKET_BUFFER_SIZE
-                ),
-            );
-            panic!();
+            panic_log(&format!(
+                "Payload too big for output ({} > {})",
+                sz, PACKET_BUFFER_SIZE
+            ));
         }
 
         self.out_buf[from..to].copy_from_slice(dat);

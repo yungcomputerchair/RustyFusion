@@ -11,7 +11,10 @@ use std::{
 use rusty_fusion::{
     config::config_init,
     database::db_init,
-    error::{log, logger_flush, logger_flush_scheduled, logger_init, FFError, FFResult, Severity},
+    error::{
+        log, log_error, logger_flush, logger_flush_scheduled, logger_init, panic_log, FFError,
+        FFResult, Severity,
+    },
     net::{
         crypto::{gen_key, DEFAULT_KEY},
         ffclient::{ClientType, FFClient},
@@ -78,9 +81,10 @@ fn main() -> Result<()> {
         timers
             .check_all(&mut server, &mut state)
             .unwrap_or_else(|e| {
-                log(e.get_severity(), e.get_msg());
                 if e.should_dc() {
-                    panic!()
+                    panic_log(e.get_msg());
+                } else {
+                    log_error(&e);
                 }
             });
         server.poll(&mut state)?;

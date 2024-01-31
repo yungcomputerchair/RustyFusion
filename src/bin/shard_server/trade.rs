@@ -1,4 +1,9 @@
-use rusty_fusion::{defines::RANGE_INTERACT, enums::ItemLocation, error::catch_fail, TradeContext};
+use rusty_fusion::{
+    defines::RANGE_INTERACT,
+    enums::ItemLocation,
+    error::{catch_fail, log_if_failed},
+    TradeContext,
+};
 use uuid::Uuid;
 
 use super::*;
@@ -36,7 +41,7 @@ pub fn trade_offer(clients: &mut ClientMap, state: &mut ShardServerState) -> FFR
                 iID_From: pkt.iID_From,
                 iID_To: pkt.iID_To,
             };
-            let _ = other_client.send_packet(P_FE2CL_REP_PC_TRADE_OFFER, &resp);
+            log_if_failed(other_client.send_packet(P_FE2CL_REP_PC_TRADE_OFFER, &resp));
 
             // to avoid other clients making offers on our behalf
             let player = state.get_player_mut(pc_id)?;
@@ -82,7 +87,7 @@ pub fn trade_offer_accept(clients: &mut ClientMap, state: &mut ShardServerState)
             }
             player_from.trade_id = Some(trade_id);
             let other_client = player_from.get_client(clients).unwrap();
-            let _ = other_client.send_packet(P_FE2CL_REP_PC_TRADE_OFFER_SUCC, &resp);
+            log_if_failed(other_client.send_packet(P_FE2CL_REP_PC_TRADE_OFFER_SUCC, &resp));
 
             let player_to = state.get_player_mut(pc_id)?;
             player_to.trade_id = Some(trade_id);
@@ -126,7 +131,7 @@ pub fn trade_offer_refusal(clients: &mut ClientMap, state: &ShardServerState) ->
         .get_player(resp.iID_From)?
         .get_client(clients)
         .unwrap();
-    let _ = other_client.send_packet(P_FE2CL_REP_PC_TRADE_OFFER_REFUSAL, &resp);
+    log_if_failed(other_client.send_packet(P_FE2CL_REP_PC_TRADE_OFFER_REFUSAL, &resp));
     Ok(())
 }
 
@@ -150,7 +155,7 @@ pub fn trade_offer_cancel(clients: &mut ClientMap, state: &mut ShardServerState)
     }
 
     let other_client = player_other.get_client(clients).unwrap();
-    let _ = other_client.send_packet(P_FE2CL_REP_PC_TRADE_OFFER_CANCEL, &resp);
+    log_if_failed(other_client.send_packet(P_FE2CL_REP_PC_TRADE_OFFER_CANCEL, &resp));
     Ok(())
 }
 
@@ -191,7 +196,7 @@ pub fn trade_cash_register(clients: &mut ClientMap, state: &mut ShardServerState
             };
             let other_id = trade.get_other_id(pc_id);
             let other_client = state.get_player(other_id)?.get_client(clients).unwrap();
-            let _ = other_client.send_packet(P_FE2CL_REP_PC_TRADE_CASH_REGISTER_SUCC, &resp);
+            log_if_failed(other_client.send_packet(P_FE2CL_REP_PC_TRADE_CASH_REGISTER_SUCC, &resp));
             clients
                 .get_self()
                 .send_packet(P_FE2CL_REP_PC_TRADE_CASH_REGISTER_SUCC, &resp)
@@ -264,7 +269,7 @@ pub fn trade_item_register(clients: &mut ClientMap, state: &mut ShardServerState
             };
             let other_id = trade.get_other_id(pc_id);
             let other_client = state.get_player(other_id)?.get_client(clients).unwrap();
-            let _ = other_client.send_packet(P_FE2CL_REP_PC_TRADE_ITEM_REGISTER_SUCC, &resp);
+            log_if_failed(other_client.send_packet(P_FE2CL_REP_PC_TRADE_ITEM_REGISTER_SUCC, &resp));
             clients
                 .get_self()
                 .send_packet(P_FE2CL_REP_PC_TRADE_ITEM_REGISTER_SUCC, &resp)
@@ -327,7 +332,9 @@ pub fn trade_item_unregister(
                 },
             };
             let other_client = state.get_player(other_pc_id)?.get_client(clients).unwrap();
-            let _ = other_client.send_packet(P_FE2CL_REP_PC_TRADE_ITEM_UNREGISTER_SUCC, &resp);
+            log_if_failed(
+                other_client.send_packet(P_FE2CL_REP_PC_TRADE_ITEM_UNREGISTER_SUCC, &resp),
+            );
             clients
                 .get_self()
                 .send_packet(P_FE2CL_REP_PC_TRADE_ITEM_UNREGISTER_SUCC, &resp)
@@ -371,7 +378,7 @@ pub fn trade_confirm_cancel(clients: &mut ClientMap, state: &mut ShardServerStat
     other_player.trade_id = None;
 
     let other_client = other_player.get_client(clients).unwrap();
-    let _ = other_client.send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL, &resp);
+    log_if_failed(other_client.send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL, &resp));
     Ok(())
 }
 
@@ -397,7 +404,7 @@ pub fn trade_confirm(clients: &mut ClientMap, state: &mut ShardServerState) -> F
 
     client.send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM, &resp)?;
     let client_other = state.get_player(pc_id_other)?.get_client(clients).unwrap();
-    let _ = client_other.send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM, &resp);
+    log_if_failed(client_other.send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM, &resp));
 
     if !both_ready {
         return Ok(());
@@ -437,7 +444,7 @@ pub fn trade_confirm(clients: &mut ClientMap, state: &mut ShardServerState) -> F
             Item: items_other,
             ItemStay: items,
         };
-        let _ = client_other.send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM_SUCC, &resp);
+        log_if_failed(client_other.send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM_SUCC, &resp));
 
         let resp = sP_FE2CL_REP_PC_TRADE_CONFIRM_SUCC {
             iCandy: player_taros as i32,
@@ -454,7 +461,7 @@ pub fn trade_confirm(clients: &mut ClientMap, state: &mut ShardServerState) -> F
             iID_From: resp.iID_From,
             iID_To: resp.iID_To,
         };
-        let _ = client_other.send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM_ABORT, &resp);
+        log_if_failed(client_other.send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM_ABORT, &resp));
         clients
             .get_self()
             .send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM_ABORT, &resp)
@@ -475,9 +482,9 @@ pub fn trade_emotes_chat(clients: &mut ClientMap, state: &ShardServerState) -> F
                 iEmoteCode: pkt.iEmoteCode,
             };
             let client_one = state.get_player(pkt.iID_From)?.get_client(clients).unwrap();
-            let _ = client_one.send_packet(P_FE2CL_REP_PC_TRADE_EMOTES_CHAT, &resp);
+            log_if_failed(client_one.send_packet(P_FE2CL_REP_PC_TRADE_EMOTES_CHAT, &resp));
             let client_two = state.get_player(pkt.iID_To)?.get_client(clients).unwrap();
-            let _ = client_two.send_packet(P_FE2CL_REP_PC_TRADE_EMOTES_CHAT, &resp);
+            log_if_failed(client_two.send_packet(P_FE2CL_REP_PC_TRADE_EMOTES_CHAT, &resp));
             Ok(())
         })(),
         || {

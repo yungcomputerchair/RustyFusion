@@ -5,7 +5,7 @@ use rand::{distributions::uniform::SampleUniform, Rng};
 use crate::{
     defines::*,
     enums::ItemLocation,
-    error::{FFError, FFResult, Severity},
+    error::{panic_log, FFError, FFResult, Severity},
 };
 
 pub fn clamp<T: Ord>(val: T, min: T, max: T) -> T {
@@ -56,7 +56,7 @@ pub fn encode_utf16<const SIZE: usize>(chars: &str) -> [u16; SIZE] {
     let mut str_vec: Vec<u16> = chars.encode_utf16().collect();
     str_vec.push(0);
     if str_vec.len() > SIZE {
-        panic!("Buffer too small for encoded string");
+        panic_log("Buffer too small for encoded string");
     }
     str_vec.resize(SIZE, 0);
     str_vec.try_into().unwrap()

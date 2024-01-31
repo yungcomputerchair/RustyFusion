@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    error::{FFError, FFResult},
+    error::{panic_log, FFError, FFResult},
     net::ffserver::FFServer,
     state::ServerState,
 };
@@ -99,7 +99,7 @@ impl TimerMap {
         let timer = self
             .timers
             .get_mut(&timer_id)
-            .unwrap_or_else(|| panic!("Timer with id {} not found", timer_id));
+            .unwrap_or_else(|| panic_log(&format!("Timer with id {} not found", timer_id)));
         timer.reset();
     }
 }

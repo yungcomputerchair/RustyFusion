@@ -9,7 +9,7 @@ use crate::{
     chunk::{EntityMap, InstanceID},
     defines::{ID_OVERWORLD, SIZEOF_NANO_SKILLS},
     enums::{ItemType, NanoStyle, TransportationType},
-    error::{log, FFError, FFResult, Severity},
+    error::{log, panic_log, FFError, FFResult, Severity},
     npc::NPC,
     util, CrocPotData, Item, ItemStats, Path, PathPoint, Position, VendorData, VendorItem,
 };
@@ -186,9 +186,7 @@ pub struct TableData {
 impl TableData {
     fn new() -> Self {
         Self::load().unwrap_or_else(|e| {
-            log(Severity::Fatal, &e);
-            log(Severity::Fatal, "Failed loading TableData");
-            panic!();
+            panic_log(&format!("Failed loading TableData: {}", e));
         })
     }
 
@@ -455,7 +453,7 @@ pub fn tdata_init() -> &'static TableData {
     assert!(TABLE_DATA.get().is_none());
     let load_start = SystemTime::now();
     if TABLE_DATA.set(TableData::new()).is_err() {
-        panic!("Couldn't initialize TableData");
+        panic_log("Couldn't initialize TableData");
     }
     let load_time = SystemTime::now().duration_since(load_start).unwrap();
     log(
@@ -1156,7 +1154,7 @@ fn load_npc_data() -> Result<Vec<NPCData>, String> {
                 }
                 Ok(npc_data)
             } else {
-                panic!("Bad NPC tabledata (root.{}): {}", table_key, npcs);
+                Err(format!("Bad NPC tabledata (root.{}): {}", table_key, npcs))
             }
         } else {
             Err(format!("Malformed NPC tabledata root: {}", val))

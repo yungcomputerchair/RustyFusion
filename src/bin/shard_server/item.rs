@@ -47,7 +47,7 @@ pub fn item_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFRes
                 iEquipSlotNum: pkt.iFromSlotNum,
                 EquipSlotItem: item_to.into(),
             };
-            let _ = c.send_packet(P_FE2CL_PC_EQUIP_CHANGE, &pkt);
+            c.send_packet(P_FE2CL_PC_EQUIP_CHANGE, &pkt)
         });
     }
 
@@ -58,7 +58,7 @@ pub fn item_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFRes
                 iEquipSlotNum: pkt.iToSlotNum,
                 EquipSlotItem: item_from.into(),
             };
-            let _ = c.send_packet(P_FE2CL_PC_EQUIP_CHANGE, &pkt);
+            c.send_packet(P_FE2CL_PC_EQUIP_CHANGE, &pkt)
         });
     }
 

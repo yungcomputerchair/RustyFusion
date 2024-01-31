@@ -221,6 +221,26 @@ pub fn log_error(err: &FFError) {
     }
 }
 
+pub fn panic_log(msg: &str) -> ! {
+    let err = FFError::build(Severity::Fatal, msg.to_string());
+    log_error(&err);
+    panic!("A fatal error occurred, see log for details");
+}
+
+pub fn log_if_failed<T>(result: FFResult<T>) {
+    if let Err(e) = result {
+        log_error(&e);
+    }
+}
+
+pub fn panic_if_failed<T>(result: FFResult<T>) -> T {
+    if let Err(e) = &result {
+        log_error(e);
+        panic!("A fatal error occurred, see log for details");
+    }
+    result.unwrap()
+}
+
 pub mod codes {
     use super::*;
     use num_enum::TryFromPrimitive;

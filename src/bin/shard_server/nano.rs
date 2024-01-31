@@ -38,7 +38,7 @@ pub fn nano_create(clients: &mut ClientMap, state: &mut ShardServerState) -> FFR
             state
                 .entity_map
                 .for_each_around(EntityID::Player(pc_id), clients, |c| {
-                    let _ = c.send_packet(P_FE2CL_REP_PC_NANO_CREATE, &bcast);
+                    c.send_packet(P_FE2CL_REP_PC_NANO_CREATE, &bcast)
                 });
             Ok(())
         })(),
@@ -81,7 +81,7 @@ pub fn nano_equip(clients: &mut ClientMap, state: &mut ShardServerState) -> FFRe
         state
             .entity_map
             .for_each_around(EntityID::Player(pc_id), clients, |c| {
-                let _ = c.send_packet(P_FE2CL_NANO_ACTIVE, &bcast);
+                c.send_packet(P_FE2CL_NANO_ACTIVE, &bcast)
             });
     }
 
@@ -115,7 +115,7 @@ pub fn nano_unequip(clients: &mut ClientMap, state: &mut ShardServerState) -> FF
         state
             .entity_map
             .for_each_around(EntityID::Player(pc_id), clients, |c| {
-                let _ = c.send_packet(P_FE2CL_NANO_ACTIVE, &bcast);
+                c.send_packet(P_FE2CL_NANO_ACTIVE, &bcast)
             });
     }
 
@@ -151,7 +151,7 @@ pub fn nano_active(clients: &mut ClientMap, state: &mut ShardServerState) -> FFR
     state
         .entity_map
         .for_each_around(EntityID::Player(pc_id), clients, |c| {
-            let _ = c.send_packet(P_FE2CL_NANO_ACTIVE, &bcast);
+            c.send_packet(P_FE2CL_NANO_ACTIVE, &bcast)
         });
 
     clients

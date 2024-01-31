@@ -1,7 +1,7 @@
 use rusty_fusion::{
     defines::MSG_BOX_DURATION_DEFAULT,
     enums::TargetSearchBy,
-    error::{codes::PlayerSearchReqErr, FFError, Severity},
+    error::{codes::PlayerSearchReqErr, log_if_failed, FFError, Severity},
     player::PlayerSearchQuery,
     unused, util,
 };
@@ -15,7 +15,7 @@ pub fn login_connect_req(server: &mut FFClient) {
     let pkt = sP_FE2LS_REQ_CONNECT {
         iTempValue: unused!(),
     };
-    let _ = server.send_packet(P_FE2LS_REQ_CONNECT, &pkt);
+    log_if_failed(server.send_packet(P_FE2LS_REQ_CONNECT, &pkt));
 }
 
 pub fn login_connect_succ(server: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
@@ -126,7 +126,7 @@ pub fn login_motd(clients: &mut ClientMap, state: &mut ShardServerState) -> FFRe
 pub fn login_announce_msg(clients: &mut ClientMap) -> FFResult<()> {
     let pkt: sP_LS2FE_ANNOUNCE_MSG = *clients.get_self().get_packet(P_LS2FE_ANNOUNCE_MSG)?;
     clients.get_all_gameclient().for_each(|c| {
-        let _ = c.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
+        log_if_failed(c.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt));
     });
     Ok(())
 }
@@ -168,7 +168,7 @@ pub fn login_pc_location(clients: &mut ClientMap, state: &mut ShardServerState) 
                 iPC_ID: pkt.iPC_ID,
                 sResp: resp,
             };
-            let _ = login_server.send_packet(P_FE2LS_REP_PC_LOCATION_SUCC, &resp);
+            log_if_failed(login_server.send_packet(P_FE2LS_REP_PC_LOCATION_SUCC, &resp));
         }
     } else if let Some(login_server) = clients.get_login_server() {
         let resp = sP_FE2LS_REP_PC_LOCATION_FAIL {
@@ -176,7 +176,7 @@ pub fn login_pc_location(clients: &mut ClientMap, state: &mut ShardServerState) 
             sReq: pkt.sReq,
             iErrorCode: PlayerSearchReqErr::NotFound as i32,
         };
-        let _ = login_server.send_packet(P_FE2LS_REP_PC_LOCATION_FAIL, &resp);
+        log_if_failed(login_server.send_packet(P_FE2LS_REP_PC_LOCATION_FAIL, &resp));
     }
     Ok(())
 }
@@ -191,7 +191,7 @@ pub fn login_pc_location_succ(
     let resp = pkt.sResp;
     let player = state.get_player(pkt.iPC_ID)?;
     let client = player.get_client(clients).unwrap();
-    let _ = client.send_packet(P_FE2CL_GM_REP_PC_LOCATION, &resp);
+    log_if_failed(client.send_packet(P_FE2CL_GM_REP_PC_LOCATION, &resp));
     Ok(())
 }
 
@@ -230,6 +230,6 @@ pub fn login_pc_location_fail(
         iDuringTime: MSG_BOX_DURATION_DEFAULT,
         szAnnounceMsg: util::encode_utf16(&err_msg),
     };
-    let _ = client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
+    log_if_failed(client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt));
     Ok(())
 }

@@ -9,7 +9,7 @@ use crate::{
     config::config_get,
     defines::{ID_OVERWORLD, MAX_NUM_CHANNELS},
     enums::ShardChannelStatus,
-    error::{log, FFError, FFResult, Severity},
+    error::{log, log_if_failed, panic_log, FFError, FFResult, Severity},
     net::{ffclient::FFClient, ClientMap},
     npc::NPC,
     player::Player,
@@ -285,8 +285,7 @@ impl EntityMap {
     pub fn gen_next_pc_id(&mut self) -> i32 {
         let id = self.next_pc_id;
         if id == u32::MAX {
-            log(Severity::Fatal, "Ran out of PC IDs");
-            panic!();
+            panic_log("Ran out of PC IDs");
         }
         self.next_pc_id += 1;
         id as i32
@@ -295,8 +294,7 @@ impl EntityMap {
     pub fn gen_next_npc_id(&mut self) -> i32 {
         let id = self.next_npc_id;
         if id == u32::MAX {
-            log(Severity::Fatal, "Ran out of NPC IDs");
-            panic!();
+            panic_log("Ran out of NPC IDs");
         }
         self.next_npc_id += 1;
         id as i32
@@ -305,7 +303,7 @@ impl EntityMap {
     pub fn track(&mut self, entity: Box<dyn Entity>) -> EntityID {
         let id = entity.get_id();
         if self.registry.contains_key(&id) {
-            panic!("Already tracking entity with id {:?}", id);
+            panic_log(&format!("Already tracking entity with id {:?}", id));
         }
         let entry = RegistryEntry {
             entity,
@@ -319,7 +317,7 @@ impl EntityMap {
         self.registry
             .remove(&id)
             .unwrap_or_else(|| {
-                panic!("Entity with id {:?} already untracked", id);
+                panic_log(&format!("Entity with id {:?} already untracked", id));
             })
             .entity
     }
@@ -331,7 +329,7 @@ impl EntityMap {
         client_map: Option<&mut ClientMap>,
     ) {
         let entry = self.registry.get_mut(&id).unwrap_or_else(|| {
-            panic!("Entity with id {:?} untracked", id);
+            panic_log(&format!("Entity with id {:?} untracked", id));
         });
         let from_chunk = entry.chunk;
         if from_chunk == to_chunk {
@@ -359,7 +357,7 @@ impl EntityMap {
             if let Some(from_client) = from.get_client(client_map) {
                 // possible for the ID to be unregistered if the instance was cleaned up
                 if let Some(to) = self.get_from_id(*e) {
-                    let _ = to.send_exit(from_client);
+                    log_if_failed(to.send_exit(from_client));
                 }
             }
 
@@ -368,7 +366,7 @@ impl EntityMap {
             if let Some(from) = self.get_from_id(*e) {
                 if let Some(from_client) = from.get_client(client_map) {
                     let to = self.get_from_id(id).unwrap();
-                    let _ = to.send_exit(from_client);
+                    log_if_failed(to.send_exit(from_client));
                 }
             }
         }
@@ -379,14 +377,14 @@ impl EntityMap {
             let from = self.get_from_id(id).unwrap();
             if let Some(from_client) = from.get_client(client_map) {
                 let to = self.get_from_id(*e).unwrap();
-                let _ = to.send_enter(from_client);
+                log_if_failed(to.send_enter(from_client));
             }
 
             // them to us
             let from = self.get_from_id(*e).unwrap();
             if let Some(from_client) = from.get_client(client_map) {
                 let to = self.get_from_id(id).unwrap();
-                let _ = to.send_enter(from_client);
+                log_if_failed(to.send_enter(from_client));
             }
         }
 
@@ -405,12 +403,12 @@ impl EntityMap {
         &mut self,
         id: EntityID,
         clients: &mut ClientMap,
-        mut f: impl FnMut(&mut FFClient),
+        mut f: impl FnMut(&mut FFClient) -> FFResult<()>,
     ) {
         if let Some(iter) = self.get_around_entity(id) {
             for e in iter {
                 if let Some(c) = e.get_client(clients) {
-                    f(c);
+                    log_if_failed(f(c));
                 }
             }
         }
@@ -464,7 +462,10 @@ impl EntityMap {
             entry.chunk = None;
             let chunk = self.get_chunk(coords).unwrap();
             if !chunk.remove(id) {
-                panic!("Chunk {:?} did not contain entity with ID {:?}", coords, id);
+                panic_log(&format!(
+                    "Chunk {:?} did not contain entity with ID {:?}",
+                    coords, id
+                ));
             }
             if let EntityID::Player(_) = id {
                 self.instance_player_exit(coords.i);
@@ -483,10 +484,10 @@ impl EntityMap {
         if let Some(coords) = to_chunk {
             if let Some(chunk) = self.get_chunk(coords) {
                 if !chunk.insert(id) {
-                    panic!(
+                    panic_log(&format!(
                         "Chunk {:?} already contained entity with ID {:?}",
                         coords, id
-                    );
+                    ));
                 }
                 if let EntityID::Player(_) = id {
                     self.instance_player_enter(coords.i);

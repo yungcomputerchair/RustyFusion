@@ -7,7 +7,7 @@ use crate::{
     config::config_get,
     defines::MAX_NUM_CHANNELS,
     enums::ItemType,
-    error::{log, FFError, FFResult, Severity},
+    error::{log, log_if_failed, panic_log, FFError, FFResult, Severity},
     helpers,
     net::{
         packet::{PacketID::*, *},
@@ -40,8 +40,7 @@ impl Default for ShardServerState {
         };
         let num_channels = config_get().shard.num_channels.get();
         if num_channels == 0 || num_channels > MAX_NUM_CHANNELS {
-            log(Severity::Fatal, "Invalid number of channels");
-            panic!();
+            panic_log("Invalid number of channels");
         }
         for channel_num in 1..=num_channels {
             for mut npc in tdata_get().get_npcs(&mut state.entity_map, channel_num) {
@@ -103,7 +102,7 @@ impl ShardServerState {
                         if player.vehicle_speed.is_some() {
                             player.vehicle_speed = None;
                             let pkt = sP_FE2CL_PC_VEHICLE_OFF_SUCC { UNUSED: unused!() };
-                            let _ = client.send_packet(P_FE2CL_PC_VEHICLE_OFF_SUCC, &pkt);
+                            log_if_failed(client.send_packet(P_FE2CL_PC_VEHICLE_OFF_SUCC, &pkt));
                             pc_ids_dismounted.push(pc_id);
                         }
 
@@ -115,7 +114,7 @@ impl ShardServerState {
                         };
                         client.queue_packet(P_FE2CL_PC_DELETE_TIME_LIMIT_ITEM, &pkt);
                         client.queue_struct(&dat);
-                        let _ = client.flush();
+                        log_if_failed(client.flush());
                     }
                 }
             }
