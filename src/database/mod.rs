@@ -9,6 +9,7 @@ use crate::player::Player;
 #[cfg(feature = "postgres")]
 mod postgresql;
 
+#[cfg(feature = "mongo")]
 mod mongo;
 
 type Int = i32;
@@ -29,20 +30,29 @@ pub trait Database: Send + std::fmt::Debug {
     fn delete_player(&mut self, pc_uid: BigInt) -> FFResult<()>;
 }
 
+const DB_NAME: &str = "rustyfusion";
 static DATABASE: OnceLock<Mutex<Box<dyn Database>>> = OnceLock::new();
 
 pub fn db_init() -> MutexGuard<'static, Box<dyn Database>> {
     match DATABASE.get() {
         Some(_) => panic_log("Database already initialized"),
         None => {
+            log(Severity::Info, "Connecting to database...");
+
             let config = &config_get().general;
-            let _db_impl: Option<Box<dyn Database>> = None;
+            let _db_impl: Option<FFResult<Box<dyn Database>>> = None;
 
             #[cfg(feature = "postgres")]
             let _db_impl = Some(postgresql::PostgresDatabase::connect(config));
 
+            #[cfg(feature = "mongo")]
+            let _db_impl = Some(mongo::MongoDatabase::connect(config));
+
             let db = match _db_impl {
-                Some(db) => db,
+                Some(Ok(db)) => db,
+                Some(Err(e)) => {
+                    panic_log(&format!("Failed to connect to database: {}", e.get_msg()))
+                }
                 None => panic_log(
                     "No database implementation enabled; please enable one through a feature",
                 ),
