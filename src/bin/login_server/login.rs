@@ -11,7 +11,7 @@ use rusty_fusion::{
     enums::{ItemLocation, ItemType},
     error::{catch_fail, FFError, FFResult, Severity},
     net::{ffclient::ClientType, packet::*},
-    unused, util, Combatant, Entity, Item,
+    placeholder, unused, util, Combatant, Entity, Item,
 };
 
 pub fn login(
@@ -30,34 +30,28 @@ pub fn login(
                 password = util::parse_utf8(&pkt.szCookie_authid);
             }
             // TODO password hashing
+            let password_hashed = placeholder!(password.clone());
 
             let mut db = db_get();
-            let mut accounts = db.query("find_account", &[&username]);
-            assert!(accounts.len() <= 1);
-            if accounts.is_empty() {
-                if config_get().login.auto_create_accounts.get() {
-                    // automatically create the account with the supplied credentials
-                    db.exec("create_account", &[&username, &password]);
-                    accounts = db.query("find_account", &[&username]);
-                    let new_acc_id: i64 = accounts.first().unwrap().get("AccountID");
-                    log(
-                        Severity::Info,
-                        &format!("Created account {} (id: {})", username, new_acc_id),
-                    );
-                } else {
-                    error_code = 1; // "Login fail: login ID error"
-                    return Err(FFError::build(
-                        Severity::Warning,
-                        format!("Couldn't find account {}", username),
-                    ));
+            let account_id = match db.find_account(&username)? {
+                Some(account_id) => account_id,
+                None => {
+                    if config_get().login.auto_create_accounts.get() {
+                        // automatically create the account with the supplied credentials
+                        db.create_account(&username, &password_hashed)?
+                    } else {
+                        error_code = 1; // "Login fail: login ID error"
+                        return Err(FFError::build(
+                            Severity::Warning,
+                            format!("Couldn't find account {}", username),
+                        ));
+                    }
                 }
-            }
-            let account = accounts.first().unwrap();
+            };
             // TODO auth
-            let account_id: i64 = account.get("AccountID");
-            let last_player_slot: i32 = account.get("Selected");
+            let last_player_slot: i32 = placeholder!(1); //account.get("Selected");
 
-            let players = db.load_players(account_id);
+            let players = db.load_players(account_id)?;
 
             let resp = sP_LS2CL_REP_LOGIN_SUCC {
                 iCharCount: players.len() as i8,
@@ -140,8 +134,8 @@ pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> FF
     let mut player = Player::new(pc_uid, slot_num);
     player.set_name(1, pkt.szFirstName, pkt.szLastName);
     let mut db = db_get();
-    db.init_player(acc_id, &player);
-    db.exec("update_selected", &[&acc_id, &(slot_num as i32)]);
+    db.init_player(acc_id, &player)?;
+    db.update_selected_player(acc_id, slot_num as i32)?;
 
     let style = &player.get_style();
     let resp = sP_LS2CL_REP_SAVE_CHAR_NAME_SUCC {
@@ -165,7 +159,7 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
     if let Some(player) = state.get_players_mut(acc_id).get_mut(&pc_uid) {
         player.style = Some(pkt.PCStyle.try_into()?);
         let mut db = db_get();
-        db.update_player_appearance(player);
+        db.update_player_appearance(player)?;
 
         player.set_item(
             ItemLocation::Equip,
@@ -182,7 +176,7 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
             EQUIP_SLOT_FOOT as usize,
             Some(Item::new(ItemType::Foot, pkt.sOn_Item.iEquipFootID)),
         )?;
-        db.save_player(player, false);
+        db.save_player(player)?;
 
         let resp = sP_LS2CL_REP_CHAR_CREATE_SUCC {
             iLevel: player.get_level(),
@@ -212,7 +206,7 @@ pub fn char_delete(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
             format!("Couldn't get player {}", pc_uid),
         ))?;
     let mut db = db_get();
-    db.exec("delete_player", &[&pc_uid]);
+    db.delete_player(pc_uid)?;
     let resp = sP_LS2CL_REP_CHAR_DELETE_SUCC {
         iSlotNum: player.get_slot_num() as i8,
     };
@@ -233,8 +227,7 @@ pub fn save_char_tutor(client: &mut FFClient, state: &mut LoginServerState) -> F
     if pkt.iTutorialFlag == 1 {
         player.set_tutorial_done();
         let mut db = db_get();
-        db.save_player(player, false);
-        Ok(())
+        db.save_player(player)
     } else {
         Err(FFError::build(
             Severity::Warning,
@@ -269,7 +262,7 @@ pub fn char_select(
         state.set_selected_player_id(account_id, pc_uid);
 
         let mut db = db_get();
-        db.exec("update_selected", &[&account_id, &(slot_num as i32)]);
+        db.update_selected_player(account_id, slot_num as i32)?;
 
         let pkt = sP_LS2CL_REP_CHAR_SELECT_SUCC { UNUSED: unused!() };
         client.send_packet(P_LS2CL_REP_CHAR_SELECT_SUCC, &pkt)

@@ -26,15 +26,7 @@ pub fn pc_enter(
     let pc_id = state.entity_map.gen_next_pc_id();
 
     let mut db = db_get();
-    let mut player = db
-        .load_player(login_data.iAccountID, login_data.iPC_UID)
-        .ok_or(FFError::build(
-            Severity::Warning,
-            format!(
-                "Player {} not found for account {}",
-                login_data.iPC_UID, login_data.iAccountID
-            ),
-        ))?;
+    let mut player = db.load_player(login_data.iAccountID, login_data.iPC_UID)?;
     player.set_player_id(pc_id);
     player.set_client_id(key);
 

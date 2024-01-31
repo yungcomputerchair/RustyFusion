@@ -12,8 +12,8 @@ use rusty_fusion::{
     config::{config_get, config_init},
     database::{db_get, db_init},
     error::{
-        log, log_error, logger_flush, logger_flush_scheduled, logger_init, panic_log, FFError,
-        FFResult, Severity,
+        log, log_error, log_if_failed, logger_flush, logger_flush_scheduled, logger_init,
+        panic_log, FFError, FFResult, Severity,
     },
     net::{
         crypto::{gen_key, EncryptionMode},
@@ -321,13 +321,13 @@ fn send_live_check(client: &mut FFClient) -> FFResult<()> {
 
 fn do_autosave(time: SystemTime, state: &mut ShardServerState) {
     log(Severity::Info, "Autosaving...");
+    let pc_ids: Vec<i32> = state.entity_map.get_player_ids().collect();
+    let players: Vec<&Player> = pc_ids
+        .iter()
+        .map(|pc_id| state.get_player(*pc_id).unwrap())
+        .collect();
     let mut db = db_get();
-    db.begin_transaction();
-    for pc_id in state.entity_map.get_player_ids() {
-        let player = state.get_player(pc_id).unwrap();
-        db.save_player(player, true);
-    }
-    db.commit_transaction();
+    log_if_failed(db.save_players(&players));
     let time_now = SystemTime::now();
     let save_time = time_now.duration_since(time).unwrap();
     log(

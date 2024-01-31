@@ -5,7 +5,7 @@ use crate::{
     database::db_get,
     defines::*,
     enums::{ItemLocation, ItemType, PlayerGuide, PlayerShardStatus, RewardType},
-    error::{log, log_if_failed, panic_log, FFError, FFResult, Severity},
+    error::{log, log_if_failed, panic_if_failed, panic_log, FFError, FFResult, Severity},
     net::{
         ffclient::FFClient,
         packet::{
@@ -962,7 +962,7 @@ impl Player {
         let player = state.get_player(pc_id).unwrap();
         let pc_uid = player.get_uid();
         let mut db = db_get();
-        db.save_player(player, false);
+        panic_if_failed(db.save_player(player));
         log(
             Severity::Info,
             &format!(
