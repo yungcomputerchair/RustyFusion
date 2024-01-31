@@ -138,7 +138,7 @@ fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>, state: 
     match client.client_type {
         ClientType::LoginServer => {
             log(
-                Severity::Info,
+                Severity::Warning,
                 &format!("Login server ({}) disconnected", client.get_addr()),
             );
             state.login_server_conn_id = None;
