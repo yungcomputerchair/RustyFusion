@@ -1,11 +1,13 @@
+#![allow(dead_code)]
+
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use crate::config::*;
 use crate::error::*;
 use crate::player::Player;
 
+#[cfg(feature = "postgres")]
 mod postgresql;
-use postgresql::PostgresDatabase;
 
 type Int = i32;
 type BigInt = i64;
@@ -32,10 +34,18 @@ pub fn db_init() -> MutexGuard<'static, Box<dyn Database>> {
         Some(_) => panic_log("Database already initialized"),
         None => {
             let config = &config_get().general;
-            let db = PostgresDatabase::connect(config);
-            DATABASE
-                .set(Mutex::new(db))
-                .unwrap();
+            let _db_impl: Option<Box<dyn Database>> = None;
+
+            #[cfg(feature = "postgres")]
+            let _db_impl = Some(postgresql::PostgresDatabase::connect(config));
+
+            let db = match _db_impl {
+                Some(db) => db,
+                None => panic_log(
+                    "No database implementation enabled; please enable one through a feature",
+                ),
+            };
+            DATABASE.set(Mutex::new(db)).unwrap();
             log(
                 Severity::Info,
                 &format!(
