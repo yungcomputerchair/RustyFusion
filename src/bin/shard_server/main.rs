@@ -327,7 +327,7 @@ fn do_autosave(time: SystemTime, state: &mut ShardServerState) {
         .map(|pc_id| state.get_player(*pc_id).unwrap())
         .collect();
     let mut db = db_get();
-    log_if_failed(db.save_players(&players));
+    log_if_failed(db.save_players(&players, None));
     let time_now = SystemTime::now();
     let save_time = time_now.duration_since(time).unwrap();
     log(

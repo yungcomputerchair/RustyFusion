@@ -155,6 +155,7 @@ struct DbPlayer {
     #[serde(rename = "_id")]
     uid: BigInt,
     account_id: BigInt, // reference to account collection
+    save_time: Int,
     slot_number: Int,
     first_name: String,
     last_name: String,
@@ -180,9 +181,9 @@ struct DbPlayer {
     nanos: Vec<DbNano>,
     items: Vec<DbItem>,
 }
-impl From<(BigInt, &Player)> for DbPlayer {
-    fn from(values: (BigInt, &Player)) -> Self {
-        let (account_id, player) = values;
+impl From<(BigInt, &Player, Int)> for DbPlayer {
+    fn from(values: (BigInt, &Player, Int)) -> Self {
+        let (account_id, player, save_time) = values;
 
         let mut skyway_bytes = Vec::new();
         for sec in player.get_skyway_flags() {
@@ -209,6 +210,7 @@ impl From<(BigInt, &Player)> for DbPlayer {
         Self {
             uid: player.get_uid(),
             account_id,
+            save_time,
             slot_number: player.get_slot_num() as Int,
             first_name: player.get_first_name(),
             last_name: player.get_last_name(),
@@ -403,7 +405,12 @@ impl MongoDatabase {
         }))
     }
 
-    fn save_player_internal(&mut self, player: &Player, tsct: &mut ClientSession) -> FFResult<()> {
+    fn save_player_internal(
+        &mut self,
+        player: &Player,
+        tsct: &mut ClientSession,
+        state_timestamp: Int,
+    ) -> FFResult<()> {
         let pc_uid = player.get_uid();
         // find the existing player so we can grab the account ID
         let existing_player = self
@@ -416,7 +423,11 @@ impl MongoDatabase {
                 format!("Player with UID {} not found in database", pc_uid),
             ))?;
 
-        let player: DbPlayer = (existing_player.account_id, player).into();
+        if existing_player.save_time >= state_timestamp {
+            return Ok(());
+        }
+
+        let player: DbPlayer = (existing_player.account_id, player, state_timestamp).into();
         self.db
             .collection::<DbPlayer>("players")
             .replace_one_with_session(doc! { "_id": player.uid }, player, None, tsct)
@@ -459,6 +470,7 @@ impl Database for MongoDatabase {
     }
 
     fn init_player(&mut self, acc_id: BigInt, player: &Player) -> FFResult<()> {
+        let state_timestamp = util::get_timestamp_sec(SystemTime::now()) as Int;
         let mut tsct = self
             .client
             .start_session(None)
@@ -467,7 +479,7 @@ impl Database for MongoDatabase {
             .map_err(FFError::from_db_error)?;
 
         // first add the player document
-        let player: DbPlayer = (acc_id, player).into();
+        let player: DbPlayer = (acc_id, player, state_timestamp).into();
         let pc_uid = player.uid;
         self.db
             .collection::<DbPlayer>("players")
@@ -489,7 +501,7 @@ impl Database for MongoDatabase {
     }
 
     fn update_player_appearance(&mut self, player: &Player) -> FFResult<()> {
-        self.save_player(player)
+        self.save_player(player, None)
     }
 
     fn update_selected_player(&mut self, acc_id: BigInt, slot_num: Int) -> FFResult<()> {
@@ -511,18 +523,26 @@ impl Database for MongoDatabase {
         Ok(())
     }
 
-    fn save_player(&mut self, player: &Player) -> FFResult<()> {
+    fn save_player(&mut self, player: &Player, state_time: Option<SystemTime>) -> FFResult<()> {
+        let state_time = state_time.unwrap_or(SystemTime::now());
+        let state_timestamp = util::get_timestamp_sec(state_time) as Int;
         let mut tsct = self
             .client
             .start_session(None)
             .map_err(FFError::from_db_error)?;
         tsct.start_transaction(None)
             .map_err(FFError::from_db_error)?;
-        self.save_player_internal(player, &mut tsct)?;
+        self.save_player_internal(player, &mut tsct, state_timestamp)?;
         tsct.commit_transaction().map_err(FFError::from_db_error)
     }
 
-    fn save_players(&mut self, players: &[&Player]) -> FFResult<()> {
+    fn save_players(
+        &mut self,
+        players: &[&Player],
+        state_time: Option<SystemTime>,
+    ) -> FFResult<()> {
+        let state_time = state_time.unwrap_or(SystemTime::now());
+        let state_timestamp = util::get_timestamp_sec(state_time) as Int;
         let mut tsct = self
             .client
             .start_session(None)
@@ -530,7 +550,7 @@ impl Database for MongoDatabase {
         tsct.start_transaction(None)
             .map_err(FFError::from_db_error)?;
         for player in players {
-            self.save_player_internal(player, &mut tsct)?;
+            self.save_player_internal(player, &mut tsct, state_timestamp)?;
         }
         tsct.commit_transaction().map_err(FFError::from_db_error)
     }

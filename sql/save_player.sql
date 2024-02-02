@@ -20,5 +20,6 @@ SET
     warplocationflag = $19,
     skywaylocationflag = $20,
     firstuseflag = $21,
-    quests = $22
-WHERE playerid = $1;
+    quests = $22,
+    savetime = $23
+WHERE playerid = $1 AND savetime < $23;

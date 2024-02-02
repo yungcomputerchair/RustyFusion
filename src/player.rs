@@ -962,7 +962,7 @@ impl Player {
         let player = state.get_player(pc_id).unwrap();
         let pc_uid = player.get_uid();
         let mut db = db_get();
-        panic_if_failed(db.save_player(player));
+        panic_if_failed(db.save_player(player, None));
         log(
             Severity::Info,
             &format!(

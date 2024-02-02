@@ -181,7 +181,7 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
             EQUIP_SLOT_FOOT as usize,
             Some(Item::new(ItemType::Foot, pkt.sOn_Item.iEquipFootID)),
         )?;
-        db.save_player(player)?;
+        db.save_player(player, None)?;
 
         let resp = sP_LS2CL_REP_CHAR_CREATE_SUCC {
             iLevel: player.get_level(),
@@ -232,7 +232,7 @@ pub fn save_char_tutor(client: &mut FFClient, state: &mut LoginServerState) -> F
     if pkt.iTutorialFlag == 1 {
         player.set_tutorial_done();
         let mut db = db_get();
-        db.save_player(player)
+        db.save_player(player, None)
     } else {
         Err(FFError::build(
             Severity::Warning,

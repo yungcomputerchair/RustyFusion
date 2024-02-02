@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use std::sync::{Mutex, MutexGuard, OnceLock};
+use std::time::SystemTime;
 
 use crate::config::*;
 use crate::error::*;
@@ -23,8 +24,9 @@ pub trait Database: Send + std::fmt::Debug {
     fn init_player(&mut self, acc_id: BigInt, player: &Player) -> FFResult<()>;
     fn update_player_appearance(&mut self, player: &Player) -> FFResult<()>;
     fn update_selected_player(&mut self, acc_id: BigInt, slot_num: Int) -> FFResult<()>;
-    fn save_player(&mut self, player: &Player) -> FFResult<()>;
-    fn save_players(&mut self, players: &[&Player]) -> FFResult<()>;
+    fn save_player(&mut self, player: &Player, state_time: Option<SystemTime>) -> FFResult<()>;
+    fn save_players(&mut self, players: &[&Player], state_time: Option<SystemTime>)
+        -> FFResult<()>;
     fn load_player(&mut self, acc_id: BigInt, pc_uid: BigInt) -> FFResult<Player>;
     fn load_players(&mut self, acc_id: BigInt) -> FFResult<Vec<Player>>;
     fn delete_player(&mut self, pc_uid: BigInt) -> FFResult<()>;
@@ -38,25 +40,8 @@ pub fn db_init() -> MutexGuard<'static, Box<dyn Database>> {
         Some(_) => panic_log("Database already initialized"),
         None => {
             log(Severity::Info, "Connecting to database...");
-
             let config = &config_get().general;
-            let _db_impl: Option<FFResult<Box<dyn Database>>> = None;
-
-            #[cfg(feature = "postgres")]
-            let _db_impl = Some(postgresql::PostgresDatabase::connect(config));
-
-            #[cfg(feature = "mongo")]
-            let _db_impl = Some(mongo::MongoDatabase::connect(config));
-
-            let db = match _db_impl {
-                Some(Ok(db)) => db,
-                Some(Err(e)) => {
-                    panic_log(&format!("Failed to connect to database: {}", e.get_msg()))
-                }
-                None => panic_log(
-                    "No database implementation enabled; please enable one through a feature",
-                ),
-            };
+            let db = db_connect(config);
             DATABASE.set(Mutex::new(db)).unwrap();
             log(
                 Severity::Info,
@@ -68,6 +53,24 @@ pub fn db_init() -> MutexGuard<'static, Box<dyn Database>> {
                 ),
             );
             db_get()
+        }
+    }
+}
+
+pub fn db_connect(config: &GeneralConfig) -> Box<dyn Database> {
+    let _db_impl: Option<FFResult<Box<dyn Database>>> = None;
+
+    #[cfg(feature = "postgres")]
+    let _db_impl = Some(postgresql::PostgresDatabase::connect(config));
+
+    #[cfg(feature = "mongo")]
+    let _db_impl = Some(mongo::MongoDatabase::connect(config));
+
+    match _db_impl {
+        Some(Ok(db)) => db,
+        Some(Err(e)) => panic_log(&format!("Failed to connect to database: {}", e.get_msg())),
+        None => {
+            panic_log("No database implementation enabled; please enable one through a feature")
         }
     }
 }

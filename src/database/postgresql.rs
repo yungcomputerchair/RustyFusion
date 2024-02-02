@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use postgres::{tls, types::ToSql, GenericClient, Row};
+use regex::Regex;
 
 use crate::{
     defines::{DB_VERSION, PROTOCOL_VERSION, SIZEOF_QUESTFLAG_NUMBER, WYVERN_LOCATION_FLAG_SIZE},
@@ -89,6 +90,17 @@ impl PostgresDatabase {
         name: &str,
         mut params: &[&(dyn ToSql + Sync)],
     ) -> FFResult<u64> {
+        static SQL_PARAMETER_REGEX: OnceLock<Regex> = OnceLock::new();
+        let calc_num_params = |s: &str| {
+            // we can use the parameter with the highest number to determine the number of parameters
+            let max_param = SQL_PARAMETER_REGEX
+                .get_or_init(|| Regex::new(r"\$[0-9]+").unwrap())
+                .find_iter(s)
+                .map(|m| m.as_str()[1..].parse::<usize>().unwrap())
+                .max();
+            max_param.unwrap_or(0)
+        };
+
         let queries = Self::read_sql(name);
         let queries: Vec<&str> = queries.split(';').collect();
 
@@ -101,7 +113,7 @@ impl PostgresDatabase {
                 continue;
             }
             //println!("{}", query);
-            let num_params = query.char_indices().filter(|(_, c)| *c == '$').count();
+            let num_params = calc_num_params(query);
             match tsct.execute(query, &params[..num_params]) {
                 Ok(r) => {
                     num_updated += r;
@@ -117,7 +129,11 @@ impl PostgresDatabase {
         Ok(num_updated)
     }
 
-    fn save_player_internal(client: &mut impl GenericClient, player: &Player) -> FFResult<()> {
+    fn save_player_internal(
+        client: &mut impl GenericClient,
+        player: &Player,
+        state_timestamp: Int,
+    ) -> FFResult<()> {
         let mut tsct = client.transaction().map_err(FFError::from_db_err)?;
         let client = &mut tsct;
         let save_item = Self::prep(client, "save_item")?;
@@ -166,6 +182,7 @@ impl PostgresDatabase {
                 &skyway_bytes,
                 &player.flags.tip_flags.to_le_bytes().as_slice(),
                 &quest_bytes,
+                &state_timestamp,
             ],
         )?;
 
@@ -405,14 +422,23 @@ impl Database for PostgresDatabase {
         Ok(players)
     }
 
-    fn save_player(&mut self, player: &Player) -> FFResult<()> {
-        Self::save_player_internal(&mut self.client, player)
+    fn save_player(&mut self, player: &Player, state_time: Option<SystemTime>) -> FFResult<()> {
+        let state_time = state_time.unwrap_or(SystemTime::now());
+        let state_timestamp = util::get_timestamp_sec(state_time) as Int;
+        Self::save_player_internal(&mut self.client, player, state_timestamp)
     }
 
-    fn save_players(&mut self, players: &[&Player]) -> FFResult<()> {
+    fn save_players(
+        &mut self,
+        players: &[&Player],
+        state_time: Option<SystemTime>,
+    ) -> FFResult<()> {
+        let state_time = state_time.unwrap_or(SystemTime::now());
+        let state_timestamp = util::get_timestamp_sec(state_time) as Int;
+
         let mut tsct = self.client.transaction().map_err(FFError::from_db_err)?;
         for player in players {
-            Self::save_player_internal(&mut tsct, player)?;
+            Self::save_player_internal(&mut tsct, player, state_timestamp)?;
         }
         tsct.commit().map_err(FFError::from_db_err)?;
         Ok(())

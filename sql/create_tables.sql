@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS Players (
     Slot               INTEGER NOT NULL,
     Created            INTEGER DEFAULT extract(epoch from now()) NOT NULL,
     LastLogin          INTEGER DEFAULT extract(epoch from now()) NOT NULL,
+    SaveTime           INTEGER DEFAULT extract(epoch from now()) NOT NULL,
     Level              INTEGER DEFAULT 1 NOT NULL,
     Nano1              INTEGER DEFAULT 0 NOT NULL,
     Nano2              INTEGER DEFAULT 0 NOT NULL,
@@ -64,7 +65,7 @@ CREATE TABLE IF NOT EXISTS Players (
     WarpLocationFlag   INTEGER DEFAULT 0 NOT NULL,
     SkywayLocationFlag BYTEA NOT NULL,
     FirstUseFlag       BYTEA NOT NULL,
-    Quests             BYTEA NOT NULL,
+    Quests             BYTEA NOT NULL,    
     FOREIGN KEY(AccountID) REFERENCES Accounts(AccountID) ON DELETE CASCADE,
     UNIQUE (AccountID, Slot),
     UNIQUE (FirstName, LastName)

@@ -1,7 +1,7 @@
 #![allow(non_upper_case_globals)]
 
 pub const PROTOCOL_VERSION: i32 = 104;
-pub const DB_VERSION: i32 = 4;
+pub const DB_VERSION: i32 = 5;
 
 pub const MAX_NUM_SHARDS: usize = 9;
 pub const MAX_NUM_CHANNELS: usize = 25;
