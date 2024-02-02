@@ -1,7 +1,22 @@
+use std::{sync::mpsc::Receiver, time::SystemTime};
+
+use crate::error::FFResult;
+
 use self::{login::LoginServerState, shard::ShardServerState};
 
 pub mod login;
 pub mod shard;
+
+#[derive(Debug)]
+pub struct FFReceiver<T> {
+    start_time: SystemTime,
+    rx: Receiver<FFResult<T>>,
+}
+impl<T> FFReceiver<T> {
+    pub fn new(start_time: SystemTime, rx: Receiver<FFResult<T>>) -> Self {
+        Self { start_time, rx }
+    }
+}
 
 pub enum ServerState {
     Login(Box<LoginServerState>),

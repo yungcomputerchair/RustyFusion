@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    sync::mpsc::{Receiver, TryRecvError},
-    time::SystemTime,
-};
+use std::{collections::HashMap, sync::mpsc::TryRecvError, time::SystemTime};
 
 use uuid::Uuid;
 
@@ -23,11 +19,13 @@ use crate::{
     Entity, EntityID, Item, TradeContext,
 };
 
+use super::FFReceiver;
+
 pub struct ShardServerState {
     pub login_server_conn_id: Option<Uuid>,
     pub shard_id: Option<i32>,
     pub login_data: HashMap<i64, LoginData>,
-    pub autosave_rx: Option<(SystemTime, Receiver<FFResult<()>>)>,
+    pub autosave_rx: Option<FFReceiver<()>>,
     pub entity_map: EntityMap,
     pub buyback_lists: HashMap<i32, Vec<Item>>,
     pub ongoing_trades: HashMap<Uuid, TradeContext>,
@@ -153,10 +151,10 @@ impl ShardServerState {
     }
 
     pub fn check_receivers(&mut self) {
-        if let Some((start_time, receiver)) = &self.autosave_rx {
-            match receiver.try_recv() {
+        if let Some(receiver) = &self.autosave_rx {
+            match receiver.rx.try_recv() {
                 Ok(Ok(())) => {
-                    let elapsed = start_time.elapsed().unwrap();
+                    let elapsed = receiver.start_time.elapsed().unwrap();
                     log(
                         Severity::Info,
                         &format!("Autosave complete ({:.2}s)", elapsed.as_secs_f32()),

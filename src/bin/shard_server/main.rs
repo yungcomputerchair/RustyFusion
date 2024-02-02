@@ -26,7 +26,7 @@ use rusty_fusion::{
         ClientMap, LoginData,
     },
     player::Player,
-    state::{shard::ShardServerState, ServerState},
+    state::{shard::ShardServerState, FFReceiver, ServerState},
     tabledata::tdata_init,
     timer::TimerMap,
     unused, Entity, EntityID,
@@ -349,6 +349,6 @@ fn do_autosave(time: SystemTime, state: &mut ShardServerState) -> FFResult<()> {
         )
     })?;
 
-    state.autosave_rx = Some((time, rx));
+    state.autosave_rx = Some(FFReceiver::new(time, rx));
     Ok(())
 }
