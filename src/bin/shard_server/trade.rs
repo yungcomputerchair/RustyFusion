@@ -1,4 +1,5 @@
 use rusty_fusion::{
+    database::db_run_parallel,
     defines::RANGE_INTERACT,
     enums::ItemLocation,
     error::{catch_fail, log_if_failed},
@@ -426,8 +427,14 @@ pub fn trade_confirm(clients: &mut ClientMap, state: &mut ShardServerState) -> F
         let player_other_taros = player_other.get_taros();
 
         // save traded state
-        *state.get_player_mut(pc_id).unwrap() = player;
-        *state.get_player_mut(pc_id_other).unwrap() = player_other;
+        *state.get_player_mut(pc_id).unwrap() = player.clone();
+        *state.get_player_mut(pc_id_other).unwrap() = player_other.clone();
+
+        // try to update the players in the DB. this is best-effort
+        log_if_failed(db_run_parallel(move |db| {
+            let _ = db.save_players(&[&player, &player_other], None);
+            Ok(())
+        }));
 
         let resp = sP_FE2CL_REP_PC_TRADE_CONFIRM_SUCC {
             iID_Request: resp.iID_Request,
