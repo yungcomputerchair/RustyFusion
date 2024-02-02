@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std::sync::mpsc::Receiver;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::SystemTime;
 
@@ -86,13 +87,13 @@ pub fn db_get() -> MutexGuard<'static, Box<dyn Database>> {
     }
 }
 
-pub fn db_run_parallel<F, T>(f: F) -> FFResult<()>
+pub fn db_run_parallel<T, F>(f: F) -> FFResult<Receiver<FFResult<T>>>
 where
+    T: Send + 'static,
     F: FnOnce(&mut dyn Database) -> FFResult<T> + Send + 'static,
 {
     let mut db = db_connect(&config_get().general)?;
-    std::thread::spawn(move || {
-        log_if_failed(f(db.as_mut()));
-    });
-    Ok(())
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || tx.send(f(db.as_mut())));
+    Ok(rx)
 }

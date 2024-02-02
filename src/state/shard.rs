@@ -1,4 +1,8 @@
-use std::{collections::HashMap, time::SystemTime};
+use std::{
+    collections::HashMap,
+    sync::mpsc::{Receiver, TryRecvError},
+    time::SystemTime,
+};
 
 use uuid::Uuid;
 
@@ -23,6 +27,7 @@ pub struct ShardServerState {
     pub login_server_conn_id: Option<Uuid>,
     pub shard_id: Option<i32>,
     pub login_data: HashMap<i64, LoginData>,
+    pub autosave_rx: Option<(SystemTime, Receiver<FFResult<()>>)>,
     pub entity_map: EntityMap,
     pub buyback_lists: HashMap<i32, Vec<Item>>,
     pub ongoing_trades: HashMap<Uuid, TradeContext>,
@@ -34,6 +39,7 @@ impl Default for ShardServerState {
             login_server_conn_id: None,
             shard_id: None,
             login_data: HashMap::new(),
+            autosave_rx: None,
             entity_map: EntityMap::default(),
             buyback_lists: HashMap::new(),
             ongoing_trades: HashMap::new(),
@@ -141,6 +147,28 @@ impl ShardServerState {
                     let mut npc = self.entity_map.get_npc_mut(npc_id).unwrap().clone();
                     npc.tick(time, clients, self);
                     *self.entity_map.get_npc_mut(npc_id).unwrap() = npc;
+                }
+            }
+        }
+    }
+
+    pub fn check_receivers(&mut self) {
+        if let Some((start_time, receiver)) = &self.autosave_rx {
+            match receiver.try_recv() {
+                Ok(Ok(())) => {
+                    let elapsed = start_time.elapsed().unwrap();
+                    log(
+                        Severity::Info,
+                        &format!("Autosave complete ({:.2}s)", elapsed.as_secs_f32()),
+                    );
+                }
+                Ok(Err(e)) => log(
+                    Severity::Warning,
+                    &format!("Autosave failed: {}", e.get_msg()),
+                ),
+                Err(TryRecvError::Empty) => (),
+                Err(TryRecvError::Disconnected) => {
+                    self.autosave_rx = None;
                 }
             }
         }

@@ -455,7 +455,7 @@ pub fn tdata_init() -> &'static TableData {
     if TABLE_DATA.set(TableData::new()).is_err() {
         panic_log("Couldn't initialize TableData");
     }
-    let load_time = SystemTime::now().duration_since(load_start).unwrap();
+    let load_time = load_start.elapsed().unwrap();
     log(
         Severity::Info,
         &format!("Loaded TableData ({:.2}s)", load_time.as_secs_f32()),

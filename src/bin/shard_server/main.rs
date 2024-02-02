@@ -12,8 +12,8 @@ use rusty_fusion::{
     config::{config_get, config_init},
     database::{db_init, db_run_parallel},
     error::{
-        log, log_error, logger_flush, logger_flush_scheduled, logger_init, panic_log, FFError,
-        FFResult, Severity,
+        log, log_error, log_if_failed, logger_flush, logger_flush_scheduled, logger_init,
+        panic_log, FFError, FFResult, Severity,
     },
     net::{
         crypto::{gen_key, EncryptionMode},
@@ -85,11 +85,16 @@ fn main() -> Result<()> {
         false,
     );
     timers.register_timer(
-        |t, _, st| {
-            do_autosave(t, st.as_shard());
+        |t, _, st| do_autosave(t, st.as_shard()),
+        Duration::from_secs(config.shard.autosave_interval.get() * 60),
+        false,
+    );
+    timers.register_timer(
+        |_, _, st| {
+            st.as_shard().check_receivers();
             Ok(())
         },
-        Duration::from_secs(config.shard.autosave_interval.get() * 60),
+        Duration::from_secs(1),
         false,
     );
 
@@ -118,7 +123,7 @@ fn main() -> Result<()> {
     }
 
     log(Severity::Info, "Shard server shutting down...");
-    do_autosave(SystemTime::now(), state.as_shard());
+    log_if_failed(do_autosave(SystemTime::now(), state.as_shard()));
     Ok(())
 }
 
@@ -319,20 +324,31 @@ fn send_live_check(client: &mut FFClient) -> FFResult<()> {
     }
 }
 
-fn do_autosave(time: SystemTime, state: &mut ShardServerState) {
-    log(Severity::Info, "Autosaving...");
+fn do_autosave(time: SystemTime, state: &mut ShardServerState) -> FFResult<()> {
     let pc_ids: Vec<i32> = state.entity_map.get_player_ids().collect();
+    if pc_ids.is_empty() {
+        return Ok(());
+    }
+
+    log(
+        Severity::Info,
+        &format!("Autosaving {} player(s)...", pc_ids.len()),
+    );
     let players: Vec<Player> = pc_ids
         .iter()
         .map(|pc_id| state.get_player(*pc_id).unwrap().clone())
         .collect();
-    if let Err(e) = db_run_parallel(move |db| {
+    let rx = db_run_parallel(move |db| {
         let player_refs: Vec<&Player> = players.iter().collect();
         db.save_players(&player_refs, Some(time))
-    }) {
-        log(
+    })
+    .map_err(|e| {
+        FFError::build(
             Severity::Warning,
-            &format!("Autosave cancelled: {}", e.get_msg()),
-        );
-    }
+            format!("Autosave cancelled: {}", e.get_msg()),
+        )
+    })?;
+
+    state.autosave_rx = Some((time, rx));
+    Ok(())
 }
