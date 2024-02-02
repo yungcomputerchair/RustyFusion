@@ -36,6 +36,7 @@ pub type PacketCallback = fn(
 pub type DisconnectCallback = fn(usize, &mut HashMap<usize, FFClient>, &mut ServerState);
 
 #[allow(non_snake_case)]
+#[derive(Debug, Clone)]
 pub struct LoginData {
     pub iAccountID: i64,
     pub iPC_UID: i64,

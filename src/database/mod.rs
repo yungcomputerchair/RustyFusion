@@ -35,13 +35,35 @@ pub trait Database: Send + std::fmt::Debug {
 const DB_NAME: &str = "rustyfusion";
 static DATABASE: OnceLock<Mutex<Box<dyn Database>>> = OnceLock::new();
 
+fn db_connect(config: &GeneralConfig) -> FFResult<Box<dyn Database>> {
+    let _db_impl: Option<FFResult<Box<dyn Database>>> = None;
+
+    #[cfg(feature = "postgres")]
+    let _db_impl = Some(postgresql::PostgresDatabase::connect(config));
+
+    #[cfg(feature = "mongo")]
+    let _db_impl = Some(mongo::MongoDatabase::connect(config));
+
+    match _db_impl {
+        Some(Ok(db)) => Ok(db),
+        Some(Err(e)) => Err(FFError::build(
+            Severity::Fatal,
+            format!("Failed to connect to database: {}", e.get_msg()),
+        )),
+        None => Err(FFError::build(
+            Severity::Fatal,
+            "No database implementation enabled; please enable one through a feature".to_string(),
+        )),
+    }
+}
+
 pub fn db_init() -> MutexGuard<'static, Box<dyn Database>> {
     match DATABASE.get() {
         Some(_) => panic_log("Database already initialized"),
         None => {
             log(Severity::Info, "Connecting to database...");
             let config = &config_get().general;
-            let db = db_connect(config);
+            let db = panic_if_failed(db_connect(config));
             DATABASE.set(Mutex::new(db)).unwrap();
             log(
                 Severity::Info,
@@ -57,27 +79,20 @@ pub fn db_init() -> MutexGuard<'static, Box<dyn Database>> {
     }
 }
 
-pub fn db_connect(config: &GeneralConfig) -> Box<dyn Database> {
-    let _db_impl: Option<FFResult<Box<dyn Database>>> = None;
-
-    #[cfg(feature = "postgres")]
-    let _db_impl = Some(postgresql::PostgresDatabase::connect(config));
-
-    #[cfg(feature = "mongo")]
-    let _db_impl = Some(mongo::MongoDatabase::connect(config));
-
-    match _db_impl {
-        Some(Ok(db)) => db,
-        Some(Err(e)) => panic_log(&format!("Failed to connect to database: {}", e.get_msg())),
-        None => {
-            panic_log("No database implementation enabled; please enable one through a feature")
-        }
-    }
-}
-
 pub fn db_get() -> MutexGuard<'static, Box<dyn Database>> {
     match DATABASE.get() {
         Some(db) => db.lock().unwrap(),
         None => panic_log("Database not initialized"),
     }
+}
+
+pub fn db_run_parallel<F, T>(f: F) -> FFResult<()>
+where
+    F: FnOnce(&mut dyn Database) -> FFResult<T> + Send + 'static,
+{
+    let mut db = db_connect(&config_get().general)?;
+    std::thread::spawn(move || {
+        log_if_failed(f(db.as_mut()));
+    });
+    Ok(())
 }
