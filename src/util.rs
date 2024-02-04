@@ -34,22 +34,26 @@ pub fn clamp_max<T: Ord>(val: T, max: T) -> T {
     }
 }
 
-pub fn parse_utf16(chars: &[u16]) -> String {
+pub fn parse_utf16(chars: &[u16]) -> FFResult<String> {
     let end_pos: usize = chars.iter().position(|&c| c == 0).unwrap_or(chars.len());
-    if let Ok(val) = String::from_utf16(&chars[..end_pos]) {
-        val
-    } else {
-        String::new()
-    }
+    String::from_utf16(&chars[..end_pos]).map_err(|_| {
+        FFError::build(
+            Severity::Warning,
+            format!("Bytes are not UTF-16: {:?}", chars),
+        )
+    })
 }
 
-pub fn parse_utf8(chars: &[u8]) -> String {
+pub fn parse_utf8(chars: &[u8]) -> FFResult<String> {
     let end_pos: usize = chars.iter().position(|&c| c == 0).unwrap_or(chars.len());
-    if let Ok(val) = std::str::from_utf8(&chars[..end_pos]) {
-        val.to_string()
-    } else {
-        String::new()
-    }
+    std::str::from_utf8(&chars[..end_pos])
+        .map_err(|_| {
+            FFError::build(
+                Severity::Warning,
+                format!("Bytes are not UTF-8: {:?}", chars),
+            )
+        })
+        .map(|s| s.to_string())
 }
 
 pub fn encode_utf16<const SIZE: usize>(chars: &str) -> [u16; SIZE] {

@@ -272,8 +272,8 @@ pub fn gm_pc_location(clients: &mut ClientMap, state: &mut ShardServerState) -> 
     let search_query = match search_mode {
         TargetSearchBy::PlayerID => PlayerSearchQuery::ByID(pkt.iTargetPC_ID),
         TargetSearchBy::PlayerName => PlayerSearchQuery::ByName(
-            util::parse_utf16(&pkt.szTargetPC_FirstName),
-            util::parse_utf16(&pkt.szTargetPC_LastName),
+            util::parse_utf16(&pkt.szTargetPC_FirstName)?,
+            util::parse_utf16(&pkt.szTargetPC_LastName)?,
         ),
         TargetSearchBy::PlayerUID => PlayerSearchQuery::ByUID(pkt.iTargetPC_UID),
     };
@@ -294,8 +294,8 @@ pub fn gm_pc_location(clients: &mut ClientMap, state: &mut ShardServerState) -> 
             iX: pos.x,
             iY: pos.y,
             iZ: pos.z,
-            szTargetPC_FirstName: util::encode_utf16(&player.get_first_name()),
-            szTargetPC_LastName: util::encode_utf16(&player.get_last_name()),
+            szTargetPC_FirstName: util::encode_utf16(&player.first_name),
+            szTargetPC_LastName: util::encode_utf16(&player.last_name),
         };
         clients
             .get_self()
@@ -328,8 +328,8 @@ pub fn gm_target_pc_special_state_onoff(
     let search_query = match search_mode {
         TargetSearchBy::PlayerID => PlayerSearchQuery::ByID(pkt.iTargetPC_ID),
         TargetSearchBy::PlayerName => PlayerSearchQuery::ByName(
-            util::parse_utf16(&pkt.szTargetPC_FirstName),
-            util::parse_utf16(&pkt.szTargetPC_LastName),
+            util::parse_utf16(&pkt.szTargetPC_FirstName)?,
+            util::parse_utf16(&pkt.szTargetPC_LastName)?,
         ),
         TargetSearchBy::PlayerUID => PlayerSearchQuery::ByUID(pkt.iTargetPC_UID),
     };
@@ -386,8 +386,8 @@ pub fn gm_target_pc_teleport(
     let search_query = match search_mode {
         TargetSearchBy::PlayerID => PlayerSearchQuery::ByID(pkt.iTargetPC_ID),
         TargetSearchBy::PlayerName => PlayerSearchQuery::ByName(
-            util::parse_utf16(&pkt.szTargetPC_FirstName),
-            util::parse_utf16(&pkt.szTargetPC_LastName),
+            util::parse_utf16(&pkt.szTargetPC_FirstName)?,
+            util::parse_utf16(&pkt.szTargetPC_LastName)?,
         ),
         TargetSearchBy::PlayerUID => PlayerSearchQuery::ByUID(pkt.iTargetPC_UID),
     };
@@ -431,8 +431,8 @@ pub fn gm_target_pc_teleport(
             let search_query = match search_mode {
                 TargetSearchBy::PlayerID => PlayerSearchQuery::ByID(pkt.iGoalPC_ID),
                 TargetSearchBy::PlayerName => PlayerSearchQuery::ByName(
-                    util::parse_utf16(&pkt.szGoalPC_FirstName),
-                    util::parse_utf16(&pkt.szGoalPC_LastName),
+                    util::parse_utf16(&pkt.szGoalPC_FirstName)?,
+                    util::parse_utf16(&pkt.szGoalPC_LastName)?,
                 ),
                 TargetSearchBy::PlayerUID => PlayerSearchQuery::ByUID(pkt.iGoalPC_UID),
             };
@@ -480,8 +480,8 @@ pub fn gm_kick_player(clients: &mut ClientMap, state: &mut ShardServerState) -> 
     let search_query = match search_mode {
         TargetSearchBy::PlayerID => PlayerSearchQuery::ByID(pkt.iTargetPC_ID),
         TargetSearchBy::PlayerName => PlayerSearchQuery::ByName(
-            util::parse_utf16(&pkt.szTargetPC_FirstName),
-            util::parse_utf16(&pkt.szTargetPC_LastName),
+            util::parse_utf16(&pkt.szTargetPC_FirstName)?,
+            util::parse_utf16(&pkt.szTargetPC_LastName)?,
         ),
         TargetSearchBy::PlayerUID => PlayerSearchQuery::ByUID(pkt.iTargetPC_UID),
     };

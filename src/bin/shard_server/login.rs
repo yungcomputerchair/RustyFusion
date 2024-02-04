@@ -138,8 +138,8 @@ pub fn login_pc_location(clients: &mut ClientMap, state: &mut ShardServerState) 
     let search_query = match search_mode {
         TargetSearchBy::PlayerID => PlayerSearchQuery::ByID(req.iTargetPC_ID),
         TargetSearchBy::PlayerName => PlayerSearchQuery::ByName(
-            util::parse_utf16(&req.szTargetPC_FirstName),
-            util::parse_utf16(&req.szTargetPC_LastName),
+            util::parse_utf16(&req.szTargetPC_FirstName)?,
+            util::parse_utf16(&req.szTargetPC_LastName)?,
         ),
         TargetSearchBy::PlayerUID => PlayerSearchQuery::ByUID(req.iTargetPC_UID),
     };
@@ -160,8 +160,8 @@ pub fn login_pc_location(clients: &mut ClientMap, state: &mut ShardServerState) 
             iX: pos.x,
             iY: pos.y,
             iZ: pos.z,
-            szTargetPC_FirstName: util::encode_utf16(&player.get_first_name()),
-            szTargetPC_LastName: util::encode_utf16(&player.get_last_name()),
+            szTargetPC_FirstName: util::encode_utf16(&player.first_name),
+            szTargetPC_LastName: util::encode_utf16(&player.last_name),
         };
         if let Some(login_server) = clients.get_login_server() {
             let resp = sP_FE2LS_REP_PC_LOCATION_SUCC {
@@ -210,8 +210,8 @@ pub fn login_pc_location_fail(
             let search_query = match search_mode {
                 TargetSearchBy::PlayerID => PlayerSearchQuery::ByID(req.iTargetPC_ID),
                 TargetSearchBy::PlayerName => PlayerSearchQuery::ByName(
-                    util::parse_utf16(&req.szTargetPC_FirstName),
-                    util::parse_utf16(&req.szTargetPC_LastName),
+                    util::parse_utf16(&req.szTargetPC_FirstName)?,
+                    util::parse_utf16(&req.szTargetPC_LastName)?,
                 ),
                 TargetSearchBy::PlayerUID => PlayerSearchQuery::ByUID(req.iTargetPC_UID),
             };

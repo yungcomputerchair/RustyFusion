@@ -17,7 +17,7 @@ use crate::{
         ClientMap,
     },
     state::shard::ShardServerState,
-    util::{self, clamp, clamp_max, clamp_min, parse_utf16},
+    util::{self, clamp, clamp_max, clamp_min},
     Combatant, Entity, EntityID, Item, Mission, Nano, Position,
 };
 
@@ -69,26 +69,10 @@ impl Default for PlayerStyle {
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PlayerFlags {
+    pub name_check_flag: bool,
     pub tutorial_flag: bool,
     pub payzone_flag: bool,
     pub tip_flags: i128,
-}
-
-#[derive(Debug, Clone, Copy, Default)]
-struct PlayerName {
-    name_check: i8,
-    first_name: [u16; SIZEOF_PC_FIRST_NAME as usize],
-    last_name: [u16; SIZEOF_PC_LAST_NAME as usize],
-}
-impl Display for PlayerName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} {}",
-            parse_utf16(&self.first_name),
-            parse_utf16(&self.last_name)
-        )
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -292,6 +276,8 @@ pub struct Player {
     id: Option<i32>,
     slot_num: usize,
     uid: i64,
+    pub first_name: String,
+    pub last_name: String,
     client_id: Option<usize>,
     perms: i16,
     pub show_gm_marker: bool,
@@ -305,7 +291,6 @@ pub struct Player {
     pub instance_id: InstanceID,
     pub style: Option<PlayerStyle>,
     pub flags: PlayerFlags,
-    name: PlayerName,
     level: i16,
     hp: i32,
     guide_data: GuideData,
@@ -363,9 +348,9 @@ impl Player {
         let style = self.style.unwrap_or_default();
         sPCStyle {
             iPC_UID: self.uid,
-            iNameCheck: self.name.name_check,
-            szFirstName: self.name.first_name,
-            szLastName: self.name.last_name,
+            iNameCheck: if self.flags.name_check_flag { 1 } else { 0 },
+            szFirstName: util::encode_utf16(&self.first_name),
+            szLastName: util::encode_utf16(&self.last_name),
             iGender: style.gender,
             iFaceStyle: style.face_style,
             iHairStyle: style.hair_style,
@@ -607,22 +592,6 @@ impl Player {
             ItemEquip: self.inventory.equipped.map(Option::<Item>::into),
             Nano: self.get_active_nano().cloned().into(),
             eRT: unused!(),
-        }
-    }
-
-    pub fn get_first_name(&self) -> String {
-        parse_utf16(&self.name.first_name)
-    }
-
-    pub fn get_last_name(&self) -> String {
-        parse_utf16(&self.name.last_name)
-    }
-
-    pub fn set_name(&mut self, name_check: i8, first_name: [u16; 9], last_name: [u16; 17]) {
-        self.name = PlayerName {
-            name_check,
-            first_name,
-            last_name,
         }
     }
 
@@ -1109,7 +1078,14 @@ impl Display for Player {
             Some(title) => format!("({}) ", title),
             None => String::new(),
         };
-        write!(f, "{}{} ({})", title, self.name, self.get_uid(),)
+        write!(
+            f,
+            "{}{} {} ({})",
+            title,
+            self.first_name,
+            self.last_name,
+            self.get_uid()
+        )
     }
 }
 
@@ -1137,8 +1113,8 @@ impl PlayerSearchQuery {
             PlayerSearchQuery::ByName(first_name, last_name) => state
                 .entity_map
                 .find_players(|player| {
-                    player.get_first_name().eq_ignore_ascii_case(first_name)
-                        && player.get_last_name().eq_ignore_ascii_case(last_name)
+                    player.first_name.eq_ignore_ascii_case(first_name)
+                        && player.last_name.eq_ignore_ascii_case(last_name)
                 })
                 .first()
                 .copied(),

@@ -212,8 +212,8 @@ impl From<(BigInt, &Player, Int)> for DbPlayer {
             account_id,
             save_time,
             slot_number: player.get_slot_num() as Int,
-            first_name: player.get_first_name(),
-            last_name: player.get_last_name(),
+            first_name: player.first_name.clone(),
+            last_name: player.last_name.clone(),
             name_check: placeholder!(1) as Int,
             style: player.style.as_ref().map(|style| style.into()),
             level: player.get_level() as Int,
@@ -250,11 +250,8 @@ impl TryFrom<DbPlayer> for Player {
             None
         };
 
-        player.set_name(
-            db_player.name_check as i8,
-            util::encode_utf16(&db_player.first_name),
-            util::encode_utf16(&db_player.last_name),
-        );
+        player.first_name = db_player.first_name;
+        player.last_name = db_player.last_name;
 
         player.set_position(Position {
             x: db_player.pos[0],
@@ -295,6 +292,7 @@ impl TryFrom<DbPlayer> for Player {
 
         let first_use_bytes: &[u8] = &db_player.tip_flags_bytes;
         player.flags = PlayerFlags {
+            name_check_flag: db_player.name_check != 0,
             tutorial_flag: db_player.tutorial_flag != 0,
             payzone_flag: db_player.payzone_flag != 0,
             tip_flags: i128::from_le_bytes(first_use_bytes[..16].try_into().unwrap()),

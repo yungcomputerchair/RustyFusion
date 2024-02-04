@@ -23,12 +23,18 @@ pub fn login(
     let mut error_code = 0;
     catch_fail(
         (|| {
-            let mut username = util::parse_utf16(&pkt.szID);
-            let mut password = util::parse_utf16(&pkt.szPassword);
-            if username.is_empty() {
-                username = util::parse_utf8(&pkt.szCookie_TEGid);
-                password = util::parse_utf8(&pkt.szCookie_authid);
-            }
+            let username = if pkt.szID[0] != 0 {
+                util::parse_utf16(&pkt.szID)?
+            } else {
+                util::parse_utf8(&pkt.szCookie_TEGid)?
+            };
+
+            let password = if pkt.szPassword[0] != 0 {
+                util::parse_utf16(&pkt.szPassword)?
+            } else {
+                util::parse_utf8(&pkt.szCookie_authid)?
+            };
+
             // TODO password hashing
             let password_hashed = placeholder!(password.clone());
 
@@ -137,7 +143,11 @@ pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> FF
     }
 
     let mut player = Player::new(pc_uid, slot_num);
-    player.set_name(1, pkt.szFirstName, pkt.szLastName);
+    let first_name = util::parse_utf16(&pkt.szFirstName)?;
+    let last_name = util::parse_utf16(&pkt.szLastName)?;
+    player.first_name = first_name;
+    player.last_name = last_name;
+
     let mut db = db_get();
     db.init_player(acc_id, &player)?;
     db.update_selected_player(acc_id, slot_num as i32)?;

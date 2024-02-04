@@ -196,7 +196,7 @@ pub fn motd(client: &mut FFClient) -> FFResult<()> {
 
 pub fn motd_register(client: &mut FFClient) -> FFResult<()> {
     let pkt: &sP_FE2LS_MOTD_REGISTER = client.get_packet(P_FE2LS_MOTD_REGISTER)?;
-    let motd = util::parse_utf16(&pkt.szMessage);
+    let motd = util::parse_utf16(&pkt.szMessage)?;
     let motd_path = config_get().login.motd_path.get();
     if std::fs::write(motd_path.clone(), motd.as_bytes()).is_err() {
         log(

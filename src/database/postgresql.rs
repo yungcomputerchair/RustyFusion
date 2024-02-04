@@ -244,14 +244,10 @@ impl PostgresDatabase {
             None
         };
 
-        let first_name = row.get("FirstName");
-        let last_name = row.get("LastName");
-        let name_check: Int = row.get("NameCheck");
-        player.set_name(
-            name_check as i8,
-            util::encode_utf16(first_name),
-            util::encode_utf16(last_name),
-        );
+        let first_name: String = row.get("FirstName");
+        let last_name: String = row.get("LastName");
+        player.first_name = first_name;
+        player.last_name = last_name;
 
         player.set_position(Position {
             x: row.get("XCoordinate"),
@@ -289,6 +285,7 @@ impl PostgresDatabase {
         let first_use_bytes: &[u8] = row.get("FirstUseFlag");
         player_flags.tip_flags = i128::from_le_bytes(first_use_bytes[..16].try_into().unwrap());
         player_flags.tutorial_flag = row.get::<_, Int>("TutorialFlag") != 0;
+        player_flags.name_check_flag = row.get::<_, Int>("NameCheck") != 0;
         player.flags = player_flags;
 
         let skyway_bytes: &[u8] = row.get("SkywayLocationFlag");
@@ -324,8 +321,8 @@ impl Database for PostgresDatabase {
             &[
                 &player.get_uid(),
                 &acc_id,
-                &player.get_first_name(),
-                &player.get_last_name(),
+                &player.first_name,
+                &player.last_name,
                 &(player.get_style().iNameCheck as Int),
                 &(player.get_slot_num() as Int),
                 &player.get_position().x,
