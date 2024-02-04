@@ -39,17 +39,17 @@ pub fn login(
             let password_hashed = placeholder!(password.clone());
 
             let mut db = db_get();
-            let account_id = match db.find_account(&username)? {
-                Some(account_id) => account_id,
+            let account = match db.find_account(&username)? {
+                Some(account) => account,
                 None => {
                     if config_get().login.auto_create_accounts.get() {
                         // automatically create the account with the supplied credentials
-                        let new_acc_id = db.create_account(&username, &password_hashed)?;
+                        let new_acc = db.create_account(&username, &password_hashed)?;
                         log(
                             Severity::Info,
-                            &format!("Created account {} with ID {}", username, new_acc_id),
+                            &format!("Created account {} with ID {}", username, new_acc.id),
                         );
-                        new_acc_id
+                        new_acc
                     } else {
                         error_code = 1; // "Login fail: login ID error"
                         return Err(FFError::build(
@@ -59,10 +59,11 @@ pub fn login(
                     }
                 }
             };
-            // TODO auth
-            let last_player_slot: i32 = placeholder!(1); //account.get("Selected");
 
-            let players = db.load_players(account_id)?;
+            // TODO auth
+
+            let last_player_slot = account.selected_slot;
+            let players = db.load_players(account.id)?;
 
             let resp = sP_LS2CL_REP_LOGIN_SUCC {
                 iCharCount: players.len() as i8,
@@ -87,11 +88,11 @@ pub fn login(
 
             let serial_key: i64 = random();
             client.client_type = ClientType::GameClient {
-                account_id,
+                account_id: account.id,
                 serial_key,
                 pc_id: None,
             };
-            state.set_account(account_id, username, players.clone().iter().cloned());
+            state.start_session(account, players.clone().iter().cloned());
 
             players.iter().try_for_each(|player| {
                 let pos = player.get_position();

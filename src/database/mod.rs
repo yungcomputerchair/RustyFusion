@@ -7,6 +7,7 @@ use std::time::SystemTime;
 use crate::config::*;
 use crate::error::*;
 use crate::player::Player;
+use crate::state::login::Account;
 
 #[cfg(feature = "postgres")]
 mod postgresql;
@@ -20,8 +21,8 @@ type Text = String;
 type Bytes = Vec<u8>;
 
 pub trait Database: Send + std::fmt::Debug {
-    fn find_account(&mut self, username: &Text) -> FFResult<Option<BigInt>>;
-    fn create_account(&mut self, username: &Text, password_hashed: &Text) -> FFResult<BigInt>;
+    fn find_account(&mut self, username: &Text) -> FFResult<Option<Account>>;
+    fn create_account(&mut self, username: &Text, password_hashed: &Text) -> FFResult<Account>;
     fn init_player(&mut self, acc_id: BigInt, player: &Player) -> FFResult<()>;
     fn update_player_appearance(&mut self, player: &Player) -> FFResult<()>;
     fn update_selected_player(&mut self, acc_id: BigInt, slot_num: Int) -> FFResult<()>;

@@ -367,27 +367,37 @@ impl Database for PostgresDatabase {
         Ok(())
     }
 
-    fn find_account(&mut self, username: &Text) -> FFResult<Option<BigInt>> {
+    fn find_account(&mut self, username: &Text) -> FFResult<Option<Account>> {
         let client = &mut self.client;
         let rows = Self::query(client, "find_account", &[username])?;
-        if rows.is_empty() {
-            Ok(None)
-        } else {
-            Ok(Some(rows[0].get("AccountId")))
-        }
+        assert!(rows.len() <= 1);
+        Ok(rows.first().map(|row| Account {
+            id: row.get("AccountId"),
+            username: username.clone(),
+            password_hashed: row.get("Password"),
+            selected_slot: row.get::<_, Int>("Selected") as u8,
+            account_level: row.get::<_, Int>("AccountLevel") as u8,
+            banned_until: util::get_systime_from_sec(row.get::<_, Int>("BannedUntil") as u64),
+            ban_reason: row.get("BanReason"),
+        }))
     }
 
-    fn create_account(&mut self, username: &Text, password_hashed: &Text) -> FFResult<BigInt> {
+    fn create_account(&mut self, username: &Text, password_hashed: &Text) -> FFResult<Account> {
         let client = &mut self.client;
         let updated = Self::exec(client, "create_account", &[username, password_hashed])?;
         assert_eq!(updated, 1);
-        let acc_id = Self::query(client, "find_account", &[username])?[0].get("AccountId");
-        Ok(acc_id)
+        let new_acc = self.find_account(username)?.unwrap();
+        Ok(new_acc)
     }
 
     fn update_selected_player(&mut self, acc_id: BigInt, slot_num: Int) -> FFResult<()> {
         let client = &mut self.client;
-        let updated = Self::exec(client, "update_selected", &[&acc_id, &slot_num])?;
+        let timestamp_now = util::get_timestamp_sec(SystemTime::now()) as Int;
+        let updated = Self::exec(
+            client,
+            "update_selected",
+            &[&acc_id, &slot_num, &timestamp_now],
+        )?;
         assert_eq!(updated, 1);
         Ok(())
     }

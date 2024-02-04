@@ -36,6 +36,19 @@ struct DbAccount {
     banned_since_time: Int,
     ban_reason: Text,
 }
+impl From<DbAccount> for Account {
+    fn from(acc: DbAccount) -> Self {
+        Self {
+            id: acc.account_id,
+            username: acc.username,
+            password_hashed: acc.password_hash,
+            selected_slot: acc.selected_slot as u8,
+            account_level: acc.account_level as u8,
+            banned_until: util::get_systime_from_sec(acc.banned_until_time as u64),
+            ban_reason: acc.ban_reason,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct DbItem {
@@ -434,17 +447,17 @@ impl MongoDatabase {
     }
 }
 impl Database for MongoDatabase {
-    fn find_account(&mut self, username: &Text) -> FFResult<Option<BigInt>> {
+    fn find_account(&mut self, username: &Text) -> FFResult<Option<Account>> {
         let result = self
             .db
             .collection::<DbAccount>("accounts")
             .find_one(doc! { "username": username }, None)
             .map_err(FFError::from_db_error)?
-            .map(|acc| acc.account_id);
+            .map(|acc| acc.into());
         Ok(result)
     }
 
-    fn create_account(&mut self, username: &Text, password_hashed: &Text) -> FFResult<BigInt> {
+    fn create_account(&mut self, username: &Text, password_hashed: &Text) -> FFResult<Account> {
         let account_id = util::get_uid();
         let timestamp_now = util::get_timestamp_sec(SystemTime::now()) as Int;
         let account = DbAccount {
@@ -464,7 +477,8 @@ impl Database for MongoDatabase {
             .collection::<DbAccount>("accounts")
             .insert_one(account, None)
             .map_err(FFError::from_db_error)?;
-        Ok(account_id)
+        let new_acc = self.find_account(username)?.unwrap();
+        Ok(new_acc)
     }
 
     fn init_player(&mut self, acc_id: BigInt, player: &Player) -> FFResult<()> {
@@ -503,12 +517,13 @@ impl Database for MongoDatabase {
     }
 
     fn update_selected_player(&mut self, acc_id: BigInt, slot_num: Int) -> FFResult<()> {
+        let timestamp_now = util::get_timestamp_sec(SystemTime::now()) as Int;
         let result = self
             .db
             .collection::<DbAccount>("accounts")
             .update_one(
                 doc! { "_id": acc_id },
-                doc! { "$set": { "selected_slot": slot_num } },
+                doc! { "$set": { "selected_slot": slot_num, "last_login_time": timestamp_now } },
                 None,
             )
             .map_err(FFError::from_db_error)?;

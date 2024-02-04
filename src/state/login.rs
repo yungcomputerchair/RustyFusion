@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    time::SystemTime,
+};
 
 use uuid::Uuid;
 
@@ -9,8 +12,18 @@ use crate::{
     player::Player,
 };
 
-struct Account {
-    username: String,
+pub struct Account {
+    pub id: i64,
+    pub username: String,
+    pub password_hashed: String,
+    pub selected_slot: u8,
+    pub account_level: u8,
+    pub banned_until: SystemTime,
+    pub ban_reason: String,
+}
+
+struct LoginSession {
+    account: Account,
     players: HashMap<i64, Player>,
     selected_player_uid: Option<i64>,
 }
@@ -35,7 +48,7 @@ pub struct PlayerSearchRequest {
 
 pub struct LoginServerState {
     pub server_id: Uuid,
-    accounts: HashMap<i64, Account>,
+    sessions: HashMap<i64, LoginSession>,
     shard_id_pool: Vec<i32>,
     shards: HashMap<i32, ShardServerInfo>,
     pub player_search_reqeust: Option<PlayerSearchRequest>,
@@ -44,7 +57,7 @@ impl Default for LoginServerState {
     fn default() -> Self {
         Self {
             server_id: Uuid::new_v4(),
-            accounts: HashMap::new(),
+            sessions: HashMap::new(),
             shard_id_pool: (1..=MAX_NUM_SHARDS as i32).collect(),
             shards: HashMap::new(),
             player_search_reqeust: None,
@@ -52,61 +65,56 @@ impl Default for LoginServerState {
     }
 }
 impl LoginServerState {
-    fn get_account(&self, acc_id: i64) -> FFResult<&Account> {
-        self.accounts.get(&acc_id).ok_or(FFError::build(
+    fn get_session(&self, acc_id: i64) -> FFResult<&LoginSession> {
+        self.sessions.get(&acc_id).ok_or(FFError::build(
             Severity::Warning,
             format!("Account {} not logged in", acc_id),
         ))
     }
 
-    fn get_account_mut(&mut self, acc_id: i64) -> FFResult<&mut Account> {
-        self.accounts.get_mut(&acc_id).ok_or(FFError::build(
+    fn get_session_mut(&mut self, acc_id: i64) -> FFResult<&mut LoginSession> {
+        self.sessions.get_mut(&acc_id).ok_or(FFError::build(
             Severity::Warning,
             format!("Account {} not logged in", acc_id),
         ))
     }
 
-    pub fn set_account(
-        &mut self,
-        acc_id: i64,
-        username: String,
-        player_it: impl Iterator<Item = Player>,
-    ) {
+    pub fn start_session(&mut self, account: Account, player_it: impl Iterator<Item = Player>) {
         let mut players = HashMap::new();
         for player in player_it {
             players.insert(player.get_uid(), player);
         }
-        self.accounts.insert(
-            acc_id,
-            Account {
-                username,
+        self.sessions.insert(
+            account.id,
+            LoginSession {
+                account,
                 players,
                 selected_player_uid: None,
             },
         );
     }
 
-    pub fn unset_account(&mut self, acc_id: i64) {
-        self.accounts.remove(&acc_id);
+    pub fn end_session(&mut self, acc_id: i64) {
+        self.sessions.remove(&acc_id);
     }
 
     pub fn set_selected_player_id(&mut self, acc_id: i64, player_uid: i64) {
-        let acc = self.accounts.get_mut(&acc_id).unwrap();
-        acc.selected_player_uid = Some(player_uid);
+        let session = self.sessions.get_mut(&acc_id).unwrap();
+        session.selected_player_uid = Some(player_uid);
     }
 
     pub fn get_selected_player_id(&self, acc_id: i64) -> Option<i64> {
-        let acc = self.get_account(acc_id).unwrap();
-        acc.selected_player_uid
+        let session = self.get_session(acc_id).unwrap();
+        session.selected_player_uid
     }
 
     pub fn get_username(&self, acc_id: i64) -> String {
-        let acc = self.get_account(acc_id).unwrap();
-        acc.username.clone()
+        let session = self.get_session(acc_id).unwrap();
+        session.account.username.clone()
     }
 
     pub fn get_players_mut(&mut self, acc_id: i64) -> &mut HashMap<i64, Player> {
-        let acc = self.get_account_mut(acc_id).unwrap();
+        let acc = self.get_session_mut(acc_id).unwrap();
         &mut acc.players
     }
 
