@@ -62,6 +62,30 @@ pub fn login(
 
             // TODO auth
 
+            // ban check
+            if account.banned_until > time {
+                let ban_duration =
+                    util::format_duration(account.banned_until.duration_since(time).unwrap());
+                log(
+                    Severity::Info,
+                    &format!(
+                        "Banned account {} tried to log in (banned for {})",
+                        account.username, ban_duration
+                    ),
+                );
+                let ban_message = format!(
+                    "You are banned for {}.\nReason: {}",
+                    ban_duration, account.ban_reason
+                );
+                let resp = sP_FE2CL_GM_REP_PC_ANNOUNCE {
+                    iAnnounceType: unused!(),
+                    iDuringTime: i32::MAX,
+                    szAnnounceMsg: util::encode_utf16(&ban_message),
+                };
+                client.send_packet(P_FE2CL_GM_REP_PC_ANNOUNCE, &resp)?;
+                return Ok(());
+            }
+
             let last_player_slot = account.selected_slot;
             let players = db.load_players(account.id)?;
 

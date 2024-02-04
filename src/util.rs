@@ -86,6 +86,19 @@ pub fn get_systime_from_sec(timestamp_sec: u64) -> SystemTime {
     SystemTime::UNIX_EPOCH + diff
 }
 
+pub fn format_duration(duration: Duration) -> String {
+    let secs = duration.as_secs();
+    let mins = secs / 60;
+    let hours = mins / 60;
+    let days = hours / 24;
+    format!(
+        "{} day(s), {} hour(s), {} minute(s)",
+        days,
+        hours % 24,
+        mins % 60
+    )
+}
+
 pub fn get_uid() -> i64 {
     rand::random()
 }
