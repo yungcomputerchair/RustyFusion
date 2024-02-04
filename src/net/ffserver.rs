@@ -72,7 +72,7 @@ impl FFServer {
         let client_keys: Vec<usize> = self.clients.keys().copied().collect();
         for key in client_keys {
             let client = self.clients.get_mut(&key).unwrap();
-            if client.should_dc {
+            if client.should_dc() {
                 self.disconnect_client(key, state)?;
             }
             // TODO move live checks here maybe

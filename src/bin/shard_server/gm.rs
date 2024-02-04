@@ -498,7 +498,7 @@ pub fn gm_kick_player(clients: &mut ClientMap, state: &mut ShardServerState) -> 
         iExitCode: EXIT_CODE_REQ_BY_GM as i32,
     };
     log_if_failed(client.send_packet(P_FE2CL_REP_PC_EXIT_SUCC, &pkt));
-    client.should_dc = true;
+    client.disconnect();
     Ok(())
 }
 

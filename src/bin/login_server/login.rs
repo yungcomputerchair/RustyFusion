@@ -182,7 +182,7 @@ pub fn pc_exit_duplicate(
     };
     let old_client = clients.get_mut(&old_key).unwrap();
     log_if_failed(old_client.send_packet(P_LS2CL_REP_PC_EXIT_DUPLICATE, &pkt));
-    old_client.should_dc = true;
+    old_client.disconnect();
     Ok(())
 }
 

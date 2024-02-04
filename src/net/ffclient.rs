@@ -42,7 +42,7 @@ pub struct FFClient {
     pub client_type: ClientType,
     pub last_heartbeat: SystemTime,
     pub live_check_pending: bool,
-    pub should_dc: bool,
+    should_dc: bool,
 }
 
 impl FFClient {
@@ -64,6 +64,14 @@ impl FFClient {
             live_check_pending: false,
             should_dc: false,
         }
+    }
+
+    pub fn should_dc(&self) -> bool {
+        self.should_dc
+    }
+
+    pub fn disconnect(&mut self) {
+        self.should_dc = true;
     }
 
     pub fn get_addr(&self) -> String {
