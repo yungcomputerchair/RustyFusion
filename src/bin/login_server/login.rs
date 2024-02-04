@@ -20,7 +20,7 @@ pub fn login(
     time: SystemTime,
 ) -> FFResult<()> {
     let pkt: sP_CL2LS_REQ_LOGIN = *client.get_packet(P_CL2LS_REQ_LOGIN)?;
-    let mut error_code = 0;
+    let mut error_code = 4; // "Login error"
     catch_fail(
         (|| {
             let username = if pkt.szID[0] != 0 {
@@ -51,7 +51,7 @@ pub fn login(
                         );
                         new_acc
                     } else {
-                        error_code = 1; // "Login fail: login ID error"
+                        error_code = 1; // "Sorry, the ID you have entered does not exist. Please try again."
                         return Err(FFError::build(
                             Severity::Warning,
                             format!("Couldn't find account {}", username),
@@ -62,7 +62,16 @@ pub fn login(
 
             // TODO auth
 
-            // ban check
+            // check if login session active
+            if state.is_session_active(account.id) {
+                error_code = 3; // "ID already in use. Disconnect existing connection?"
+                return Err(FFError::build(
+                    Severity::Debug,
+                    format!("Account {} already logged in", username),
+                ));
+            }
+
+            // check if banned
             if account.banned_until > time {
                 let ban_duration =
                     util::format_duration(account.banned_until.duration_since(time).unwrap());
@@ -141,6 +150,40 @@ pub fn login(
             client.send_packet(P_LS2CL_REP_LOGIN_FAIL, &resp)
         },
     )
+}
+
+pub fn pc_exit_duplicate(
+    new_key: usize,
+    clients: &mut HashMap<usize, FFClient>,
+    state: &mut LoginServerState,
+) -> FFResult<()> {
+    let client = clients.get_mut(&new_key).unwrap();
+    let pkt: &sP_CL2LS_REQ_PC_EXIT_DUPLICATE = client.get_packet(P_CL2LS_REQ_PC_EXIT_DUPLICATE)?;
+    // N.B. this packet doesn't work if the new client is using a cookie :(
+    let username = util::parse_utf16(&pkt.szID)?;
+    let (old_key, acc_id) = clients
+        .iter()
+        .find_map(|(key, c)| {
+            let acc_id = c.get_account_id().ok()?;
+            let acc_username = state.get_username(acc_id);
+            if acc_username == username {
+                Some((*key, acc_id))
+            } else {
+                None
+            }
+        })
+        .ok_or(FFError::build(
+            Severity::Warning,
+            format!("Couldn't find existing session for account {}", username),
+        ))?;
+    state.end_session(acc_id);
+    let pkt = sP_LS2CL_REP_PC_EXIT_DUPLICATE {
+        iErrorCode: unused!(),
+    };
+    let old_client = clients.get_mut(&old_key).unwrap();
+    log_if_failed(old_client.send_packet(P_LS2CL_REP_PC_EXIT_DUPLICATE, &pkt));
+    old_client.should_dc = true;
+    Ok(())
 }
 
 pub fn check_char_name(client: &mut FFClient) -> FFResult<()> {

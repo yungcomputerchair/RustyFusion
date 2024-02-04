@@ -79,6 +79,10 @@ impl LoginServerState {
         ))
     }
 
+    pub fn is_session_active(&self, acc_id: i64) -> bool {
+        self.sessions.contains_key(&acc_id)
+    }
+
     pub fn start_session(&mut self, account: Account, player_it: impl Iterator<Item = Player>) {
         let mut players = HashMap::new();
         for player in player_it {

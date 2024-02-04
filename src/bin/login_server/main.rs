@@ -106,16 +106,26 @@ impl Drop for Cleanup {
 fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>, state: &mut ServerState) {
     let state = state.as_login();
     let client = clients.get_mut(&key).unwrap();
-    if let ClientType::ShardServer(shard_id) = client.client_type {
-        state.unregister_shard(shard_id);
-        log(
-            Severity::Info,
-            &format!(
-                "Shard server #{} ({}) disconnected",
-                shard_id,
-                client.get_addr()
-            ),
-        );
+    match client.client_type {
+        ClientType::ShardServer(shard_id) => {
+            state.unregister_shard(shard_id);
+            log(
+                Severity::Info,
+                &format!(
+                    "Shard server #{} ({}) disconnected",
+                    shard_id,
+                    client.get_addr()
+                ),
+            );
+        }
+        ClientType::GameClient { account_id, .. } => {
+            state.end_session(account_id);
+            log(
+                Severity::Debug,
+                &format!("Login session ended for account #{}", account_id),
+            );
+        }
+        _ => (),
     }
 }
 
@@ -145,6 +155,7 @@ fn handle_packet(
         P_FE2LS_REP_PC_LOCATION_FAIL => shard::pc_location_fail(key, clients, state),
         //
         P_CL2LS_REQ_LOGIN => login::login(client, state, time),
+        P_CL2LS_REQ_PC_EXIT_DUPLICATE => login::pc_exit_duplicate(key, clients, state),
         P_CL2LS_REQ_SHARD_LIST_INFO => login::shard_list_info(client, state),
         P_CL2LS_REQ_CHECK_CHAR_NAME => login::check_char_name(client),
         P_CL2LS_REQ_SAVE_CHAR_NAME => login::save_char_name(client, state),
