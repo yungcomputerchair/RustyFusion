@@ -84,7 +84,7 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
 - [ ] Interactive terminal (bonus) *
 
 ### Known Issues
-- You can log in as the same character twice simultaneously
+- None
 
 Items that are ***highlighted*** are in planning or WIP. Items marked with `*` are either new and not present in OpenFusion or enhanced from OpenFusion. Some items have dependencies in other categories, so the list won't get completed in order.
 
