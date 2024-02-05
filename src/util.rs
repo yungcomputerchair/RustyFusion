@@ -86,6 +86,14 @@ pub fn get_systime_from_sec(timestamp_sec: u64) -> SystemTime {
     SystemTime::UNIX_EPOCH + diff
 }
 
+pub fn hash_password(password: &str) -> FFResult<String> {
+    bcrypt::hash(password, bcrypt::DEFAULT_COST).map_err(FFError::from_bcrypt_err)
+}
+
+pub fn check_password(password: &str, hash: &str) -> FFResult<bool> {
+    bcrypt::verify(password, hash).map_err(FFError::from_bcrypt_err)
+}
+
 pub fn format_duration(duration: Duration) -> String {
     let secs = duration.as_secs();
     let mins = secs / 60;

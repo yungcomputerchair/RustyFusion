@@ -86,6 +86,15 @@ impl FFError {
         Self::new(severity, msg, true)
     }
 
+    pub fn from_bcrypt_err(error: bcrypt::BcryptError) -> Self {
+        Self {
+            severity: Severity::Warning,
+            msg: format!("BCrypt error ({:?})", error),
+            should_dc: false,
+            parent: None,
+        }
+    }
+
     pub fn from_io_err(error: std::io::Error) -> Self {
         Self {
             severity: match error.kind() {

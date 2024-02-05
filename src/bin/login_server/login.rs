@@ -11,7 +11,7 @@ use rusty_fusion::{
     enums::{ItemLocation, ItemType},
     error::{catch_fail, log_if_failed, FFError, FFResult, Severity},
     net::{ffclient::ClientType, packet::*},
-    placeholder, unused, util, Combatant, Entity, Item,
+    unused, util, Combatant, Entity, Item,
 };
 
 pub fn login(
@@ -35,15 +35,13 @@ pub fn login(
                 util::parse_utf8(&pkt.szCookie_authid)?
             };
 
-            // TODO password hashing
-            let password_hashed = placeholder!(password.clone());
-
             let mut db = db_get();
             let account = match db.find_account(&username)? {
                 Some(account) => account,
                 None => {
                     if config_get().login.auto_create_accounts.get() {
                         // automatically create the account with the supplied credentials
+                        let password_hashed = util::hash_password(&password)?;
                         let new_acc = db.create_account(&username, &password_hashed)?;
                         log(
                             Severity::Info,
@@ -60,7 +58,14 @@ pub fn login(
                 }
             };
 
-            // TODO auth
+            // check password
+            if !util::check_password(&password, &account.password_hashed)? {
+                error_code = 2; // "Sorry, the ID and Password you have entered do not match. Please try again."
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!("Incorrect password for account {}", username),
+                ));
+            }
 
             // check if banned
             if account.banned_until > time {

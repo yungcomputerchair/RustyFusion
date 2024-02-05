@@ -19,6 +19,7 @@ postgres = { version = "0.19.7", optional = true }
 mongodb = { version = "2.8.0", features = ["tokio-sync"], optional = true }
 num_enum = "0.7.2"
 regex = "1.10.3"
+bcrypt = "0.15.0"
 
 [features]
 default = ["postgres"]
