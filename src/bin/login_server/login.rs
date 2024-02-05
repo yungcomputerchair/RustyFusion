@@ -27,13 +27,17 @@ pub fn login(
                 util::parse_utf16(&pkt.szID)?
             } else {
                 util::parse_utf8(&pkt.szCookie_TEGid)?
-            };
+            }
+            .trim()
+            .to_lowercase();
 
             let password = if pkt.szPassword[0] != 0 {
                 util::parse_utf16(&pkt.szPassword)?
             } else {
                 util::parse_utf8(&pkt.szCookie_authid)?
-            };
+            }
+            .trim()
+            .to_owned();
 
             let mut db = db_get();
             let account = match db.find_account(&username)? {
