@@ -9,7 +9,7 @@ use rusty_fusion::{
     database::db_get,
     defines::*,
     enums::{ItemLocation, ItemType},
-    error::{catch_fail, FFError, FFResult, Severity},
+    error::{catch_fail, log_if_failed, FFError, FFResult, Severity},
     net::{ffclient::ClientType, packet::*},
     placeholder, unused, util, Combatant, Entity, Item,
 };
@@ -62,15 +62,6 @@ pub fn login(
 
             // TODO auth
 
-            // check if login session active
-            if state.is_session_active(account.id) {
-                error_code = 3; // "ID already in use. Disconnect existing connection?"
-                return Err(FFError::build(
-                    Severity::Debug,
-                    format!("Account {} already logged in", username),
-                ));
-            }
-
             // check if banned
             if account.banned_until > time {
                 let ban_duration =
@@ -97,6 +88,34 @@ pub fn login(
 
             let last_player_slot = account.selected_slot;
             let players = db.load_players(account.id)?;
+
+            /*
+             * Check if this account is already logged in, meaning:
+             * a) the account has a session here in the login server, or
+             * b) one of the account's players is tracked in a shard server
+             */
+            if state.is_session_active(account.id) {
+                client.client_type = ClientType::UnauthedClient {
+                    username: username.clone(),
+                    dup_pc_uid: None,
+                };
+            } else if let Some(dup_player) = players
+                .iter()
+                .find(|p| state.get_player_shard(p.get_uid()).is_some())
+            {
+                client.client_type = ClientType::UnauthedClient {
+                    username: username.clone(),
+                    dup_pc_uid: Some(dup_player.get_uid()),
+                };
+            }
+
+            if matches!(client.client_type, ClientType::UnauthedClient { .. }) {
+                error_code = 3; // "ID already in use. Disconnect existing connection?"
+                return Err(FFError::build(
+                    Severity::Debug,
+                    format!("Account {} already logged in", username),
+                ));
+            }
 
             let resp = sP_LS2CL_REP_LOGIN_SUCC {
                 iCharCount: players.len() as i8,
@@ -158,32 +177,54 @@ pub fn pc_exit_duplicate(
     state: &mut LoginServerState,
 ) -> FFResult<()> {
     let client = clients.get_mut(&new_key).unwrap();
-    let pkt: &sP_CL2LS_REQ_PC_EXIT_DUPLICATE = client.get_packet(P_CL2LS_REQ_PC_EXIT_DUPLICATE)?;
-    // N.B. this packet doesn't work if the new client is using a cookie :(
-    let username = util::parse_utf16(&pkt.szID)?;
-    let (old_key, acc_id) = clients
-        .iter()
-        .find_map(|(key, c)| {
-            let acc_id = c.get_account_id().ok()?;
-            let acc_username = state.get_username(acc_id);
-            if acc_username == username {
-                Some((*key, acc_id))
-            } else {
-                None
-            }
-        })
-        .ok_or(FFError::build(
+    let client_type = client.client_type.clone();
+    let ClientType::UnauthedClient {
+        username,
+        dup_pc_uid,
+    } = client_type
+    else {
+        return Err(FFError::build(
             Severity::Warning,
-            format!("Couldn't find existing session for account {}", username),
-        ))?;
-    state.end_session(acc_id);
-    let pkt = sP_LS2CL_REP_PC_EXIT_DUPLICATE {
-        iErrorCode: unused!(),
+            "Client is not an unauthed client".to_string(),
+        ));
     };
-    let old_client = clients.get_mut(&old_key).unwrap();
-    log_if_failed(old_client.send_packet(P_LS2CL_REP_PC_EXIT_DUPLICATE, &pkt));
-    old_client.disconnect();
-    Ok(())
+
+    if let Some(dup_pc_uid) = dup_pc_uid {
+        // find the shard server that the duplicate player is on
+        let shard_id = state.get_player_shard(dup_pc_uid).ok_or(FFError::build(
+            Severity::Warning,
+            format!("Couldn't find shard server for player {}", dup_pc_uid),
+        ))?;
+        let shard = clients
+            .values_mut()
+            .find(|c| matches!(c.client_type, ClientType::ShardServer(sid) if sid == shard_id))
+            .unwrap();
+        let pkt = sP_LS2FE_REQ_PC_EXIT_DUPLICATE {
+            iPC_UID: dup_pc_uid,
+        };
+        log_if_failed(shard.send_packet(P_LS2FE_REQ_PC_EXIT_DUPLICATE, &pkt));
+        Ok(())
+    } else {
+        // kick login server session
+        for client in clients.values_mut() {
+            if matches!(client.client_type, ClientType::GameClient { account_id, .. } if state.get_username(account_id) == username)
+            {
+                let pkt = sP_LS2CL_REP_PC_EXIT_DUPLICATE {
+                    iErrorCode: unused!(),
+                };
+                log_if_failed(client.send_packet(P_LS2CL_REP_PC_EXIT_DUPLICATE, &pkt));
+                client.disconnect();
+                return Ok(());
+            }
+        }
+        Err(FFError::build(
+            Severity::Warning,
+            format!(
+                "Couldn't find client with login session for account {}",
+                username
+            ),
+        ))
+    }
 }
 
 pub fn check_char_name(client: &mut FFClient) -> FFResult<()> {

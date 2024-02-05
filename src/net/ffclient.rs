@@ -19,6 +19,10 @@ use super::{
 #[derive(Debug, Clone)]
 pub enum ClientType {
     Unknown,
+    UnauthedClient {
+        username: String,
+        dup_pc_uid: Option<i64>,
+    },
     GameClient {
         account_id: i64,
         serial_key: i64,    // iEnterSerialKey

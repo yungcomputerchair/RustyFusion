@@ -233,3 +233,29 @@ pub fn login_pc_location_fail(
     log_if_failed(client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt));
     Ok(())
 }
+
+pub fn login_pc_exit_duplicate(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let pkt: &sP_LS2FE_REQ_PC_EXIT_DUPLICATE = clients
+        .get_self()
+        .get_packet(P_LS2FE_REQ_PC_EXIT_DUPLICATE)?;
+    let pc_uid = pkt.iPC_UID;
+    let pc_id = *state
+        .entity_map
+        .find_players(|p| p.get_uid() == pc_uid)
+        .first()
+        .ok_or(FFError::build(
+            Severity::Warning,
+            format!("Couldn't find player with UID {}", pc_uid),
+        ))?;
+    let player = state.get_player_mut(pc_id).unwrap();
+    let client = player.get_client(clients).unwrap();
+    let pkt = sP_FE2CL_REP_PC_EXIT_DUPLICATE {
+        iErrorCode: unused!(),
+    };
+    log_if_failed(client.send_packet(P_FE2CL_REP_PC_EXIT_DUPLICATE, &pkt));
+    client.disconnect();
+    Ok(())
+}

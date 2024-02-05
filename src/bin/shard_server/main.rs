@@ -185,6 +185,7 @@ fn handle_packet(
         P_LS2FE_REQ_PC_LOCATION => login::login_pc_location(&mut clients, state),
         P_LS2FE_REP_PC_LOCATION_SUCC => login::login_pc_location_succ(&mut clients, state),
         P_LS2FE_REP_PC_LOCATION_FAIL => login::login_pc_location_fail(&mut clients, state),
+        P_LS2FE_REQ_PC_EXIT_DUPLICATE => login::login_pc_exit_duplicate(&mut clients, state),
         //
         P_CL2LS_REQ_LOGIN => wrong_server(clients.get_self()),
         //

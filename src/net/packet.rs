@@ -531,6 +531,7 @@ pub enum PacketID {
     P_LS2FE_REP_PC_LOCATION_SUCC = 0x23000007,  // 587202567
     P_LS2FE_REP_PC_LOCATION_FAIL = 0x23000008,  // 587202568
     P_LS2FE_REQ_PC_LOCATION = 0x23000009,       // 587202569
+    P_LS2FE_REQ_PC_EXIT_DUPLICATE = 0x2300000a, // 587202570
 
     P_FE2LS_REQ_CONNECT = 0x32000001,                // 838860801
     P_FE2LS_REP_LIVE_CHECK = 0x32000002,             // 838860802
@@ -6600,6 +6601,14 @@ pub struct sP_LS2FE_REQ_PC_LOCATION {
     pub sReq: sP_CL2FE_GM_REQ_PC_LOCATION,
 }
 impl FFPacket for sP_LS2FE_REQ_PC_LOCATION {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_LS2FE_REQ_PC_EXIT_DUPLICATE {
+    pub iPC_UID: i64,
+}
+impl FFPacket for sP_LS2FE_REQ_PC_EXIT_DUPLICATE {}
 
 #[repr(packed(4))]
 #[repr(C)]

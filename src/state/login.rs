@@ -164,6 +164,15 @@ impl LoginServerState {
         old_shard_id
     }
 
+    pub fn get_player_shard(&self, player_uid: i64) -> Option<i32> {
+        for (shard_id, shard) in self.shards.iter() {
+            if shard.player_uids.contains(&player_uid) {
+                return Some(*shard_id);
+            }
+        }
+        None
+    }
+
     pub fn get_shard_channel_statuses(
         &self,
         shard_id: i32,
