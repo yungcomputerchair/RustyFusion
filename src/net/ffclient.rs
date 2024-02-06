@@ -159,7 +159,7 @@ impl FFClient {
         let pkt = self.get_struct()?;
 
         if !SILENCED_PACKETS.contains(&pkt_id) {
-            log(Severity::Debug, &format!("{:?}", pkt));
+            log(Severity::Debug, &format!("{:#?}", pkt));
         }
 
         Ok(pkt)
