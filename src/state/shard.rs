@@ -3,9 +3,9 @@ use std::{collections::HashMap, sync::mpsc::TryRecvError, time::SystemTime};
 use uuid::Uuid;
 
 use crate::{
-    chunk::EntityMap,
+    chunk::{EntityMap, InstanceID},
     config::config_get,
-    defines::MAX_NUM_CHANNELS,
+    defines::{ID_OVERWORLD, MAX_NUM_CHANNELS},
     enums::ItemType,
     error::{log, log_if_failed, panic_log, FFError, FFResult, Severity},
     helpers,
@@ -15,6 +15,7 @@ use crate::{
     },
     npc::NPC,
     player::Player,
+    slider::Slider,
     tabledata::tdata_get,
     Entity, EntityID, Item, TradeContext,
 };
@@ -56,6 +57,61 @@ impl Default for ShardServerState {
                 let id = entity_map.track(Box::new(npc));
                 entity_map.update(id, Some(chunk_pos), None);
             }
+
+            // spawn sliders uniformly across the circuit
+            let mut slider_circuit = tdata_get().get_slider_path();
+            let num_sliders = config_get().shard.num_sliders.get();
+            let slider_gap_size = slider_circuit.get_total_length() / num_sliders as u32;
+            let mut pos = slider_circuit.points[0].pos;
+            let mut dist_to_next = 0;
+            let mut sliders_spawned = 0;
+            loop {
+                if dist_to_next > 0 {
+                    let target_pos = slider_circuit.get_target_pos();
+                    let dist_to_target = target_pos.distance_to(&pos);
+                    if dist_to_target <= dist_to_next {
+                        // next point is closer than the distance to the next slider,
+                        // so we advance to the next point and continue
+                        pos = target_pos;
+                        dist_to_next -= dist_to_target;
+                        slider_circuit.advance();
+                    } else {
+                        // next point is farther than the distance to the next slider,
+                        // so we interpolate the position and prime a slider spawn
+                        let (new_pos, _) = pos.interpolate(&target_pos, dist_to_next as f32);
+                        pos = new_pos;
+                        dist_to_next = 0;
+                    }
+                    continue;
+                }
+
+                // spawn slider here
+                let instance_id = InstanceID {
+                    channel_num,
+                    map_num: ID_OVERWORLD,
+                    instance_num: None,
+                };
+                let entity_map = &mut state.entity_map;
+                let slider = Slider::new(
+                    entity_map.gen_next_slider_id(),
+                    pos,
+                    0,
+                    Some(slider_circuit.clone()),
+                    instance_id,
+                );
+                sliders_spawned += 1;
+                let chunk_pos = slider.get_chunk_coords();
+                let id = entity_map.track(Box::new(slider));
+                entity_map.update(id, Some(chunk_pos), None);
+                dist_to_next = slider_gap_size;
+                if sliders_spawned as usize == num_sliders {
+                    break;
+                }
+            }
+            log(
+                Severity::Debug,
+                &format!("Spawned {} sliders", sliders_spawned),
+            );
         }
         state
     }
@@ -87,6 +143,22 @@ impl ShardServerState {
             Severity::Warning,
             format!("Player with ID {} doesn't exist", pc_id),
         ))
+    }
+
+    pub fn get_slider(&self, slider_id: i32) -> FFResult<&Slider> {
+        self.entity_map.get_slider(slider_id).ok_or(FFError::build(
+            Severity::Warning,
+            format!("Slider with ID {} doesn't exist", slider_id),
+        ))
+    }
+
+    pub fn get_slider_mut(&mut self, slider_id: i32) -> FFResult<&mut Slider> {
+        self.entity_map
+            .get_slider_mut(slider_id)
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Slider with ID {} doesn't exist", slider_id),
+            ))
     }
 
     pub fn check_for_expired_vehicles(&mut self, time: SystemTime, clients: &mut ClientMap) {
@@ -145,6 +217,11 @@ impl ShardServerState {
                     let mut npc = self.entity_map.get_npc_mut(npc_id).unwrap().clone();
                     npc.tick(time, clients, self);
                     *self.entity_map.get_npc_mut(npc_id).unwrap() = npc;
+                }
+                EntityID::Slider(slider_id) => {
+                    let mut slider = self.entity_map.get_slider_mut(slider_id).unwrap().clone();
+                    slider.tick(time, clients, self);
+                    *self.entity_map.get_slider_mut(slider_id).unwrap() = slider;
                 }
             }
         }

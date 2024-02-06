@@ -447,6 +447,10 @@ impl TableData {
     pub fn get_npc_path(&self, npc_type: i32) -> Option<Path> {
         self.path_data.npc_paths.get(&npc_type).cloned()
     }
+
+    pub fn get_slider_path(&self) -> Path {
+        self.path_data.slider_path.clone()
+    }
 }
 
 pub fn tdata_init() -> &'static TableData {

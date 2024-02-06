@@ -191,6 +191,8 @@ pub fn pc_move(
     };
     let angle = pkt.iAngle;
 
+    // TODO anticheat
+
     let resp = sP_FE2CL_PC_MOVE {
         iCliTime: pkt.iCliTime,
         iX: pkt.iX,
@@ -213,9 +215,6 @@ pub fn pc_move(
         });
 
     let player = state.get_player_mut(pc_id)?;
-
-    // TODO anticheat
-
     let entity_id = player.get_id();
     player.set_position(pos);
     player.set_rotation(angle);
@@ -241,6 +240,8 @@ pub fn pc_jump(
     };
     let angle = pkt.iAngle;
 
+    // TODO anticheat
+
     let resp = sP_FE2CL_PC_JUMP {
         iCliTime: pkt.iCliTime,
         iX: pkt.iX,
@@ -263,9 +264,6 @@ pub fn pc_jump(
         });
 
     let player = state.get_player_mut(pc_id)?;
-
-    // TODO anticheat
-
     let entity_id = player.get_id();
     player.set_position(pos);
     player.set_rotation(angle);
@@ -290,6 +288,8 @@ pub fn pc_stop(
         z: pkt.iZ,
     };
 
+    // TODO anticheat
+
     let resp = sP_FE2CL_PC_STOP {
         iCliTime: pkt.iCliTime,
         iX: pkt.iX,
@@ -306,9 +306,6 @@ pub fn pc_stop(
         });
 
     let player = state.get_player_mut(pc_id)?;
-
-    // TODO anticheat
-
     let entity_id = player.get_id();
     player.set_position(pos);
     let chunk = player.get_chunk_coords();
@@ -316,6 +313,78 @@ pub fn pc_stop(
         .entity_map
         .update(entity_id, Some(chunk), Some(clients));
     Ok(())
+}
+
+pub fn pc_movetransportation(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+    time: SystemTime,
+) -> FFResult<()> {
+    let client = clients.get_self();
+    let pc_id = client.get_player_id()?;
+    let pkt: &sP_CL2FE_REQ_PC_MOVETRANSPORTATION =
+        client.get_packet(P_CL2FE_REQ_PC_MOVETRANSPORTATION)?;
+    let pos = Position {
+        x: pkt.iX,
+        y: pkt.iY,
+        z: pkt.iZ,
+    };
+    let angle = pkt.iAngle;
+
+    let _slider = state.get_slider(pkt.iT_ID)?;
+    // TODO anticheat
+
+    let resp = sP_FE2CL_PC_MOVETRANSPORTATION {
+        iCliTime: pkt.iCliTime,
+        iLcX: pkt.iLcX,
+        iLcY: pkt.iLcY,
+        iLcZ: pkt.iLcZ,
+        iX: pkt.iX,
+        iY: pkt.iY,
+        iZ: pkt.iZ,
+        fVX: pkt.fVX,
+        fVY: pkt.fVY,
+        fVZ: pkt.fVZ,
+        iT_ID: pkt.iT_ID,
+        iAngle: pkt.iAngle,
+        cKeyValue: pkt.cKeyValue,
+        iSpeed: pkt.iSpeed,
+        iPC_ID: pc_id,
+        iSvrTime: util::get_timestamp_ms(time),
+    };
+
+    state
+        .entity_map
+        .for_each_around(EntityID::Player(pc_id), clients, |client| {
+            client.send_packet(P_FE2CL_PC_MOVETRANSPORTATION, &resp)
+        });
+
+    let player = state.get_player_mut(pc_id)?;
+
+    // TODO anticheat
+
+    let entity_id = player.get_id();
+    player.set_position(pos);
+    player.set_rotation(angle);
+    let chunk = player.get_chunk_coords();
+    state
+        .entity_map
+        .update(entity_id, Some(chunk), Some(clients));
+    Ok(())
+}
+
+pub fn pc_transport_warp(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+    let pkt: &sP_CL2FE_REQ_PC_TRANSPORT_WARP = client.get_packet(P_CL2FE_REQ_PC_TRANSPORT_WARP)?;
+
+    let slider = state.get_slider(pkt.iTransport_ID)?;
+    let resp = sP_FE2CL_REP_PC_TRANSPORT_WARP_SUCC {
+        TransportationAppearanceData: slider.get_appearance_data(),
+        iLcX: pkt.iLcX,
+        iLcY: pkt.iLcY,
+        iLcZ: pkt.iLcZ,
+    };
+
+    client.send_packet(P_FE2CL_REP_PC_TRANSPORT_WARP_SUCC, &resp)
 }
 
 pub fn pc_vehicle_on(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {

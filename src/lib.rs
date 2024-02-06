@@ -50,6 +50,7 @@ pub mod tabledata;
 pub mod chunk;
 pub mod npc;
 pub mod player;
+pub mod slider;
 
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
 pub struct Position {
@@ -65,6 +66,19 @@ impl Position {
         let dy = self.y.abs_diff(other.y) as f32 / DIST_MATH_SCALE;
         let dz = self.z.abs_diff(other.z) as f32 / DIST_MATH_SCALE;
         ((dx * dx + dy * dy + dz * dz).sqrt() * DIST_MATH_SCALE) as u32
+    }
+
+    pub fn interpolate(&self, target: &Position, distance: f32) -> (Position, bool) {
+        let source = (*self).into();
+        let target = (*target).into();
+        let delta = vec3_sub(target, source);
+        let delta_len = vec3_len(delta);
+        if delta_len <= distance {
+            (target.into(), true)
+        } else {
+            let new_pos = vec3_add(source, vec3_scale(delta, distance / delta_len)).into();
+            (new_pos, false)
+        }
     }
 
     pub fn get_unstuck(&self) -> Position {
@@ -130,6 +144,22 @@ impl Path {
         }
     }
 
+    pub fn get_total_length(&self) -> u32 {
+        let mut total_length = 0;
+        for i in 0..self.points.len() - 1 {
+            total_length += self.points[i].pos.distance_to(&self.points[i + 1].pos);
+        }
+        if self.cycle {
+            total_length += self
+                .points
+                .last()
+                .unwrap()
+                .pos
+                .distance_to(&self.points[0].pos);
+        }
+        total_length
+    }
+
     pub fn get_target_pos(&self) -> Position {
         self.points[self.idx].pos
     }
@@ -141,7 +171,7 @@ impl Path {
         }
     }
 
-    fn advance(&mut self) {
+    pub fn advance(&mut self) -> bool {
         self.idx += 1;
         if self.idx == self.points.len() {
             if self.cycle {
@@ -150,13 +180,15 @@ impl Path {
                 self.idx -= 1; // hold last point as target
                 self.state = PathState::Done;
             }
+            true
+        } else {
+            false
         }
     }
 
     pub fn tick(&mut self, pos: &mut Position) -> bool {
         match self.state {
             PathState::Pending => {
-                self.idx = 0;
                 self.state = PathState::Moving;
             }
             PathState::Moving => {
@@ -164,19 +196,16 @@ impl Path {
                 let target_point = self.points[self.idx];
                 let target_pos = target_point.pos;
                 let source_pos = *pos;
-                let delta = vec3_sub(target_pos.into(), source_pos.into());
-                let delta_len = vec3_len(delta);
-                if delta_len <= dist {
+                let (new_pos, snap) = source_pos.interpolate(&target_pos, dist);
+                *pos = new_pos;
+                if snap {
                     // reached target
-                    *pos = target_pos;
                     if target_point.stop_ticks > 0 {
                         self.state = PathState::Waiting(target_point.stop_ticks);
                     } else {
                         self.advance();
                         return true;
                     }
-                } else {
-                    *pos = vec3_add(source_pos.into(), vec3_scale(delta, dist / delta_len)).into();
                 }
             }
             PathState::Waiting(ticks_left) => {
@@ -732,6 +761,7 @@ impl From<Option<Mission>> for sRunningQuest {
 pub enum EntityID {
     Player(i32),
     NPC(i32),
+    Slider(i32),
 }
 
 pub trait Entity {

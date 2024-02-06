@@ -38,5 +38,6 @@ max_channel_pop = 100 # how many players are allowed per channel.
                       # warp to a channel that is full.
 visibility_range = 1 # how far (chunks) game clients can see entities
 autosave_interval = 5 # how often (minutes) to save all players to the database
+num_sliders = 20 # how many sliders (evenly spaced out) there should be on the slider circuit
 vehicle_duration = 10_080  # how long (minutes) after a vehicle is bought before it expires
                            # defaults to one week

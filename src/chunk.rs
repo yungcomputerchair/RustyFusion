@@ -13,6 +13,7 @@ use crate::{
     net::{ffclient::FFClient, ClientMap},
     npc::NPC,
     player::Player,
+    slider::Slider,
     Entity, EntityID, Position,
 };
 
@@ -100,6 +101,7 @@ pub struct EntityMap {
     chunk_maps: HashMap<InstanceID, ChunkMap>,
     next_pc_id: u32,
     next_npc_id: u32,
+    next_slider_id: u32,
 }
 
 impl EntityMap {
@@ -233,6 +235,24 @@ impl EntityMap {
             .collect()
     }
 
+    pub fn get_slider(&self, slider_id: i32) -> Option<&Slider> {
+        let id = EntityID::Slider(slider_id);
+        self.registry.get(&id).and_then(|entry| {
+            let entity_ref = entry.entity.as_ref().as_any();
+            let slider_ref = entity_ref.downcast_ref();
+            slider_ref
+        })
+    }
+
+    pub fn get_slider_mut(&mut self, slider_id: i32) -> Option<&mut Slider> {
+        let id = EntityID::Slider(slider_id);
+        self.registry.get_mut(&id).and_then(|entry| {
+            let entity_ref = entry.entity.as_mut().as_any_mut();
+            let slider_ref = entity_ref.downcast_mut();
+            slider_ref
+        })
+    }
+
     pub fn validate_proximity(&self, ids: &[EntityID], range: u32) -> FFResult<bool> {
         let mut locations = Vec::with_capacity(ids.len());
         for id in ids {
@@ -297,6 +317,15 @@ impl EntityMap {
             panic_log("Ran out of NPC IDs");
         }
         self.next_npc_id += 1;
+        id as i32
+    }
+
+    pub fn gen_next_slider_id(&mut self) -> i32 {
+        let id = self.next_slider_id;
+        if id == u32::MAX {
+            panic_log("Ran out of slider IDs");
+        }
+        self.next_slider_id += 1;
         id as i32
     }
 
@@ -637,6 +666,7 @@ impl Default for EntityMap {
             chunk_maps: HashMap::new(),
             next_pc_id: 1,
             next_npc_id: 1,
+            next_slider_id: 1,
         }
     }
 }
