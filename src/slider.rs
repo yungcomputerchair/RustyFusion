@@ -99,8 +99,8 @@ impl Entity for Slider {
 
     fn tick(&mut self, _time: SystemTime, clients: &mut ClientMap, state: &mut ShardServerState) {
         if let Some(path) = self.path.as_mut() {
-            path.tick(&mut self.position);
             let speed = path.get_speed();
+            path.tick(&mut self.position);
             let chunk_pos = self.get_chunk_coords();
             state
                 .entity_map
