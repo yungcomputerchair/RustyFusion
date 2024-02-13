@@ -13,12 +13,13 @@ use crate::{
 };
 
 const PACKET_BUFFER_SIZE: usize = 4096;
-const SILENCED_PACKETS: [PacketID; 4] = [
+const SILENCED_PACKETS: [PacketID; 5] = [
     P_LS2FE_REP_CONNECT_SUCC,
     //
     P_CL2FE_REQ_PC_MOVE,
     P_CL2FE_REQ_PC_JUMP,
     P_CL2FE_REQ_PC_STOP,
+    P_CL2FE_REQ_PC_MOVETRANSPORTATION,
 ];
 
 pub mod crypto;
