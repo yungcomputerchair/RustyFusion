@@ -6,6 +6,8 @@ pub const DB_VERSION: i32 = 5;
 pub const MAX_NUM_SHARDS: usize = 9;
 pub const MAX_NUM_CHANNELS: usize = 25;
 
+pub const SHARD_TICKS_PER_SECOND: usize = 8;
+
 pub const SIZEOF_NANO_SKILLS: usize = 3;
 
 pub const NANO_STAMINA_MAX: i16 = 150;

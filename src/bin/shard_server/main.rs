@@ -11,6 +11,7 @@ use std::{
 use rusty_fusion::{
     config::{config_get, config_init},
     database::{db_init, db_run_parallel},
+    defines::SHARD_TICKS_PER_SECOND,
     error::{
         log, log_error, log_if_failed, logger_flush, logger_flush_scheduled, logger_init,
         panic_log, FFError, FFResult, Severity,
@@ -81,7 +82,7 @@ fn main() -> Result<()> {
             st.as_shard().tick_entities(t, &mut srv.get_client_map());
             Ok(())
         },
-        Duration::from_secs(1),
+        Duration::from_millis(1000 / SHARD_TICKS_PER_SECOND as u64),
         false,
     );
     timers.register_timer(

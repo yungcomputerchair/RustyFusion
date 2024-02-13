@@ -3,7 +3,9 @@
 use std::{any::Any, cmp::min, hash::Hash, time::SystemTime};
 
 use chunk::ChunkCoords;
-use defines::{NANO_STAMINA_MAX, SIZEOF_TRADE_SLOT, SIZEOF_VENDOR_TABLE_SLOT};
+use defines::{
+    NANO_STAMINA_MAX, SHARD_TICKS_PER_SECOND, SIZEOF_TRADE_SLOT, SIZEOF_VENDOR_TABLE_SLOT,
+};
 use enums::ItemType;
 use error::{panic_log, FFError, FFResult, Severity};
 use net::{
@@ -189,7 +191,7 @@ impl Path {
                 self.state = PathState::Moving;
             }
             PathState::Moving => {
-                let dist = self.points[self.idx].speed as f32;
+                let dist = self.points[self.idx].speed as f32 / SHARD_TICKS_PER_SECOND as f32;
                 let target_point = self.points[self.idx];
                 let target_pos = target_point.pos;
                 let source_pos = *pos;
@@ -198,7 +200,7 @@ impl Path {
                 if snap {
                     // reached target
                     if target_point.stop_ticks > 0 {
-                        self.state = PathState::Waiting(target_point.stop_ticks);
+                        self.state = PathState::Waiting(target_point.stop_ticks * SHARD_TICKS_PER_SECOND);
                     } else {
                         self.advance();
                         return true;
