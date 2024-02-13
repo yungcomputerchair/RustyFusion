@@ -171,7 +171,7 @@ impl Path {
         }
     }
 
-    pub fn advance(&mut self) -> bool {
+    pub fn advance(&mut self) {
         self.idx += 1;
         if self.idx == self.points.len() {
             if self.cycle {
@@ -180,9 +180,6 @@ impl Path {
                 self.idx -= 1; // hold last point as target
                 self.state = PathState::Done;
             }
-            true
-        } else {
-            false
         }
     }
 
