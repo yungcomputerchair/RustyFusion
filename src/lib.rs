@@ -200,7 +200,8 @@ impl Path {
                 if snap {
                     // reached target
                     if target_point.stop_ticks > 0 {
-                        self.state = PathState::Waiting(target_point.stop_ticks * SHARD_TICKS_PER_SECOND);
+                        self.state =
+                            PathState::Waiting(target_point.stop_ticks * SHARD_TICKS_PER_SECOND);
                     } else {
                         self.advance();
                         return true;
