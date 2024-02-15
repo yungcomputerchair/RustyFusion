@@ -47,6 +47,7 @@ pub struct FFClient {
     pub last_heartbeat: SystemTime,
     pub live_check_pending: bool,
     should_dc: bool,
+    ignore_packets: bool,
 }
 
 impl FFClient {
@@ -67,6 +68,7 @@ impl FFClient {
             last_heartbeat: SystemTime::now(),
             live_check_pending: false,
             should_dc: false,
+            ignore_packets: false,
         }
     }
 
@@ -128,6 +130,21 @@ impl FFClient {
             *pc_id = None;
         }
         Ok(pc_id)
+    }
+
+    pub fn set_ignore_packets(&mut self, ignore: bool) -> FFResult<()> {
+        if self.ignore_packets == ignore {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Tried to set ignore_packets to {} when it's already {}",
+                    ignore, self.ignore_packets
+                ),
+            ));
+        }
+
+        self.ignore_packets = ignore;
+        Ok(())
     }
 
     pub fn peek_packet_id(&self) -> FFResult<PacketID> {
@@ -217,6 +234,17 @@ impl FFClient {
         decrypt_payload(buf, &self.e_key);
 
         let id = self.peek_packet_id()?;
+
+        // discard packet if we're ignoring them for this client.
+        // we need to set the data length to 0 to "empty" the buffer.
+        // we also need to return an error so the caller doesn't fire the packet handler.
+        if self.ignore_packets {
+            self.in_data_len = 0;
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Ignoring {:?} from {}", id, self.get_addr()),
+            ));
+        }
 
         if !SILENCED_PACKETS.contains(&id) {
             log(
