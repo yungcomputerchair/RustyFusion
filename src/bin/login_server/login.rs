@@ -265,6 +265,7 @@ pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> FF
     let last_name = util::parse_utf16(&pkt.szLastName)?;
     player.first_name = first_name;
     player.last_name = last_name;
+    player.flags.name_check_flag = true; // TODO check name + config
 
     let mut db = db_get();
     db.init_player(acc_id, &player)?;
