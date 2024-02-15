@@ -80,7 +80,7 @@ pub fn pc_enter(
             player, player.instance_id.channel_num
         ),
     );
-    state.entity_map.track(Box::new(player));
+    state.entity_map.track(Box::new(player), true);
 
     clients
         .get_self()

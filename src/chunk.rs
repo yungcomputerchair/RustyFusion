@@ -79,6 +79,7 @@ fn get_visibility_range() -> usize {
 struct RegistryEntry {
     entity: Box<dyn Entity>,
     chunk: Option<ChunkCoords>,
+    tick: bool,
 }
 
 struct ChunkMap {
@@ -133,6 +134,12 @@ impl EntityMap {
 
     pub fn get_all_ids(&self) -> impl Iterator<Item = EntityID> + '_ {
         self.registry.keys().cloned()
+    }
+
+    pub fn get_tickable_ids(&self) -> impl Iterator<Item = EntityID> + '_ {
+        self.registry
+            .iter()
+            .filter_map(|(id, entry)| if entry.tick { Some(*id) } else { None })
     }
 
     pub fn get_around_entity(
@@ -329,7 +336,7 @@ impl EntityMap {
         id as i32
     }
 
-    pub fn track(&mut self, entity: Box<dyn Entity>) -> EntityID {
+    pub fn track(&mut self, entity: Box<dyn Entity>, tick: bool) -> EntityID {
         let id = entity.get_id();
         if self.registry.contains_key(&id) {
             panic_log(&format!("Already tracking entity with id {:?}", id));
@@ -337,6 +344,7 @@ impl EntityMap {
         let entry = RegistryEntry {
             entity,
             chunk: None,
+            tick,
         };
         self.registry.insert(id, entry);
         id
@@ -599,7 +607,7 @@ impl EntityMap {
                             npc.leader_id = None;
 
                             let chunk_pos = npc.get_chunk_coords();
-                            let new_npc_id = self.track(Box::new(npc));
+                            let new_npc_id = self.track(Box::new(npc), false);
                             self.update(new_npc_id, Some(chunk_pos), None);
                             npc_count += 1;
                         }

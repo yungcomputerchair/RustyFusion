@@ -54,7 +54,7 @@ impl Default for ShardServerState {
                 }
                 let chunk_pos = npc.get_chunk_coords();
                 let entity_map = &mut state.entity_map;
-                let id = entity_map.track(Box::new(npc));
+                let id = entity_map.track(Box::new(npc), false);
                 entity_map.update(id, Some(chunk_pos), None);
             }
 
@@ -101,7 +101,7 @@ impl Default for ShardServerState {
                 );
                 sliders_spawned += 1;
                 let chunk_pos = slider.get_chunk_coords();
-                let id = entity_map.track(Box::new(slider));
+                let id = entity_map.track(Box::new(slider), true);
                 entity_map.update(id, Some(chunk_pos), None);
                 dist_to_next = slider_gap_size;
                 if sliders_spawned as usize == num_sliders {
@@ -203,7 +203,7 @@ impl ShardServerState {
     }
 
     pub fn tick_entities(&mut self, time: SystemTime, clients: &mut ClientMap) {
-        let eids: Vec<EntityID> = self.entity_map.get_all_ids().collect();
+        let eids: Vec<EntityID> = self.entity_map.get_tickable_ids().collect();
         for eid in eids {
             match eid {
                 // we copy the entity here so we can mutably borrow the state.
