@@ -118,20 +118,6 @@ impl EntityMap {
         }
     }
 
-    pub fn get_from_ids(
-        &mut self,
-        ids: &HashSet<EntityID>,
-    ) -> impl Iterator<Item = &mut Box<dyn Entity>> {
-        let ids = ids.clone();
-        self.registry.iter_mut().filter_map(move |(id, entry)| {
-            if ids.contains(id) {
-                Some(&mut entry.entity)
-            } else {
-                None
-            }
-        })
-    }
-
     pub fn get_all_ids(&self) -> impl Iterator<Item = EntityID> + '_ {
         self.registry.keys().cloned()
     }
@@ -142,15 +128,11 @@ impl EntityMap {
             .filter_map(|(id, entry)| if entry.tick { Some(*id) } else { None })
     }
 
-    pub fn get_around_entity(
-        &mut self,
-        id: EntityID,
-    ) -> Option<impl Iterator<Item = &mut Box<dyn Entity>>> {
+    pub fn get_around_entity(&mut self, id: EntityID) -> HashSet<EntityID> {
         if let Some(coords) = self.registry.get(&id).and_then(|entry| entry.chunk) {
-            let ids = self.get_around(coords, get_visibility_range());
-            Some(self.get_from_ids(&ids))
+            self.get_around(coords, get_visibility_range())
         } else {
-            None
+            HashSet::new()
         }
     }
 
@@ -442,11 +424,10 @@ impl EntityMap {
         clients: &mut ClientMap,
         mut f: impl FnMut(&mut FFClient) -> FFResult<()>,
     ) {
-        if let Some(iter) = self.get_around_entity(id) {
-            for e in iter {
-                if let Some(c) = e.get_client(clients) {
-                    log_if_failed(f(c));
-                }
+        for eid in self.get_around_entity(id).iter() {
+            let e = self.registry.get_mut(eid).unwrap().entity.as_mut();
+            if let Some(c) = e.get_client(clients) {
+                log_if_failed(f(c));
             }
         }
     }
