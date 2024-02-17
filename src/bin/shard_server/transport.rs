@@ -32,7 +32,7 @@ pub fn regist_transportation_location(
                         return Err(FFError::build(
                             Severity::Warning,
                             format!(
-                                "Player {} tried to register a warp location with the wrong NPC type",
+                                "Player {} tried to register a S.C.A.M.P.E.R. location with the wrong NPC type",
                                 player.get_player_id()
                             ),
                         ));
@@ -40,13 +40,22 @@ pub fn regist_transportation_location(
                     player.update_scamper_flags(pkt.iLocationID)?;
                 }
                 TransportationType::Wyvern => {
-                    // TODO NPC type validation
+                    let location_data = tdata_get().get_skyway_data(pkt.iLocationID)?;
+                    if location_data.npc_type != npc_type {
+                        return Err(FFError::build(
+                            Severity::Warning,
+                            format!(
+                                "Player {} tried to register a Skyway location with the wrong NPC type",
+                                player.get_player_id()
+                            ),
+                        ));
+                    }
                     player.update_skyway_flags(pkt.iLocationID)?;
                 }
-                TransportationType::Bus => {
+                other => {
                     return Err(FFError::build(
                         Severity::Warning,
-                        "Bus reg invalid".to_string(),
+                        format!("Can't register transportation type {:?}", other),
                     ));
                 }
             }

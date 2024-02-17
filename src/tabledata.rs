@@ -255,7 +255,7 @@ impl TableData {
             ))
     }
 
-    pub fn get_monkey_skyway_data(&self, location_id: i32) -> FFResult<&TransporterData> {
+    pub fn get_skyway_data(&self, location_id: i32) -> FFResult<&TransporterData> {
         self.xdt_data
             .transportation_data
             .monkey_skyway_data
