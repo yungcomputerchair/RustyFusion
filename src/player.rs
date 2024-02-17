@@ -95,33 +95,40 @@ struct TransportData {
     pub skyway_flags: [i64; WYVERN_LOCATION_FLAG_SIZE as usize],
 }
 impl TransportData {
-    pub fn set_scamper_flag(&mut self, bit_offset: i32) -> FFResult<i32> {
-        if !(1..=32).contains(&bit_offset) {
+    pub fn set_scamper_flag(&mut self, location_id: i32) -> FFResult<i32> {
+        if !(1..=32).contains(&location_id) {
             Err(FFError::build(
                 Severity::Warning,
-                format!("Scamper flag offset out of range: {}", bit_offset),
+                format!("Scamper flag offset out of range: {}", location_id),
             ))
         } else {
-            self.scamper_flags |= 1 << (bit_offset - 1);
+            let offset = location_id - 1;
+            self.scamper_flags |= 1 << offset;
             Ok(self.scamper_flags)
         }
     }
 
     pub fn set_skyway_flag(
         &mut self,
-        bit_offset: i32,
+        location_id: i32,
     ) -> FFResult<[i64; WYVERN_LOCATION_FLAG_SIZE as usize]> {
-        if !(1..=(WYVERN_LOCATION_FLAG_SIZE as i32 * 64)).contains(&bit_offset) {
-            Err(FFError::build(
-                Severity::Warning,
-                format!("Skyway flag offset out of range: {}", bit_offset),
-            ))
-        } else {
-            let idx = if bit_offset > 32 { 1 } else { 0 };
-            let offset = (bit_offset - 1) % 32;
-            self.skyway_flags[idx] = 1 << offset;
-            Ok(self.skyway_flags)
-        }
+        match location_id {
+            (1..=63) => {
+                let offset = location_id - 1;
+                self.skyway_flags[0] |= 1 << offset;
+            }
+            (64..=127) => {
+                let offset = location_id - 64;
+                self.skyway_flags[1] |= 1 << offset;
+            }
+            _ => {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!("Invalid skyway location ID: {}", location_id),
+                ))
+            }
+        };
+        Ok(self.skyway_flags)
     }
 }
 
