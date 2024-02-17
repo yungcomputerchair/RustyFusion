@@ -69,14 +69,15 @@ pub struct TripData {
 }
 
 #[derive(Debug)]
-pub struct ScamperData {
+pub struct TransporterData {
     pub npc_type: i32,
     pub pos: Position,
 }
 
 struct TransportationData {
     trip_data: HashMap<i32, TripData>,
-    scamper_data: HashMap<i32, ScamperData>,
+    scamper_data: HashMap<i32, TransporterData>,
+    monkey_skyway_data: HashMap<i32, TransporterData>,
 }
 
 #[derive(Debug)]
@@ -243,7 +244,7 @@ impl TableData {
             ))
     }
 
-    pub fn get_scamper_data(&self, location_id: i32) -> FFResult<&ScamperData> {
+    pub fn get_scamper_data(&self, location_id: i32) -> FFResult<&TransporterData> {
         self.xdt_data
             .transportation_data
             .scamper_data
@@ -251,6 +252,20 @@ impl TableData {
             .ok_or(FFError::build(
                 Severity::Warning,
                 format!("Scamper data for location id {} doesn't exist", location_id),
+            ))
+    }
+
+    pub fn get_monkey_skyway_data(&self, location_id: i32) -> FFResult<&TransporterData> {
+        self.xdt_data
+            .transportation_data
+            .monkey_skyway_data
+            .get(&location_id)
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Monkey Skyway data for location id {} doesn't exist",
+                    location_id
+                ),
             ))
     }
 
@@ -786,13 +801,12 @@ fn load_transportation_data(
         }
     }
 
-    fn load_scamper_data(
+    fn load_transporter_data(
         root: &Map<std::string::String, Value>,
-    ) -> Result<HashMap<i32, ScamperData>, String> {
-        const SCAMPER_DATA_KEY: &str = "m_pTransportationWarpLocation";
-
+        data_key: &str,
+    ) -> Result<HashMap<i32, TransporterData>, String> {
         #[derive(Debug, Deserialize)]
-        struct ScamperDataEntry {
+        struct TransporterDataEntry {
             m_iLocationID: i32,
             m_iNPCID: i32,
             m_iXpos: i32,
@@ -802,15 +816,15 @@ fn load_transportation_data(
         }
 
         let data = root
-            .get(SCAMPER_DATA_KEY)
-            .ok_or(format!("Key missing: {}", SCAMPER_DATA_KEY))?;
+            .get(data_key)
+            .ok_or(format!("Key missing: {}", data_key))?;
         if let Value::Array(data) = data {
             let mut scamper_map = HashMap::new();
             for v in data {
-                let data_entry: ScamperDataEntry = serde_json::from_value(v.clone())
-                    .map_err(|e| format!("Malformed scamper data entry: {} {}", e, v))?;
+                let data_entry: TransporterDataEntry = serde_json::from_value(v.clone())
+                    .map_err(|e| format!("Malformed transporter data entry: {} {}", e, v))?;
                 let key = data_entry.m_iLocationID;
-                let data_entry = ScamperData {
+                let data_entry = TransporterData {
                     npc_type: data_entry.m_iNPCID,
                     pos: Position {
                         x: data_entry.m_iXpos,
@@ -822,7 +836,7 @@ fn load_transportation_data(
             }
             Ok(scamper_map)
         } else {
-            Err(format!("Array missing: {}", SCAMPER_DATA_KEY))
+            Err(format!("Array missing: {}", data_key))
         }
     }
 
@@ -832,7 +846,8 @@ fn load_transportation_data(
     if let Value::Object(table) = table {
         Ok(TransportationData {
             trip_data: load_trip_data(table)?,
-            scamper_data: load_scamper_data(table)?,
+            scamper_data: load_transporter_data(table, "m_pTransportationWarpLocation")?,
+            monkey_skyway_data: load_transporter_data(table, "m_pBroomstickLocation")?,
         })
     } else {
         Err(format!("Object missing: {}", TRANSPORTATION_TABLE_KEY))
