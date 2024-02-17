@@ -49,12 +49,14 @@ impl Default for ShardServerState {
         }
         for channel_num in 1..=num_channels {
             for mut npc in tdata_get().get_npcs(&mut state.entity_map, channel_num) {
+                let mut needs_tick = false;
                 if let Some(path) = tdata_get().get_npc_path(npc.ty) {
                     npc.set_path(path);
+                    needs_tick = true;
                 }
                 let chunk_pos = npc.get_chunk_coords();
                 let entity_map = &mut state.entity_map;
-                let id = entity_map.track(Box::new(npc), false);
+                let id = entity_map.track(Box::new(npc), needs_tick);
                 entity_map.update(id, Some(chunk_pos), None);
             }
 
