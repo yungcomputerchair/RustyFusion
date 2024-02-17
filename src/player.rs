@@ -857,7 +857,7 @@ impl Player {
         // TODO delete all active missions
         // place in Sector V future
         let mut rand = rand::thread_rng();
-        let range = PC_START_LOCATION_RANDOM_RANGE as i32 / 2;
+        let range = 0; //PC_START_LOCATION_RANDOM_RANGE as i32 / 2;
         self.position = Position {
             x: 632032 + rand.gen_range(-range..=range),
             y: 187177 + rand.gen_range(-range..=range),
