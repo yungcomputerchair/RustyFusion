@@ -112,15 +112,29 @@ struct TransportData {
 }
 impl TransportData {
     pub fn set_scamper_flag(&mut self, location_id: i32) -> FFResult<i32> {
-        if !(1..=32).contains(&location_id) {
-            Err(FFError::build(
+        match location_id {
+            (1..=32) => {
+                let offset = location_id - 1;
+                self.scamper_flags |= 1 << offset;
+                Ok(self.scamper_flags)
+            }
+            _ => Err(FFError::build(
                 Severity::Warning,
-                format!("Scamper flag offset out of range: {}", location_id),
-            ))
-        } else {
-            let offset = location_id - 1;
-            self.scamper_flags |= 1 << offset;
-            Ok(self.scamper_flags)
+                format!("Invalid S.C.A.M.P.E.R. location ID: {}", location_id),
+            )),
+        }
+    }
+
+    pub fn test_scamper_flag(&self, location_id: i32) -> FFResult<bool> {
+        match location_id {
+            (1..=32) => {
+                let offset = location_id - 1;
+                Ok(self.scamper_flags & (1 << offset) != 0)
+            }
+            _ => Err(FFError::build(
+                Severity::Warning,
+                format!("Invalid S.C.A.M.P.E.R. location ID: {}", location_id),
+            )),
         }
     }
 
@@ -145,6 +159,23 @@ impl TransportData {
             }
         };
         Ok(self.skyway_flags)
+    }
+
+    pub fn test_skyway_flag(&self, location_id: i32) -> FFResult<bool> {
+        match location_id {
+            (1..=63) => {
+                let offset = location_id - 1;
+                Ok(self.skyway_flags[0] & (1 << offset) != 0)
+            }
+            (64..=127) => {
+                let offset = location_id - 64;
+                Ok(self.skyway_flags[1] & (1 << offset) != 0)
+            }
+            _ => Err(FFError::build(
+                Severity::Warning,
+                format!("Invalid skyway location ID: {}", location_id),
+            )),
+        }
     }
 }
 
@@ -846,15 +877,23 @@ impl Player {
         self.transport_data.skyway_flags = flags;
     }
 
-    pub fn update_scamper_flags(&mut self, bit_offset: i32) -> FFResult<i32> {
-        self.transport_data.set_scamper_flag(bit_offset)
+    pub fn unlock_scamper_location(&mut self, location_id: i32) -> FFResult<i32> {
+        self.transport_data.set_scamper_flag(location_id)
     }
 
-    pub fn update_skyway_flags(
+    pub fn is_scamper_location_unlocked(&self, location_id: i32) -> FFResult<bool> {
+        self.transport_data.test_scamper_flag(location_id)
+    }
+
+    pub fn unlock_skyway_location(
         &mut self,
-        bit_offset: i32,
+        location_id: i32,
     ) -> FFResult<[i64; WYVERN_LOCATION_FLAG_SIZE as usize]> {
-        self.transport_data.set_skyway_flag(bit_offset)
+        self.transport_data.set_skyway_flag(location_id)
+    }
+
+    pub fn is_skyway_location_unlocked(&self, location_id: i32) -> FFResult<bool> {
+        self.transport_data.test_skyway_flag(location_id)
     }
 
     pub fn set_tutorial_done(&mut self) {

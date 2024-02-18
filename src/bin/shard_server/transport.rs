@@ -37,7 +37,7 @@ pub fn regist_transportation_location(
                             ),
                         ));
                     }
-                    player.update_scamper_flags(pkt.iLocationID)?;
+                    player.unlock_scamper_location(pkt.iLocationID)?;
                 }
                 TransportationType::Wyvern => {
                     let location_data = tdata_get().get_skyway_data(pkt.iLocationID)?;
@@ -50,7 +50,7 @@ pub fn regist_transportation_location(
                             ),
                         ));
                     }
-                    player.update_skyway_flags(pkt.iLocationID)?;
+                    player.unlock_skyway_location(pkt.iLocationID)?;
                 }
                 other => {
                     return Err(FFError::build(
@@ -114,6 +114,33 @@ pub fn warp_use_transportation(
             match trip.transportation_type {
                 TransportationType::Warp => {
                     let src_data = tdata_get().get_scamper_data(trip.start_location)?;
+                    if !player
+                        .is_scamper_location_unlocked(trip.start_location)
+                        .unwrap()
+                    {
+                        return Err(FFError::build(
+                            Severity::Warning,
+                            format!(
+                                "Player {} tried to warp from an unregistered S.C.A.M.P.E.R. location",
+                                player.get_player_id()
+                            ),
+                        ));
+                    }
+
+                    let dest_data = tdata_get().get_scamper_data(trip.end_location)?;
+                    if !player
+                        .is_scamper_location_unlocked(trip.end_location)
+                        .unwrap()
+                    {
+                        return Err(FFError::build(
+                            Severity::Warning,
+                            format!(
+                                "Player {} tried to warp to an unregistered S.C.A.M.P.E.R. location",
+                                player.get_player_id()
+                            ),
+                        ));
+                    }
+
                     if src_data.npc_type != npc_type {
                         return Err(FFError::build(
                             Severity::Warning,
@@ -124,12 +151,34 @@ pub fn warp_use_transportation(
                         ));
                     }
 
-                    let dest_data = tdata_get().get_scamper_data(trip.end_location)?;
                     player.set_taros(new_taros);
                     player.set_position(dest_data.pos);
                 }
                 TransportationType::Wyvern => {
                     let src_data = tdata_get().get_skyway_data(trip.start_location)?;
+                    if !player
+                        .is_skyway_location_unlocked(trip.start_location)
+                        .unwrap()
+                    {
+                        return Err(FFError::build(
+                            Severity::Warning,
+                            format!(
+                                "Player {} tried to warp from an unregistered Skyway location",
+                                player.get_player_id()
+                            ),
+                        ));
+                    }
+
+                    if !player.is_skyway_location_unlocked(trip.end_location)? {
+                        return Err(FFError::build(
+                            Severity::Warning,
+                            format!(
+                                "Player {} tried to warp to an unregistered Skyway location",
+                                player.get_player_id()
+                            ),
+                        ));
+                    }
+
                     if src_data.npc_type != npc_type {
                         return Err(FFError::build(
                             Severity::Warning,
