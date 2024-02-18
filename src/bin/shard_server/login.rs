@@ -1,6 +1,6 @@
 use rusty_fusion::{
     defines::MSG_BOX_DURATION_DEFAULT,
-    enums::TargetSearchBy,
+    enums::{PlayerShardStatus, TargetSearchBy},
     error::{codes::PlayerSearchReqErr, log_if_failed, FFError, Severity},
     player::PlayerSearchQuery,
     unused, util,
@@ -32,6 +32,15 @@ pub fn login_connect_succ(server: &mut FFClient, state: &mut ShardServerState) -
         aChannelStatus: state.entity_map.get_channel_statuses().map(|s| s as u8),
     };
     server.send_packet(P_FE2LS_UPDATE_CHANNEL_STATUSES, &pkt)?;
+
+    for pc_id in state.entity_map.get_player_ids() {
+        let player = state.get_player(pc_id).unwrap();
+        let pkt = sP_FE2LS_UPDATE_PC_SHARD {
+            iPC_UID: player.get_uid(),
+            ePSS: PlayerShardStatus::Entered as i8,
+        };
+        log_if_failed(server.send_packet(P_FE2LS_UPDATE_PC_SHARD, &pkt));
+    }
 
     state.login_server_conn_id = Some(login_server_id);
     state.shard_id = Some(shard_id);
