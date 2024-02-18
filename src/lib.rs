@@ -173,6 +173,14 @@ impl Path {
         }
     }
 
+    pub fn is_done(&self) -> bool {
+        matches!(self.state, PathState::Done)
+    }
+
+    pub fn is_waiting(&self) -> bool {
+        matches!(self.state, PathState::Waiting(_))
+    }
+
     pub fn advance(&mut self) {
         self.idx += 1;
         if self.idx == self.points.len() {

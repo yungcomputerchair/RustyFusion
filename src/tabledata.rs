@@ -58,6 +58,7 @@ struct FollowerData {
     offset_y: i32,
 }
 
+#[derive(Debug)]
 pub struct TripData {
     pub npc_id: i32,
     pub transportation_type: TransportationType,
@@ -465,6 +466,17 @@ impl TableData {
 
     pub fn get_slider_path(&self) -> Path {
         self.path_data.slider_path.clone()
+    }
+
+    pub fn get_skyway_path(&self, path_id: i32) -> FFResult<Path> {
+        self.path_data
+            .skyway_paths
+            .get(&path_id)
+            .cloned()
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("No skyway path with id {}", path_id),
+            ))
     }
 }
 

@@ -134,3 +134,17 @@ pub enum TeleportType {
     SomeoneLocation = 3, /*eCN_GM_TeleportMapType__SomeoneLocation*/
     Unstick = 4,         /*eCN_GM_TeleportMapType__Unstick*/
 }
+
+#[repr(i32)]
+#[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
+#[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
+pub enum RideType {
+    None = 0, /*eRT_None*/
+    Wyvern = 1, /*eRT_Wyvern*/
+              /*eRT__End*/
+}
+impl RideType {
+    pub fn end() -> i32 {
+        2
+    }
+}

@@ -1,6 +1,6 @@
 use rusty_fusion::{
     defines::{ID_TIME_MACHINE_WARP, RANGE_INTERACT},
-    enums::TransportationType,
+    enums::{RideType, TransportationType},
     error::catch_fail,
     tabledata::tdata_get,
     Combatant, Item,
@@ -98,7 +98,8 @@ pub fn warp_use_transportation(
                 .validate_proximity(&[EntityID::Player(pc_id), npc.get_id()], RANGE_INTERACT)?;
 
             let player = state.get_player_mut(pc_id)?;
-            let trip = tdata_get().get_trip_data(pkt.iTransporationID)?;
+            let trip_id = pkt.iTransporationID;
+            let trip = tdata_get().get_trip_data(trip_id)?;
             if player.get_taros() < trip.cost {
                 return Err(FFError::build(
                     Severity::Warning,
@@ -109,6 +110,7 @@ pub fn warp_use_transportation(
                 ));
             }
 
+            let new_taros = player.get_taros() - trip.cost;
             match trip.transportation_type {
                 TransportationType::Warp => {
                     let src_data = tdata_get().get_scamper_data(trip.start_location)?;
@@ -123,30 +125,49 @@ pub fn warp_use_transportation(
                     }
 
                     let dest_data = tdata_get().get_scamper_data(trip.end_location)?;
+                    player.set_taros(new_taros);
                     player.set_position(dest_data.pos);
                 }
-                TransportationType::Wyvern => {}
-                TransportationType::Bus => {
+                TransportationType::Wyvern => {
+                    let src_data = tdata_get().get_skyway_data(trip.start_location)?;
+                    if src_data.npc_type != npc_type {
+                        return Err(FFError::build(
+                            Severity::Warning,
+                            format!(
+                                "Player {} tried to warp with the wrong NPC type",
+                                player.get_player_id()
+                            ),
+                        ));
+                    }
+
+                    let path = tdata_get().get_skyway_path(trip.route_number)?;
+                    player.start_skyway_ride(trip, path);
+                    // we don't charge the player until the ride is done
+                }
+                other => {
                     return Err(FFError::build(
                         Severity::Warning,
-                        "Bus warp invalid".to_string(),
+                        format!("Can't warp with transportation type {:?}", other),
                     ));
                 }
             }
 
-            let player = state.get_player_mut(pc_id)?;
             let new_pos = player.get_position();
-            let taros_left = player.set_taros(player.get_taros() - trip.cost);
             let resp = sP_FE2CL_REP_PC_WARP_USE_TRANSPORTATION_SUCC {
                 eTT: trip.transportation_type as i32,
                 iX: new_pos.x,
                 iY: new_pos.y,
                 iZ: new_pos.z,
-                iCandy: taros_left as i32,
+                iCandy: new_taros as i32,
             };
             clients
                 .get_self()
-                .send_packet(P_FE2CL_REP_PC_WARP_USE_TRANSPORTATION_SUCC, &resp)
+                .send_packet(P_FE2CL_REP_PC_WARP_USE_TRANSPORTATION_SUCC, &resp)?;
+
+            if trip.transportation_type == TransportationType::Wyvern {
+                rusty_fusion::helpers::broadcast_monkey(pc_id, RideType::Wyvern, clients, state);
+            }
+            Ok(())
         })(),
         || {
             let resp = sP_FE2CL_REP_PC_WARP_USE_TRANSPORTATION_FAIL {

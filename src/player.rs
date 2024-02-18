@@ -1,24 +1,31 @@
-use std::{any::Any, collections::HashMap, fmt::Display, time::SystemTime};
+use std::{
+    any::Any,
+    collections::HashMap,
+    fmt::Display,
+    time::{Duration, SystemTime},
+};
 
 use crate::{
     chunk::{ChunkCoords, InstanceID},
     database::db_get,
     defines::*,
-    enums::{ItemLocation, ItemType, PlayerGuide, PlayerShardStatus, RewardType},
+    enums::{ItemLocation, ItemType, PlayerGuide, PlayerShardStatus, RewardType, RideType},
     error::{log, log_if_failed, panic_if_failed, panic_log, FFError, FFResult, Severity},
     net::{
         ffclient::FFClient,
         packet::{
-            sNano, sPCAppearanceData, sPCLoadData2CL, sPCStyle, sPCStyle2, sP_FE2CL_PC_EXIT,
-            sP_FE2CL_PC_NEW, sP_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL,
-            sP_FE2LS_UPDATE_CHANNEL_STATUSES, sP_FE2LS_UPDATE_PC_SHARD, sTimeBuff,
+            sNano, sPCAppearanceData, sPCLoadData2CL, sPCStyle, sPCStyle2,
+            sP_FE2CL_PC_BROOMSTICK_MOVE, sP_FE2CL_PC_EXIT, sP_FE2CL_PC_NEW,
+            sP_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL, sP_FE2LS_UPDATE_CHANNEL_STATUSES,
+            sP_FE2LS_UPDATE_PC_SHARD, sTimeBuff,
             PacketID::{self, *},
         },
         ClientMap,
     },
     state::shard::ShardServerState,
+    tabledata::TripData,
     util::{self, clamp, clamp_max, clamp_min},
-    Combatant, Entity, EntityID, Item, Mission, Nano, Position,
+    Combatant, Entity, EntityID, Item, Mission, Nano, Path, Position,
 };
 
 use rand::Rng;
@@ -89,10 +96,19 @@ impl Default for GuideData {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Clone)]
+struct SkywayRideState {
+    trip_data: &'static TripData,
+    path: Path,
+    monkey_pos: Position,
+    resume_time: SystemTime,
+}
+
+#[derive(Debug, Default, Clone)]
 struct TransportData {
     pub scamper_flags: i32,
     pub skyway_flags: [i64; WYVERN_LOCATION_FLAG_SIZE as usize],
+    pub skyway_ride: Option<SkywayRideState>,
 }
 impl TransportData {
     pub fn set_scamper_flag(&mut self, location_id: i32) -> FFResult<i32> {
@@ -934,6 +950,16 @@ impl Player {
         &self.pre_warp_data
     }
 
+    pub fn start_skyway_ride(&mut self, trip_data: &'static TripData, mut path: Path) {
+        path.tick(&mut self.position); // advance to Moving state
+        self.transport_data.skyway_ride = Some(SkywayRideState {
+            trip_data,
+            path,
+            monkey_pos: self.position,
+            resume_time: SystemTime::now(),
+        });
+    }
+
     pub fn disconnect(pc_id: i32, state: &mut ShardServerState, clients: &mut ClientMap) {
         let player = state.get_player(pc_id).unwrap();
         let pc_uid = player.get_uid();
@@ -1062,8 +1088,69 @@ impl Entity for Player {
         }
     }
 
-    fn tick(&mut self, _time: SystemTime, _clients: &mut ClientMap, _state: &mut ShardServerState) {
-        // TODO
+    fn tick(&mut self, time: SystemTime, clients: &mut ClientMap, state: &mut ShardServerState) {
+        let pc_id = self.id.unwrap();
+        // Skyway ride
+        if let Some(ref mut ride) = self.transport_data.skyway_ride {
+            if ride.resume_time > time {
+                return;
+            }
+
+            if ride.path.is_done() {
+                // we're done!
+                let final_pos = ride.monkey_pos;
+                let cost = ride.trip_data.cost;
+                self.set_taros(self.taros - cost);
+                self.set_position(final_pos);
+                self.transport_data.skyway_ride = None;
+                crate::helpers::broadcast_monkey(pc_id, RideType::None, clients, state);
+                return;
+            }
+
+            // N.B. the client doesn't treat monkey movement like every other movement.
+            // instead of using the speed value from the packet, it uses the distance between the
+            // current position and the target position. so we can only send move packets once we've
+            // covered about the same distance as the speed.
+            // 100% causes the client to go too fast and pause, but 80% seems to work fine.
+            const SPEED_TO_DISTANCE_FACTOR: f32 = 1.0;
+
+            // tick the path until we've covered the same distance as the speed
+            let speed = ride.path.get_speed() as u32;
+            let distance_to_cover = (speed as f32 * SPEED_TO_DISTANCE_FACTOR) as u32;
+            let mut distance = 0;
+            while distance < distance_to_cover {
+                let old_pos = ride.monkey_pos;
+                ride.path.tick(&mut ride.monkey_pos);
+                distance += old_pos.distance_to(&ride.monkey_pos);
+                if ride.path.is_done() {
+                    break;
+                }
+            }
+
+            // update the player's chunk.
+            // We don't actually update their position until they land
+            let chunk_coords = ChunkCoords::from_pos_inst(ride.monkey_pos, self.instance_id);
+            state
+                .entity_map
+                .update(EntityID::Player(pc_id), Some(chunk_coords), Some(clients));
+
+            // send the move packet
+            let pkt = sP_FE2CL_PC_BROOMSTICK_MOVE {
+                iPC_ID: pc_id,
+                iToX: ride.monkey_pos.x,
+                iToY: ride.monkey_pos.y,
+                iToZ: ride.monkey_pos.z,
+                iSpeed: unused!(),
+            };
+            state
+                .entity_map
+                .for_each_around(EntityID::Player(pc_id), clients, |c| {
+                    c.send_packet(PacketID::P_FE2CL_PC_BROOMSTICK_MOVE, &pkt)
+                });
+
+            // wait for the client to catch up. in theory, takes one second.
+            ride.resume_time = time + Duration::from_secs(1);
+        }
     }
 
     fn as_any(&self) -> &dyn Any {
