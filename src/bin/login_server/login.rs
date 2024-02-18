@@ -102,7 +102,10 @@ pub fn login(
              * Check if this account is already logged in, meaning:
              * a) the account has a session here in the login server, or
              * b) one of the account's players is tracked in a shard server
+             *
+             * Disabled in debug mode for convenience!
              */
+            #[cfg(not(debug_assertions))]
             if state.is_session_active(account.id) {
                 client.client_type = ClientType::UnauthedClient {
                     username: username.clone(),
