@@ -1,6 +1,4 @@
-use std::time::SystemTime;
-
-use super::*;
+use std::{collections::HashMap, time::SystemTime};
 
 use rand::random;
 
@@ -8,10 +6,17 @@ use rusty_fusion::{
     config::config_get,
     database::db_get,
     defines::*,
+    entity::{Combatant, Entity, Player},
     enums::{ItemLocation, ItemType},
-    error::{catch_fail, log_if_failed, FFError, FFResult, Severity},
-    net::{ffclient::ClientType, packet::*},
-    unused, util, Combatant, Entity, Item,
+    error::{catch_fail, log, log_if_failed, FFError, FFResult, Severity},
+    item::Item,
+    net::{
+        crypto,
+        packet::{PacketID::*, *},
+        ClientType, FFClient,
+    },
+    state::LoginServerState,
+    unused, util,
 };
 
 pub fn login(
@@ -141,14 +146,14 @@ pub fn login(
             let e_base: u64 = resp.uiSvrTime;
             let e_iv1: i32 = (resp.iCharCount + 1) as i32;
             let e_iv2: i32 = (resp.iSlotNum + 1) as i32;
-            let fe_base: u64 = u64::from_le_bytes(DEFAULT_KEY.try_into().unwrap());
+            let fe_base: u64 = u64::from_le_bytes(crypto::DEFAULT_KEY.try_into().unwrap());
             let fe_iv1: i32 = pkt.iClientVerC;
             let fe_iv2: i32 = 1;
 
             client.send_packet(P_LS2CL_REP_LOGIN_SUCC, &resp)?;
 
-            client.e_key = gen_key(e_base, e_iv1, e_iv2);
-            client.fe_key = gen_key(fe_base, fe_iv1, fe_iv2);
+            client.e_key = crypto::gen_key(e_base, e_iv1, e_iv2);
+            client.fe_key = crypto::gen_key(fe_base, fe_iv1, fe_iv2);
 
             let serial_key: i64 = random();
             client.client_type = ClientType::GameClient {

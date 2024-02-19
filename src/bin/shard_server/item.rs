@@ -1,16 +1,26 @@
-use std::cmp::min;
-
-use rand::random;
-use rusty_fusion::{
-    defines::{EQUIP_SLOT_VEHICLE, PC_BATTERY_MAX, RANGE_INTERACT},
-    enums::{ItemLocation, ItemType},
-    error::{catch_fail, FFError, Severity},
-    placeholder,
-    tabledata::tdata_get,
-    Item,
+use std::{
+    cmp::min,
+    time::{Duration, SystemTime},
 };
 
-use super::*;
+use rand::random;
+
+use rusty_fusion::{
+    config::config_get,
+    defines::*,
+    entity::{Entity, EntityID},
+    enums::*,
+    error::*,
+    item::Item,
+    net::{
+        packet::{PacketID::*, *},
+        ClientMap, FFClient,
+    },
+    placeholder,
+    state::ShardServerState,
+    tabledata::tdata_get,
+    unused,
+};
 
 pub fn item_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
@@ -247,7 +257,7 @@ pub fn item_chest_open(client: &mut FFClient, state: &mut ShardServerState) -> F
                     format!("C.R.A.T.E. in empty slot: {}", pkt.iSlotNum),
                 ))?;
 
-            if chest.get_type() != ItemType::Chest {
+            if chest.ty != ItemType::Chest {
                 return Err(FFError::build(
                     Severity::Warning,
                     format!("Item is not a C.R.A.T.E.: {:?}", chest),
@@ -255,7 +265,7 @@ pub fn item_chest_open(client: &mut FFClient, state: &mut ShardServerState) -> F
             }
 
             let reward_item = tdata_get()
-                .get_item_from_crate(chest.get_id(), player.get_style().iGender as i32)
+                .get_item_from_crate(chest.id, player.get_style().iGender as i32)
                 .unwrap_or(placeholder!(Item::new(ItemType::General, 119)));
 
             player.set_item(location, pkt.iSlotNum as usize, Some(reward_item))?;
@@ -352,28 +362,27 @@ pub fn vendor_item_buy(
                 Severity::Warning,
                 "Tried to buy nothing".to_string(),
             ))?;
-            if item.get_type() == ItemType::Vehicle {
+            if item.ty == ItemType::Vehicle {
                 // set expiration date
-                let duration = Duration::from_secs(config_get().shard.vehicle_duration.get() * 60);
-                let expires = time + duration;
+                let duration_min = config_get().shard.vehicle_duration.get();
+                let duration_sec = Duration::from_secs(duration_min * 60);
+                let expires = time + duration_sec;
                 item.set_expiry_time(expires);
             }
 
             let vendor_data = tdata_get().get_vendor_data(pkt.iVendorID)?;
-            if !vendor_data.has_item(item.get_id(), item.get_type()) {
+            if !vendor_data.has_item(item.id, item.ty) {
                 return Err(FFError::build(
                     Severity::Warning,
                     format!(
                         "Vendor {} doesn't sell item ({}, {:?})",
-                        pkt.iVendorID,
-                        item.get_id(),
-                        item.get_type()
+                        pkt.iVendorID, item.id, item.ty
                     ),
                 ));
             }
 
             let stats = item.get_stats()?;
-            let price = stats.buy_price * item.get_quantity() as u32;
+            let price = stats.buy_price * item.quantity as u32;
             let player = state.get_player_mut(client.get_player_id()?)?;
             if player.get_taros() < price {
                 Err(FFError::build(
@@ -499,7 +508,7 @@ pub fn vendor_item_restore_buy(
             ))?;
 
             let item = buyback_list.remove(found_idx);
-            let cost = item.get_stats()?.sell_price * item.get_quantity() as u32; // sell price is cost for buyback
+            let cost = item.get_stats()?.sell_price * item.quantity as u32; // sell price is cost for buyback
             let player = state.get_player_mut(pc_id)?;
 
             if player.get_taros() < cost {

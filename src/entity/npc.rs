@@ -2,16 +2,17 @@ use std::{collections::HashSet, time::SystemTime};
 
 use crate::{
     chunk::{ChunkCoords, InstanceID},
+    entity::{Combatant, Entity, EntityID},
     error::FFResult,
     net::{
-        ffclient::FFClient,
         packet::{
             sNPCAppearanceData, sP_FE2CL_NPC_ENTER, sP_FE2CL_NPC_EXIT, sP_FE2CL_NPC_MOVE, PacketID,
         },
-        ClientMap,
+        ClientMap, FFClient,
     },
-    state::shard::ShardServerState,
-    Combatant, Entity, EntityID, Path, Position,
+    path::Path,
+    state::ShardServerState,
+    Position,
 };
 
 #[derive(Debug, Clone)]

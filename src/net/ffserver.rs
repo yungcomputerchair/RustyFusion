@@ -14,8 +14,7 @@ use crate::{
 };
 
 use super::{
-    ffclient::{ClientType, FFClient},
-    ClientMap, DisconnectCallback, PacketCallback,
+    ClientMap, DisconnectCallback, PacketCallback, {ClientType, FFClient},
 };
 
 const EPOLL_KEY_SELF: usize = 0;

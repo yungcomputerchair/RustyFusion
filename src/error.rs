@@ -7,7 +7,7 @@ use std::{
     time::SystemTime,
 };
 
-use crate::{config::config_get, net::ffserver::FFServer, state::ServerState};
+use crate::{config::config_get, net::FFServer, state::ServerState};
 
 pub type FFResult<T> = std::result::Result<T, FFError>;
 pub fn catch_fail<T>(

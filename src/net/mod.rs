@@ -1,11 +1,8 @@
 use std::{collections::HashMap, mem::size_of, slice::from_raw_parts, time::SystemTime};
 
-use self::{
-    ffclient::{ClientType, FFClient},
-    packet::{
-        FFPacket,
-        PacketID::{self, *},
-    },
+use self::packet::{
+    FFPacket,
+    PacketID::{self, *},
 };
 use crate::{
     error::{log, FFResult, Severity},
@@ -22,9 +19,13 @@ const SILENCED_PACKETS: [PacketID; 5] = [
     P_CL2FE_REQ_PC_MOVETRANSPORTATION,
 ];
 
+mod ffclient;
+pub use ffclient::*;
+
+mod ffserver;
+pub use ffserver::*;
+
 pub mod crypto;
-pub mod ffclient;
-pub mod ffserver;
 pub mod packet;
 
 pub type PacketCallback = fn(

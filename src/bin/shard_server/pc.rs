@@ -1,17 +1,23 @@
+use std::time::SystemTime;
+
 use rusty_fusion::{
     chunk::MAP_SQUARE_SIZE,
+    config::config_get,
     database::db_get,
-    defines::{self, EQUIP_SLOT_VEHICLE, EXIT_CODE_REQ_BY_PC, ID_OVERWORLD},
-    enums::{ItemLocation, PlayerShardStatus},
-    error::{catch_fail, log_if_failed},
+    defines::*,
+    entity::{Entity, EntityID, Player},
+    enums::*,
+    error::*,
+    net::{
+        crypto::{self, EncryptionMode},
+        packet::{PacketID::*, *},
+        ClientMap, ClientType, FFClient,
+    },
     placeholder,
+    state::ShardServerState,
     tabledata::tdata_get,
-    util, Position,
+    unused, util, Position,
 };
-
-use super::*;
-
-use crate::ShardServerState;
 
 pub fn pc_enter(
     clients: &mut ClientMap,
@@ -47,7 +53,7 @@ pub fn pc_enter(
 
     let iv1: i32 = resp.iID + 1;
     let iv2: i32 = resp.PCLoadData2CL.iFusionMatter + 1;
-    client.e_key = gen_key(resp.uiSvrTime, iv1, iv2);
+    client.e_key = crypto::gen_key(resp.uiSvrTime, iv1, iv2);
     client.fe_key = login_data.uiFEKey.to_le_bytes();
     client.enc_mode = EncryptionMode::FEKey;
 
@@ -479,7 +485,7 @@ pub fn pc_special_state_switch(
     let player = state.get_player_mut(pc_id)?;
 
     match pkt.iSpecialStateFlag as u32 {
-        defines::CN_SPECIAL_STATE_FLAG__FULL_UI => {
+        CN_SPECIAL_STATE_FLAG__FULL_UI => {
             player.in_menu = !player.in_menu;
         }
         _ => {

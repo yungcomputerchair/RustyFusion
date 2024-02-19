@@ -9,10 +9,13 @@ use crate::{
     chunk::{ChunkCoords, InstanceID},
     database::db_get,
     defines::*,
+    entity::{Combatant, Entity, EntityID},
     enums::{ItemLocation, ItemType, PlayerGuide, PlayerShardStatus, RewardType, RideType},
     error::{log, log_if_failed, panic_if_failed, panic_log, FFError, FFResult, Severity},
+    item::Item,
+    mission::Mission,
+    nano::Nano,
     net::{
-        ffclient::FFClient,
         packet::{
             sNano, sPCAppearanceData, sPCLoadData2CL, sPCStyle, sPCStyle2,
             sP_FE2CL_PC_BROOMSTICK_MOVE, sP_FE2CL_PC_EXIT, sP_FE2CL_PC_NEW,
@@ -20,12 +23,13 @@ use crate::{
             sP_FE2LS_UPDATE_PC_SHARD, sTimeBuff,
             PacketID::{self, *},
         },
-        ClientMap,
+        ClientMap, FFClient,
     },
-    state::shard::ShardServerState,
+    path::Path,
+    state::ShardServerState,
     tabledata::TripData,
     util::{self, clamp, clamp_max, clamp_min},
-    Combatant, Entity, EntityID, Item, Mission, Nano, Path, Position,
+    Position,
 };
 
 use rand::Rng;
@@ -449,7 +453,7 @@ impl Player {
     }
 
     pub fn set_nano(&mut self, nano: Nano) {
-        self.nano_data.nano_inventory.insert(nano.id, nano);
+        self.nano_data.nano_inventory.insert(nano.get_id(), nano);
     }
 
     pub fn get_active_nano_slot(&self) -> Option<usize> {

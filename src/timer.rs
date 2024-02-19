@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     error::{panic_log, FFError, FFResult},
-    net::ffserver::FFServer,
+    net::FFServer,
     state::ServerState,
 };
 

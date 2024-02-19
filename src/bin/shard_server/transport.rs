@@ -1,12 +1,16 @@
 use rusty_fusion::{
-    defines::{ID_TIME_MACHINE_WARP, RANGE_INTERACT},
-    enums::{RideType, TransportationType},
-    error::catch_fail,
+    defines::*,
+    entity::{Combatant, Entity, EntityID},
+    enums::*,
+    error::*,
+    net::{
+        packet::{PacketID::*, *},
+        ClientMap, FFClient,
+    },
+    state::ShardServerState,
     tabledata::tdata_get,
-    Combatant, Item,
+    unused,
 };
-
-use super::*;
 
 pub fn regist_transportation_location(
     client: &mut FFClient,
@@ -326,7 +330,7 @@ pub fn time_to_go_warp(clients: &mut ClientMap, state: &mut ShardServerState) ->
 mod helpers {
     #![allow(clippy::too_many_arguments)]
 
-    use rusty_fusion::{chunk::InstanceID, defines::TYPE_TIME_MACHINE, util};
+    use rusty_fusion::{chunk::InstanceID, defines::TYPE_TIME_MACHINE, item::Item, util};
 
     use super::*;
 
@@ -396,7 +400,7 @@ mod helpers {
             let item = player
                 .get_item(req_item_location_ord.try_into()?, req_item_slot)?
                 .as_ref();
-            if !item.is_some_and(|item| item.get_type() == item_type && item.get_id() == item_id) {
+            if !item.is_some_and(|item| item.ty == item_type && item.id == item_id) {
                 return Err(FFError::build(
                     Severity::Warning,
                     format!(
@@ -416,7 +420,7 @@ mod helpers {
             )?;
             if !item
                 .as_mut()
-                .is_some_and(|item| item.get_type() == item_type && item.get_id() == item_id)
+                .is_some_and(|item| item.ty == item_type && item.id == item_id)
             {
                 return Err(FFError::build(
                     Severity::Warning,

@@ -5,9 +5,9 @@ use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::SystemTime;
 
 use crate::config::*;
+use crate::entity::Player;
 use crate::error::*;
-use crate::player::Player;
-use crate::state::login::Account;
+use crate::state::Account;
 
 #[cfg(feature = "postgres")]
 mod postgresql;

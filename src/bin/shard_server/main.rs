@@ -12,25 +12,22 @@ use rusty_fusion::{
     config::{config_get, config_init},
     database::{db_init, db_run_parallel},
     defines::SHARD_TICKS_PER_SECOND,
+    entity::Player,
     error::{
         log, log_error, log_if_failed, logger_flush, logger_flush_scheduled, logger_init,
         panic_log, FFError, FFResult, Severity,
     },
     net::{
-        crypto::{gen_key, EncryptionMode},
-        ffclient::{ClientType, FFClient},
-        ffserver::FFServer,
         packet::{
             PacketID::{self, *},
             *,
         },
-        ClientMap, LoginData,
+        ClientMap, ClientType, FFClient, FFServer,
     },
-    player::Player,
-    state::{shard::ShardServerState, FFReceiver, ServerState},
+    state::{FFReceiver, ServerState, ShardServerState},
     tabledata::tdata_init,
     timer::TimerMap,
-    unused, Entity, EntityID,
+    unused,
 };
 
 fn main() -> Result<()> {

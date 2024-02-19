@@ -1,13 +1,19 @@
-use rusty_fusion::{
-    database::db_run_parallel,
-    defines::RANGE_INTERACT,
-    enums::ItemLocation,
-    error::{catch_fail, log_if_failed},
-    TradeContext,
-};
 use uuid::Uuid;
 
-use super::*;
+use rusty_fusion::{
+    database::db_run_parallel,
+    defines::*,
+    entity::{Entity, EntityID},
+    enums::*,
+    error::*,
+    net::{
+        packet::{PacketID::*, *},
+        ClientMap,
+    },
+    state::ShardServerState,
+    trade::TradeContext,
+    unused,
+};
 
 pub fn trade_offer(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let pkt: sP_CL2FE_REQ_PC_TRADE_OFFER =
@@ -255,8 +261,8 @@ pub fn trade_item_register(clients: &mut ClientMap, state: &mut ShardServerState
 
             let trade = state.ongoing_trades.get_mut(&trade_id).unwrap();
             let trade_slot_num = pkt.Item.iSlotNum as usize;
-            let quantity_left = item.get_quantity()
-                - trade.add_item(pc_id, trade_slot_num, inven_slot_num, quantity)?;
+            let quantity_left =
+                item.quantity - trade.add_item(pc_id, trade_slot_num, inven_slot_num, quantity)?;
 
             let resp = sP_FE2CL_REP_PC_TRADE_ITEM_REGISTER_SUCC {
                 iID_Request: pkt.iID_Request,
@@ -316,7 +322,7 @@ pub fn trade_item_unregister(
                 .get_item(ItemLocation::Inven, inven_slot_num)
                 .unwrap()
                 .unwrap();
-            let quantity = item.get_quantity() - quantity_left;
+            let quantity = item.quantity - quantity_left;
 
             let resp = sP_FE2CL_REP_PC_TRADE_ITEM_UNREGISTER_SUCC {
                 iID_Request: pkt.iID_Request,
@@ -328,7 +334,7 @@ pub fn trade_item_unregister(
                     iInvenNum: inven_slot_num as i32,
                     /* IMPORTANT: the client sends us type 8 here so we MUST override it.
                      * This took me an entire day to diagnose. */
-                    iType: item.get_type() as i16,
+                    iType: item.ty as i16,
                     ..pkt.Item
                 },
             };

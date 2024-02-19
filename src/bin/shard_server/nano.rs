@@ -1,8 +1,17 @@
 use rusty_fusion::{
-    enums::ItemLocation, error::catch_fail, placeholder, tabledata::tdata_get, Combatant, Item,
+    entity::{Combatant, EntityID},
+    enums::*,
+    error::*,
+    item::Item,
+    net::{
+        packet::{PacketID::*, *},
+        ClientMap, FFClient,
+    },
+    placeholder,
+    state::ShardServerState,
+    tabledata::tdata_get,
+    unused,
 };
-
-use super::*;
 
 pub fn nano_create(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let pkt: sP_CL2FE_REQ_PC_NANO_CREATE =
@@ -199,9 +208,9 @@ pub fn nano_tune(client: &mut FFClient, state: &mut ShardServerState) -> FFResul
 
                     let slot =
                         player_working.get_item_mut(ItemLocation::Inven, *slot_num as usize)?;
-                    if slot.is_some_and(|stack| stack.get_id() == tuning.req_item_id) {
+                    if slot.is_some_and(|stack| stack.id == tuning.req_item_id) {
                         let removed = Item::split_items(slot, quantity_left);
-                        quantity_left -= removed.unwrap().get_quantity();
+                        quantity_left -= removed.unwrap().quantity;
                         item_slots[i] = *slot_num;
                         items[i] = (*slot).into();
                     }

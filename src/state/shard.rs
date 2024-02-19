@@ -6,18 +6,17 @@ use crate::{
     chunk::{EntityMap, InstanceID},
     config::config_get,
     defines::{ID_OVERWORLD, MAX_NUM_CHANNELS},
+    entity::{Entity, EntityID, Player, Slider, NPC},
     enums::ItemType,
     error::{log, log_if_failed, panic_log, FFError, FFResult, Severity},
     helpers,
+    item::Item,
     net::{
         packet::{PacketID::*, *},
         ClientMap, LoginData,
     },
-    npc::NPC,
-    player::Player,
-    slider::Slider,
     tabledata::tdata_get,
-    Entity, EntityID, Item, TradeContext,
+    trade::TradeContext,
 };
 
 use super::FFReceiver;
@@ -64,7 +63,7 @@ impl Default for ShardServerState {
             let mut slider_circuit = tdata_get().get_slider_path();
             let num_sliders = config_get().shard.num_sliders.get();
             let slider_gap_size = slider_circuit.get_total_length() / num_sliders as u32;
-            let mut pos = slider_circuit.points[0].pos;
+            let mut pos = slider_circuit.get_points()[0].pos;
             let mut dist_to_next = 0;
             let mut sliders_spawned = 0;
             loop {
@@ -171,7 +170,7 @@ impl ShardServerState {
             let player = self.entity_map.get_player_mut(pc_id).unwrap();
             for (location, slot_num) in player.find_items_any(|item| item.ty == ItemType::Vehicle) {
                 let vehicle_slot = player.get_item_mut(location, slot_num).unwrap();
-                if let Some(expiry_time) = vehicle_slot.unwrap().expiry_time {
+                if let Some(expiry_time) = vehicle_slot.unwrap().get_expiry_time() {
                     if time > expiry_time {
                         vehicle_slot.take();
 

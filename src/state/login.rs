@@ -7,9 +7,9 @@ use uuid::Uuid;
 
 use crate::{
     defines::{MAX_NUM_CHANNELS, MAX_NUM_SHARDS},
+    entity::Player,
     enums::ShardChannelStatus,
     error::{FFError, FFResult, Severity},
-    player::Player,
 };
 
 pub struct Account {

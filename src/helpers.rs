@@ -1,12 +1,12 @@
 use crate::{
+    entity::{Entity, EntityID},
     enums::RideType,
     error::log_if_failed,
     net::{
         packet::{PacketID::*, *},
         ClientMap,
     },
-    state::shard::ShardServerState,
-    Entity, EntityID,
+    state::ShardServerState,
 };
 
 pub fn broadcast_state(

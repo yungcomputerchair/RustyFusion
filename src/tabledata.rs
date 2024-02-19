@@ -7,11 +7,14 @@ use std::{collections::HashMap, sync::OnceLock, time::SystemTime};
 
 use crate::{
     chunk::{EntityMap, InstanceID},
-    defines::{ID_OVERWORLD, SIZEOF_NANO_SKILLS},
-    enums::{ItemType, NanoStyle, TransportationType},
+    defines::*,
+    entity::NPC,
+    enums::*,
     error::{log, panic_log, FFError, FFResult, Severity},
-    npc::NPC,
-    util, CrocPotData, Item, ItemStats, Path, PathPoint, Position, VendorData, VendorItem,
+    item::{CrocPotData, Item, ItemStats, VendorData, VendorItem},
+    nano::{NanoStats, NanoTuning},
+    path::{Path, PathPoint},
+    util, Position,
 };
 
 static TABLE_DATA: OnceLock<TableData> = OnceLock::new();
@@ -103,20 +106,6 @@ pub struct MapData {
 struct InstanceData {
     warp_data: HashMap<i32, WarpData>,
     map_data: HashMap<u32, MapData>,
-}
-
-#[derive(Debug)]
-pub struct NanoStats {
-    pub style: NanoStyle,
-    pub skills: [i16; SIZEOF_NANO_SKILLS],
-}
-
-#[derive(Debug)]
-pub struct NanoTuning {
-    pub fusion_matter_cost: u32,
-    pub req_item_id: i16,
-    pub req_item_quantity: u16,
-    pub skill_id: i16,
 }
 
 struct NanoData {

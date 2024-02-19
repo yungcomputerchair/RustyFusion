@@ -3,18 +3,19 @@ use std::{any::Any, time::SystemTime};
 use crate::{
     chunk::{ChunkCoords, InstanceID},
     defines::TYPE_SLIDER,
+    entity::{Entity, EntityID},
     enums::TransportationType,
     error::FFResult,
     net::{
-        ffclient::FFClient,
         packet::{
             sP_FE2CL_TRANSPORTATION_ENTER, sP_FE2CL_TRANSPORTATION_EXIT,
             sP_FE2CL_TRANSPORTATION_MOVE, sTransportationAppearanceData, PacketID::*,
         },
-        ClientMap,
+        ClientMap, FFClient,
     },
-    state::shard::ShardServerState,
-    Entity, EntityID, Path, Position,
+    path::Path,
+    state::ShardServerState,
+    Position,
 };
 
 #[derive(Debug, Clone)]

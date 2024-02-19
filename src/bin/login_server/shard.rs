@@ -1,14 +1,19 @@
-use std::{collections::HashSet, time::SystemTime};
-
-use super::*;
+use std::{
+    collections::{HashMap, HashSet},
+    time::SystemTime,
+};
 
 use rusty_fusion::{
     config::config_get,
     defines::MAX_NUM_CHANNELS,
     enums::{PlayerShardStatus, ShardChannelStatus},
-    error::{codes::PlayerSearchReqErr, log_if_failed},
-    net::{ffclient::ClientType, packet::*},
-    state::login::PlayerSearchRequest,
+    error::{codes::PlayerSearchReqErr, log, log_if_failed, FFError, FFResult, Severity},
+    net::{
+        crypto,
+        packet::{PacketID::*, *},
+        ClientType, FFClient,
+    },
+    state::{LoginServerState, PlayerSearchRequest},
     util,
 };
 
@@ -41,7 +46,7 @@ pub fn connect(
 
     let iv1: i32 = resp.aLS_UID.into_iter().reduce(|a, b| a ^ b).unwrap() as i32;
     let iv2: i32 = shard_id + 1;
-    server.e_key = gen_key(resp.uiSvrTime, iv1, iv2);
+    server.e_key = crypto::gen_key(resp.uiSvrTime, iv1, iv2);
 
     log(
         Severity::Info,

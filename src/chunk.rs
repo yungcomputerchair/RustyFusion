@@ -8,13 +8,11 @@ use std::{
 use crate::{
     config::config_get,
     defines::{ID_OVERWORLD, MAX_NUM_CHANNELS},
+    entity::{Entity, EntityID, Player, Slider, NPC},
     enums::ShardChannelStatus,
     error::{log, log_if_failed, panic_log, FFError, FFResult, Severity},
-    net::{ffclient::FFClient, ClientMap},
-    npc::NPC,
-    player::Player,
-    slider::Slider,
-    Entity, EntityID, Position,
+    net::{ClientMap, FFClient},
+    Position,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

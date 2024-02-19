@@ -2,15 +2,19 @@ use std::cmp::max;
 
 use rusty_fusion::{
     chunk::InstanceID,
-    defines::{self, EXIT_CODE_REQ_BY_GM, MSG_BOX_DURATION_DEFAULT},
-    enums::{AreaType, ItemLocation, RewardType, TargetSearchBy, TeleportType},
-    error::{catch_fail, log_if_failed, FFError, Severity},
+    defines::*,
+    entity::{Combatant, Entity, EntityID, PlayerSearchQuery},
+    enums::*,
+    error::*,
+    item::Item,
+    net::{
+        packet::{PacketID::*, *},
+        ClientMap, FFClient,
+    },
     placeholder,
-    player::PlayerSearchQuery,
-    util, Combatant, Item, Position,
+    state::ShardServerState,
+    unused, util, Position,
 };
-
-use super::*;
 
 pub fn gm_pc_set_value(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
     helpers::validate_gm(client, state)?;
@@ -22,17 +26,13 @@ pub fn gm_pc_set_value(client: &mut FFClient, state: &mut ShardServerState) -> F
     let player = state.get_player_mut(pc_id)?;
 
     let value = match value_type as u32 {
-        defines::CN_GM_SET_VALUE_TYPE__HP => player.set_hp(value),
-        defines::CN_GM_SET_VALUE_TYPE__WEAPON_BATTERY => {
-            player.set_weapon_boosts(value as u32) as i32
-        }
-        defines::CN_GM_SET_VALUE_TYPE__NANO_BATTERY => player.set_nano_potions(value as u32) as i32,
-        defines::CN_GM_SET_VALUE_TYPE__FUSION_MATTER => {
-            player.set_fusion_matter(value as u32) as i32
-        }
-        defines::CN_GM_SET_VALUE_TYPE__CANDY => player.set_taros(value as u32) as i32,
-        defines::CN_GM_SET_VALUE_TYPE__SPEED => placeholder!(value),
-        defines::CN_GM_SET_VALUE_TYPE__JUMP => placeholder!(value),
+        CN_GM_SET_VALUE_TYPE__HP => player.set_hp(value),
+        CN_GM_SET_VALUE_TYPE__WEAPON_BATTERY => player.set_weapon_boosts(value as u32) as i32,
+        CN_GM_SET_VALUE_TYPE__NANO_BATTERY => player.set_nano_potions(value as u32) as i32,
+        CN_GM_SET_VALUE_TYPE__FUSION_MATTER => player.set_fusion_matter(value as u32) as i32,
+        CN_GM_SET_VALUE_TYPE__CANDY => player.set_taros(value as u32) as i32,
+        CN_GM_SET_VALUE_TYPE__SPEED => placeholder!(value),
+        CN_GM_SET_VALUE_TYPE__JUMP => placeholder!(value),
         _ => {
             return Err(FFError::build(
                 Severity::Warning,
@@ -166,13 +166,13 @@ pub fn gm_pc_special_state_switch(
     let player = state.get_player_mut(pc_id)?;
 
     match pkt.iSpecialStateFlag as u32 {
-        defines::CN_SPECIAL_STATE_FLAG__PRINT_GM => {
+        CN_SPECIAL_STATE_FLAG__PRINT_GM => {
             player.show_gm_marker = !player.show_gm_marker;
         }
-        defines::CN_SPECIAL_STATE_FLAG__INVISIBLE => {
+        CN_SPECIAL_STATE_FLAG__INVISIBLE => {
             player.invisible = !player.invisible;
         }
-        defines::CN_SPECIAL_STATE_FLAG__INVULNERABLE => {
+        CN_SPECIAL_STATE_FLAG__INVULNERABLE => {
             player.invulnerable = !player.invulnerable;
         }
         _ => {
@@ -341,7 +341,7 @@ pub fn gm_target_pc_special_state_onoff(
     let new_flag = pkt.iONOFF != 0;
     match pkt.iSpecialStateFlag as u32 {
         // this packet is only used for /mute
-        defines::CN_SPECIAL_STATE_FLAG__MUTE_FREECHAT => {
+        CN_SPECIAL_STATE_FLAG__MUTE_FREECHAT => {
             player.freechat_muted = new_flag;
         }
         _ => {

@@ -1,15 +1,21 @@
-use rusty_fusion::{
-    defines::MSG_BOX_DURATION_DEFAULT,
-    enums::{PlayerShardStatus, TargetSearchBy},
-    error::{codes::PlayerSearchReqErr, log_if_failed, FFError, Severity},
-    player::PlayerSearchQuery,
-    unused, util,
-};
+use std::net::SocketAddr;
+
 use uuid::Uuid;
 
-use super::*;
-
-use std::net::SocketAddr;
+use rusty_fusion::{
+    config::config_get,
+    defines::*,
+    entity::{Entity, PlayerSearchQuery},
+    enums::*,
+    error::{codes::PlayerSearchReqErr, *},
+    net::{
+        crypto,
+        packet::{PacketID::*, *},
+        ClientMap, FFClient, LoginData,
+    },
+    state::ShardServerState,
+    unused, util,
+};
 
 pub fn login_connect_req(server: &mut FFClient) {
     let pkt = sP_FE2LS_REQ_CONNECT {
@@ -26,7 +32,7 @@ pub fn login_connect_succ(server: &mut FFClient, state: &mut ShardServerState) -
 
     let iv1: i32 = pkt.aLS_UID.into_iter().reduce(|a, b| a ^ b).unwrap() as i32;
     let iv2: i32 = shard_id + 1;
-    server.e_key = gen_key(conn_time, iv1, iv2);
+    server.e_key = crypto::gen_key(conn_time, iv1, iv2);
 
     let pkt = sP_FE2LS_UPDATE_CHANNEL_STATUSES {
         aChannelStatus: state.entity_map.get_channel_statuses().map(|s| s as u8),
