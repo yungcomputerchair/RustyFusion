@@ -101,7 +101,12 @@ pub fn login(
             }
 
             let last_player_slot = account.selected_slot;
-            let players = db.load_players(account.id)?;
+            let mut players = db.load_players(account.id)?;
+            for player in &mut players {
+                // even if the player has a temporary name,
+                // we want to show the real name in character selection
+                player.flags.name_check_flag = true;
+            }
 
             /*
              * Check if this account is already logged in, meaning:
