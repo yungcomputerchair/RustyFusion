@@ -64,6 +64,9 @@ pub fn send_menuchat_message(
         (|| {
             let client = clients.get_self();
             let pc_id = client.get_player_id()?;
+
+            // TODO validate contents
+
             let resp = sP_FE2CL_REP_SEND_MENUCHAT_MESSAGE_SUCC {
                 iPC_ID: pc_id,
                 szFreeChat: pkt.szFreeChat,
