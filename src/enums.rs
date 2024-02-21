@@ -1,13 +1,14 @@
 #![allow(non_camel_case_types)]
 
 use num_enum::TryFromPrimitive;
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::{defines::*, error::FFError};
 
 macro_rules! ffenum {
     ($name:ident, $ty:ty, { $($variant:ident = $val:expr,)* }) => {
         #[repr($ty)]
-        #[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
+        #[derive(Serialize_repr, Deserialize_repr, PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
         #[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
         pub enum $name {
             $($variant = $val,)*
@@ -15,7 +16,7 @@ macro_rules! ffenum {
     };
     ($name:ident, $ty:ty, $end:expr, { $($variant:ident = $val:expr,)* }) => {
         #[repr($ty)]
-        #[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
+        #[derive(Serialize_repr, Deserialize_repr, PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
         #[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
         pub enum $name {
             $($variant = $val,)*
