@@ -4,93 +4,87 @@ use num_enum::TryFromPrimitive;
 
 use crate::{defines::*, error::FFError};
 
-#[repr(i32)]
-#[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
-#[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
-pub enum NanoStyle {
+macro_rules! ffenum {
+    ($name:ident, $ty:ty, { $($variant:ident = $val:expr,)* }) => {
+        #[repr($ty)]
+        #[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
+        #[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
+        pub enum $name {
+            $($variant = $val,)*
+        }
+    };
+    ($name:ident, $ty:ty, $end:expr, { $($variant:ident = $val:expr,)* }) => {
+        #[repr($ty)]
+        #[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
+        #[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
+        pub enum $name {
+            $($variant = $val,)*
+        }
+        impl $name {
+            pub fn end() -> $ty {
+                $end
+            }
+        }
+    };
+}
+
+/* Server-defined enums */
+
+ffenum!(NanoStyle, i32, {
     Adaptium = NANO_STYLE_CRYSTAL as i32,
     Blastons = NANO_STYLE_ENERGY as i32,
     Cosmix = NANO_STYLE_FLUID as i32,
-}
+});
 
-#[repr(i16)]
-#[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
-#[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
-pub enum PlayerGuide {
+ffenum!(PlayerGuide, i16, {
     Edd = 1,
     Dexter = 2,
     Mojo = 3,
     Ben = 4,
     Computress = 5,
-}
+});
 
-#[repr(i8)]
-#[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
-#[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
-pub enum PlayerShardStatus {
+ffenum!(PlayerShardStatus, i8, {
     Entered = 0,
     Exited = 1,
-}
+});
 
-#[repr(u8)]
-#[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
-#[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
-pub enum ShardChannelStatus {
+ffenum!(ShardChannelStatus, u8, {
     Closed = 0,
     Empty = 1,
     Normal = 2,
     Busy = 3,
-}
+});
 
-#[repr(i8)]
-#[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
-#[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
-pub enum AreaType {
+ffenum!(AreaType, i8, {
     Local = 0,
     Channel = 1,
     Shard = 2,
     Global = 3,
-}
+});
 
-#[repr(i32)]
-#[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
-#[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
-pub enum TargetSearchBy {
+ffenum!(TargetSearchBy, i32, {
     PlayerID = 0,
     PlayerName = 1,
     PlayerUID = 2,
-}
+});
 
-#[repr(i32)]
-#[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
-#[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
-pub enum RewardType {
+ffenum!(RewardType, i32, {
     Taros = 0,
     FusionMatter = 1,
-}
+});
 
-/* Enums ripped from the client */
+/* Enums ripped directly from the client */
 
-#[repr(i32)]
-#[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
-#[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
-pub enum ItemLocation {
+ffenum!(ItemLocation, i32, 4, {
     Equip = 0,  /*eIL_Equip*/
     Inven = 1,  /*eIL_Inven*/
     QInven = 2, /*eIL_QInven*/
     Bank = 3,   /*eIL_Bank*/
                 /*eIL__End*/
-}
-impl ItemLocation {
-    pub fn end() -> i32 {
-        4
-    }
-}
+});
 
-#[repr(i16)]
-#[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
-#[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
-pub enum ItemType {
+ffenum!(ItemType, i16, {
     Hand = 0,              /*eItemType_Hand*/
     UpperBody = 1,         /*eItemType_UpperBody*/
     LowerBody = 2,         /*eItemType_LowerBody*/
@@ -111,40 +105,26 @@ pub enum ItemType {
     Skill = 27,            /*eItemType_Skill*/
     Npc = 30,              /*eItemType_Npc*/
     SkillBuffEffect = 138, /*eItemType_SkillBuffEffect*/
-}
+});
 
-#[repr(i32)]
-#[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
-#[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
-pub enum TransportationType {
+ffenum!(TransportationType, i32, {
     /*eTT_None*/
     Warp = 1,   /*eTT_Warp*/
     Wyvern = 2, /*eTT_Wyvern*/
     Bus = 3,    /*eTT_Bus*/
                 /*eTT__End*/
-}
+});
 
-#[repr(i32)]
-#[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
-#[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
-pub enum TeleportType {
+ffenum!(TeleportType, i32, {
     XYZ = 0,             /*eCN_GM_TeleportMapType__XYZ*/
     MapXYZ = 1,          /*eCN_GM_TeleportMapType__MapXYZ*/
     MyLocation = 2,      /*eCN_GM_TeleportMapType__MyLocation*/
     SomeoneLocation = 3, /*eCN_GM_TeleportMapType__SomeoneLocation*/
     Unstick = 4,         /*eCN_GM_TeleportMapType__Unstick*/
-}
+});
 
-#[repr(i32)]
-#[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
-#[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
-pub enum RideType {
+ffenum!(RideType, i32, 2, {
     None = 0, /*eRT_None*/
     Wyvern = 1, /*eRT_Wyvern*/
               /*eRT__End*/
-}
-impl RideType {
-    pub fn end() -> i32 {
-        2
-    }
-}
+});
