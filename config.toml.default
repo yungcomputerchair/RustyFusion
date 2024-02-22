@@ -14,6 +14,7 @@ db_username = "admin" # what username to connect to database with
 db_password = "mypassword" # CHANGE ME; what password to connect to database with
 db_host = "localhost" # hostname/address of database server to connect to
 db_port = 5432 # port used by database server
+table_data_path = "tabledata/" # path to OpenFusion table data repository
 
 [login]
 log_path = "login.log" # path to log file, or blank for console logging only

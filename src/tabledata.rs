@@ -7,6 +7,7 @@ use std::{collections::HashMap, sync::OnceLock, time::SystemTime};
 
 use crate::{
     chunk::{EntityMap, InstanceID},
+    config::config_get,
     defines::*,
     entity::NPC,
     enums::*,
@@ -29,19 +30,21 @@ struct XDTData {
 }
 impl XDTData {
     fn load() -> Result<Self, String> {
-        let raw = load_json("tabledata/xdt.json")?;
-        if let Value::Object(root) = raw {
-            Ok(Self {
-                vendor_data: load_vendor_data(&root)?,
-                item_data: load_item_data(&root)?,
-                crocpot_data: load_crocpot_data(&root)?,
-                transportation_data: load_transportation_data(&root)?,
-                instance_data: load_instance_data(&root)?,
-                nano_data: load_nano_data(&root)?,
-            })
-        } else {
-            Err(format!("Bad XDT tabledata (root): {}", raw))
-        }
+        let root = load_json("xdt.json")?;
+        Ok(Self {
+            vendor_data: load_vendor_data(&root)
+                .map_err(|e| format!("Error loading vendor data: {}", e))?,
+            item_data: load_item_data(&root)
+                .map_err(|e| format!("Error loading item data: {}", e))?,
+            crocpot_data: load_crocpot_data(&root)
+                .map_err(|e| format!("Error loading crocpot data: {}", e))?,
+            transportation_data: load_transportation_data(&root)
+                .map_err(|e| format!("Error loading transportation data: {}", e))?,
+            instance_data: load_instance_data(&root)
+                .map_err(|e| format!("Error loading instance data: {}", e))?,
+            nano_data: load_nano_data(&root)
+                .map_err(|e| format!("Error loading nano data: {}", e))?,
+        })
     }
 }
 
@@ -183,10 +186,10 @@ impl TableData {
 
     fn load() -> Result<Self, String> {
         Ok(Self {
-            xdt_data: XDTData::load()?,
-            npc_data: load_npc_data()?,
-            drop_data: load_drop_data()?,
-            path_data: load_path_data()?,
+            xdt_data: XDTData::load().map_err(|e| format!("Error loading XDT: {}", e))?,
+            npc_data: load_npc_data().map_err(|e| format!("Error loading NPC data: {}", e))?,
+            drop_data: load_drop_data().map_err(|e| format!("Error loading drop data: {}", e))?,
+            path_data: load_path_data().map_err(|e| format!("Error loading path data: {}", e))?,
         })
     }
 
@@ -488,12 +491,50 @@ pub fn tdata_get() -> &'static TableData {
     TABLE_DATA.get().unwrap()
 }
 
-fn load_json(path: &str) -> Result<Value, String> {
-    let file =
-        std::fs::read_to_string(path).map_err(|e| format!("Couldn't read file {}: {}", path, e))?;
-    serde_json::from_str(&file).map_err(|e| format!("Couldn't parse {} as JSON: {}", path, e))
+fn load_json(filename: &str) -> Result<Map<std::string::String, Value>, String> {
+    let tdata_path = config_get().general.table_data_path.get();
+    let path = std::path::Path::new(&tdata_path).join(filename);
 
+    let file = std::fs::read_to_string(path.clone())
+        .map_err(|e| format!("Couldn't read file {:?}: {}", path, e))?;
+    let json = serde_json::from_str(&file)
+        .map_err(|e| format!("Couldn't parse {:?} as JSON: {}", path, e))?;
+
+    let Value::Object(root) = json else {
+        return Err(format!("Malformed {:?}", path));
+    };
     // TODO patching
+    Ok(root)
+}
+
+fn get_object<'a>(
+    root: &'a Map<std::string::String, Value>,
+    key: &'static str,
+) -> Result<&'a Map<std::string::String, Value>, String> {
+    root.get(key)
+        .ok_or(format!("Key missing: {}", key))
+        .and_then(|v| {
+            if let Value::Object(v) = v {
+                Ok(v)
+            } else {
+                Err(format!("Value is not an object: {}", key))
+            }
+        })
+}
+
+fn get_array<'a>(
+    root: &'a Map<std::string::String, Value>,
+    key: &'static str,
+) -> Result<&'a Vec<Value>, String> {
+    root.get(key)
+        .ok_or(format!("Key missing: {}", key))
+        .and_then(|v| {
+            if let Value::Array(v) = v {
+                Ok(v)
+            } else {
+                Err(format!("Value is not an array: {}", key))
+            }
+        })
 }
 
 fn load_item_data(
@@ -578,43 +619,26 @@ fn load_item_data(
             _ => unimplemented!(),
         };
 
-        let item_table = root
-            .get(table_key)
-            .ok_or(format!("Key missing: {}", table_key))?;
-        if let Value::Object(item_table) = item_table {
-            let item_data = item_table.get(ITEM_TABLE_ITEM_DATA_KEY).ok_or(format!(
-                "Key missing: {}.{}",
-                table_key, ITEM_TABLE_ITEM_DATA_KEY
-            ))?;
-            if let Value::Array(item_data) = item_data {
-                for i in item_data {
-                    let data: ItemDataEntry = serde_json::from_value(i.clone()).map_err(|e| {
-                        format!("Malformed item data entry ({:?}): {} {}", item_type, e, i)
-                    })?;
-                    let key = (data.m_iItemNumber as i16, item_type);
-                    let data = ItemStats {
-                        buy_price: data.m_iItemPrice as u32,
-                        sell_price: data.m_iItemSellPrice as u32,
-                        sellable: data.m_iSellAble != 0,
-                        tradeable: data.m_iTradeAble != 0,
-                        max_stack_size: data.m_iStackNumber as u16,
-                        required_level: data.m_iMinReqLev.unwrap_or(0) as i16,
-                        rarity: data.m_iRarity.map(|v| v as i8),
-                        gender: data.m_iReqSex.map(|v| v as i8),
-                        speed: data.m_iUp_runSpeed,
-                    };
-                    map.insert(key, data);
-                }
-                Ok(())
-            } else {
-                Err(format!(
-                    "Array missing: {}.{}",
-                    table_key, ITEM_TABLE_ITEM_DATA_KEY
-                ))
-            }
-        } else {
-            Err(format!("Object missing: {}", table_key))
+        let item_table = get_object(root, table_key)?;
+        let item_data = get_array(item_table, ITEM_TABLE_ITEM_DATA_KEY)?;
+        for i in item_data {
+            let data: ItemDataEntry = serde_json::from_value(i.clone())
+                .map_err(|e| format!("Malformed item data entry ({:?}): {} {}", item_type, e, i))?;
+            let key = (data.m_iItemNumber as i16, item_type);
+            let data = ItemStats {
+                buy_price: data.m_iItemPrice as u32,
+                sell_price: data.m_iItemSellPrice as u32,
+                sellable: data.m_iSellAble != 0,
+                tradeable: data.m_iTradeAble != 0,
+                max_stack_size: data.m_iStackNumber as u16,
+                required_level: data.m_iMinReqLev.unwrap_or(0) as i16,
+                rarity: data.m_iRarity.map(|v| v as i8),
+                gender: data.m_iReqSex.map(|v| v as i8),
+                speed: data.m_iUp_runSpeed,
+            };
+            map.insert(key, data);
         }
+        Ok(())
     }
 
     let mut map = HashMap::new();
@@ -646,44 +670,29 @@ fn load_vendor_data(
         m_iSellCost: i32,
     }
 
-    let vendor_table = root
-        .get(VENDOR_TABLE_KEY)
-        .ok_or(format!("Key missing: {}", VENDOR_TABLE_KEY))?;
-    if let Value::Object(vendor_table) = vendor_table {
-        let item_data = vendor_table.get(VENDOR_TABLE_ITEM_DATA_KEY).ok_or(format!(
-            "Key missing: {}.{}",
-            VENDOR_TABLE_KEY, VENDOR_TABLE_ITEM_DATA_KEY
-        ))?;
-        if let Value::Array(item_data) = item_data {
-            let mut vendor_data = HashMap::new();
-            for v in item_data {
-                let vendor_data_entry: VendorDataEntry = serde_json::from_value(v.clone())
-                    .map_err(|e| format!("Malformed vendor data entry: {} {}", e, v))?;
-                let key = vendor_data_entry.m_iNpcNumber;
-                let vendor_data_entry = VendorItem {
-                    sort_number: vendor_data_entry.m_iSortNumber,
-                    ty: vendor_data_entry
-                        .m_iItemType
-                        .try_into()
-                        .map_err(|e: FFError| e.get_msg().to_string())?,
-                    id: vendor_data_entry.m_iitemID,
-                };
+    let vendor_table = get_object(root, VENDOR_TABLE_KEY)?;
+    let item_data = get_array(vendor_table, VENDOR_TABLE_ITEM_DATA_KEY)?;
 
-                vendor_data
-                    .entry(key)
-                    .or_insert_with(|| VendorData::new(key))
-                    .insert(vendor_data_entry);
-            }
-            Ok(vendor_data)
-        } else {
-            Err(format!(
-                "Array missing: {}.{}",
-                VENDOR_TABLE_KEY, VENDOR_TABLE_ITEM_DATA_KEY
-            ))
-        }
-    } else {
-        Err(format!("Object missing: {}", VENDOR_TABLE_KEY))
+    let mut vendor_data = HashMap::new();
+    for v in item_data {
+        let vendor_data_entry: VendorDataEntry = serde_json::from_value(v.clone())
+            .map_err(|e| format!("Malformed vendor data entry: {} {}", e, v))?;
+        let key = vendor_data_entry.m_iNpcNumber;
+        let vendor_data_entry = VendorItem {
+            sort_number: vendor_data_entry.m_iSortNumber,
+            ty: vendor_data_entry
+                .m_iItemType
+                .try_into()
+                .map_err(|e: FFError| e.get_msg().to_string())?,
+            id: vendor_data_entry.m_iitemID,
+        };
+
+        vendor_data
+            .entry(key)
+            .or_insert_with(|| VendorData::new(key))
+            .insert(vendor_data_entry);
     }
+    Ok(vendor_data)
 }
 
 fn load_crocpot_data(
@@ -704,45 +713,27 @@ fn load_crocpot_data(
         m_iStatConstant: i32,
     }
 
-    let crocpot_table = root
-        .get(CROCPOT_TABLE_KEY)
-        .ok_or(format!("Key missing: {}", CROCPOT_TABLE_KEY))?;
-    if let Value::Object(crocpot_table) = crocpot_table {
-        let crocpot_data = crocpot_table
-            .get(CROCPOT_TABLE_CROCPOT_DATA_KEY)
-            .ok_or(format!(
-                "Key missing: {}.{}",
-                CROCPOT_TABLE_KEY, CROCPOT_TABLE_CROCPOT_DATA_KEY
-            ))?;
-        if let Value::Array(crocpot_data) = crocpot_data {
-            let mut crocpot_table = HashMap::new();
-            for v in crocpot_data {
-                let crocpot_data_entry: CrocPotDataEntry = serde_json::from_value(v.clone())
-                    .map_err(|e| format!("Malformed crocpot data entry: {} {}", e, v))?;
-                let key = crocpot_data_entry.m_iLevelGap as i16;
-                let crocpot_odds = CrocPotData {
-                    base_chance: crocpot_data_entry.m_fLevelGapStandard / 100.0,
-                    rarity_diff_multipliers: [
-                        crocpot_data_entry.m_fSameGrade / 100.0,
-                        crocpot_data_entry.m_fOneGrade / 100.0,
-                        crocpot_data_entry.m_fTwoGrade / 100.0,
-                        crocpot_data_entry.m_fThreeGrade / 100.0,
-                    ],
-                    price_multiplier_looks: crocpot_data_entry.m_iLookConstant as u32,
-                    price_multiplier_stats: crocpot_data_entry.m_iStatConstant as u32,
-                };
-                crocpot_table.insert(key, crocpot_odds);
-            }
-            Ok(crocpot_table)
-        } else {
-            Err(format!(
-                "Array missing: {}.{}",
-                CROCPOT_TABLE_KEY, CROCPOT_TABLE_CROCPOT_DATA_KEY
-            ))
-        }
-    } else {
-        Err(format!("Object missing: {}", CROCPOT_TABLE_KEY))
+    let crocpot_table = get_object(root, CROCPOT_TABLE_KEY)?;
+    let crocpot_data = get_array(crocpot_table, CROCPOT_TABLE_CROCPOT_DATA_KEY)?;
+    let mut crocpot_table = HashMap::new();
+    for v in crocpot_data {
+        let crocpot_data_entry: CrocPotDataEntry = serde_json::from_value(v.clone())
+            .map_err(|e| format!("Malformed crocpot data entry: {} {}", e, v))?;
+        let key = crocpot_data_entry.m_iLevelGap as i16;
+        let crocpot_odds = CrocPotData {
+            base_chance: crocpot_data_entry.m_fLevelGapStandard / 100.0,
+            rarity_diff_multipliers: [
+                crocpot_data_entry.m_fSameGrade / 100.0,
+                crocpot_data_entry.m_fOneGrade / 100.0,
+                crocpot_data_entry.m_fTwoGrade / 100.0,
+                crocpot_data_entry.m_fThreeGrade / 100.0,
+            ],
+            price_multiplier_looks: crocpot_data_entry.m_iLookConstant as u32,
+            price_multiplier_stats: crocpot_data_entry.m_iStatConstant as u32,
+        };
+        crocpot_table.insert(key, crocpot_odds);
     }
+    Ok(crocpot_table)
 }
 
 fn load_transportation_data(
@@ -751,7 +742,7 @@ fn load_transportation_data(
     const TRANSPORTATION_TABLE_KEY: &str = "m_pTransportationTable";
 
     fn load_trip_data(
-        root: &Map<std::string::String, Value>,
+        table: &Map<std::string::String, Value>,
     ) -> Result<HashMap<i32, TripData>, String> {
         const TRIP_DATA_KEY: &str = "m_pTransportationData";
 
@@ -770,41 +761,35 @@ fn load_transportation_data(
             m_iRouteNum: i32,
         }
 
-        let data = root
-            .get(TRIP_DATA_KEY)
-            .ok_or(format!("Key missing: {}", TRIP_DATA_KEY))?;
-        if let Value::Array(data) = data {
-            let mut trip_map = HashMap::new();
-            for v in data {
-                let trip_entry: TripDataEntry = serde_json::from_value(v.clone())
-                    .map_err(|e| format!("Malformed trip data entry: {} {}", e, v))?;
-                let key = trip_entry.m_iVehicleID;
-                if key == 0 {
-                    continue;
-                }
-                let trip_entry = TripData {
-                    npc_id: trip_entry.m_iNPCID,
-                    start_location: trip_entry.m_iStartLocation,
-                    end_location: trip_entry.m_iEndLocation,
-                    cost: trip_entry.m_iCost as u32,
-                    speed: trip_entry.m_iSpeed,
-                    route_number: trip_entry.m_iRouteNum,
-                    transportation_type: trip_entry
-                        .m_iMoveType
-                        .try_into()
-                        .map_err(|e: FFError| e.get_msg().to_string())?,
-                };
-                trip_map.insert(key, trip_entry);
+        let data = get_array(table, TRIP_DATA_KEY)?;
+        let mut trip_map = HashMap::new();
+        for v in data {
+            let trip_entry: TripDataEntry = serde_json::from_value(v.clone())
+                .map_err(|e| format!("Malformed trip data entry: {} {}", e, v))?;
+            let key = trip_entry.m_iVehicleID;
+            if key == 0 {
+                continue;
             }
-            Ok(trip_map)
-        } else {
-            Err(format!("Array missing: {}", TRIP_DATA_KEY))
+            let trip_entry = TripData {
+                npc_id: trip_entry.m_iNPCID,
+                start_location: trip_entry.m_iStartLocation,
+                end_location: trip_entry.m_iEndLocation,
+                cost: trip_entry.m_iCost as u32,
+                speed: trip_entry.m_iSpeed,
+                route_number: trip_entry.m_iRouteNum,
+                transportation_type: trip_entry
+                    .m_iMoveType
+                    .try_into()
+                    .map_err(|e: FFError| e.get_msg().to_string())?,
+            };
+            trip_map.insert(key, trip_entry);
         }
+        Ok(trip_map)
     }
 
     fn load_transporter_data(
-        root: &Map<std::string::String, Value>,
-        data_key: &str,
+        table: &Map<std::string::String, Value>,
+        data_key: &'static str,
     ) -> Result<HashMap<i32, TransporterData>, String> {
         #[derive(Debug, Deserialize)]
         struct TransporterDataEntry {
@@ -816,50 +801,38 @@ fn load_transportation_data(
             m_iZone: i32,
         }
 
-        let data = root
-            .get(data_key)
-            .ok_or(format!("Key missing: {}", data_key))?;
-        if let Value::Array(data) = data {
-            let mut scamper_map = HashMap::new();
-            for v in data {
-                let data_entry: TransporterDataEntry = serde_json::from_value(v.clone())
-                    .map_err(|e| format!("Malformed transporter data entry: {} {}", e, v))?;
-                let key = data_entry.m_iLocationID;
-                let data_entry = TransporterData {
-                    npc_type: data_entry.m_iNPCID,
-                    pos: Position {
-                        x: data_entry.m_iXpos,
-                        y: data_entry.m_iYpos,
-                        z: data_entry.m_iZpos,
-                    },
-                };
-                scamper_map.insert(key, data_entry);
-            }
-            Ok(scamper_map)
-        } else {
-            Err(format!("Array missing: {}", data_key))
+        let data = get_array(table, data_key)?;
+        let mut scamper_map = HashMap::new();
+        for v in data {
+            let data_entry: TransporterDataEntry = serde_json::from_value(v.clone())
+                .map_err(|e| format!("Malformed transporter data entry: {} {}", e, v))?;
+            let key = data_entry.m_iLocationID;
+            let data_entry = TransporterData {
+                npc_type: data_entry.m_iNPCID,
+                pos: Position {
+                    x: data_entry.m_iXpos,
+                    y: data_entry.m_iYpos,
+                    z: data_entry.m_iZpos,
+                },
+            };
+            scamper_map.insert(key, data_entry);
         }
+        Ok(scamper_map)
     }
 
-    let table = root
-        .get(TRANSPORTATION_TABLE_KEY)
-        .ok_or(format!("Key missing: {}", TRANSPORTATION_TABLE_KEY))?;
-    if let Value::Object(table) = table {
-        Ok(TransportationData {
-            trip_data: load_trip_data(table)?,
-            scamper_data: load_transporter_data(table, "m_pTransportationWarpLocation")?,
-            monkey_skyway_data: load_transporter_data(table, "m_pBroomstickLocation")?,
-        })
-    } else {
-        Err(format!("Object missing: {}", TRANSPORTATION_TABLE_KEY))
-    }
+    let table = get_object(root, TRANSPORTATION_TABLE_KEY)?;
+    Ok(TransportationData {
+        trip_data: load_trip_data(table)?,
+        scamper_data: load_transporter_data(table, "m_pTransportationWarpLocation")?,
+        monkey_skyway_data: load_transporter_data(table, "m_pBroomstickLocation")?,
+    })
 }
 
 fn load_instance_data(root: &Map<std::string::String, Value>) -> Result<InstanceData, String> {
     const INSTANCE_TABLE_KEY: &str = "m_pInstanceTable";
 
     fn load_warp_data(
-        table_root: &Map<std::string::String, Value>,
+        table: &Map<std::string::String, Value>,
     ) -> Result<HashMap<i32, WarpData>, String> {
         const WARP_DATA_KEY: &str = "m_pWarpData";
 
@@ -883,66 +856,60 @@ fn load_instance_data(root: &Map<std::string::String, Value>) -> Result<Instance
             m_iCost: i32,
         }
 
-        let data = table_root
-            .get(WARP_DATA_KEY)
-            .ok_or(format!("Key missing: {}", WARP_DATA_KEY))?;
-        if let Value::Array(data) = data {
-            let mut warp_map = HashMap::new();
-            for v in data {
-                let warp_data_entry: WarpDataEntry = serde_json::from_value(v.clone())
-                    .map_err(|e| format!("Malformed warp data entry: {} {}", e, v))?;
-                let key = warp_data_entry.m_iWarpNumber;
-                let data_entry = WarpData {
-                    pos: Position {
-                        x: warp_data_entry.m_iToX,
-                        y: warp_data_entry.m_iToY,
-                        z: warp_data_entry.m_iToZ,
-                    },
-                    npc_type: warp_data_entry.m_iNpcNumber,
-                    is_instance: warp_data_entry.m_iIsInstance != 0,
-                    is_group_warp: warp_data_entry.m_iWarpGroupType != 0,
-                    map_num: warp_data_entry.m_iToMapNum as u32,
-                    min_level: warp_data_entry.m_iLimit_Level as i16,
-                    req_task: if warp_data_entry.m_iMissionID == 0 {
-                        None
-                    } else {
-                        Some((
-                            warp_data_entry.m_iMissionID,
-                            warp_data_entry.m_iLimit_TaskID,
-                        ))
-                    },
-                    req_item: if warp_data_entry.m_iLimit_ItemID == 0 {
-                        None
-                    } else {
-                        Some((
-                            (warp_data_entry.m_iLimit_ItemType as i16)
-                                .try_into()
-                                .map_err(|e: FFError| e.get_msg().to_string())?,
-                            warp_data_entry.m_iLimit_ItemID as i16,
-                        ))
-                    },
-                    req_item_consumed: if warp_data_entry.m_iLimit_UseItemID == 0 {
-                        None
-                    } else {
-                        Some((
-                            (warp_data_entry.m_iLimit_UseItemType as i16)
-                                .try_into()
-                                .map_err(|e: FFError| e.get_msg().to_string())?,
-                            warp_data_entry.m_iLimit_UseItemID as i16,
-                        ))
-                    },
-                    cost: warp_data_entry.m_iCost as u32,
-                };
-                warp_map.insert(key, data_entry);
-            }
-            Ok(warp_map)
-        } else {
-            Err(format!("Array missing: {}", WARP_DATA_KEY))
+        let data = get_array(table, WARP_DATA_KEY)?;
+        let mut warp_map = HashMap::new();
+        for v in data {
+            let warp_data_entry: WarpDataEntry = serde_json::from_value(v.clone())
+                .map_err(|e| format!("Malformed warp data entry: {} {}", e, v))?;
+            let key = warp_data_entry.m_iWarpNumber;
+            let data_entry = WarpData {
+                pos: Position {
+                    x: warp_data_entry.m_iToX,
+                    y: warp_data_entry.m_iToY,
+                    z: warp_data_entry.m_iToZ,
+                },
+                npc_type: warp_data_entry.m_iNpcNumber,
+                is_instance: warp_data_entry.m_iIsInstance != 0,
+                is_group_warp: warp_data_entry.m_iWarpGroupType != 0,
+                map_num: warp_data_entry.m_iToMapNum as u32,
+                min_level: warp_data_entry.m_iLimit_Level as i16,
+                req_task: if warp_data_entry.m_iMissionID == 0 {
+                    None
+                } else {
+                    Some((
+                        warp_data_entry.m_iMissionID,
+                        warp_data_entry.m_iLimit_TaskID,
+                    ))
+                },
+                req_item: if warp_data_entry.m_iLimit_ItemID == 0 {
+                    None
+                } else {
+                    Some((
+                        (warp_data_entry.m_iLimit_ItemType as i16)
+                            .try_into()
+                            .map_err(|e: FFError| e.get_msg().to_string())?,
+                        warp_data_entry.m_iLimit_ItemID as i16,
+                    ))
+                },
+                req_item_consumed: if warp_data_entry.m_iLimit_UseItemID == 0 {
+                    None
+                } else {
+                    Some((
+                        (warp_data_entry.m_iLimit_UseItemType as i16)
+                            .try_into()
+                            .map_err(|e: FFError| e.get_msg().to_string())?,
+                        warp_data_entry.m_iLimit_UseItemID as i16,
+                    ))
+                },
+                cost: warp_data_entry.m_iCost as u32,
+            };
+            warp_map.insert(key, data_entry);
         }
+        Ok(warp_map)
     }
 
     fn load_map_data(
-        table_root: &Map<std::string::String, Value>,
+        table: &Map<std::string::String, Value>,
     ) -> Result<HashMap<u32, MapData>, String> {
         const INSTANCE_DATA_KEY: &str = "m_pInstanceData";
 
@@ -954,49 +921,37 @@ fn load_instance_data(root: &Map<std::string::String, Value>) -> Result<Instance
             m_iZoneY: i32,
         }
 
-        let data = table_root
-            .get(INSTANCE_DATA_KEY)
-            .ok_or(format!("Key missing: {}", INSTANCE_DATA_KEY))?;
-        if let Value::Array(data) = data {
-            let mut map_map = HashMap::new();
-            for v in data {
-                let map_data_entry: MapDataEntry = serde_json::from_value(v.clone())
-                    .map_err(|e| format!("Malformed map data entry: {} {}", e, v))?;
-                let key = map_data_entry.m_iInstanceNameID;
-                let map_data_entry = MapData {
-                    ep_id: if map_data_entry.m_iIsEP == 0 {
-                        None
-                    } else {
-                        Some(map_data_entry.m_iIsEP as u32)
-                    },
-                    map_square: (map_data_entry.m_iZoneX, map_data_entry.m_iZoneY),
-                };
-                map_map.insert(key, map_data_entry);
-            }
-            Ok(map_map)
-        } else {
-            Err(format!("Array missing: {}", INSTANCE_DATA_KEY))
+        let data = get_array(table, INSTANCE_DATA_KEY)?;
+        let mut map_map = HashMap::new();
+        for v in data {
+            let map_data_entry: MapDataEntry = serde_json::from_value(v.clone())
+                .map_err(|e| format!("Malformed map data entry: {} {}", e, v))?;
+            let key = map_data_entry.m_iInstanceNameID;
+            let map_data_entry = MapData {
+                ep_id: if map_data_entry.m_iIsEP == 0 {
+                    None
+                } else {
+                    Some(map_data_entry.m_iIsEP as u32)
+                },
+                map_square: (map_data_entry.m_iZoneX, map_data_entry.m_iZoneY),
+            };
+            map_map.insert(key, map_data_entry);
         }
+        Ok(map_map)
     }
 
-    let table = root
-        .get(INSTANCE_TABLE_KEY)
-        .ok_or(format!("Key missing: {}", INSTANCE_TABLE_KEY))?;
-    if let Value::Object(table) = table {
-        Ok(InstanceData {
-            warp_data: load_warp_data(table)?,
-            map_data: load_map_data(table)?,
-        })
-    } else {
-        Err(format!("Object missing: {}", INSTANCE_TABLE_KEY))
-    }
+    let table = get_object(root, INSTANCE_TABLE_KEY)?;
+    Ok(InstanceData {
+        warp_data: load_warp_data(table)?,
+        map_data: load_map_data(table)?,
+    })
 }
 
 fn load_nano_data(root: &Map<std::string::String, Value>) -> Result<NanoData, String> {
     const NANO_TABLE_KEY: &str = "m_pNanoTable";
 
     fn load_stats(
-        table_root: &Map<std::string::String, Value>,
+        table: &Map<std::string::String, Value>,
     ) -> Result<HashMap<i16, NanoStats>, String> {
         const NANO_TABLE_NANO_DATA_KEY: &str = "m_pNanoData";
 
@@ -1025,39 +980,29 @@ fn load_nano_data(root: &Map<std::string::String, Value>) -> Result<NanoData, St
             m_iSound: i32,
         }
 
-        let nano_data = table_root.get(NANO_TABLE_NANO_DATA_KEY).ok_or(format!(
-            "Key missing: {}.{}",
-            NANO_TABLE_KEY, NANO_TABLE_NANO_DATA_KEY
-        ))?;
-        if let Value::Array(nano_data) = nano_data {
-            let mut nano_table = HashMap::new();
-            for v in nano_data {
-                let nano_data_entry: NanoStatsEntry = serde_json::from_value(v.clone())
-                    .map_err(|e| format!("Malformed nano data entry: {} {}", e, v))?;
-                let key = nano_data_entry.m_iNanoNumber as i16;
-                if key == 0 {
-                    continue;
-                }
-                let nano_data_entry = NanoStats {
-                    style: nano_data_entry
-                        .m_iStyle
-                        .try_into()
-                        .map_err(|e: FFError| e.get_msg().to_string())?,
-                    skills: nano_data_entry.m_iTune,
-                };
-                nano_table.insert(key, nano_data_entry);
+        let nano_data = get_array(table, NANO_TABLE_NANO_DATA_KEY)?;
+        let mut nano_table = HashMap::new();
+        for v in nano_data {
+            let nano_data_entry: NanoStatsEntry = serde_json::from_value(v.clone())
+                .map_err(|e| format!("Malformed nano data entry: {} {}", e, v))?;
+            let key = nano_data_entry.m_iNanoNumber as i16;
+            if key == 0 {
+                continue;
             }
-            Ok(nano_table)
-        } else {
-            Err(format!(
-                "Array missing: {}.{}",
-                NANO_TABLE_KEY, NANO_TABLE_NANO_DATA_KEY
-            ))
+            let nano_data_entry = NanoStats {
+                style: nano_data_entry
+                    .m_iStyle
+                    .try_into()
+                    .map_err(|e: FFError| e.get_msg().to_string())?,
+                skills: nano_data_entry.m_iTune,
+            };
+            nano_table.insert(key, nano_data_entry);
         }
+        Ok(nano_table)
     }
 
     pub fn load_tunings(
-        table_root: &Map<std::string::String, Value>,
+        table: &Map<std::string::String, Value>,
     ) -> Result<HashMap<i16, NanoTuning>, String> {
         const NANO_TABLE_NANO_TUNE_DATA_KEY: &str = "m_pNanoTuneData";
 
@@ -1070,49 +1015,31 @@ fn load_nano_data(root: &Map<std::string::String, Value>) -> Result<NanoData, St
             m_iSkillID: i32,
         }
 
-        let nano_tuning = table_root
-            .get(NANO_TABLE_NANO_TUNE_DATA_KEY)
-            .ok_or(format!(
-                "Key missing: {}.{}",
-                NANO_TABLE_KEY, NANO_TABLE_NANO_TUNE_DATA_KEY
-            ))?;
-        if let Value::Array(nano_tuning) = nano_tuning {
-            let mut nano_tuning_table = HashMap::new();
-            for v in nano_tuning {
-                let nano_tuning_entry: NanoTuningEntry = serde_json::from_value(v.clone())
-                    .map_err(|e| format!("Malformed nano tuning entry: {} {}", e, v))?;
-                let key = nano_tuning_entry.m_iTuneNumber as i16;
-                if key == 0 {
-                    continue;
-                }
-                let nano_tuning_entry = NanoTuning {
-                    fusion_matter_cost: nano_tuning_entry.m_iReqFusionMatter as u32,
-                    req_item_id: nano_tuning_entry.m_iReqItemID as i16,
-                    req_item_quantity: nano_tuning_entry.m_iReqItemCount as u16,
-                    skill_id: nano_tuning_entry.m_iSkillID as i16,
-                };
-                nano_tuning_table.insert(key, nano_tuning_entry);
+        let nano_tuning = get_array(table, NANO_TABLE_NANO_TUNE_DATA_KEY)?;
+        let mut nano_tuning_table = HashMap::new();
+        for v in nano_tuning {
+            let nano_tuning_entry: NanoTuningEntry = serde_json::from_value(v.clone())
+                .map_err(|e| format!("Malformed nano tuning entry: {} {}", e, v))?;
+            let key = nano_tuning_entry.m_iTuneNumber as i16;
+            if key == 0 {
+                continue;
             }
-            Ok(nano_tuning_table)
-        } else {
-            Err(format!(
-                "Array missing: {}.{}",
-                NANO_TABLE_KEY, NANO_TABLE_NANO_TUNE_DATA_KEY
-            ))
+            let nano_tuning_entry = NanoTuning {
+                fusion_matter_cost: nano_tuning_entry.m_iReqFusionMatter as u32,
+                req_item_id: nano_tuning_entry.m_iReqItemID as i16,
+                req_item_quantity: nano_tuning_entry.m_iReqItemCount as u16,
+                skill_id: nano_tuning_entry.m_iSkillID as i16,
+            };
+            nano_tuning_table.insert(key, nano_tuning_entry);
         }
+        Ok(nano_tuning_table)
     }
 
-    let table = root
-        .get(NANO_TABLE_KEY)
-        .ok_or(format!("Key missing: {}", NANO_TABLE_KEY))?;
-    if let Value::Object(table) = table {
-        Ok(NanoData {
-            nano_stats: load_stats(table)?,
-            nano_tunings: load_tunings(table)?,
-        })
-    } else {
-        Err(format!("Object missing: {}", NANO_TABLE_KEY))
-    }
+    let table = get_object(root, NANO_TABLE_KEY)?;
+    Ok(NanoData {
+        nano_stats: load_stats(table)?,
+        nano_tunings: load_tunings(table)?,
+    })
 }
 
 fn load_npc_data() -> Result<Vec<NPCData>, String> {
@@ -1120,7 +1047,7 @@ fn load_npc_data() -> Result<Vec<NPCData>, String> {
     const MOB_TABLE_KEY: &str = "mobs";
     const MOB_GROUP_TABLE_KEY: &str = "groups";
 
-    fn load_npc_table(val: &Value, table_key: &str) -> Result<Vec<NPCData>, String> {
+    fn load_npc_table(table: &Map<std::string::String, Value>) -> Result<Vec<NPCData>, String> {
         #[derive(Deserialize)]
         struct FollowerDataEntry {
             iNPCType: i32,
@@ -1139,56 +1066,49 @@ fn load_npc_data() -> Result<Vec<NPCData>, String> {
             iZ: i32,
         }
 
-        if let Value::Object(root) = val {
-            let npcs = root
-                .get(table_key)
-                .ok_or(format!("Key missing: {}", table_key))?;
-            if let Value::Object(npcs) = npcs {
-                let mut npc_data = Vec::new();
-                for (_, v) in npcs {
-                    let npc_data_entry: NPCDataEntry = serde_json::from_value(v.clone())
-                        .map_err(|e| format!("Malformed NPC data entry: {}", e))?;
-                    let npc_data_entry = NPCData {
-                        npc_type: npc_data_entry.iNPCType,
-                        pos: Position {
-                            x: npc_data_entry.iX,
-                            y: npc_data_entry.iY,
-                            z: npc_data_entry.iZ,
-                        },
-                        angle: npc_data_entry.iAngle,
-                        map_num: npc_data_entry.iMapNum,
-                        followers: if let Some(followers) = npc_data_entry.aFollowers {
-                            followers
-                                .into_iter()
-                                .map(|f| FollowerData {
-                                    npc_type: f.iNPCType,
-                                    offset_x: f.iOffsetX,
-                                    offset_y: f.iOffsetY,
-                                })
-                                .collect()
-                        } else {
-                            Vec::new()
-                        },
-                    };
-                    npc_data.push(npc_data_entry);
-                }
-                Ok(npc_data)
-            } else {
-                Err(format!("Bad NPC tabledata (root.{}): {}", table_key, npcs))
-            }
-        } else {
-            Err(format!("Malformed NPC tabledata root: {}", val))
+        let mut npc_data = Vec::new();
+        for (_, v) in table {
+            let npc_data_entry: NPCDataEntry = serde_json::from_value(v.clone())
+                .map_err(|e| format!("Malformed NPC data entry: {}", e))?;
+            let npc_data_entry = NPCData {
+                npc_type: npc_data_entry.iNPCType,
+                pos: Position {
+                    x: npc_data_entry.iX,
+                    y: npc_data_entry.iY,
+                    z: npc_data_entry.iZ,
+                },
+                angle: npc_data_entry.iAngle,
+                map_num: npc_data_entry.iMapNum,
+                followers: if let Some(followers) = npc_data_entry.aFollowers {
+                    followers
+                        .into_iter()
+                        .map(|f| FollowerData {
+                            npc_type: f.iNPCType,
+                            offset_x: f.iOffsetX,
+                            offset_y: f.iOffsetY,
+                        })
+                        .collect()
+                } else {
+                    Vec::new()
+                },
+            };
+            npc_data.push(npc_data_entry);
         }
+        Ok(npc_data)
     }
 
     let mut npc_data = Vec::new();
-    npc_data.extend(load_npc_table(
-        &load_json("tabledata/NPCs.json")?,
-        NPC_TABLE_KEY,
-    )?);
-    let mob_json = load_json("tabledata/mobs.json")?;
-    npc_data.extend(load_npc_table(&mob_json, MOB_TABLE_KEY)?);
-    npc_data.extend(load_npc_table(&mob_json, MOB_GROUP_TABLE_KEY)?);
+
+    let npc_root = load_json("NPCs.json")?;
+    let npc_table = get_object(&npc_root, NPC_TABLE_KEY)?;
+    npc_data.extend(load_npc_table(npc_table)?);
+
+    let mob_root = load_json("mobs.json")?;
+    let mob_table = get_object(&mob_root, MOB_TABLE_KEY)?;
+    npc_data.extend(load_npc_table(mob_table)?);
+    let grouped_mob_table = get_object(&mob_root, MOB_GROUP_TABLE_KEY)?;
+    npc_data.extend(load_npc_table(grouped_mob_table)?);
+
     Ok(npc_data)
 }
 
@@ -1208,58 +1128,38 @@ fn load_drop_data() -> Result<DropData, String> {
     const ITEM_REFERENCES_ID_KEY: &str = "ItemReferenceID";
 
     fn load_drop_table<T: DeserializeOwned>(
-        root: &Value,
-        table_key: &str,
+        table: &Map<std::string::String, Value>,
         id_key: &str,
     ) -> Result<HashMap<i32, T>, String> {
-        if let Value::Object(root) = root {
-            let data = root
-                .get(table_key)
-                .ok_or(format!("Key missing: {}", table_key))?;
-            if let Value::Object(data) = data {
-                let mut data_map = HashMap::new();
-                for (n, v) in data {
-                    let key = v.get(id_key).ok_or(format!("Key missing: {}", id_key))?;
-                    if let Value::Number(key) = key {
-                        let key = key.as_i64().ok_or(format!("Key not i64: {}", key))?;
-                        let val: T = serde_json::from_value(v.clone())
-                            .map_err(|e| format!("Malformed drops data entry: {}", e))?;
-                        data_map.insert(key as i32, val);
-                    } else {
-                        return Err(format!(
-                            "Bad drops tabledata key (root.{}.{}): {}",
-                            table_key, n, key
-                        ));
-                    }
-                }
-                Ok(data_map)
-            } else {
-                Err(format!(
-                    "Bad drops tabledata (root.{}): {}",
-                    table_key, data
-                ))
-            }
-        } else {
-            Err(format!("Malformed drops tabledata root: {}", root))
+        let mut data_map = HashMap::new();
+        for (_, v) in table {
+            let key = v.get(id_key).ok_or(format!("Key missing: {}", id_key))?;
+            let Value::Number(key) = key else {
+                return Err(format!("Key not numeric: {}", key));
+            };
+            let key = key.as_i64().ok_or(format!("Key not an integer: {}", key))?;
+            let val: T = serde_json::from_value(v.clone())
+                .map_err(|e| format!("Malformed drops data entry: {}", e))?;
+            data_map.insert(key as i32, val);
         }
+        Ok(data_map)
     }
 
-    let root = load_json("tabledata/drops.json")?;
+    let drop_root = load_json("drops.json")?;
+
+    let crate_drop_chances_table = get_object(&drop_root, CRATE_DROP_CHANCES_TABLE_KEY)?;
+    let crate_drop_types_table = get_object(&drop_root, CRATE_DROP_TYPES_TABLE_KEY)?;
+    let crate_data_table = get_object(&drop_root, CRATE_DATA_TABLE_KEY)?;
+    let rarity_weights_table = get_object(&drop_root, RARITY_WEIGHTS_TABLE_KEY)?;
+    let item_sets_table = get_object(&drop_root, ITEM_SETS_TABLE_KEY)?;
+    let item_references_table = get_object(&drop_root, ITEM_REFERENCES_TABLE_KEY)?;
     Ok(DropData {
-        crate_drop_chances: load_drop_table(
-            &root,
-            CRATE_DROP_CHANCES_TABLE_KEY,
-            CRATE_DROP_CHANCES_ID_KEY,
-        )?,
-        crate_drop_types: load_drop_table(
-            &root,
-            CRATE_DROP_TYPES_TABLE_KEY,
-            CRATE_DROP_TYPES_ID_KEY,
-        )?,
-        crate_data: load_drop_table(&root, CRATE_DATA_TABLE_KEY, CRATE_DATA_ID_KEY)?,
-        rarity_weights: load_drop_table(&root, RARITY_WEIGHTS_TABLE_KEY, RARITY_WEIGHTS_ID_KEY)?,
-        item_sets: load_drop_table(&root, ITEM_SETS_TABLE_KEY, ITEM_SETS_ID_KEY)?,
-        item_refs: load_drop_table(&root, ITEM_REFERENCES_TABLE_KEY, ITEM_REFERENCES_ID_KEY)?,
+        crate_drop_chances: load_drop_table(crate_drop_chances_table, CRATE_DROP_CHANCES_ID_KEY)?,
+        crate_drop_types: load_drop_table(crate_drop_types_table, CRATE_DROP_TYPES_ID_KEY)?,
+        crate_data: load_drop_table(crate_data_table, CRATE_DATA_ID_KEY)?,
+        rarity_weights: load_drop_table(rarity_weights_table, RARITY_WEIGHTS_ID_KEY)?,
+        item_sets: load_drop_table(item_sets_table, ITEM_SETS_ID_KEY)?,
+        item_refs: load_drop_table(item_references_table, ITEM_REFERENCES_ID_KEY)?,
     })
 }
 
@@ -1285,38 +1185,29 @@ fn load_path_data() -> Result<PathData, String> {
             aPoints: Vec<PathPointEntry>,
         }
 
-        let skyway_table = root
-            .get(SKYWAY_TABLE_KEY)
-            .ok_or(format!("Key missing: {}", SKYWAY_TABLE_KEY))?;
-        if let Value::Object(skyway_table) = skyway_table {
-            let mut skyway_paths = HashMap::new();
-            for (_, v) in skyway_table {
-                let skyway_path_entry: SkywayPathEntry = serde_json::from_value(v.clone())
-                    .map_err(|e| format!("Malformed skyway path entry: {} {}", e, v))?;
-                let key = skyway_path_entry.iRouteID;
-                let speed = skyway_path_entry.iMonkeySpeed;
-                let mut points = Vec::new();
-                for point in &skyway_path_entry.aPoints {
-                    points.push(PathPoint {
-                        pos: Position {
-                            x: point.iX,
-                            y: point.iY,
-                            z: point.iZ,
-                        },
-                        speed,
-                        stop_ticks: 0,
-                    });
-                }
-                let skyway_path = Path::new(points, false);
-                skyway_paths.insert(key, skyway_path);
+        let skyway_table = get_object(root, SKYWAY_TABLE_KEY)?;
+        let mut skyway_paths = HashMap::new();
+        for (_, v) in skyway_table {
+            let skyway_path_entry: SkywayPathEntry = serde_json::from_value(v.clone())
+                .map_err(|e| format!("Malformed skyway path entry: {} {}", e, v))?;
+            let key = skyway_path_entry.iRouteID;
+            let speed = skyway_path_entry.iMonkeySpeed;
+            let mut points = Vec::new();
+            for point in &skyway_path_entry.aPoints {
+                points.push(PathPoint {
+                    pos: Position {
+                        x: point.iX,
+                        y: point.iY,
+                        z: point.iZ,
+                    },
+                    speed,
+                    stop_ticks: 0,
+                });
             }
-            Ok(skyway_paths)
-        } else {
-            Err(format!(
-                "Bad skyway path data (root.{}): {}",
-                SKYWAY_TABLE_KEY, skyway_table
-            ))
+            let skyway_path = Path::new(points, false);
+            skyway_paths.insert(key, skyway_path);
         }
+        Ok(skyway_paths)
     }
 
     fn load_slider_path(root: &Map<std::string::String, Value>) -> Result<Path, String> {
@@ -1325,39 +1216,30 @@ fn load_path_data() -> Result<PathData, String> {
         const SLIDER_SPEED_SLOW: i32 = 450;
         const SLIDER_STOP_TICKS: usize = 16;
 
-        let slider_table = root
-            .get(SLIDER_TABLE_KEY)
-            .ok_or(format!("Key missing: {}", SLIDER_TABLE_KEY))?;
-        if let Value::Object(slider_table) = slider_table {
-            let mut points = Vec::new();
-            let mut was_stop = false;
-            for (_, v) in slider_table {
-                let point: PathPointEntry = serde_json::from_value(v.clone())
-                    .map_err(|e| format!("Malformed slider path entry: {} {}", e, v))?;
-                let is_stop = point.bStop.unwrap();
-                points.push(PathPoint {
-                    pos: Position {
-                        x: point.iX,
-                        y: point.iY,
-                        z: point.iZ,
-                    },
-                    // we go slow if we're approaching or leaving a stop.
-                    speed: if is_stop || was_stop {
-                        SLIDER_SPEED_SLOW
-                    } else {
-                        SLIDER_SPEED
-                    },
-                    stop_ticks: if is_stop { SLIDER_STOP_TICKS } else { 0 },
-                });
-                was_stop = is_stop;
-            }
-            Ok(Path::new(points, true))
-        } else {
-            Err(format!(
-                "Bad slider path data (root.{}): {}",
-                SLIDER_TABLE_KEY, slider_table
-            ))
+        let slider_table = get_object(root, SLIDER_TABLE_KEY)?;
+        let mut points = Vec::new();
+        let mut was_stop = false;
+        for (_, v) in slider_table {
+            let point: PathPointEntry = serde_json::from_value(v.clone())
+                .map_err(|e| format!("Malformed slider path entry: {} {}", e, v))?;
+            let is_stop = point.bStop.unwrap();
+            points.push(PathPoint {
+                pos: Position {
+                    x: point.iX,
+                    y: point.iY,
+                    z: point.iZ,
+                },
+                // we go slow if we're approaching or leaving a stop.
+                speed: if is_stop || was_stop {
+                    SLIDER_SPEED_SLOW
+                } else {
+                    SLIDER_SPEED
+                },
+                stop_ticks: if is_stop { SLIDER_STOP_TICKS } else { 0 },
+            });
+            was_stop = is_stop;
         }
+        Ok(Path::new(points, true))
     }
 
     fn load_npc_paths(
@@ -1373,56 +1255,43 @@ fn load_path_data() -> Result<PathData, String> {
             aPoints: Vec<PathPointEntry>,
         }
 
-        let npc_table = root
-            .get(NPC_TABLE_KEY)
-            .ok_or(format!("Key missing: {}", NPC_TABLE_KEY))?;
-        if let Value::Object(npc_table) = npc_table {
-            let mut npc_paths = HashMap::new();
-            for (_, v) in npc_table {
-                let npc_path_entry: NPCPathEntry = serde_json::from_value(v.clone())
-                    .map_err(|e| format!("Malformed NPC path entry: {} {}", e, v))?;
-                let mut points = Vec::new();
-                for point in &npc_path_entry.aPoints {
-                    points.push(PathPoint {
-                        pos: Position {
-                            x: point.iX,
-                            y: point.iY,
-                            z: point.iZ,
-                        },
-                        speed: npc_path_entry.iBaseSpeed,
-                        stop_ticks: point.iStopTicks.unwrap(),
-                    });
-                }
-                let cycle = if points[0] == points[points.len() - 1] {
-                    // cyclic NPC paths in tdata have the starting point
-                    // duplicated at the end, but this messes up our math.
-                    points.pop();
-                    true
-                } else {
-                    false
-                };
-                let npc_path = Path::new(points, cycle);
-                for npc_type in &npc_path_entry.aNPCTypes {
-                    npc_paths.insert(*npc_type, npc_path.clone());
-                }
+        let npc_table = get_object(root, NPC_TABLE_KEY)?;
+        let mut npc_paths = HashMap::new();
+        for (_, v) in npc_table {
+            let npc_path_entry: NPCPathEntry = serde_json::from_value(v.clone())
+                .map_err(|e| format!("Malformed NPC path entry: {} {}", e, v))?;
+            let mut points = Vec::new();
+            for point in &npc_path_entry.aPoints {
+                points.push(PathPoint {
+                    pos: Position {
+                        x: point.iX,
+                        y: point.iY,
+                        z: point.iZ,
+                    },
+                    speed: npc_path_entry.iBaseSpeed,
+                    stop_ticks: point.iStopTicks.unwrap(),
+                });
             }
-            Ok(npc_paths)
-        } else {
-            Err(format!(
-                "Bad NPC path data (root.{}): {}",
-                NPC_TABLE_KEY, npc_table
-            ))
+            let cycle = if points[0] == points[points.len() - 1] {
+                // cyclic NPC paths in tdata have the starting point
+                // duplicated at the end, but this messes up our math.
+                points.pop();
+                true
+            } else {
+                false
+            };
+            let npc_path = Path::new(points, cycle);
+            for npc_type in &npc_path_entry.aNPCTypes {
+                npc_paths.insert(*npc_type, npc_path.clone());
+            }
         }
+        Ok(npc_paths)
     }
 
-    let root = load_json("tabledata/paths.json")?;
-    if let Value::Object(root) = root {
-        Ok(PathData {
-            skyway_paths: load_skyway_paths(&root)?,
-            slider_path: load_slider_path(&root)?,
-            npc_paths: load_npc_paths(&root)?,
-        })
-    } else {
-        Err(format!("Malformed path tabledata root: {}", root))
-    }
+    let paths_root = load_json("paths.json")?;
+    Ok(PathData {
+        skyway_paths: load_skyway_paths(&paths_root)?,
+        slider_path: load_slider_path(&paths_root)?,
+        npc_paths: load_npc_paths(&paths_root)?,
+    })
 }
