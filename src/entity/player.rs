@@ -531,34 +531,32 @@ impl Player {
     }
 
     pub fn unlock_nano(&mut self, nano_id: i16) -> FFResult<&mut Nano> {
+        if self.nano_data.nano_inventory.contains_key(&nano_id) {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Nano {} is already unlocked", nano_id),
+            ));
+        }
+
         self.nano_data
             .nano_inventory
             .insert(nano_id, Nano::new(nano_id));
-        self.get_nano_mut(nano_id)
+        Ok(self.get_nano_mut(nano_id).unwrap())
     }
 
-    pub fn get_nano(&self, nano_id: i16) -> FFResult<&Nano> {
-        self.nano_data
-            .nano_inventory
-            .get(&nano_id)
-            .ok_or(FFError::build(
-                Severity::Warning,
-                format!("Nano {} is locked", nano_id),
-            ))
+    pub fn get_nano(&self, nano_id: i16) -> Option<&Nano> {
+        self.nano_data.nano_inventory.get(&nano_id)
     }
 
-    pub fn get_nano_mut(&mut self, nano_id: i16) -> FFResult<&mut Nano> {
-        self.nano_data
-            .nano_inventory
-            .get_mut(&nano_id)
-            .ok_or(FFError::build(
-                Severity::Warning,
-                format!("Nano {} is locked", nano_id),
-            ))
+    pub fn get_nano_mut(&mut self, nano_id: i16) -> Option<&mut Nano> {
+        self.nano_data.nano_inventory.get_mut(&nano_id)
     }
 
     pub fn tune_nano(&mut self, nano_id: i16, skill_selection: Option<usize>) -> FFResult<()> {
-        let nano = self.get_nano_mut(nano_id)?;
+        let nano = self.get_nano_mut(nano_id).ok_or(FFError::build(
+            Severity::Warning,
+            format!("Nano {} is locked", nano_id),
+        ))?;
 
         if let Some(skill_idx) = skill_selection {
             if skill_idx >= SIZEOF_NANO_SKILLS {

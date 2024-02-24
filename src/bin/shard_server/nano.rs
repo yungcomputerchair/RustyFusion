@@ -196,7 +196,11 @@ pub fn nano_tune(client: &mut FFClient, state: &mut ShardServerState) -> FFResul
 
             let mut player_working = player.clone();
             if player_working
-                .get_nano(pkt.iNanoID)?
+                .get_nano(pkt.iNanoID)
+                .ok_or(FFError::build(
+                    Severity::Warning,
+                    format!("Player does not have nano {}", pkt.iNanoID),
+                ))?
                 .selected_skill
                 .is_some()
             {
