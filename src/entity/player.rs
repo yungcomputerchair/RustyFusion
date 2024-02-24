@@ -20,7 +20,7 @@ use crate::{
             sNano, sPCAppearanceData, sPCLoadData2CL, sPCStyle, sPCStyle2,
             sP_FE2CL_PC_BROOMSTICK_MOVE, sP_FE2CL_PC_EXIT, sP_FE2CL_PC_NEW,
             sP_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL, sP_FE2LS_UPDATE_CHANNEL_STATUSES,
-            sP_FE2LS_UPDATE_PC_SHARD, sTimeBuff,
+            sP_FE2LS_UPDATE_PC_SHARD, sRunningQuest, sTimeBuff,
             PacketID::{self, *},
         },
         ClientMap, FFClient,
@@ -211,10 +211,12 @@ impl Default for Nanocom {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default)]
-struct MissionData {
-    current_missions: [Option<Task>; SIZEOF_RQUEST_SLOT as usize],
-    active_mission_id: i32,
+#[derive(Debug, Clone, Default)]
+struct MissionJournal {
+    current_nano_mission: Option<Task>,
+    current_guide_mission: Option<Task>,
+    current_world_missions: [Option<Task>; 4],
+    active_mission_slot: Option<usize>,
     mission_flags: [i64; SIZEOF_QUESTFLAG_NUMBER as usize],
     repeat_mission_flags: [i64; SIZEOF_REPEAT_QUESTFLAG_NUMBER as usize],
 }
@@ -353,7 +355,7 @@ pub struct Player {
     hp: i32,
     guide_data: GuideData,
     nano_data: Nanocom,
-    mission_data: MissionData,
+    mission_journal: MissionJournal,
     inventory: PlayerInventory,
     taros: u32,
     fusion_matter: u32,
@@ -433,12 +435,43 @@ impl Player {
         self.instance_id.map_num as i32
     }
 
-    pub fn get_active_mission_id(&self) -> i32 {
-        self.mission_data.active_mission_id
+    pub fn get_active_mission_id(&self) -> Option<i32> {
+        let idx = self.mission_journal.active_mission_slot?;
+        let active_task = match idx {
+            0 => self.mission_journal.current_nano_mission.as_ref(),
+            1 => self.mission_journal.current_guide_mission.as_ref(),
+            _ => self.mission_journal.current_world_missions[idx - 2].as_ref(),
+        }?;
+        let task_def = active_task.get_task_def();
+        Some(task_def.mission_id)
     }
 
     pub fn get_mission_flags(&self) -> [i64; SIZEOF_QUESTFLAG_NUMBER as usize] {
-        self.mission_data.mission_flags
+        self.mission_journal.mission_flags
+    }
+
+    pub fn get_running_quests(&self) -> [sRunningQuest; SIZEOF_RQUEST_SLOT as usize] {
+        let mut running_quests = [sRunningQuest::default(); SIZEOF_RQUEST_SLOT as usize];
+        for (i, quest) in running_quests.iter_mut().enumerate().take(6) {
+            let task = match i {
+                0 => self.mission_journal.current_nano_mission.as_ref(),
+                1 => self.mission_journal.current_guide_mission.as_ref(),
+                _ => self.mission_journal.current_world_missions[i - 2].as_ref(),
+            };
+            if let Some(task) = task {
+                let task_def = task.get_task_def();
+                quest.m_aCurrTaskID = task_def.task_id;
+                for (j, (npc_id, count)) in task.remaining_enemies.iter().enumerate() {
+                    quest.m_aKillNPCID[j] = *npc_id;
+                    quest.m_aKillNPCCount[j] = *count as i32;
+                }
+                for (j, (item_id, count)) in task_def.req_items.iter().enumerate() {
+                    quest.m_aNeededItemID[j] = *item_id as i32;
+                    quest.m_aNeededItemCount[j] = *count as i32;
+                }
+            }
+        }
+        running_quests
     }
 
     pub fn change_nano(&mut self, slot: usize, nano_id: Option<i16>) -> FFResult<()> {
@@ -585,10 +618,10 @@ impl Player {
                 iValue: placeholder!(0),
                 iConfirmNum: placeholder!(0),
             },
-            aQuestFlag: self.mission_data.mission_flags,
-            aRepeatQuestFlag: self.mission_data.repeat_mission_flags,
-            aRunningQuest: self.mission_data.current_missions.map(Option::<Task>::into),
-            iCurrentMissionID: self.mission_data.active_mission_id,
+            aQuestFlag: self.mission_journal.mission_flags,
+            aRepeatQuestFlag: self.mission_journal.repeat_mission_flags,
+            aRunningQuest: self.get_running_quests(),
+            iCurrentMissionID: self.get_active_mission_id().unwrap_or(0),
             iWarpLocationFlag: self.transport_data.scamper_flags,
             aWyvernLocationFlag: self.transport_data.skyway_flags,
             iBuddyWarpTime: self.buddy_warp_time,

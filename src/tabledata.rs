@@ -17,7 +17,7 @@ use crate::{
     enums::*,
     error::{log, panic_log, FFError, FFResult, Severity},
     item::{CrocPotData, Item, ItemStats, VendorData, VendorItem},
-    mission::TaskDefinition,
+    mission::{MissionDefinition, TaskDefinition},
     nano::{NanoStats, NanoTuning},
     path::{Path, PathPoint},
     util, Position,
@@ -125,7 +125,7 @@ struct NanoData {
 }
 
 struct MissionData {
-    mission_task_ids: HashMap<i32, Vec<i32>>,
+    mission_definitions: HashMap<i32, MissionDefinition>,
     task_definitions: HashMap<i32, TaskDefinition>,
 }
 
@@ -482,6 +482,10 @@ impl TableData {
                 Severity::Warning,
                 format!("No skyway path with id {}", path_id),
             ))
+    }
+
+    pub fn get_task_definition(&self, task_id: i32) -> Option<&TaskDefinition> {
+        self.xdt_data.mission_data.task_definitions.get(&task_id)
     }
 }
 
@@ -1065,6 +1069,7 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
         m_iHMissionID: i32,
         m_iRepeatflag: i32,
         m_iHNPCID: i32,
+        m_iHMissionType: i32,
         m_iHTaskType: i32,
         m_iSUOutgoingTask: i32,
         m_iFOutgoingTask: i32,
@@ -1088,18 +1093,28 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
     let table = get_object(root, MISSION_TABLE_KEY)?;
     let mission_data = get_array(table, MISSION_TABLE_MISSION_DATA_KEY)?;
 
-    let mut task_trees = HashMap::new();
+    let mut mission_defs = HashMap::new();
     let mut task_defs = HashMap::new();
     for v in mission_data.iter().skip(1) {
         let entry: MissionDataEntry = serde_json::from_value(v.clone())
             .map_err(|e| format!("Malformed mission data entry: {} {}", e, v))?;
         let task_id = entry.m_iHTaskID;
         let mission_id = entry.m_iHMissionID;
+        let mission_type: MissionType = entry
+            .m_iHMissionType
+            .try_into()
+            .map_err(|e: FFError| e.get_msg().to_string())?;
 
         // add task to the task tree for its mission
-        task_trees
+        mission_defs
             .entry(mission_id)
-            .or_insert_with(Vec::new)
+            .or_insert_with(|| MissionDefinition {
+                mission_id,
+                mission_name: placeholder!(format!("Mission #{}", mission_id)),
+                task_ids: Vec::new(),
+                mission_type,
+            })
+            .task_ids
             .push(task_id);
 
         // create task definition
@@ -1197,8 +1212,9 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
         };
         task_defs.insert(task_id, task_def);
     }
+
     Ok(MissionData {
-        mission_task_ids: task_trees,
+        mission_definitions: mission_defs,
         task_definitions: task_defs,
     })
 }

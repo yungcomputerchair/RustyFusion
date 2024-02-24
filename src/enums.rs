@@ -69,7 +69,7 @@ ffenum!(TargetSearchBy, i32, {
 });
 
 // eTaskTypeProperty.cs
-ffenum!(TaskType, i32, {
+ffenum!(TaskType, i32, 7, {
     Unknown = 0,
     Talk = 1,
     GotoLocation = 2,
@@ -77,6 +77,14 @@ ffenum!(TaskType, i32, {
     Delivery = 4,
     Defeat = 5,
     EscortDefence = 6,
+});
+
+// eMissionTypeProperty.cs
+ffenum!(MissionType, i32, 4, {
+    Unknown = 0,
+    Guide = 1,
+    Nano = 2,
+    Normal = 3,
 });
 
 ffenum!(RewardType, i32, {

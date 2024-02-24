@@ -1,6 +1,14 @@
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
-use crate::{enums::*, net::packet::*};
+use crate::{enums::*, net::packet::sRunningQuest, tabledata::tdata_get};
+
+#[derive(Debug)]
+pub struct MissionDefinition {
+    pub mission_id: i32,
+    pub mission_name: String,
+    pub task_ids: Vec<i32>,
+    pub mission_type: MissionType,
+}
 
 #[derive(Debug)]
 pub struct TaskDefinition {
@@ -29,37 +37,26 @@ pub struct TaskDefinition {
     pub escort_npc_type: Option<i32>,          // m_iCSUDEFNPCID
 }
 
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct Task {
     task_id: i32,
-    target_npc_ids: [i32; 3],
-    target_npc_counts: [i32; 3],
-    target_item_ids: [i32; 3],
-    target_item_counts: [i32; 3],
+    pub remaining_enemies: Vec<(i32, usize)>,
+    pub fail_time: Option<SystemTime>,
 }
-impl From<Task> for sRunningQuest {
-    fn from(value: Task) -> Self {
-        Self {
-            m_aCurrTaskID: value.task_id,
-            m_aKillNPCID: value.target_npc_ids,
-            m_aKillNPCCount: value.target_npc_counts,
-            m_aNeededItemID: value.target_item_ids,
-            m_aNeededItemCount: value.target_item_counts,
-        }
+impl Task {
+    pub fn get_task_def(&self) -> &TaskDefinition {
+        tdata_get().get_task_definition(self.task_id).unwrap()
     }
 }
-impl From<Option<Task>> for sRunningQuest {
-    fn from(value: Option<Task>) -> Self {
-        if let Some(task) = value {
-            return task.into();
-        }
 
-        Self {
+impl Default for sRunningQuest {
+    fn default() -> Self {
+        sRunningQuest {
             m_aCurrTaskID: 0,
-            m_aKillNPCID: [0, 0, 0],
-            m_aKillNPCCount: [0, 0, 0],
-            m_aNeededItemID: [0, 0, 0],
-            m_aNeededItemCount: [0, 0, 0],
+            m_aKillNPCID: [0; 3],
+            m_aKillNPCCount: [0; 3],
+            m_aNeededItemID: [0; 3],
+            m_aNeededItemCount: [0; 3],
         }
     }
 }
