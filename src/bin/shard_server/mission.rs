@@ -125,9 +125,19 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
 
             // all clear, start the task
             let task: Task = task_def.into();
+            let mission_def = task.get_mission_def().unwrap();
 
             let player = state.get_player_mut(pc_id)?;
-            player.mission_journal.start_task(task)?;
+            if player.mission_journal.start_task(task)? {
+                log(
+                    Severity::Debug,
+                    &format!(
+                        "Player {} started mission: {}",
+                        player.get_uid(),
+                        mission_def.mission_name
+                    ),
+                );
+            }
 
             let resp = sP_FE2CL_REP_PC_TASK_START_SUCC {
                 iTaskNum: pkt.iTaskNum,

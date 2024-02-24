@@ -50,11 +50,11 @@ pub struct Task {
     pub completed: bool,
 }
 impl Task {
-    pub fn get_task_def(&self) -> FFResult<&TaskDefinition> {
+    pub fn get_task_def(&self) -> FFResult<&'static TaskDefinition> {
         tdata_get().get_task_definition(self.task_id)
     }
 
-    pub fn get_mission_def(&self) -> FFResult<&MissionDefinition> {
+    pub fn get_mission_def(&self) -> FFResult<&'static MissionDefinition> {
         let task_def = self.get_task_def()?;
         let mission_def = tdata_get().get_mission_definition(task_def.mission_id)?;
         Ok(mission_def)
@@ -176,12 +176,12 @@ impl MissionJournal {
         }
     }
 
-    pub fn start_task(&mut self, task: Task) -> FFResult<()> {
+    pub fn start_task(&mut self, task: Task) -> FFResult<bool> {
         let mission_def = task.get_mission_def()?;
         let mission_existing_task = self
             .get_task_iter_mut()
             .find(|t| t.get_task_def().unwrap().mission_id == mission_def.mission_id);
-        if let Some(existing_task) = mission_existing_task {
+        let new_mission = if let Some(existing_task) = mission_existing_task {
             if !existing_task.completed {
                 return Err(FFError::build(
                     Severity::Warning,
@@ -192,6 +192,7 @@ impl MissionJournal {
                 ));
             }
             *existing_task = task; // replace existing task
+            false
         } else {
             let slot = match mission_def.mission_type {
                 MissionType::Unknown => {
@@ -215,8 +216,9 @@ impl MissionJournal {
                     ))?,
             };
             *slot = Some(task);
-        }
-        Ok(())
+            true
+        };
+        Ok(new_mission)
     }
 }
 

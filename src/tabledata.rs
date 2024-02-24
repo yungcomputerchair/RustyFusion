@@ -1080,11 +1080,13 @@ fn load_nano_data(root: &Map<std::string::String, Value>) -> Result<NanoData, St
 fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionData, String> {
     const MISSION_TABLE_KEY: &str = "m_pMissionTable";
     const MISSION_TABLE_MISSION_DATA_KEY: &str = "m_pMissionData";
+    const MISSION_TABLE_MISSION_STRINGS_KEY: &str = "m_pMissionStringData";
 
     #[derive(Debug, Deserialize)]
     struct MissionDataEntry {
         m_iHTaskID: i32,
         m_iHMissionID: i32,
+        m_iHMissionName: usize,
         m_iHNPCID: i32,
         m_iHMissionType: i32,
         m_iHTaskType: i32,
@@ -1107,8 +1109,14 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
         m_iCSUNumToKill: [usize; MAX_NEED_SORT_OF_ENEMY as usize],
     }
 
+    #[derive(Debug, Deserialize)]
+    struct MissionStringEntry {
+        m_pstrNameString: String,
+    }
+
     let table = get_object(root, MISSION_TABLE_KEY)?;
     let mission_data = get_array(table, MISSION_TABLE_MISSION_DATA_KEY)?;
+    let mission_strings = get_array(table, MISSION_TABLE_MISSION_STRINGS_KEY)?;
 
     let mut mission_defs = HashMap::new();
     let mut task_defs = HashMap::new();
@@ -1121,13 +1129,21 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
             .m_iHMissionType
             .try_into()
             .map_err(|e: FFError| e.get_msg().to_string())?;
+        let mission_name = match mission_strings.get(entry.m_iHMissionName) {
+            Some(val) => {
+                let mission_string_entry: MissionStringEntry = serde_json::from_value(val.clone())
+                    .map_err(|e| format!("Malformed mission string entry: {} {}", e, val))?;
+                mission_string_entry.m_pstrNameString
+            }
+            _ => format!("Mission #{}", mission_id),
+        };
 
         // add task to the task tree for its mission
         mission_defs
             .entry(mission_id)
             .or_insert_with(|| MissionDefinition {
                 mission_id,
-                mission_name: placeholder!(format!("Mission #{}", mission_id)),
+                mission_name,
                 task_ids: Vec::new(),
                 mission_type,
             })
