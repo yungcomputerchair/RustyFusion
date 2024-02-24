@@ -157,3 +157,37 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
         },
     )
 }
+
+pub fn set_current_mission_id(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+    let pkt: sP_CL2FE_REQ_PC_SET_CURRENT_MISSION_ID =
+        *client.get_packet(P_CL2FE_REQ_PC_SET_CURRENT_MISSION_ID)?;
+    catch_fail(
+        (|| {
+            let pc_id = client.get_player_id()?;
+            let player = state.get_player_mut(pc_id)?;
+            let active_mission_slot = player
+                .mission_journal
+                .set_active_mission_id(pkt.iCurrentMissionID)?;
+            log(
+                Severity::Debug,
+                &format!(
+                    "Player {} set active mission slot to {}, mission ID {}",
+                    player.get_uid(),
+                    active_mission_slot,
+                    pkt.iCurrentMissionID
+                ),
+            );
+
+            let resp = sP_FE2CL_REP_PC_SET_CURRENT_MISSION_ID {
+                iCurrentMissionID: pkt.iCurrentMissionID,
+            };
+            client.send_packet(P_FE2CL_REP_PC_SET_CURRENT_MISSION_ID, &resp)
+        })(),
+        || {
+            let resp = sP_FE2CL_REP_PC_SET_CURRENT_MISSION_ID {
+                iCurrentMissionID: 0,
+            };
+            client.send_packet(P_FE2CL_REP_PC_SET_CURRENT_MISSION_ID, &resp)
+        },
+    )
+}

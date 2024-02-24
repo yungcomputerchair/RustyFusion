@@ -176,6 +176,30 @@ impl MissionJournal {
         }
     }
 
+    pub fn set_active_mission_id(&mut self, mission_id: i32) -> FFResult<usize> {
+        let mut current_mission_slot = None;
+        for idx in 0..6 {
+            if let Some(task) = self.get_current_task_by_idx(idx) {
+                let task_def = task.get_task_def().unwrap();
+                if task_def.mission_id == mission_id {
+                    current_mission_slot = Some(idx);
+                    break;
+                }
+            }
+        }
+
+        match current_mission_slot {
+            Some(idx) => {
+                self.active_mission_slot = Some(idx);
+                Ok(idx)
+            }
+            None => Err(FFError::build(
+                Severity::Warning,
+                format!("No current task for mission ID {}", mission_id),
+            )),
+        }
+    }
+
     pub fn start_task(&mut self, task: Task) -> FFResult<bool> {
         let mission_def = task.get_mission_def()?;
         let mission_existing_task = self
