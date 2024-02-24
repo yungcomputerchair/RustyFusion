@@ -54,6 +54,12 @@ impl Task {
     pub fn get_task_def(&self) -> FFResult<&TaskDefinition> {
         tdata_get().get_task_definition(self.task_id)
     }
+
+    pub fn get_mission_def(&self) -> FFResult<&MissionDefinition> {
+        let task_def = self.get_task_def()?;
+        let mission_def = tdata_get().get_mission_definition(task_def.mission_id)?;
+        Ok(mission_def)
+    }
 }
 impl From<&TaskDefinition> for Task {
     fn from(task_def: &TaskDefinition) -> Self {
@@ -108,6 +114,14 @@ impl MissionJournal {
         tasks.into_iter()
     }
 
+    fn get_current_task_by_idx(&self, idx: usize) -> Option<&Task> {
+        match idx {
+            0 => self.current_nano_mission.as_ref(),
+            1 => self.current_guide_mission.as_ref(),
+            _ => self.current_world_missions[idx - 2].as_ref(),
+        }
+    }
+
     pub fn get_mission_flags(&self) -> [i64; SIZEOF_QUESTFLAG_NUMBER as usize] {
         self.completed_mission_flags
     }
@@ -119,11 +133,7 @@ impl MissionJournal {
     pub fn get_running_quests(&self) -> [sRunningQuest; SIZEOF_RQUEST_SLOT as usize] {
         let mut running_quests = [sRunningQuest::default(); SIZEOF_RQUEST_SLOT as usize];
         for (i, quest) in running_quests.iter_mut().enumerate().take(6) {
-            let task = match i {
-                0 => self.current_nano_mission.as_ref(),
-                1 => self.current_guide_mission.as_ref(),
-                _ => self.current_world_missions[i - 2].as_ref(),
-            };
+            let task = self.get_current_task_by_idx(i);
             if let Some(task) = task {
                 let task_def = task.get_task_def().unwrap();
                 quest.m_aCurrTaskID = task_def.task_id;
@@ -142,11 +152,7 @@ impl MissionJournal {
 
     pub fn get_active_mission_id(&self) -> Option<i32> {
         let idx = self.active_mission_slot?;
-        let active_task = match idx {
-            0 => self.current_nano_mission.as_ref(),
-            1 => self.current_guide_mission.as_ref(),
-            _ => self.current_world_missions[idx - 2].as_ref(),
-        }?;
+        let active_task = self.get_current_task_by_idx(idx)?;
         let task_def = active_task.get_task_def().unwrap();
         Some(task_def.mission_id)
     }
@@ -160,38 +166,62 @@ impl MissionJournal {
         task_ids
     }
 
-    pub fn is_mission_completed(&self, mission_id: i32) -> bool {
-        let chunk = mission_id / 64;
-        let offset = mission_id % 64;
-        (self.completed_mission_flags[chunk as usize] & (1 << offset)) != 0
+    pub fn is_mission_completed(&self, mission_id: i32) -> FFResult<bool> {
+        const MAX_MISSION_ID: i32 = SIZEOF_QUESTFLAG_NUMBER as i32 * 64;
+        match mission_id {
+            1..=MAX_MISSION_ID => {
+                let offset = mission_id - 1;
+                let flags_idx = offset / 64;
+                let bit_idx = offset % 64;
+                Ok((self.completed_mission_flags[flags_idx as usize] & (1 << bit_idx)) != 0)
+            }
+            _ => Err(FFError::build(
+                Severity::Warning,
+                format!("Invalid mission ID {}", mission_id),
+            )),
+        }
+    }
+
+    pub fn is_repeat_completed(&self, repeat_idx: usize) -> FFResult<bool> {
+        const MAX_REPEAT_IDX: usize = SIZEOF_REPEAT_QUESTFLAG_NUMBER as usize * 32;
+        match repeat_idx {
+            1..=MAX_REPEAT_IDX => {
+                let offset = repeat_idx - 1;
+                let flags_idx = offset / 32;
+                let bit_idx = offset % 32;
+                Ok((self.repeat_mission_flags[flags_idx] & (1 << bit_idx)) != 0)
+            }
+            _ => Err(FFError::build(
+                Severity::Warning,
+                format!("Invalid repeat index {}", repeat_idx),
+            )),
+        }
     }
 
     pub fn start_task(&mut self, task: Task) -> FFResult<()> {
-        let task_def = task.get_task_def()?;
-        let mission_existing_task = self.get_task_iter_mut().find(|t| {
-            t.get_task_def()
-                .is_ok_and(|def| def.mission_id == task_def.mission_id)
-        });
+        let mission_def = task.get_mission_def()?;
+        let mission_existing_task = self
+            .get_task_iter_mut()
+            .find(|t| t.get_task_def().unwrap().mission_id == mission_def.mission_id);
         if let Some(existing_task) = mission_existing_task {
             if !existing_task.completed {
                 return Err(FFError::build(
                     Severity::Warning,
                     format!(
-                        "Tried to start task {} while another task for mission {} is in progress",
-                        task_def.task_id, task_def.mission_id
+                        "Tried to start task {} while task {} for mission {} is in progress",
+                        task.task_id, existing_task.task_id, mission_def.mission_id
                     ),
                 ));
             }
             *existing_task = task; // replace existing task
         } else {
-            let mission_def = tdata_get().get_mission_definition(task_def.mission_id)?;
             let slot = match mission_def.mission_type {
                 MissionType::Unknown => {
                     return Err(FFError::build(
                         Severity::Warning,
                         format!(
                             "Tried to start task {} for unknown mission type",
-                            task_def.task_id
+                            task.task_id
                         ),
                     ))
                 }

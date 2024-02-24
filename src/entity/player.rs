@@ -128,7 +128,7 @@ impl TransportData {
 
     pub fn test_scamper_flag(&self, location_id: i32) -> FFResult<bool> {
         match location_id {
-            (1..=32) => {
+            1..=32 => {
                 let offset = location_id - 1;
                 Ok(self.scamper_flags & (1 << offset) != 0)
             }
@@ -144,11 +144,11 @@ impl TransportData {
         location_id: i32,
     ) -> FFResult<[i64; WYVERN_LOCATION_FLAG_SIZE as usize]> {
         match location_id {
-            (1..=63) => {
+            1..=63 => {
                 let offset = location_id - 1;
                 self.skyway_flags[0] |= 1 << offset;
             }
-            (64..=127) => {
+            64..=127 => {
                 let offset = location_id - 64;
                 self.skyway_flags[1] |= 1 << offset;
             }
