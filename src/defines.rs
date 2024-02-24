@@ -29,6 +29,7 @@ pub const MSG_BOX_DURATION_DEFAULT: i32 = 3;
 
 /* Constants ripped from the client */
 
+// csDefines.cs
 pub const SUCC: u32 = 1;
 pub const FAIL: u32 = 0;
 pub const SIZEOF_BYTE: u32 = 1;
@@ -321,3 +322,17 @@ pub const SEND_UNICAST: u32 = 1;
 pub const SEND_ANYCAST: u32 = 2;
 pub const SEND_ANYCAST_NEW: u32 = 3;
 pub const SEND_BROADCAST: u32 = 4;
+
+// eMissionConst.cs
+pub const MAX_NEED_SORT_OF_ENEMY: u32 = 3;
+pub const MAX_REQUIRE_MISSION: u32 = 2;
+pub const MAX_REQUIRE_NANO: u32 = 5;
+//pub const SIZEOF_NANO_BANK_SLOT: u32 = 37;
+pub const MAX_NEED_SORT_OF_ITEM: u32 = 3;
+pub const NEARBY_NPC_RANGE: u32 = 5000;
+//pub const SIZEOF_QUESTFLAG_NUMBER: u32 = 0x10;    // assigned as 32 in csDefines... wtf?
+//pub const SIZEOF_REPEAT_QUESTFLAG_NUMBER: u32 = 8;
+pub const MAX_QUEST: u32 = 30;
+//pub const MENTOR_CHANGE_BASE_COST: u32 = 100;
+pub const MAX_UNIT_TIME_OF_MISSION_SYSTEM_UPDATING: u32 = 1;
+pub const MAX_BARKER_CHECK_PERIOD_TIME: u32 = 20;

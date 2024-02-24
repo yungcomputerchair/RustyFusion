@@ -13,7 +13,7 @@ use crate::{
     enums::{ItemLocation, ItemType, PlayerGuide, PlayerShardStatus, RewardType, RideType},
     error::{log, log_if_failed, panic_if_failed, panic_log, FFError, FFResult, Severity},
     item::Item,
-    mission::Mission,
+    mission::Task,
     nano::Nano,
     net::{
         packet::{
@@ -213,7 +213,7 @@ impl Default for Nanocom {
 
 #[derive(Debug, Clone, Copy, Default)]
 struct MissionData {
-    current_missions: [Option<Mission>; SIZEOF_RQUEST_SLOT as usize],
+    current_missions: [Option<Task>; SIZEOF_RQUEST_SLOT as usize],
     active_mission_id: i32,
     mission_flags: [i64; SIZEOF_QUESTFLAG_NUMBER as usize],
     repeat_mission_flags: [i64; SIZEOF_REPEAT_QUESTFLAG_NUMBER as usize],
@@ -587,10 +587,7 @@ impl Player {
             },
             aQuestFlag: self.mission_data.mission_flags,
             aRepeatQuestFlag: self.mission_data.repeat_mission_flags,
-            aRunningQuest: self
-                .mission_data
-                .current_missions
-                .map(Option::<Mission>::into),
+            aRunningQuest: self.mission_data.current_missions.map(Option::<Task>::into),
             iCurrentMissionID: self.mission_data.active_mission_id,
             iWarpLocationFlag: self.transport_data.scamper_flags,
             aWyvernLocationFlag: self.transport_data.skyway_flags,

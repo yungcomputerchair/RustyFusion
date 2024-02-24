@@ -3,7 +3,11 @@
 
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::{Map, Value};
-use std::{collections::HashMap, sync::OnceLock, time::SystemTime};
+use std::{
+    collections::HashMap,
+    sync::OnceLock,
+    time::{Duration, SystemTime},
+};
 
 use crate::{
     chunk::{EntityMap, InstanceID},
@@ -13,6 +17,7 @@ use crate::{
     enums::*,
     error::{log, panic_log, FFError, FFResult, Severity},
     item::{CrocPotData, Item, ItemStats, VendorData, VendorItem},
+    mission::TaskDefinition,
     nano::{NanoStats, NanoTuning},
     path::{Path, PathPoint},
     util, Position,
@@ -27,6 +32,7 @@ struct XDTData {
     transportation_data: TransportationData,
     instance_data: InstanceData,
     nano_data: NanoData,
+    mission_data: MissionData,
 }
 impl XDTData {
     fn load() -> Result<Self, String> {
@@ -44,6 +50,8 @@ impl XDTData {
                 .map_err(|e| format!("Error loading instance data: {}", e))?,
             nano_data: load_nano_data(&root)
                 .map_err(|e| format!("Error loading nano data: {}", e))?,
+            mission_data: load_mission_data(&root)
+                .map_err(|e| format!("Error loading mission data: {}", e))?,
         })
     }
 }
@@ -114,6 +122,11 @@ struct InstanceData {
 struct NanoData {
     nano_stats: HashMap<i16, NanoStats>,
     nano_tunings: HashMap<i16, NanoTuning>,
+}
+
+struct MissionData {
+    mission_task_ids: HashMap<i32, Vec<i32>>,
+    task_definitions: HashMap<i32, TaskDefinition>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1039,6 +1052,154 @@ fn load_nano_data(root: &Map<std::string::String, Value>) -> Result<NanoData, St
     Ok(NanoData {
         nano_stats: load_stats(table)?,
         nano_tunings: load_tunings(table)?,
+    })
+}
+
+fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionData, String> {
+    const MISSION_TABLE_KEY: &str = "m_pMissionTable";
+    const MISSION_TABLE_MISSION_DATA_KEY: &str = "m_pMissionData";
+
+    #[derive(Debug, Deserialize)]
+    struct MissionDataEntry {
+        m_iHTaskID: i32,
+        m_iHMissionID: i32,
+        m_iRepeatflag: i32,
+        m_iHNPCID: i32,
+        m_iHTaskType: i32,
+        m_iSUOutgoingTask: i32,
+        m_iFOutgoingTask: i32,
+        m_iCSTReqMission: [i32; MAX_REQUIRE_MISSION as usize],
+        m_iCSTRReqNano: [i16; MAX_REQUIRE_NANO as usize],
+        m_iCTRReqLvMin: i16,
+        m_iCSTReqGuide: i16,
+        m_iCSUDEFNPCID: i32,
+        m_iCSTItemID: [i16; MAX_NEED_SORT_OF_ITEM as usize],
+        m_iCSTItemNumNeeded: [usize; MAX_NEED_SORT_OF_ITEM as usize],
+        m_iCSTTrigger: i32,
+        m_iCSUCheckTimer: u64,
+        m_iHTerminatorNPCID: i32,
+        m_iRequireInstanceID: u32,
+        m_iCSUItemID: [i16; MAX_NEED_SORT_OF_ITEM as usize],
+        m_iCSUItemNumNeeded: [usize; MAX_NEED_SORT_OF_ITEM as usize],
+        m_iCSUEnemyID: [i32; MAX_NEED_SORT_OF_ENEMY as usize],
+        m_iCSUNumToKill: [usize; MAX_NEED_SORT_OF_ENEMY as usize],
+    }
+
+    let table = get_object(root, MISSION_TABLE_KEY)?;
+    let mission_data = get_array(table, MISSION_TABLE_MISSION_DATA_KEY)?;
+
+    let mut task_trees = HashMap::new();
+    let mut task_defs = HashMap::new();
+    for v in mission_data.iter().skip(1) {
+        let entry: MissionDataEntry = serde_json::from_value(v.clone())
+            .map_err(|e| format!("Malformed mission data entry: {} {}", e, v))?;
+        let task_id = entry.m_iHTaskID;
+        let mission_id = entry.m_iHMissionID;
+
+        // add task to the task tree for its mission
+        task_trees
+            .entry(mission_id)
+            .or_insert_with(Vec::new)
+            .push(task_id);
+
+        // create task definition
+        let task_def = TaskDefinition {
+            task_id,
+            mission_id,
+            repeatable: entry.m_iRepeatflag != 0,
+            giver_npc_type: match entry.m_iHNPCID {
+                0 => None,
+                x => Some(x),
+            },
+            task_type: entry
+                .m_iHTaskType
+                .try_into()
+                .map_err(|e: FFError| e.get_msg().to_string())?,
+            success_task_id: match entry.m_iSUOutgoingTask {
+                0 => None,
+                x => Some(x),
+            },
+            fail_task_id: match entry.m_iFOutgoingTask {
+                0 => None,
+                x => Some(x),
+            },
+            prereq_completed_mission_ids: entry
+                .m_iCSTReqMission
+                .iter()
+                .flat_map(|id| match id {
+                    0 => None,
+                    x => Some(*x),
+                })
+                .collect(),
+            prereq_nano_ids: entry
+                .m_iCSTRReqNano
+                .iter()
+                .flat_map(|id| match id {
+                    0 => None,
+                    x => Some(*x),
+                })
+                .collect(),
+            prereq_level: match entry.m_iCTRReqLvMin {
+                0 => None,
+                x => Some(x),
+            },
+            prereq_guide: match entry.m_iCSTReqGuide {
+                0 => None,
+                x => Some(x.try_into().map_err(|e: FFError| e.get_msg().to_string())?),
+            },
+            prereq_items: entry
+                .m_iCSTItemID
+                .iter()
+                .zip(entry.m_iCSTItemNumNeeded.iter())
+                .flat_map(|(&id, &num)| match id {
+                    0 => None,
+                    x => Some((x, num)),
+                })
+                .collect(),
+            prereq_task_id_in_active_mission: match entry.m_iCSTTrigger {
+                0 => None,
+                x => Some(x),
+            },
+            time_limit: match entry.m_iCSUCheckTimer {
+                0 => None,
+                x => Some(Duration::from_secs(x)),
+            },
+            destination_npc_type: match entry.m_iHTerminatorNPCID {
+                0 => None,
+                x => Some(x),
+            },
+            destination_map_num: match entry.m_iRequireInstanceID {
+                0 => None,
+                x => Some(x),
+            },
+            req_items: entry
+                .m_iCSUItemID
+                .iter()
+                .zip(entry.m_iCSUItemNumNeeded.iter())
+                .flat_map(|(&id, &num)| match id {
+                    0 => None,
+                    x => Some((x, num)),
+                })
+                .collect(),
+            req_defeat_enemies: entry
+                .m_iCSUEnemyID
+                .iter()
+                .zip(entry.m_iCSUNumToKill.iter())
+                .flat_map(|(&id, &num)| match id {
+                    0 => None,
+                    x => Some((x, num)),
+                })
+                .collect(),
+            escort_npc_type: match entry.m_iCSUDEFNPCID {
+                0 => None,
+                x => Some(x),
+            },
+        };
+        task_defs.insert(task_id, task_def);
+    }
+    Ok(MissionData {
+        mission_task_ids: task_trees,
+        task_definitions: task_defs,
     })
 }
 

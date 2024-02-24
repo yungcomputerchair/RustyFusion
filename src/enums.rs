@@ -29,8 +29,6 @@ macro_rules! ffenum {
     };
 }
 
-/* Server-defined enums */
-
 ffenum!(NanoStyle, i32, {
     Adaptium = NANO_STYLE_CRYSTAL as i32,
     Blastons = NANO_STYLE_ENERGY as i32,
@@ -70,13 +68,23 @@ ffenum!(TargetSearchBy, i32, {
     PlayerUID = 2,
 });
 
+// eTaskTypeProperty.cs
+ffenum!(TaskType, i32, {
+    Unknown = 0,
+    Talk = 1,
+    GotoLocation = 2,
+    UseItems = 3,
+    Delivery = 4,
+    Defeat = 5,
+    EscortDefence = 6,
+});
+
 ffenum!(RewardType, i32, {
     Taros = 0,
     FusionMatter = 1,
 });
 
-/* Enums ripped directly from the client */
-
+// eItemLocation.cs
 ffenum!(ItemLocation, i32, 4, {
     Equip = 0,  /*eIL_Equip*/
     Inven = 1,  /*eIL_Inven*/
@@ -85,6 +93,7 @@ ffenum!(ItemLocation, i32, 4, {
                 /*eIL__End*/
 });
 
+// eItemType.cs
 ffenum!(ItemType, i16, {
     Hand = 0,              /*eItemType_Hand*/
     UpperBody = 1,         /*eItemType_UpperBody*/
@@ -108,6 +117,7 @@ ffenum!(ItemType, i16, {
     SkillBuffEffect = 138, /*eItemType_SkillBuffEffect*/
 });
 
+// eTransportationType.cs
 ffenum!(TransportationType, i32, {
     /*eTT_None*/
     Warp = 1,   /*eTT_Warp*/
@@ -116,6 +126,7 @@ ffenum!(TransportationType, i32, {
                 /*eTT__End*/
 });
 
+// eCN_GM_TeleportType.cs
 ffenum!(TeleportType, i32, {
     XYZ = 0,             /*eCN_GM_TeleportMapType__XYZ*/
     MapXYZ = 1,          /*eCN_GM_TeleportMapType__MapXYZ*/
@@ -124,6 +135,7 @@ ffenum!(TeleportType, i32, {
     Unstick = 4,         /*eCN_GM_TeleportMapType__Unstick*/
 });
 
+// eRideType.cs
 ffenum!(RideType, i32, 2, {
     None = 0, /*eRT_None*/
     Wyvern = 1, /*eRT_Wyvern*/
