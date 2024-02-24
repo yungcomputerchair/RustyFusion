@@ -565,7 +565,7 @@ impl Player {
                 iConfirmNum: placeholder!(0),
             },
             aQuestFlag: self.mission_journal.get_mission_flags(),
-            aRepeatQuestFlag: self.mission_journal.get_repeat_mission_flags(),
+            aRepeatQuestFlag: unused!(),
             aRunningQuest: self.mission_journal.get_running_quests(),
             iCurrentMissionID: self.mission_journal.get_active_mission_id().unwrap_or(0),
             iWarpLocationFlag: self.transport_data.scamper_flags,

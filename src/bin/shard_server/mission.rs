@@ -114,7 +114,6 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
                 .is_mission_completed(task_def.mission_id)
                 .unwrap()
             {
-                // TODO check repeatability
                 return Err(FFError::build(
                     Severity::Warning,
                     format!(

@@ -1,7 +1,7 @@
 use std::time::{Duration, SystemTime};
 
 use crate::{
-    defines::{SIZEOF_QUESTFLAG_NUMBER, SIZEOF_REPEAT_QUESTFLAG_NUMBER, SIZEOF_RQUEST_SLOT},
+    defines::{SIZEOF_QUESTFLAG_NUMBER, SIZEOF_RQUEST_SLOT},
     enums::*,
     error::{FFError, FFResult, Severity},
     net::packet::sRunningQuest,
@@ -18,12 +18,11 @@ pub struct MissionDefinition {
 
 #[derive(Debug)]
 pub struct TaskDefinition {
-    pub task_id: i32,                   // m_iHTaskID
-    pub mission_id: i32,                // m_iHMissionID
-    pub repeat_flag_idx: Option<usize>, // m_iRepeatflag
-    pub task_type: TaskType,            // m_iHTaskType
-    pub success_task_id: Option<i32>,   // m_iSUOutgoingTask
-    pub fail_task_id: Option<i32>,      // m_iFOutgoingTask
+    pub task_id: i32,                 // m_iHTaskID
+    pub mission_id: i32,              // m_iHMissionID
+    pub task_type: TaskType,          // m_iHTaskType
+    pub success_task_id: Option<i32>, // m_iSUOutgoingTask
+    pub fail_task_id: Option<i32>,    // m_iFOutgoingTask
 
     // prerequisites
     pub giver_npc_type: Option<i32>,            // m_iHNPCID
@@ -79,7 +78,6 @@ pub struct MissionJournal {
     pub current_world_missions: [Option<Task>; 4],
     pub active_mission_slot: Option<usize>,
     completed_mission_flags: [i64; SIZEOF_QUESTFLAG_NUMBER as usize],
-    repeat_mission_flags: [i64; SIZEOF_REPEAT_QUESTFLAG_NUMBER as usize],
 }
 impl MissionJournal {
     fn get_task_iter(&self) -> impl Iterator<Item = &Task> {
@@ -126,10 +124,6 @@ impl MissionJournal {
         self.completed_mission_flags
     }
 
-    pub fn get_repeat_mission_flags(&self) -> [i64; SIZEOF_REPEAT_QUESTFLAG_NUMBER as usize] {
-        self.repeat_mission_flags
-    }
-
     pub fn get_running_quests(&self) -> [sRunningQuest; SIZEOF_RQUEST_SLOT as usize] {
         let mut running_quests = [sRunningQuest::default(); SIZEOF_RQUEST_SLOT as usize];
         for (i, quest) in running_quests.iter_mut().enumerate().take(6) {
@@ -171,29 +165,13 @@ impl MissionJournal {
         match mission_id {
             1..=MAX_MISSION_ID => {
                 let offset = mission_id - 1;
-                let flags_idx = offset / 64;
-                let bit_idx = offset % 64;
+                let flags_idx = offset / 32;
+                let bit_idx = offset % 32;
                 Ok((self.completed_mission_flags[flags_idx as usize] & (1 << bit_idx)) != 0)
             }
             _ => Err(FFError::build(
                 Severity::Warning,
                 format!("Invalid mission ID {}", mission_id),
-            )),
-        }
-    }
-
-    pub fn is_repeat_completed(&self, repeat_idx: usize) -> FFResult<bool> {
-        const MAX_REPEAT_IDX: usize = SIZEOF_REPEAT_QUESTFLAG_NUMBER as usize * 32;
-        match repeat_idx {
-            1..=MAX_REPEAT_IDX => {
-                let offset = repeat_idx - 1;
-                let flags_idx = offset / 32;
-                let bit_idx = offset % 32;
-                Ok((self.repeat_mission_flags[flags_idx] & (1 << bit_idx)) != 0)
-            }
-            _ => Err(FFError::build(
-                Severity::Warning,
-                format!("Invalid repeat index {}", repeat_idx),
             )),
         }
     }
