@@ -484,8 +484,26 @@ impl TableData {
             ))
     }
 
-    pub fn get_task_definition(&self, task_id: i32) -> Option<&TaskDefinition> {
-        self.xdt_data.mission_data.task_definitions.get(&task_id)
+    pub fn get_task_definition(&self, task_id: i32) -> FFResult<&TaskDefinition> {
+        self.xdt_data
+            .mission_data
+            .task_definitions
+            .get(&task_id)
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Task with id {} doesn't exist", task_id),
+            ))
+    }
+
+    pub fn get_mission_definition(&self, mission_id: i32) -> FFResult<&MissionDefinition> {
+        self.xdt_data
+            .mission_data
+            .mission_definitions
+            .get(&mission_id)
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Mission with id {} doesn't exist", mission_id),
+            ))
     }
 }
 
@@ -1171,7 +1189,7 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
                     x => Some((x, num)),
                 })
                 .collect(),
-            prereq_task_id_in_active_mission: match entry.m_iCSTTrigger {
+            prereq_running_task_id: match entry.m_iCSTTrigger {
                 0 => None,
                 x => Some(x),
             },

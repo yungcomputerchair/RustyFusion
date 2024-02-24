@@ -13,7 +13,7 @@ use crate::{
     enums::{ItemLocation, ItemType, PlayerGuide, PlayerShardStatus, RewardType, RideType},
     error::{log, log_if_failed, panic_if_failed, panic_log, FFError, FFResult, Severity},
     item::Item,
-    mission::Task,
+    mission::{MissionJournal, Task},
     nano::Nano,
     net::{
         packet::{
@@ -209,16 +209,6 @@ impl Default for Nanocom {
             active_slot: None,
         }
     }
-}
-
-#[derive(Debug, Clone, Default)]
-struct MissionJournal {
-    current_nano_mission: Option<Task>,
-    current_guide_mission: Option<Task>,
-    current_world_missions: [Option<Task>; 4],
-    active_mission_slot: Option<usize>,
-    mission_flags: [i64; SIZEOF_QUESTFLAG_NUMBER as usize],
-    repeat_mission_flags: [i64; SIZEOF_REPEAT_QUESTFLAG_NUMBER as usize],
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -442,12 +432,21 @@ impl Player {
             1 => self.mission_journal.current_guide_mission.as_ref(),
             _ => self.mission_journal.current_world_missions[idx - 2].as_ref(),
         }?;
-        let task_def = active_task.get_task_def();
+        let task_def = active_task.get_task_def().unwrap();
         Some(task_def.mission_id)
     }
 
+    pub fn get_current_task_ids(&self) -> Vec<i32> {
+        let mut task_ids = Vec::new();
+        for task in self.mission_journal.get_task_iter() {
+            let task_def = task.get_task_def().unwrap();
+            task_ids.push(task_def.task_id);
+        }
+        task_ids
+    }
+
     pub fn get_mission_flags(&self) -> [i64; SIZEOF_QUESTFLAG_NUMBER as usize] {
-        self.mission_journal.mission_flags
+        self.mission_journal.get_mission_flags()
     }
 
     pub fn get_running_quests(&self) -> [sRunningQuest; SIZEOF_RQUEST_SLOT as usize] {
@@ -459,7 +458,7 @@ impl Player {
                 _ => self.mission_journal.current_world_missions[i - 2].as_ref(),
             };
             if let Some(task) = task {
-                let task_def = task.get_task_def();
+                let task_def = task.get_task_def().unwrap();
                 quest.m_aCurrTaskID = task_def.task_id;
                 for (j, (npc_id, count)) in task.remaining_enemies.iter().enumerate() {
                     quest.m_aKillNPCID[j] = *npc_id;
@@ -472,6 +471,14 @@ impl Player {
             }
         }
         running_quests
+    }
+
+    pub fn has_completed_mission(&self, mission_id: i32) -> bool {
+        self.mission_journal.is_mission_completed(mission_id)
+    }
+
+    pub fn start_task(&mut self, task: Task) -> FFResult<()> {
+        self.mission_journal.start_task(task)
     }
 
     pub fn change_nano(&mut self, slot: usize, nano_id: Option<i16>) -> FFResult<()> {
@@ -616,8 +623,8 @@ impl Player {
                 iValue: placeholder!(0),
                 iConfirmNum: placeholder!(0),
             },
-            aQuestFlag: self.mission_journal.mission_flags,
-            aRepeatQuestFlag: self.mission_journal.repeat_mission_flags,
+            aQuestFlag: self.mission_journal.get_mission_flags(),
+            aRepeatQuestFlag: self.mission_journal.get_repeat_mission_flags(),
             aRunningQuest: self.get_running_quests(),
             iCurrentMissionID: self.get_active_mission_id().unwrap_or(0),
             iWarpLocationFlag: self.transport_data.scamper_flags,
@@ -783,6 +790,16 @@ impl Player {
         let old_item = slot_from.take();
         *slot_from = item;
         Ok(old_item)
+    }
+
+    pub fn get_quest_item_count(&self, item_id: i16) -> usize {
+        let mut count = 0;
+        for item in self.inventory.mission.iter().flatten() {
+            if item.id == item_id {
+                count += item.quantity as usize;
+            }
+        }
+        count
     }
 
     pub fn find_free_slot(&self, location: ItemLocation) -> FFResult<usize> {

@@ -178,7 +178,7 @@ impl PostgresDatabase {
                 &(player.get_weapon_boosts() as Int),
                 &(player.get_nano_potions() as Int),
                 &((player.get_guide() as i16) as Int),
-                &player.get_active_mission_id(),
+                &player.get_active_mission_id().unwrap_or(0),
                 &player.get_scamper_flags(),
                 &skyway_bytes,
                 &player.flags.tip_flags.to_le_bytes().as_slice(),
