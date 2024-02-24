@@ -147,7 +147,7 @@ impl PostgresDatabase {
         }
 
         let mut quest_bytes = Vec::new();
-        for sec in player.mission_journal.get_mission_flags() {
+        for sec in player.mission_journal.completed_mission_flags {
             quest_bytes.extend_from_slice(&sec.to_le_bytes());
         }
 
@@ -295,6 +295,12 @@ impl PostgresDatabase {
             BigInt::from_le_bytes(skyway_bytes[8..16].try_into().unwrap()),
         ]);
         player.set_scamper_flag(row.get("WarpLocationFlag"));
+
+        let quest_bytes: &[u8] = row.get("Quests");
+        for i in 0..player.mission_journal.completed_mission_flags.len() {
+            player.mission_journal.completed_mission_flags[i] =
+                BigInt::from_le_bytes(quest_bytes[i * 8..(i + 1) * 8].try_into().unwrap());
+        }
 
         let items = Self::query(client, "load_items", &[&pc_uid])?;
         for item in items {

@@ -205,7 +205,7 @@ impl From<(BigInt, &Player, Int)> for DbPlayer {
         }
 
         let mut quest_bytes = Vec::new();
-        for sec in player.mission_journal.get_mission_flags() {
+        for sec in player.mission_journal.completed_mission_flags {
             quest_bytes.extend_from_slice(&sec.to_le_bytes());
         }
 
@@ -333,6 +333,12 @@ impl TryFrom<DbPlayer> for Player {
             }
             let (loc, slot_num) = inv_loc.unwrap();
             log_if_failed(player.set_item(loc, slot_num, item));
+        }
+
+        let quest_bytes: &[u8] = &db_player.quest_bytes;
+        for i in 0..player.mission_journal.completed_mission_flags.len() {
+            player.mission_journal.completed_mission_flags[i] =
+                BigInt::from_le_bytes(quest_bytes[i * 8..(i + 1) * 8].try_into().unwrap());
         }
 
         Ok(player)

@@ -73,11 +73,11 @@ impl From<&TaskDefinition> for Task {
 
 #[derive(Debug, Clone, Default)]
 pub struct MissionJournal {
-    pub current_nano_mission: Option<Task>,
-    pub current_guide_mission: Option<Task>,
-    pub current_world_missions: [Option<Task>; 4],
-    pub active_mission_slot: Option<usize>,
-    completed_mission_flags: [i64; SIZEOF_QUESTFLAG_NUMBER as usize],
+    current_nano_mission: Option<Task>,
+    current_guide_mission: Option<Task>,
+    current_world_missions: [Option<Task>; 4],
+    active_mission_slot: Option<usize>,
+    pub completed_mission_flags: [i64; SIZEOF_QUESTFLAG_NUMBER as usize],
 }
 impl MissionJournal {
     fn get_task_iter(&self) -> impl Iterator<Item = &Task> {
@@ -118,10 +118,6 @@ impl MissionJournal {
             1 => self.current_guide_mission.as_ref(),
             _ => self.current_world_missions[idx - 2].as_ref(),
         }
-    }
-
-    pub fn get_mission_flags(&self) -> [i64; SIZEOF_QUESTFLAG_NUMBER as usize] {
-        self.completed_mission_flags
     }
 
     pub fn get_running_quests(&self) -> [sRunningQuest; SIZEOF_RQUEST_SLOT as usize] {
