@@ -1085,7 +1085,7 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
     struct MissionDataEntry {
         m_iHTaskID: i32,
         m_iHMissionID: i32,
-        m_iRepeatflag: i32,
+        m_iRepeatflag: usize,
         m_iHNPCID: i32,
         m_iHMissionType: i32,
         m_iHTaskType: i32,
@@ -1139,7 +1139,10 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
         let task_def = TaskDefinition {
             task_id,
             mission_id,
-            repeatable: entry.m_iRepeatflag != 0,
+            repeat_flag_idx: match entry.m_iRepeatflag {
+                0 => None,
+                x => Some(x),
+            },
             giver_npc_type: match entry.m_iHNPCID {
                 0 => None,
                 x => Some(x),

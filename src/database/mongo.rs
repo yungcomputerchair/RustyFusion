@@ -205,7 +205,7 @@ impl From<(BigInt, &Player, Int)> for DbPlayer {
         }
 
         let mut quest_bytes = Vec::new();
-        for sec in player.get_mission_flags() {
+        for sec in player.mission_journal.get_mission_flags() {
             quest_bytes.extend_from_slice(&sec.to_le_bytes());
         }
 
@@ -242,7 +242,7 @@ impl From<(BigInt, &Player, Int)> for DbPlayer {
             weapon_boosts: player.get_weapon_boosts() as Int,
             nano_potions: player.get_nano_potions() as Int,
             guide: (player.get_guide() as i16) as Int,
-            active_mission_id: player.get_active_mission_id().unwrap_or(0),
+            active_mission_id: player.mission_journal.get_active_mission_id().unwrap_or(0),
             scamper_flags: player.get_scamper_flags(),
             skyway_bytes,
             tip_flags_bytes: player.flags.tip_flags.to_le_bytes().to_vec(),

@@ -147,7 +147,7 @@ impl PostgresDatabase {
         }
 
         let mut quest_bytes = Vec::new();
-        for sec in player.get_mission_flags() {
+        for sec in player.mission_journal.get_mission_flags() {
             quest_bytes.extend_from_slice(&sec.to_le_bytes());
         }
 
@@ -178,7 +178,7 @@ impl PostgresDatabase {
                 &(player.get_weapon_boosts() as Int),
                 &(player.get_nano_potions() as Int),
                 &((player.get_guide() as i16) as Int),
-                &player.get_active_mission_id().unwrap_or(0),
+                &player.mission_journal.get_active_mission_id().unwrap_or(0),
                 &player.get_scamper_flags(),
                 &skyway_bytes,
                 &player.flags.tip_flags.to_le_bytes().as_slice(),

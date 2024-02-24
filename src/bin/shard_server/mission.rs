@@ -96,7 +96,7 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
 
             // check required running task ID
             if let Some(running_task_id) = task_def.prereq_running_task_id {
-                let running_task_ids = player.get_current_task_ids();
+                let running_task_ids = player.mission_journal.get_current_task_ids();
                 if !running_task_ids.contains(&running_task_id) {
                     return Err(FFError::build(
                         Severity::Warning,
@@ -109,7 +109,10 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
             }
 
             // check completed missions
-            if player.has_completed_mission(task_def.mission_id) {
+            if player
+                .mission_journal
+                .is_mission_completed(task_def.mission_id)
+            {
                 // TODO check repeatability
                 return Err(FFError::build(
                     Severity::Warning,
@@ -124,7 +127,7 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
             let task: Task = task_def.into();
 
             let player = state.get_player_mut(pc_id)?;
-            player.start_task(task)?;
+            player.mission_journal.start_task(task)?;
 
             let resp = sP_FE2CL_REP_PC_TASK_START_SUCC {
                 iTaskNum: pkt.iTaskNum,

@@ -1,7 +1,7 @@
 use std::time::{Duration, SystemTime};
 
 use crate::{
-    defines::{SIZEOF_QUESTFLAG_NUMBER, SIZEOF_REPEAT_QUESTFLAG_NUMBER},
+    defines::{SIZEOF_QUESTFLAG_NUMBER, SIZEOF_REPEAT_QUESTFLAG_NUMBER, SIZEOF_RQUEST_SLOT},
     enums::*,
     error::{FFError, FFResult, Severity},
     net::packet::sRunningQuest,
@@ -18,12 +18,12 @@ pub struct MissionDefinition {
 
 #[derive(Debug)]
 pub struct TaskDefinition {
-    pub task_id: i32,                 // m_iHTaskID
-    pub mission_id: i32,              // m_iHMissionID
-    pub repeatable: bool,             // m_iRepeatflag
-    pub task_type: TaskType,          // m_iHTaskType
-    pub success_task_id: Option<i32>, // m_iSUOutgoingTask
-    pub fail_task_id: Option<i32>,    // m_iFOutgoingTask
+    pub task_id: i32,                   // m_iHTaskID
+    pub mission_id: i32,                // m_iHMissionID
+    pub repeat_flag_idx: Option<usize>, // m_iRepeatflag
+    pub task_type: TaskType,            // m_iHTaskType
+    pub success_task_id: Option<i32>,   // m_iSUOutgoingTask
+    pub fail_task_id: Option<i32>,      // m_iFOutgoingTask
 
     // prerequisites
     pub giver_npc_type: Option<i32>,            // m_iHNPCID
@@ -76,7 +76,7 @@ pub struct MissionJournal {
     repeat_mission_flags: [i64; SIZEOF_REPEAT_QUESTFLAG_NUMBER as usize],
 }
 impl MissionJournal {
-    pub fn get_task_iter(&self) -> impl Iterator<Item = &Task> {
+    fn get_task_iter(&self) -> impl Iterator<Item = &Task> {
         let mut tasks = Vec::new();
         if let Some(task) = &self.current_nano_mission {
             tasks.push(task);
@@ -92,7 +92,7 @@ impl MissionJournal {
         tasks.into_iter()
     }
 
-    pub fn get_task_iter_mut(&mut self) -> impl Iterator<Item = &mut Task> {
+    fn get_task_iter_mut(&mut self) -> impl Iterator<Item = &mut Task> {
         let mut tasks = Vec::new();
         if let Some(task) = &mut self.current_nano_mission {
             tasks.push(task);
@@ -114,6 +114,50 @@ impl MissionJournal {
 
     pub fn get_repeat_mission_flags(&self) -> [i64; SIZEOF_REPEAT_QUESTFLAG_NUMBER as usize] {
         self.repeat_mission_flags
+    }
+
+    pub fn get_running_quests(&self) -> [sRunningQuest; SIZEOF_RQUEST_SLOT as usize] {
+        let mut running_quests = [sRunningQuest::default(); SIZEOF_RQUEST_SLOT as usize];
+        for (i, quest) in running_quests.iter_mut().enumerate().take(6) {
+            let task = match i {
+                0 => self.current_nano_mission.as_ref(),
+                1 => self.current_guide_mission.as_ref(),
+                _ => self.current_world_missions[i - 2].as_ref(),
+            };
+            if let Some(task) = task {
+                let task_def = task.get_task_def().unwrap();
+                quest.m_aCurrTaskID = task_def.task_id;
+                for (j, (npc_id, count)) in task.remaining_enemies.iter().enumerate() {
+                    quest.m_aKillNPCID[j] = *npc_id;
+                    quest.m_aKillNPCCount[j] = *count as i32;
+                }
+                for (j, (item_id, count)) in task_def.req_items.iter().enumerate() {
+                    quest.m_aNeededItemID[j] = *item_id as i32;
+                    quest.m_aNeededItemCount[j] = *count as i32;
+                }
+            }
+        }
+        running_quests
+    }
+
+    pub fn get_active_mission_id(&self) -> Option<i32> {
+        let idx = self.active_mission_slot?;
+        let active_task = match idx {
+            0 => self.current_nano_mission.as_ref(),
+            1 => self.current_guide_mission.as_ref(),
+            _ => self.current_world_missions[idx - 2].as_ref(),
+        }?;
+        let task_def = active_task.get_task_def().unwrap();
+        Some(task_def.mission_id)
+    }
+
+    pub fn get_current_task_ids(&self) -> Vec<i32> {
+        let mut task_ids = Vec::new();
+        for task in self.get_task_iter() {
+            let task_def = task.get_task_def().unwrap();
+            task_ids.push(task_def.task_id);
+        }
+        task_ids
     }
 
     pub fn is_mission_completed(&self, mission_id: i32) -> bool {
