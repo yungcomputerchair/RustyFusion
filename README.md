@@ -15,19 +15,19 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
   - [x] Character creation
   - [x] Character deletion
   - [x] Character selection
-  - [x] Shard selection *
-  - [x] Shard querying (channel + player info) *
+  - [x] Shard selection +
+  - [x] Shard querying (channel + player info) +
 - [x] Core shard server functionality
   - [x] Login server connection
   - [x] Client connection
-  - [x] Channels *
-  - [x] MOTD *
+  - [x] Channels +
+  - [x] MOTD +
 - [x] Config and tabledata frameworks
 - [x] Core database functionality
-  - [x] Framework *
+  - [x] Framework +
   - [x] Account loading
-  - [x] Player loading + saving
-  - [x] Periodic shard auto-saving *
+  - [x] Player loading & saving
+  - [x] Periodic shard auto-saving +
 - [x] Chunking
   - [x] Framework
   - [x] Entity tracking
@@ -56,26 +56,30 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
   - [x] Changing nano powers
 - [ ] Combat
   - [x] Mobs
-  - [ ] Core combat loop + mob AI
+  - [ ] Core combat loop & mob AI
   - [ ] Abilities and (de)buffs
     - [ ] Passive skills (including nano)
     - [ ] Active skills (including nano)
-    - [ ] Gumballs + other usables
+    - [ ] Gumballs & other usables
   - [ ] Mob drops
 - [ ] E.G.G.s (the ones on the ground that buff you)
-- [ ] ***Missions***
+- [ ] Missions
+  - [x] Starting tasks +
+  - [x] Switching active mission
+  - [ ] ***Completing tasks +***
+  - [ ] Mission rewards
 - [x] Entity pathing
 - [ ] Infected Zone races
 - [x] Guide changing
 - [ ] Admin features
-  - [x] Built-in admin commands *
+  - [x] Built-in admin commands +
   - [ ] Custom command system
   - [ ] OpenFusion monitor protocol
-  - [ ] Interactive terminal (bonus) *
+  - [ ] Interactive terminal (bonus)
 - [x] Time machine
 - [ ] Event system
   - [ ] Fuse boss fight
-  - [ ] Scripting API (bonus) *
+  - [ ] Scripting API (bonus)
 - [ ] "Academy" (build 1013) support (currently, only build 104 is supported)
   - [ ] Struct support
   - [ ] Patching framework
@@ -86,7 +90,7 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
 ### Known Issues
 - Nanos are not dismissed at the start of a Monkey Skyway ride
 
-Items that are ***highlighted*** are in planning or WIP. Items marked with `*` are either new and not present in OpenFusion or enhanced from OpenFusion. Some items have dependencies in other categories, so the list won't get completed in order.
+Items that are ***highlighted*** are in planning or WIP. Items marked with `+` are either new and not present in OpenFusion or enhanced from OpenFusion. Some items have dependencies in other categories, so the list won't get completed in order.
 
 ## Developing
 **RustyFusion requires an instance of a supported database backend to connect to for database operations.** You can manually configure an instance and set the connection parameters in `config.toml` or, for PostgreSQL specifically, use `docker compose` to spawn a container with the default parameters.
