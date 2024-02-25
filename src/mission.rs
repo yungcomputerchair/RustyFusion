@@ -3,7 +3,7 @@ use std::time::{Duration, SystemTime};
 use crate::{
     defines::{SIZEOF_QUESTFLAG_NUMBER, SIZEOF_RQUEST_SLOT},
     enums::*,
-    error::{FFError, FFResult, Severity},
+    error::{panic_log, FFError, FFResult, Severity},
     net::packet::sRunningQuest,
     tabledata::tdata_get,
 };
@@ -75,7 +75,7 @@ impl From<&TaskDefinition> for Task {
 pub struct MissionJournal {
     current_nano_mission: Option<Task>,
     current_guide_mission: Option<Task>,
-    current_world_missions: [Option<Task>; 4],
+    current_world_missions: Vec<Task>,
     active_mission_slot: Option<usize>,
     pub completed_mission_flags: [i64; SIZEOF_QUESTFLAG_NUMBER as usize],
 }
@@ -88,11 +88,7 @@ impl MissionJournal {
         if let Some(task) = &self.current_guide_mission {
             tasks.push(task);
         }
-        tasks.extend(
-            self.current_world_missions
-                .iter()
-                .filter_map(Option::as_ref),
-        );
+        tasks.extend(self.current_world_missions.iter());
         tasks.into_iter()
     }
 
@@ -104,11 +100,7 @@ impl MissionJournal {
         if let Some(task) = &mut self.current_guide_mission {
             tasks.push(task);
         }
-        tasks.extend(
-            self.current_world_missions
-                .iter_mut()
-                .filter_map(Option::as_mut),
-        );
+        tasks.extend(self.current_world_missions.iter_mut());
         tasks.into_iter()
     }
 
@@ -116,7 +108,8 @@ impl MissionJournal {
         match idx {
             0 => self.current_nano_mission.as_ref(),
             1 => self.current_guide_mission.as_ref(),
-            _ => self.current_world_missions[idx - 2].as_ref(),
+            2..=5 => self.current_world_missions.get(idx - 2),
+            _ => panic_log("Invalid mission slot index"),
         }
     }
 
@@ -214,7 +207,7 @@ impl MissionJournal {
             *existing_task = task; // replace existing task
             false
         } else {
-            let slot = match mission_def.mission_type {
+            match mission_def.mission_type {
                 MissionType::Unknown => {
                     return Err(FFError::build(
                         Severity::Warning,
@@ -224,18 +217,34 @@ impl MissionJournal {
                         ),
                     ))
                 }
-                MissionType::Guide => &mut self.current_guide_mission,
-                MissionType::Nano => &mut self.current_nano_mission,
-                MissionType::Normal => self
-                    .current_world_missions
-                    .iter_mut()
-                    .find(|slot| slot.is_none())
-                    .ok_or(FFError::build(
-                        Severity::Warning,
-                        "No empty world mission slots".to_string(),
-                    ))?,
+                MissionType::Guide => {
+                    if self.current_guide_mission.is_some() {
+                        return Err(FFError::build(
+                            Severity::Warning,
+                            "Guide mission already in progress".to_string(),
+                        ));
+                    }
+                    self.current_guide_mission = Some(task);
+                }
+                MissionType::Nano => {
+                    if self.current_nano_mission.is_some() {
+                        return Err(FFError::build(
+                            Severity::Warning,
+                            "Nano mission already in progress".to_string(),
+                        ));
+                    }
+                    self.current_nano_mission = Some(task);
+                }
+                MissionType::Normal => {
+                    if self.current_world_missions.len() >= 4 {
+                        return Err(FFError::build(
+                            Severity::Warning,
+                            "No empty world mission slots".to_string(),
+                        ));
+                    }
+                    self.current_world_missions.push(task);
+                }
             };
-            *slot = Some(task);
             true
         };
         Ok(new_mission)
