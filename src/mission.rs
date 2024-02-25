@@ -50,6 +50,10 @@ pub struct Task {
     pub completed: bool,
 }
 impl Task {
+    pub fn get_task_id(&self) -> i32 {
+        self.task_id
+    }
+
     pub fn get_task_def(&self) -> FFResult<&'static TaskDefinition> {
         tdata_get().get_task_definition(self.task_id)
     }
@@ -58,6 +62,16 @@ impl Task {
         let task_def = self.get_task_def()?;
         let mission_def = tdata_get().get_mission_definition(task_def.mission_id)?;
         Ok(mission_def)
+    }
+
+    pub fn set_remaining_enemy_counts(&mut self, counts: [usize; 3]) {
+        self.remaining_enemies = self.get_task_def().unwrap().req_defeat_enemies.clone();
+        for (i, count) in counts.iter().enumerate() {
+            if i >= self.remaining_enemies.len() {
+                break;
+            }
+            self.remaining_enemies[i].1 = *count;
+        }
     }
 }
 impl From<&TaskDefinition> for Task {
@@ -111,6 +125,10 @@ impl MissionJournal {
             2..=5 => self.current_world_missions.get(idx - 2),
             _ => panic_log("Invalid mission slot index"),
         }
+    }
+
+    pub fn get_current_tasks(&self) -> Vec<Task> {
+        self.get_task_iter().cloned().collect()
     }
 
     pub fn get_running_quests(&self) -> [sRunningQuest; SIZEOF_RQUEST_SLOT as usize] {

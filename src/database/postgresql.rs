@@ -8,8 +8,10 @@ use crate::{
     defines::*,
     entity::{Combatant, Entity, PlayerFlags, PlayerStyle},
     item::Item,
+    mission::Task,
     nano::Nano,
     net::packet::*,
+    tabledata::tdata_get,
     util, Position,
 };
 
@@ -139,6 +141,7 @@ impl PostgresDatabase {
         let client = &mut tsct;
         let save_item = Self::prep(client, "save_item")?;
         let save_nano = Self::prep(client, "save_nano")?;
+        let save_running_quest = Self::prep(client, "save_running_quest")?;
         let pc_uid = player.get_uid();
 
         let mut skyway_bytes = Vec::new();
@@ -221,6 +224,26 @@ impl PostgresDatabase {
                 .map_err(FFError::from_db_err)?;
         }
 
+        Self::exec(client, "clear_running_quests", &[&pc_uid])?;
+        for task in player.mission_journal.get_running_quests() {
+            if task.m_aCurrTaskID == 0 {
+                continue;
+            }
+
+            client
+                .execute(
+                    &save_running_quest,
+                    &[
+                        &pc_uid,
+                        &(task.m_aCurrTaskID as Int),
+                        &(task.m_aKillNPCCount[0] as Int),
+                        &(task.m_aKillNPCCount[1] as Int),
+                        &(task.m_aKillNPCCount[2] as Int),
+                    ],
+                )
+                .map_err(FFError::from_db_err)?;
+        }
+
         tsct.commit().map_err(FFError::from_db_err)?;
         Ok(())
     }
@@ -267,9 +290,7 @@ impl PostgresDatabase {
         let nano_col_names = ["Nano1", "Nano2", "Nano3"];
         for (slot, col_name) in nano_col_names.iter().enumerate() {
             let nano_id = row.get::<_, Int>(col_name) as i16;
-            player
-                .change_nano(slot, if nano_id == 0 { None } else { Some(nano_id) })
-                .unwrap();
+            player.change_nano(slot, if nano_id == 0 { None } else { Some(nano_id) })?;
         }
         let nanos = Self::query(client, "load_nanos", &[&pc_uid])?;
         for nano in nanos {
@@ -278,8 +299,10 @@ impl PostgresDatabase {
                 iSkillID: nano.get::<_, Int>("Skill") as i16,
                 iStamina: nano.get::<_, Int>("Stamina") as i16,
             };
-            let nano: Option<Nano> = nano_raw.try_into().unwrap();
-            player.set_nano(nano.unwrap());
+            let nano: Option<Nano> = nano_raw.try_into()?;
+            if let Some(nano) = nano {
+                player.set_nano(nano);
+            }
         }
 
         let mut player_flags = PlayerFlags::default();
@@ -302,6 +325,29 @@ impl PostgresDatabase {
                 BigInt::from_le_bytes(quest_bytes[i * 8..(i + 1) * 8].try_into().unwrap());
         }
 
+        let running_quests = Self::query(client, "load_running_quests", &[&pc_uid])?;
+        for quest in running_quests {
+            let task_id: Int = quest.get("TaskID");
+            let task_def = tdata_get().get_task_definition(task_id)?;
+            let npc_count_1: Int = quest.get("RemainingNPCCount1");
+            let npc_count_2: Int = quest.get("RemainingNPCCount2");
+            let npc_count_3: Int = quest.get("RemainingNPCCount3");
+            let mut task: Task = task_def.into();
+            task.set_remaining_enemy_counts([
+                npc_count_1 as usize,
+                npc_count_2 as usize,
+                npc_count_3 as usize,
+            ]);
+            player.mission_journal.start_task(task)?;
+        }
+
+        let active_mission_id: Int = row.get("CurrentMissionID");
+        if active_mission_id != 0 {
+            player
+                .mission_journal
+                .set_active_mission_id(row.get("CurrentMissionID"))?;
+        }
+
         let items = Self::query(client, "load_items", &[&pc_uid])?;
         for item in items {
             let slot_num = item.get::<_, Int>("Slot") as usize;
@@ -311,9 +357,9 @@ impl PostgresDatabase {
                 iOpt: item.get::<_, Int>("Opt"),
                 iTimeLimit: item.get::<_, Int>("TimeLimit"),
             };
-            let item: Option<Item> = item_raw.try_into().unwrap();
-            let (loc, slot_num) = util::slot_num_to_loc_and_slot_num(slot_num).unwrap();
-            player.set_item(loc, slot_num, item).unwrap();
+            let item: Option<Item> = item_raw.try_into()?;
+            let (loc, slot_num) = util::slot_num_to_loc_and_slot_num(slot_num)?;
+            player.set_item(loc, slot_num, item)?;
         }
 
         Ok(player)
@@ -431,7 +477,16 @@ impl Database for PostgresDatabase {
         let chars = Self::query(client, "load_players", &[&acc_id])?;
         let mut players = Vec::with_capacity(chars.len());
         for row in chars {
-            players.push(Self::load_player_internal(client, &row)?);
+            match Self::load_player_internal(client, &row) {
+                Ok(p) => players.push(p),
+                Err(e) => {
+                    let pc_uid: BigInt = row.get("PlayerId");
+                    log(
+                        Severity::Warning,
+                        &format!("Failed to load player {}: {}", pc_uid, e.get_msg()),
+                    );
+                }
+            }
         }
         Ok(players)
     }
