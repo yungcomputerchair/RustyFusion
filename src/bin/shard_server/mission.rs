@@ -125,7 +125,7 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
 
             // all clear, start the task
             let task: Task = task_def.into();
-            let mission_def = task.get_mission_def().unwrap();
+            let mission_def = task.get_mission_def();
 
             let player = state.get_player_mut(pc_id)?;
             if player.mission_journal.start_task(task)? {

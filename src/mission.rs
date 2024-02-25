@@ -54,18 +54,19 @@ impl Task {
         self.task_id
     }
 
-    pub fn get_task_def(&self) -> FFResult<&'static TaskDefinition> {
-        tdata_get().get_task_definition(self.task_id)
+    pub fn get_task_def(&self) -> &'static TaskDefinition {
+        tdata_get().get_task_definition(self.task_id).unwrap()
     }
 
-    pub fn get_mission_def(&self) -> FFResult<&'static MissionDefinition> {
-        let task_def = self.get_task_def()?;
-        let mission_def = tdata_get().get_mission_definition(task_def.mission_id)?;
-        Ok(mission_def)
+    pub fn get_mission_def(&self) -> &'static MissionDefinition {
+        let task_def = self.get_task_def();
+        tdata_get()
+            .get_mission_definition(task_def.mission_id)
+            .unwrap()
     }
 
     pub fn set_remaining_enemy_counts(&mut self, counts: [usize; 3]) {
-        self.remaining_enemies = self.get_task_def().unwrap().req_defeat_enemies.clone();
+        self.remaining_enemies = self.get_task_def().req_defeat_enemies.clone();
         for (i, count) in counts.iter().enumerate() {
             if i >= self.remaining_enemies.len() {
                 break;
@@ -136,7 +137,7 @@ impl MissionJournal {
         for (i, quest) in running_quests.iter_mut().enumerate().take(6) {
             let task = self.get_current_task_by_idx(i);
             if let Some(task) = task {
-                let task_def = task.get_task_def().unwrap();
+                let task_def = task.get_task_def();
                 quest.m_aCurrTaskID = task_def.task_id;
                 for (j, (npc_id, count)) in task.remaining_enemies.iter().enumerate() {
                     quest.m_aKillNPCID[j] = *npc_id;
@@ -154,14 +155,14 @@ impl MissionJournal {
     pub fn get_active_mission_id(&self) -> Option<i32> {
         let idx = self.active_mission_slot?;
         let active_task = self.get_current_task_by_idx(idx)?;
-        let task_def = active_task.get_task_def().unwrap();
+        let task_def = active_task.get_task_def();
         Some(task_def.mission_id)
     }
 
     pub fn get_current_task_ids(&self) -> Vec<i32> {
         let mut task_ids = Vec::new();
         for task in self.get_task_iter() {
-            let task_def = task.get_task_def().unwrap();
+            let task_def = task.get_task_def();
             task_ids.push(task_def.task_id);
         }
         task_ids
@@ -187,7 +188,7 @@ impl MissionJournal {
         let mut current_mission_slot = None;
         for idx in 0..6 {
             if let Some(task) = self.get_current_task_by_idx(idx) {
-                let task_def = task.get_task_def().unwrap();
+                let task_def = task.get_task_def();
                 if task_def.mission_id == mission_id {
                     current_mission_slot = Some(idx);
                     break;
@@ -208,10 +209,10 @@ impl MissionJournal {
     }
 
     pub fn start_task(&mut self, task: Task) -> FFResult<bool> {
-        let mission_def = task.get_mission_def()?;
+        let mission_def = task.get_mission_def();
         let mission_existing_task = self
             .get_task_iter_mut()
-            .find(|t| t.get_task_def().unwrap().mission_id == mission_def.mission_id);
+            .find(|t| t.get_task_def().mission_id == mission_def.mission_id);
         let new_mission = if let Some(existing_task) = mission_existing_task {
             if !existing_task.completed {
                 return Err(FFError::build(
