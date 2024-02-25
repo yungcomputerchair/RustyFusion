@@ -11,8 +11,10 @@ use crate::{
     defines::*,
     entity::{Combatant, Entity, PlayerFlags, PlayerStyle},
     item::Item,
+    mission::Task,
     nano::Nano,
     net::packet::*,
+    tabledata::tdata_get,
     util, Position,
 };
 
@@ -117,6 +119,34 @@ impl TryFrom<DbNano> for Option<Nano> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+struct DbTask {
+    task_id: Int,
+    npc_remaining_counts: [Int; 3],
+}
+impl From<&Task> for DbTask {
+    fn from(task: &Task) -> Self {
+        let mut npc_remaining_counts = [0; 3];
+        for (i, count) in task.remaining_enemies.iter().enumerate() {
+            npc_remaining_counts[i] = count.1 as Int;
+        }
+        Self {
+            task_id: task.get_task_id(),
+            npc_remaining_counts,
+        }
+    }
+}
+impl TryFrom<DbTask> for Task {
+    type Error = FFError;
+    fn try_from(task: DbTask) -> FFResult<Self> {
+        let npc_remaining_counts = task.npc_remaining_counts.map(|c| c as usize);
+        let task_def = tdata_get().get_task_definition(task.task_id)?;
+        let mut task: Task = task_def.into();
+        task.set_remaining_enemy_counts(npc_remaining_counts);
+        Ok(task)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct DbStyle {
     body: Int,
     eye_color: Int,
@@ -192,8 +222,9 @@ struct DbPlayer {
     skyway_bytes: Bytes,
     tip_flags_bytes: Bytes,
     quest_bytes: Bytes,
-    nanos: Vec<DbNano>,
-    items: Vec<DbItem>,
+    nanos: Option<Vec<DbNano>>,
+    items: Option<Vec<DbItem>>,
+    running_quests: Option<Vec<DbTask>>,
 }
 impl From<(BigInt, &Player, Int)> for DbPlayer {
     fn from(values: (BigInt, &Player, Int)) -> Self {
@@ -219,6 +250,12 @@ impl From<(BigInt, &Player, Int)> for DbPlayer {
         let items: Vec<DbItem> = player
             .get_item_iter()
             .map(|(slot_num, item)| (slot_num, item).into())
+            .collect();
+        let running_quests: Vec<DbTask> = player
+            .mission_journal
+            .get_current_tasks()
+            .iter()
+            .map(|task| task.into())
             .collect();
 
         Self {
@@ -248,8 +285,9 @@ impl From<(BigInt, &Player, Int)> for DbPlayer {
             tip_flags_bytes: player.flags.tip_flags.to_le_bytes().to_vec(),
             quest_bytes,
             //
-            nanos,
-            items,
+            nanos: Some(nanos),
+            items: Some(items),
+            running_quests: Some(running_quests),
         }
     }
 }
@@ -282,24 +320,18 @@ impl TryFrom<DbPlayer> for Player {
         player.set_nano_potions(db_player.nano_potions as u32);
 
         for (slot, nano_id) in db_player.equipped_nano_ids.into_iter().enumerate() {
-            player
-                .change_nano(
-                    slot,
-                    if nano_id == 0 {
-                        None
-                    } else {
-                        Some(nano_id as i16)
-                    },
-                )
-                .unwrap();
+            player.change_nano(
+                slot,
+                if nano_id == 0 {
+                    None
+                } else {
+                    Some(nano_id as i16)
+                },
+            )?;
         }
-        for nano in db_player.nanos {
-            let nano: FFResult<Option<Nano>> = nano.try_into();
-            if let Err(e) = nano {
-                log_error(&e);
-                continue;
-            }
-            if let Some(nano) = nano.unwrap() {
+        for nano in db_player.nanos.unwrap_or_default() {
+            let nano: Option<Nano> = nano.try_into()?;
+            if let Some(nano) = nano {
                 player.set_nano(nano);
             }
         }
@@ -319,20 +351,11 @@ impl TryFrom<DbPlayer> for Player {
         ]);
         player.set_scamper_flag(db_player.scamper_flags);
 
-        for item in db_player.items {
-            let values: FFResult<(usize, Option<Item>)> = item.try_into();
-            if let Err(e) = values {
-                log_error(&e);
-                continue;
-            }
-            let (slot_num, item) = values.unwrap();
-            let inv_loc = util::slot_num_to_loc_and_slot_num(slot_num);
-            if let Err(e) = inv_loc {
-                log_error(&e);
-                continue;
-            }
-            let (loc, slot_num) = inv_loc.unwrap();
-            log_if_failed(player.set_item(loc, slot_num, item));
+        for item in db_player.items.unwrap_or_default() {
+            let values: (usize, Option<Item>) = item.try_into()?;
+            let (slot_num, item) = values;
+            let (loc, slot_num) = util::slot_num_to_loc_and_slot_num(slot_num)?;
+            player.set_item(loc, slot_num, item)?;
         }
 
         let quest_bytes: &[u8] = &db_player.quest_bytes;
@@ -340,6 +363,14 @@ impl TryFrom<DbPlayer> for Player {
             player.mission_journal.completed_mission_flags[i] =
                 BigInt::from_le_bytes(quest_bytes[i * 8..(i + 1) * 8].try_into().unwrap());
         }
+
+        for task in db_player.running_quests.unwrap_or_default() {
+            let task: Task = task.try_into()?;
+            player.mission_journal.start_task(task)?;
+        }
+        player
+            .mission_journal
+            .set_active_mission_id(db_player.active_mission_id)?;
 
         Ok(player)
     }
