@@ -208,21 +208,35 @@ impl Default for Nanocom {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 struct PlayerInventory {
     main: [Option<Item>; SIZEOF_INVEN_SLOT as usize],
     equipped: [Option<Item>; SIZEOF_EQUIP_SLOT as usize],
-    mission: [Option<Item>; SIZEOF_QINVEN_SLOT as usize],
+    quest: HashMap<i16, usize>,
     bank: [Option<Item>; SIZEOF_BANK_SLOT as usize],
 }
 impl Default for PlayerInventory {
     fn default() -> Self {
         Self {
             main: [None; SIZEOF_INVEN_SLOT as usize],
-            equipped: Default::default(),
-            mission: [None; SIZEOF_QINVEN_SLOT as usize],
+            equipped: [None; SIZEOF_EQUIP_SLOT as usize],
+            quest: HashMap::new(),
             bank: [None; SIZEOF_BANK_SLOT as usize],
         }
+    }
+}
+impl PlayerInventory {
+    fn get_quest_item_arr(&self) -> [sItemBase; SIZEOF_QINVEN_SLOT as usize] {
+        let mut arr = [sItemBase::default(); SIZEOF_QINVEN_SLOT as usize];
+        for (idx, (qitem_id, qitem_quantity)) in self.quest.iter().enumerate() {
+            arr[idx] = sItemBase {
+                iID: *qitem_id,
+                iType: 0,
+                iOpt: *qitem_quantity as i32,
+                iTimeLimit: 0,
+            };
+        }
+        arr
     }
 }
 
@@ -548,7 +562,7 @@ impl Player {
             iAngle: self.rotation,
             aEquip: self.inventory.equipped.map(Option::<Item>::into),
             aInven: self.inventory.main.map(Option::<Item>::into),
-            aQInven: self.inventory.mission.map(Option::<Item>::into),
+            aQInven: self.inventory.get_quest_item_arr(),
             aNanoBank: self.nano_data.as_bank(),
             aNanoSlots: self.get_equipped_nano_ids(),
             iActiveNanoSlotNum: match self.nano_data.active_slot {
@@ -649,13 +663,7 @@ impl Player {
                     err
                 }
             }
-            ItemLocation::QInven => {
-                if slot_num < SIZEOF_QINVEN_SLOT as usize {
-                    Ok(&self.inventory.mission[slot_num])
-                } else {
-                    err
-                }
-            }
+            ItemLocation::QInven => unimplemented!("Quest items not accessible by slot number"),
             ItemLocation::Bank => {
                 if slot_num < SIZEOF_BANK_SLOT as usize {
                     Ok(&self.inventory.bank[slot_num])
@@ -698,13 +706,7 @@ impl Player {
                     err_oob
                 }
             }
-            ItemLocation::QInven => {
-                if slot_num < SIZEOF_QINVEN_SLOT as usize {
-                    Ok(&mut self.inventory.mission[slot_num])
-                } else {
-                    err_oob
-                }
-            }
+            ItemLocation::QInven => unimplemented!("Quest items not accessible by slot number"),
             ItemLocation::Bank => {
                 if slot_num < SIZEOF_BANK_SLOT as usize {
                     Ok(&mut self.inventory.bank[slot_num])
@@ -734,20 +736,18 @@ impl Player {
     }
 
     pub fn get_quest_item_count(&self, item_id: i16) -> usize {
-        let mut count = 0;
-        for item in self.inventory.mission.iter().flatten() {
-            if item.id == item_id {
-                count += item.quantity as usize;
-            }
-        }
-        count
+        self.inventory.quest.get(&item_id).copied().unwrap_or(0)
+    }
+
+    pub fn set_quest_item_count(&mut self, item_id: i16, count: usize) {
+        self.inventory.quest.insert(item_id, count);
     }
 
     pub fn find_free_slot(&self, location: ItemLocation) -> FFResult<usize> {
         let inven = match location {
             ItemLocation::Equip => self.inventory.equipped.as_slice(),
             ItemLocation::Inven => self.inventory.main.as_slice(),
-            ItemLocation::QInven => self.inventory.mission.as_slice(),
+            ItemLocation::QInven => unimplemented!("Quest item inventory not searchable"),
             ItemLocation::Bank => self.inventory.bank.as_slice(),
         };
 
@@ -783,11 +783,6 @@ impl Player {
                 .iter()
                 .map(|slot_num| (ItemLocation::Bank, *slot_num)),
         );
-        found.extend(
-            self.find_items(ItemLocation::QInven, &f)
-                .iter()
-                .map(|slot_num| (ItemLocation::QInven, *slot_num)),
-        );
         found
     }
 
@@ -795,7 +790,7 @@ impl Player {
         let inven = match location {
             ItemLocation::Equip => self.inventory.equipped.as_slice(),
             ItemLocation::Inven => self.inventory.main.as_slice(),
-            ItemLocation::QInven => self.inventory.mission.as_slice(),
+            ItemLocation::QInven => unimplemented!("Quest item inventory not searchable"),
             ItemLocation::Bank => self.inventory.bank.as_slice(),
         };
 
@@ -822,6 +817,10 @@ impl Player {
                 as usize;
         (0..inv_slot_max).filter_map(move |slot_num| {
             let (loc, slot_num_loc) = util::slot_num_to_loc_and_slot_num(slot_num).unwrap();
+            if loc == ItemLocation::QInven {
+                return None;
+            }
+
             let item = self.get_item(loc, slot_num_loc).unwrap();
             item.as_ref().map(|item| (slot_num, item))
         })
