@@ -140,6 +140,7 @@ impl PostgresDatabase {
         let mut tsct = client.transaction().map_err(FFError::from_db_err)?;
         let client = &mut tsct;
         let save_item = Self::prep(client, "save_item")?;
+        let save_quest_item = Self::prep(client, "save_quest_item")?;
         let save_nano = Self::prep(client, "save_nano")?;
         let save_running_quest = Self::prep(client, "save_running_quest")?;
         let pc_uid = player.get_uid();
@@ -220,6 +221,16 @@ impl PostgresDatabase {
                         &item_raw.iOpt,
                         &item_raw.iTimeLimit,
                     ],
+                )
+                .map_err(FFError::from_db_err)?;
+        }
+
+        Self::exec(client, "clear_quest_items", &[&pc_uid])?;
+        for (item_id, count) in player.get_quest_item_iter() {
+            client
+                .execute(
+                    &save_quest_item,
+                    &[&pc_uid, &(item_id as Int), &(count as Int)],
                 )
                 .map_err(FFError::from_db_err)?;
         }
@@ -360,6 +371,13 @@ impl PostgresDatabase {
             let item: Option<Item> = item_raw.try_into()?;
             let (loc, slot_num) = util::slot_num_to_loc_and_slot_num(slot_num)?;
             player.set_item(loc, slot_num, item)?;
+        }
+
+        let quest_items = Self::query(client, "load_quest_items", &[&pc_uid])?;
+        for quest_item in quest_items {
+            let item_id: Int = quest_item.get("ID");
+            let count: Int = quest_item.get("Opt");
+            player.set_quest_item_count(item_id as i16, count as usize);
         }
 
         Ok(player)

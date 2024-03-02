@@ -826,6 +826,10 @@ impl Player {
         })
     }
 
+    pub fn get_quest_item_iter(&self) -> impl Iterator<Item = (i16, usize)> + '_ {
+        self.inventory.quest.iter().map(|(id, count)| (*id, *count))
+    }
+
     pub fn get_equipped(&self) -> [Option<Item>; 9] {
         self.inventory.equipped
     }

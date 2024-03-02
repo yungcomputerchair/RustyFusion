@@ -90,6 +90,12 @@ impl TryFrom<DbItem> for (usize, Option<Item>) {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+struct DbQuestItem {
+    id: Int,
+    count: Int,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct DbNano {
     id: Int,
     skill_id: Int,
@@ -224,6 +230,7 @@ struct DbPlayer {
     quest_bytes: Bytes,
     nanos: Option<Vec<DbNano>>,
     items: Option<Vec<DbItem>>,
+    quest_items: Option<Vec<DbQuestItem>>,
     running_quests: Option<Vec<DbTask>>,
 }
 impl From<(BigInt, &Player, Int)> for DbPlayer {
@@ -250,6 +257,13 @@ impl From<(BigInt, &Player, Int)> for DbPlayer {
         let items: Vec<DbItem> = player
             .get_item_iter()
             .map(|(slot_num, item)| (slot_num, item).into())
+            .collect();
+        let quest_items: Vec<DbQuestItem> = player
+            .get_quest_item_iter()
+            .map(|(item_id, count)| DbQuestItem {
+                id: item_id as Int,
+                count: count as Int,
+            })
             .collect();
         let running_quests: Vec<DbTask> = player
             .mission_journal
@@ -287,6 +301,7 @@ impl From<(BigInt, &Player, Int)> for DbPlayer {
             //
             nanos: Some(nanos),
             items: Some(items),
+            quest_items: Some(quest_items),
             running_quests: Some(running_quests),
         }
     }
@@ -356,6 +371,10 @@ impl TryFrom<DbPlayer> for Player {
             let (slot_num, item) = values;
             let (loc, slot_num) = util::slot_num_to_loc_and_slot_num(slot_num)?;
             player.set_item(loc, slot_num, item)?;
+        }
+
+        for quest_item in db_player.quest_items.unwrap_or_default() {
+            player.set_quest_item_count(quest_item.id as i16, quest_item.count as usize);
         }
 
         let quest_bytes: &[u8] = &db_player.quest_bytes;
