@@ -3,3 +3,6 @@
 config.toml
 *.log*
 motd.txt*
+
+/mongodb
+

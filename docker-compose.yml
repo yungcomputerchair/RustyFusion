@@ -1,9 +1,10 @@
-# Uses default credentials
-version: '3.1'
+# These database containers are ONLY meant for development!
+# Please properly configure a production database
+version: '3.7'
 
 services:
-  db:
-    image: postgres
+  postgres:
+    image: postgres:latest
     restart: always
     ports:
       - 5432:5432
@@ -11,3 +12,26 @@ services:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: mypassword
       POSTGRES_DB: rustyfusion
+    container_name: rf-db-postgres
+  mongo:
+    image: mongo:latest
+    environment:
+      MONGO_APP_DATABASE: rustyfusion
+      MONGO_REPLICA_HOST: host.docker.internal
+      MONGO_REPLICA_PORT: 27018
+    container_name: rf-db-mongo
+    entrypoint: >
+      /bin/bash -c '
+      echo "rs.initiate()" > /docker-entrypoint-initdb.d/1-init-replicaset.js &&
+      echo "db = db.getSiblingDB(process.env[$0]);" > /docker-entrypoint-initdb.d/2-init-db-collection.js &&
+      echo "db.createCollection($1, { capped: false });" >> /docker-entrypoint-initdb.d/2-init-db-collection.js &&
+      echo "db.init.insert([{ message: $2 }]);" >> /docker-entrypoint-initdb.d/2-init-db-collection.js &&
+      /usr/local/bin/docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --noauth' "'MONGO_APP_DATABASE'" "'init'" "'db initialized successfully'"
+    expose:
+      - 27017
+    ports:
+      - 27017:27017
+    volumes:
+      - ./mongodb:/data/db
+    restart: unless-stopped
+
