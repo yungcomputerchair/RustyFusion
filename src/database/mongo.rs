@@ -387,9 +387,12 @@ impl TryFrom<DbPlayer> for Player {
             let task: Task = task.try_into()?;
             player.mission_journal.start_task(task)?;
         }
-        player
-            .mission_journal
-            .set_active_mission_id(db_player.active_mission_id)?;
+
+        if db_player.active_mission_id != 0 {
+            player
+                .mission_journal
+                .set_active_mission_id(db_player.active_mission_id)?;
+        }
 
         Ok(player)
     }
