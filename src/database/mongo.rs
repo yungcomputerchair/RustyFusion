@@ -111,16 +111,14 @@ impl From<&Nano> for DbNano {
         }
     }
 }
-impl TryFrom<DbNano> for Option<Nano> {
-    type Error = FFError;
-    fn try_from(nano: DbNano) -> FFResult<Self> {
+impl From<DbNano> for Option<Nano> {
+    fn from(nano: DbNano) -> Self {
         let nano_raw = sNano {
             iID: nano.id as i16,
             iSkillID: nano.skill_id as i16,
             iStamina: nano.stamina as i16,
         };
-        let nano: Option<Nano> = nano_raw.try_into()?;
-        Ok(nano)
+        nano_raw.into()
     }
 }
 
@@ -345,7 +343,7 @@ impl TryFrom<DbPlayer> for Player {
             )?;
         }
         for nano in db_player.nanos.unwrap_or_default() {
-            let nano: Option<Nano> = nano.try_into()?;
+            let nano: Option<Nano> = nano.into();
             if let Some(nano) = nano {
                 player.set_nano(nano);
             }

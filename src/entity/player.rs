@@ -24,7 +24,7 @@ use crate::{
     },
     path::Path,
     state::ShardServerState,
-    tabledata::TripData,
+    tabledata::{tdata_get, TripData},
     util::{self, clamp, clamp_max, clamp_min},
     Position,
 };
@@ -514,17 +514,19 @@ impl Player {
         self.nano_data.nano_inventory.get_mut(&nano_id)
     }
 
-    pub fn tune_nano(&mut self, nano_id: i16, skill_selection: Option<usize>) -> FFResult<()> {
+    pub fn tune_nano(&mut self, nano_id: i16, skill_selection: Option<i16>) -> FFResult<()> {
         let nano = self.get_nano_mut(nano_id).ok_or(FFError::build(
             Severity::Warning,
             format!("Nano {} is locked", nano_id),
         ))?;
 
-        if let Some(skill_idx) = skill_selection {
-            if skill_idx >= SIZEOF_NANO_SKILLS {
+        let stats = tdata_get().get_nano_stats(nano_id).unwrap();
+
+        if let Some(skill_id) = skill_selection {
+            if !stats.skills.contains(&skill_id) {
                 return Err(FFError::build(
                     Severity::Warning,
-                    format!("Invalid nano skill index: {}", skill_idx),
+                    format!("Invalid skill id {} for nano {}", skill_id, nano.get_id()),
                 ));
             }
         }
@@ -892,8 +894,10 @@ impl Player {
     pub fn set_tutorial_done(&mut self) {
         self.flags.tutorial_flag = true;
         // unlock buttercup
+        let buttercup_stats = tdata_get().get_nano_stats(ID_BUTTERCUP).unwrap();
         self.unlock_nano(ID_BUTTERCUP).unwrap();
-        self.tune_nano(ID_BUTTERCUP, Some(0)).unwrap();
+        self.tune_nano(ID_BUTTERCUP, Some(buttercup_stats.skills[0]))
+            .unwrap();
         self.change_nano(0, Some(ID_BUTTERCUP)).unwrap();
         // equip lightning gun
         self.set_item(

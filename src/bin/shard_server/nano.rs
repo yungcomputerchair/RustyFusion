@@ -178,17 +178,6 @@ pub fn nano_tune(client: &mut FFClient, state: &mut ShardServerState) -> FFResul
             let tuning = tdata_get().get_nano_tuning(pkt.iTuneID)?;
             let skill_id = tuning.skill_id;
 
-            let stats = tdata_get().get_nano_stats(pkt.iNanoID)?;
-            let skill_idx =
-                stats
-                    .skills
-                    .iter()
-                    .position(|sid| *sid == skill_id)
-                    .ok_or(FFError::build(
-                        Severity::Warning,
-                        format!("Bad skill ID {} for nano {}", skill_id, pkt.iNanoID),
-                    ))?;
-
             // check for + consume tuning items
             let mut item_slots = [-1; 10];
             let mut items = [None.into(); 10];
@@ -248,7 +237,7 @@ pub fn nano_tune(client: &mut FFClient, state: &mut ShardServerState) -> FFResul
                 );
             }
 
-            player_working.tune_nano(pkt.iNanoID, Some(skill_idx))?;
+            player_working.tune_nano(pkt.iNanoID, Some(skill_id))?;
             *player = player_working; // commit changes
 
             let resp = sP_FE2CL_REP_NANO_TUNE_SUCC {

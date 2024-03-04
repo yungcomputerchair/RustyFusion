@@ -310,7 +310,7 @@ impl PostgresDatabase {
                 iSkillID: nano.get::<_, Int>("Skill") as i16,
                 iStamina: nano.get::<_, Int>("Stamina") as i16,
             };
-            let nano: Option<Nano> = nano_raw.try_into()?;
+            let nano: Option<Nano> = nano_raw.into();
             if let Some(nano) = nano {
                 player.set_nano(nano);
             }
