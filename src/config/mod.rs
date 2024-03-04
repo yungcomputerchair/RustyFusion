@@ -22,20 +22,23 @@ pub struct Config {
     pub shard: ShardConfig,
 }
 impl Config {
-    fn load() -> Option<Self> {
+    fn load(path: &str) -> Option<Self> {
         #[derive(Deserialize)]
         struct ConfigLayout {
             general: Option<GeneralConfig>,
             login: Option<LoginConfig>,
             shard: Option<ShardConfig>,
         }
-        let file_read = std::fs::read_to_string("config.toml");
+        let file_read = std::fs::read_to_string(path);
         if let Err(e) = file_read {
             if let std::io::ErrorKind::NotFound = e.kind() {
-                log(Severity::Warning, "No config.toml, using default config");
+                log(
+                    Severity::Warning,
+                    "Config file {} missing, using default config",
+                );
                 return None;
             } else {
-                panic_log(&format!("Can't open config.toml: {}", e));
+                panic_log(&format!("Can't open config file {}: {}", path, e));
             }
         }
 
@@ -54,7 +57,7 @@ impl Config {
 
 pub fn config_init() -> &'static Config {
     assert!(CONFIG.get().is_none());
-    if let Some(loaded_config) = Config::load() {
+    if let Some(loaded_config) = Config::load("config.toml") {
         if CONFIG.set(loaded_config).is_err() {
             panic_log("Couldn't initialize config");
         }
@@ -85,7 +88,54 @@ macro_rules! define_setting {
                     None => $dv.into(),
                 }
             }
+
+            pub fn is_set(&self) -> bool {
+                self.0.is_some()
+            }
         }
     };
 }
 use define_setting;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    /* Validate that every setting is defined in config.toml.default */
+    fn test_default_config() {
+        let config = Config::load("config.toml.default").unwrap();
+
+        // General settings
+        let general = config.general;
+        assert!(general.logging_level.is_set());
+        assert!(general.log_write_interval.is_set());
+        assert!(general.live_check_time.is_set());
+        assert!(general.db_username.is_set());
+        assert!(general.db_password.is_set());
+        assert!(general.db_host.is_set());
+        assert!(general.db_port.is_set());
+        assert!(general.table_data_path.is_set());
+
+        // Login server settings
+        let login = config.login;
+        assert!(login.log_path.is_set());
+        assert!(login.listen_addr.is_set());
+        assert!(login.auto_create_accounts.is_set());
+        assert!(login.motd_path.is_set());
+
+        // Shard server settings
+        let shard = config.shard;
+        assert!(shard.log_path.is_set());
+        assert!(shard.listen_addr.is_set());
+        assert!(shard.external_addr.is_set());
+        assert!(shard.login_server_addr.is_set());
+        assert!(shard.login_server_conn_interval.is_set());
+        assert!(shard.num_channels.is_set());
+        assert!(shard.max_channel_pop.is_set());
+        assert!(shard.visibility_range.is_set());
+        assert!(shard.autosave_interval.is_set());
+        assert!(shard.num_sliders.is_set());
+        assert!(shard.vehicle_duration.is_set());
+    }
+}

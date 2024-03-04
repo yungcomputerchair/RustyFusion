@@ -3,7 +3,7 @@
 
 [general]
 logging_level = 2 # how verbose logging should be.
-                  # 0 = [FATAL] and [IMPORTANT] only
+                  # 0 = [FATAL] only
                   # 1 = include [WARN]
                   # 2 = also include [INFO]
                   # 3 = also include [DEBUG]
