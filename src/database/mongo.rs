@@ -367,6 +367,14 @@ impl TryFrom<DbPlayer> for Player {
         for item in db_player.items.unwrap_or_default() {
             let values: (usize, Option<Item>) = item.try_into()?;
             let (slot_num, item) = values;
+            if item.is_some_and(|item| {
+                item.get_expiry_time()
+                    .is_some_and(|et| et < SystemTime::now())
+            }) {
+                // item is expired; skip it
+                continue;
+            }
+
             let (loc, slot_num) = util::slot_num_to_loc_and_slot_num(slot_num)?;
             player.set_item(loc, slot_num, item)?;
         }

@@ -368,7 +368,16 @@ impl PostgresDatabase {
                 iOpt: item.get::<_, Int>("Opt"),
                 iTimeLimit: item.get::<_, Int>("TimeLimit"),
             };
+
             let item: Option<Item> = item_raw.try_into()?;
+            if item.is_some_and(|item| {
+                item.get_expiry_time()
+                    .is_some_and(|et| et < SystemTime::now())
+            }) {
+                // item is expired; skip it
+                continue;
+            }
+
             let (loc, slot_num) = util::slot_num_to_loc_and_slot_num(slot_num)?;
             player.set_item(loc, slot_num, item)?;
         }
