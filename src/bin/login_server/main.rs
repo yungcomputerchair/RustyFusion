@@ -42,6 +42,7 @@ fn main() -> Result<()> {
         &listen_addr,
         handle_packet,
         Some(handle_disconnect),
+        Some(send_live_check),
         Some(polling_interval),
     )?;
 
@@ -60,11 +61,6 @@ fn main() -> Result<()> {
         Duration::from_secs(config.general.log_write_interval.get()),
         false,
     );
-    timers.register_timer(
-        |t, srv, st| FFServer::do_live_checks(t, srv, st, send_live_check),
-        Duration::from_secs(config.general.live_check_time.get()) / 2,
-        false,
-    );
 
     log(
         Severity::Info,
@@ -74,6 +70,7 @@ fn main() -> Result<()> {
             state.as_login().server_id
         ),
     );
+    let live_check_time = Duration::from_secs(config.general.live_check_time.get());
     while running.load(Ordering::SeqCst) {
         timers
             .check_all(&mut server, &mut state)
@@ -84,7 +81,7 @@ fn main() -> Result<()> {
                     log_error(&e);
                 }
             });
-        server.poll(&mut state)?;
+        server.poll(&mut state, live_check_time)?;
     }
 
     log(Severity::Info, "Login server shutting down...");
@@ -173,14 +170,12 @@ fn handle_packet(
 fn send_live_check(client: &mut FFClient) -> FFResult<()> {
     match client.client_type {
         ClientType::GameClient { .. } => {
-            client.live_check_pending = true;
             let pkt = sP_LS2CL_REQ_LIVE_CHECK {
                 iTempValue: unused!(),
             };
             client.send_packet(P_LS2CL_REQ_LIVE_CHECK, &pkt)
         }
         ClientType::ShardServer(_) => {
-            client.live_check_pending = true;
             let pkt = sP_LS2FE_REQ_LIVE_CHECK {
                 iTempValue: unused!(),
             };

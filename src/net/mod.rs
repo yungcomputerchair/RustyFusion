@@ -36,6 +36,7 @@ pub type PacketCallback = fn(
     SystemTime,
 ) -> FFResult<()>;
 pub type DisconnectCallback = fn(usize, &mut HashMap<usize, FFClient>, &mut ServerState);
+pub type LiveCheckCallback = fn(&mut FFClient) -> FFResult<()>;
 
 #[allow(non_snake_case)]
 #[derive(Debug, Clone)]

@@ -8,13 +8,12 @@ use std::{
 };
 
 use crate::{
-    config::config_get,
-    error::{log, log_if_failed, FFError, FFResult, Severity},
+    error::{log, log_if_failed, Severity},
     state::ServerState,
 };
 
 use super::{
-    ClientMap, DisconnectCallback, PacketCallback, {ClientType, FFClient},
+    ClientMap, ClientType, DisconnectCallback, FFClient, LiveCheckCallback, PacketCallback,
 };
 
 const EPOLL_KEY_SELF: usize = 0;
@@ -26,6 +25,7 @@ pub struct FFServer {
     next_epoll_key: usize,
     pkt_handler: PacketCallback,
     dc_handler: Option<DisconnectCallback>,
+    live_check_handler: Option<LiveCheckCallback>,
     clients: HashMap<usize, FFClient>,
 }
 
@@ -34,6 +34,7 @@ impl FFServer {
         addr: &str,
         pkt_handler: PacketCallback,
         dc_handler: Option<DisconnectCallback>,
+        live_check_handler: Option<LiveCheckCallback>,
         poll_timeout: Option<Duration>,
     ) -> Result<Self> {
         let server: Self = Self {
@@ -43,6 +44,7 @@ impl FFServer {
             next_epoll_key: EPOLL_KEY_SELF + 1,
             pkt_handler,
             dc_handler,
+            live_check_handler,
             clients: HashMap::new(),
         };
         server.sock.set_nonblocking(true)?;
@@ -67,14 +69,26 @@ impl FFServer {
         None
     }
 
-    pub fn poll(&mut self, state: &mut ServerState) -> Result<()> {
+    pub fn poll(&mut self, state: &mut ServerState, live_check_interval: Duration) -> Result<()> {
         let client_keys: Vec<usize> = self.clients.keys().copied().collect();
         for key in client_keys {
             let client = self.clients.get_mut(&key).unwrap();
+
+            // live check
+            if let Some(callback) = self.live_check_handler {
+                let time_since_last_heartbeat = client.last_heartbeat.elapsed().unwrap();
+                if time_since_last_heartbeat > 2 * live_check_interval {
+                    // client didn't respond to live check
+                    client.disconnect();
+                } else if time_since_last_heartbeat > live_check_interval {
+                    // send live check
+                    log_if_failed(callback(client));
+                }
+            }
+
             if client.should_dc() {
                 self.disconnect_client(key, state)?;
             }
-            // TODO move live checks here maybe
         }
 
         let time_now = SystemTime::now();
@@ -161,37 +175,5 @@ impl FFServer {
         let client = self.clients.remove(&key).unwrap();
         self.poller.delete(&client.sock)?;
         Ok(()) // client is dropped
-    }
-
-    pub fn do_live_checks(
-        time: SystemTime,
-        server: &mut FFServer,
-        state: &mut ServerState,
-        mut live_check_handler: impl FnMut(&mut FFClient) -> FFResult<()>,
-    ) -> FFResult<()> {
-        log(Severity::Debug, "Doing live checks");
-        let live_check_time = Duration::from_secs(config_get().general.live_check_time.get());
-
-        let mut dc_keys = Vec::new();
-        for (key, client) in server.get_clients() {
-            let since = time
-                .duration_since(client.last_heartbeat)
-                .unwrap_or_default();
-            if since > live_check_time {
-                if client.live_check_pending {
-                    // hasn't responded to live check, mark for DC
-                    dc_keys.push(*key);
-                    continue;
-                }
-                log_if_failed(live_check_handler(client));
-            }
-        }
-
-        for key in dc_keys {
-            server
-                .disconnect_client(key, state)
-                .map_err(FFError::from_io_err)?;
-        }
-        Ok(())
     }
 }

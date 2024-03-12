@@ -45,7 +45,6 @@ pub struct FFClient {
     pub enc_mode: EncryptionMode,
     pub client_type: ClientType,
     pub last_heartbeat: SystemTime,
-    pub live_check_pending: bool,
     should_dc: bool,
     ignore_packets: bool,
 }
@@ -66,7 +65,6 @@ impl FFClient {
             enc_mode: EncryptionMode::EKey,
             client_type: ClientType::Unknown,
             last_heartbeat: SystemTime::now(),
-            live_check_pending: false,
             should_dc: false,
             ignore_packets: false,
         }
@@ -205,7 +203,6 @@ impl FFClient {
 
     pub fn read_payload(&mut self) -> FFResult<()> {
         self.last_heartbeat = SystemTime::now();
-        self.live_check_pending = false;
 
         // read the size
         let mut sz_buf: [u8; 4] = [0; 4];

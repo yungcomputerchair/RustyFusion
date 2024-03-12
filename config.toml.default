@@ -8,8 +8,9 @@ logging_level = 2 # how verbose logging should be.
                   # 2 = also include [INFO]
                   # 3 = also include [DEBUG]
 log_write_interval = 60 # how long (seconds) between log file writes
-live_check_time = 60 # how much network silence (minimum, seconds) before sending a live check.
-                     # the live check timer will run at twice this frequency
+live_check_time = 60 # how much network silence (seconds) before sending a live check.
+                     # if this amount of time passes *again* after sending a live check,
+                     # the client will be disconnected
 db_username = "admin" # what username to connect to database with
 db_password = "mypassword" # CHANGE ME; what password to connect to database with
 db_host = "localhost" # hostname/address of database server to connect to
