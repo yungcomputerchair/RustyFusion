@@ -194,6 +194,7 @@ pub fn warp_use_transportation(
                     }
 
                     let path = tdata_get().get_skyway_path(trip.route_number)?;
+                    player.set_active_nano_slot(None).unwrap();
                     player.start_skyway_ride(trip, path);
                     // we don't charge the player until the ride is done
                 }
