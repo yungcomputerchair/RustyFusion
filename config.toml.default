@@ -2,11 +2,12 @@
 # If a setting is omitted, the default value will be used.
 
 [general]
-logging_level = 2 # how verbose logging should be.
-                  # 0 = [FATAL] only
-                  # 1 = include [WARN]
-                  # 2 = also include [INFO]
-                  # 3 = also include [DEBUG]
+logging_level_console = 2 # how verbose logging should be in the console...
+logging_level_file = 2    # ...and in the log files
+                          # 0 = [FATAL] only
+                          # 1 = include [WARN]
+                          # 2 = also include [INFO]
+                          # 3 = also include [DEBUG]
 log_write_interval = 60 # how long (seconds) between log file writes
 live_check_time = 60 # how much network silence (seconds) before sending a live check.
                      # if this amount of time passes *again* after sending a live check,

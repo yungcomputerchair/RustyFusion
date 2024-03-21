@@ -11,7 +11,8 @@ define_setting!(TableDataPathSetting, String, "tabledata/".to_string());
 
 #[derive(Deserialize, Default)]
 pub struct GeneralConfig {
-    pub logging_level: LoggingLevelSetting,
+    pub logging_level_console: LoggingLevelSetting,
+    pub logging_level_file: LoggingLevelSetting,
     pub log_write_interval: LogWriteIntervalSetting,
     pub live_check_time: LiveCheckTimeSetting,
     pub db_username: DbUsernameSetting,

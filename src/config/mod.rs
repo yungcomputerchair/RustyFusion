@@ -108,7 +108,8 @@ mod tests {
 
         // General settings
         let general = config.general;
-        assert!(general.logging_level.is_set());
+        assert!(general.logging_level_console.is_set());
+        assert!(general.logging_level_file.is_set());
         assert!(general.log_write_interval.is_set());
         assert!(general.live_check_time.is_set());
         assert!(general.db_username.is_set());

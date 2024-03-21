@@ -206,26 +206,29 @@ pub fn log(severity: Severity, msg: &str) {
 pub fn log_error(err: &FFError) {
     let severity = err.get_severity();
 
-    let threshold = config_get().general.logging_level.get();
-    if severity as usize > threshold {
-        return;
+    let config = &config_get().general;
+    let threshold_console = config.logging_level_console.get();
+    let threshold_file = config.logging_level_file.get();
+
+    if severity as usize <= threshold_console {
+        // Log to console, colored output
+        let msg = err.get_formatted(true);
+        if severity == Severity::Fatal {
+            // Print to stderr instead
+            eprintln!("{}", msg);
+        } else {
+            println!("{}", msg);
+        }
     }
 
-    // Log to console, colored output
-    let msg = err.get_formatted(true);
-    if severity == Severity::Fatal {
-        // Print to stderr instead
-        eprintln!("{}", msg);
-    } else {
-        println!("{}", msg);
-    }
-
-    // Log to file
-    let msg = err.get_formatted(false);
-    if let Some(logger) = LOGGER.get() {
-        let mut logger = logger.lock().unwrap();
-        if writeln!(logger, "{}", msg).is_err() {
-            println!("Couldn't write to log file!");
+    if severity as usize <= threshold_file {
+        // Log to file
+        let msg = err.get_formatted(false);
+        if let Some(logger) = LOGGER.get() {
+            let mut logger = logger.lock().unwrap();
+            if writeln!(logger, "{}", msg).is_err() {
+                println!("Couldn't write to log file!");
+            }
         }
     }
 }
