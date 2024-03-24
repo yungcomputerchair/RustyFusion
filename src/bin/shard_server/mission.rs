@@ -81,7 +81,7 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
                 }
             }
 
-            // check completed missions
+            // check if already completed
             if player
                 .mission_journal
                 .is_mission_completed(task_def.mission_id)
@@ -94,6 +94,22 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
                         task_def.mission_id
                     ),
                 ));
+            }
+
+            // check prereq missions
+            for prereq_mission_id in &task_def.prereq_completed_mission_ids {
+                if !player
+                    .mission_journal
+                    .is_mission_completed(*prereq_mission_id)?
+                {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!(
+                            "Tried to start task {} without completing prereq mission {}",
+                            pkt.iTaskNum, prereq_mission_id
+                        ),
+                    ));
+                }
             }
 
             // check map number
