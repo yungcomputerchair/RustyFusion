@@ -1,4 +1,7 @@
-use std::time::{Duration, SystemTime};
+use std::{
+    collections::{HashMap, HashSet},
+    time::{Duration, SystemTime},
+};
 
 use crate::{
     defines::{SIZEOF_QUESTFLAG_NUMBER, SIZEOF_RQUEST_SLOT},
@@ -12,40 +15,48 @@ use crate::{
 pub struct MissionDefinition {
     pub mission_id: i32,
     pub mission_name: String,
-    pub task_ids: Vec<i32>,
+    pub first_task_id: i32,
     pub mission_type: MissionType,
 }
 
 #[derive(Debug)]
 pub struct TaskDefinition {
-    pub task_id: i32,                 // m_iHTaskID
-    pub mission_id: i32,              // m_iHMissionID
-    pub task_type: TaskType,          // m_iHTaskType
-    pub success_task_id: Option<i32>, // m_iSUOutgoingTask
-    pub fail_task_id: Option<i32>,    // m_iFOutgoingTask
+    pub task_id: i32,        // m_iHTaskID
+    pub mission_id: i32,     // m_iHMissionID
+    pub task_type: TaskType, // m_iHTaskType
 
     // prerequisites
-    pub giver_npc_type: Option<i32>,            // m_iHNPCID
-    pub prereq_completed_mission_ids: Vec<i32>, // m_iCSTReqMission
-    pub prereq_nano_ids: Vec<i16>,              // m_iCSTRReqNano
-    pub prereq_level: Option<i16>,              // m_iCTRReqLvMin
-    pub prereq_guide: Option<PlayerGuide>,      // m_iCSTReqGuide
-    pub prereq_items: Vec<(i16, usize)>,        // m_iCSTItemID, m_iCSTItemNumNeeded
-    pub prereq_running_task_id: Option<i32>,    // m_iCSTTrigger
+    pub prereq_npc_type: Option<i32>,               // m_iHNPCID
+    pub prereq_completed_mission_ids: HashSet<i32>, // m_iCSTReqMission
+    pub prereq_nano_ids: HashSet<i16>,              // m_iCSTRReqNano
+    pub prereq_level: Option<i16>,                  // m_iCTRReqLvMin
+    pub prereq_guide: Option<PlayerGuide>,          // m_iCSTReqGuide
+    pub prereq_map_num: Option<u32>,                // m_iRequireInstanceID
 
-    // win conditions
-    pub time_limit: Option<Duration>,          // m_iCSUCheckTimer
-    pub destination_npc_type: Option<i32>,     // m_iHTerminatorNPCID
-    pub destination_map_num: Option<u32>,      // m_iRequireInstanceID
-    pub req_items: Vec<(i16, usize)>,          // m_iCSUItemID, m_iCSUItemNumNeeded
-    pub req_defeat_enemies: Vec<(i32, usize)>, // m_iCSUEnemyID, m_iCSUNumToKill
-    pub escort_npc_type: Option<i32>,          // m_iCSUDEFNPCID
+    // objectives
+    pub obj_npc_type: Option<i32>,        // m_iHTerminatorNPCID
+    pub obj_qitems: HashMap<i16, usize>,  // m_iCSUItemID -> m_iCSUItemNumNeeded
+    pub obj_enemies: HashMap<i32, usize>, // m_iCSUEnemyID -> m_iCSUNumToKill
+    pub obj_enemy_id_ordering: Vec<i32>, // m_iCSUEnemyID (needed for loading counts correctly from DB)
+    pub obj_escort_npc_type: Option<i32>, // m_iCSUDEFNPCID
+    pub obj_time_limit: Option<Duration>, // m_iCSUCheckTimer
+
+    // failure
+    pub fail_task_id: Option<i32>,        // m_iFOutgoingTask
+    pub fail_qitems: HashMap<i16, isize>, // m_iFItemID -> m_iFItemNumNeeded
+
+    // success
+    pub succ_task_id: Option<i32>,        // m_iSUOutgoingTask
+    pub succ_qitems: HashMap<i16, isize>, // m_iSUItem -> m_iSUInstancename
+
+    // delete
+    pub del_qitems: HashSet<i16>, // m_iDelItemID
 }
 
 #[derive(Debug, Clone)]
 pub struct Task {
     task_id: i32,
-    pub remaining_enemies: Vec<(i32, usize)>,
+    pub remaining_enemy_defeats: HashMap<i32, usize>,
     pub fail_time: Option<SystemTime>,
     pub completed: bool,
 }
@@ -65,13 +76,23 @@ impl Task {
             .unwrap()
     }
 
-    pub fn set_remaining_enemy_counts(&mut self, counts: [usize; 3]) {
-        self.remaining_enemies = self.get_task_def().req_defeat_enemies.clone();
-        for (i, count) in counts.iter().enumerate() {
-            if i >= self.remaining_enemies.len() {
-                break;
-            }
-            self.remaining_enemies[i].1 = *count;
+    pub fn get_remaining_enemy_defeats(&self) -> [usize; 3] {
+        let task_def = self.get_task_def();
+        let enemy_types = task_def.obj_enemy_id_ordering.as_slice();
+        let mut counts = [0; 3];
+        for (idx, enemy_type) in enemy_types.iter().enumerate() {
+            counts[idx] = self.remaining_enemy_defeats[enemy_type];
+        }
+        counts
+    }
+
+    pub fn set_remaining_enemy_defeats(&mut self, counts: [usize; 3]) {
+        let task_def = self.get_task_def();
+        let enemy_types = task_def.obj_enemy_id_ordering.as_slice();
+        self.remaining_enemy_defeats = task_def.obj_enemies.clone();
+        for (idx, enemy_type) in enemy_types.iter().enumerate() {
+            self.remaining_enemy_defeats
+                .insert(*enemy_type, counts[idx]);
         }
     }
 }
@@ -79,8 +100,8 @@ impl From<&TaskDefinition> for Task {
     fn from(task_def: &TaskDefinition) -> Self {
         Task {
             task_id: task_def.task_id,
-            remaining_enemies: task_def.req_defeat_enemies.clone(),
-            fail_time: task_def.time_limit.map(|d| SystemTime::now() + d),
+            remaining_enemy_defeats: task_def.obj_enemies.clone(),
+            fail_time: task_def.obj_time_limit.map(|d| SystemTime::now() + d),
             completed: false,
         }
     }
@@ -139,11 +160,11 @@ impl MissionJournal {
             if let Some(task) = task {
                 let task_def = task.get_task_def();
                 quest.m_aCurrTaskID = task_def.task_id;
-                for (j, (npc_id, count)) in task.remaining_enemies.iter().enumerate() {
+                for (j, (npc_id, count)) in task.remaining_enemy_defeats.iter().enumerate() {
                     quest.m_aKillNPCID[j] = *npc_id;
                     quest.m_aKillNPCCount[j] = *count as i32;
                 }
-                for (j, (item_id, count)) in task_def.req_items.iter().enumerate() {
+                for (j, (item_id, count)) in task_def.obj_qitems.iter().enumerate() {
                     quest.m_aNeededItemID[j] = *item_id as i32;
                     quest.m_aNeededItemCount[j] = *count as i32;
                 }

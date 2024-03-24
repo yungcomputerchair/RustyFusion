@@ -1091,15 +1091,16 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
         m_iHMissionType: i32,
         m_iHTaskType: i32,
         m_iSUOutgoingTask: i32,
+        m_iSUItem: [i16; MAX_NEED_SORT_OF_ITEM as usize],
+        m_iSUInstancename: [isize; MAX_NEED_SORT_OF_ITEM as usize],
         m_iFOutgoingTask: i32,
+        m_iFItemID: [i16; MAX_NEED_SORT_OF_ITEM as usize],
+        m_iFItemNumNeeded: [isize; MAX_NEED_SORT_OF_ITEM as usize],
         m_iCSTReqMission: [i32; MAX_REQUIRE_MISSION as usize],
         m_iCSTRReqNano: [i16; MAX_REQUIRE_NANO as usize],
         m_iCTRReqLvMin: i16,
         m_iCSTReqGuide: i16,
         m_iCSUDEFNPCID: i32,
-        m_iCSTItemID: [i16; MAX_NEED_SORT_OF_ITEM as usize],
-        m_iCSTItemNumNeeded: [usize; MAX_NEED_SORT_OF_ITEM as usize],
-        m_iCSTTrigger: i32,
         m_iCSUCheckTimer: u64,
         m_iHTerminatorNPCID: i32,
         m_iRequireInstanceID: u32,
@@ -1107,6 +1108,7 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
         m_iCSUItemNumNeeded: [usize; MAX_NEED_SORT_OF_ITEM as usize],
         m_iCSUEnemyID: [i32; MAX_NEED_SORT_OF_ENEMY as usize],
         m_iCSUNumToKill: [usize; MAX_NEED_SORT_OF_ENEMY as usize],
+        m_iDelItemID: [i16; 4],
     }
 
     #[derive(Debug, Deserialize)]
@@ -1138,31 +1140,25 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
             _ => format!("Mission #{}", mission_id),
         };
 
-        // add task to the task tree for its mission
+        // create mission entry if this is the first time we've seen it
         mission_defs
             .entry(mission_id)
             .or_insert_with(|| MissionDefinition {
                 mission_id,
                 mission_name,
-                task_ids: Vec::new(),
+                first_task_id: task_id,
                 mission_type,
-            })
-            .task_ids
-            .push(task_id);
+            });
 
         // create task definition
         let task_def = TaskDefinition {
             task_id,
             mission_id,
-            giver_npc_type: match entry.m_iHNPCID {
-                0 => None,
-                x => Some(x),
-            },
             task_type: entry
                 .m_iHTaskType
                 .try_into()
                 .map_err(|e: FFError| e.get_msg().to_string())?,
-            success_task_id: match entry.m_iSUOutgoingTask {
+            succ_task_id: match entry.m_iSUOutgoingTask {
                 0 => None,
                 x => Some(x),
             },
@@ -1194,53 +1190,78 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
                 0 => None,
                 x => Some(x.try_into().map_err(|e: FFError| e.get_msg().to_string())?),
             },
-            prereq_items: entry
-                .m_iCSTItemID
-                .iter()
-                .zip(entry.m_iCSTItemNumNeeded.iter())
-                .flat_map(|(&id, &num)| match id {
-                    0 => None,
-                    x => Some((x, num)),
-                })
-                .collect(),
-            prereq_running_task_id: match entry.m_iCSTTrigger {
-                0 => None,
-                x => Some(x),
-            },
-            time_limit: match entry.m_iCSUCheckTimer {
+            obj_time_limit: match entry.m_iCSUCheckTimer {
                 0 => None,
                 x => Some(Duration::from_secs(x)),
             },
-            destination_npc_type: match entry.m_iHTerminatorNPCID {
+            obj_npc_type: match entry.m_iHTerminatorNPCID {
                 0 => None,
                 x => Some(x),
             },
-            destination_map_num: match entry.m_iRequireInstanceID {
+            prereq_map_num: match entry.m_iRequireInstanceID {
                 0 => None,
                 x => Some(x),
             },
-            req_items: entry
+            obj_escort_npc_type: match entry.m_iCSUDEFNPCID {
+                0 => None,
+                x => Some(x),
+            },
+            prereq_npc_type: match entry.m_iHNPCID {
+                0 => None,
+                x => Some(x),
+            },
+            obj_qitems: entry
                 .m_iCSUItemID
                 .iter()
                 .zip(entry.m_iCSUItemNumNeeded.iter())
-                .flat_map(|(&id, &num)| match id {
+                .flat_map(|(id, num)| match id {
                     0 => None,
-                    x => Some((x, num)),
+                    x => Some((*x, *num)),
                 })
                 .collect(),
-            req_defeat_enemies: entry
+            obj_enemies: entry
                 .m_iCSUEnemyID
                 .iter()
                 .zip(entry.m_iCSUNumToKill.iter())
-                .flat_map(|(&id, &num)| match id {
+                .flat_map(|(id, num)| match id {
                     0 => None,
-                    x => Some((x, num)),
+                    x => Some((*x, *num)),
                 })
                 .collect(),
-            escort_npc_type: match entry.m_iCSUDEFNPCID {
-                0 => None,
-                x => Some(x),
-            },
+            obj_enemy_id_ordering: entry
+                .m_iCSUEnemyID
+                .iter()
+                .flat_map(|id| match id {
+                    0 => None,
+                    x => Some(*x),
+                })
+                .collect(),
+            fail_qitems: entry
+                .m_iFItemID
+                .iter()
+                .zip(entry.m_iFItemNumNeeded.iter())
+                .flat_map(|(id, num)| match id {
+                    0 => None,
+                    x => Some((*x, *num)),
+                })
+                .collect(),
+            succ_qitems: entry
+                .m_iSUItem
+                .iter()
+                .zip(entry.m_iSUInstancename.iter())
+                .flat_map(|(id, num)| match id {
+                    0 => None,
+                    x => Some((*x, *num)),
+                })
+                .collect(),
+            del_qitems: entry
+                .m_iDelItemID
+                .iter()
+                .flat_map(|id| match id {
+                    0 => None,
+                    x => Some(*x),
+                })
+                .collect(),
         };
         task_defs.insert(task_id, task_def);
     }

@@ -21,7 +21,7 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
             let task_def = tdata_get().get_task_definition(pkt.iTaskNum)?;
 
             // check giver NPC type + proximity
-            if let Some(giver_npc_type) = task_def.giver_npc_type {
+            if let Some(giver_npc_type) = task_def.prereq_npc_type {
                 let req_npc_id = pkt.iNPC_ID;
                 let req_npc = state.get_npc(req_npc_id)?;
                 if req_npc.ty != giver_npc_type {
@@ -81,33 +81,6 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
                 }
             }
 
-            // check items
-            for (item_id, count) in &task_def.prereq_items {
-                if player.get_quest_item_count(*item_id) < *count {
-                    return Err(FFError::build(
-                        Severity::Warning,
-                        format!(
-                            "Tried to start task {} without quest item {} x {}",
-                            pkt.iTaskNum, item_id, count
-                        ),
-                    ));
-                }
-            }
-
-            // check required running task ID
-            if let Some(running_task_id) = task_def.prereq_running_task_id {
-                let running_task_ids = player.mission_journal.get_current_task_ids();
-                if !running_task_ids.contains(&running_task_id) {
-                    return Err(FFError::build(
-                        Severity::Warning,
-                        format!(
-                            "Tried to start task {} without current task {}",
-                            pkt.iTaskNum, running_task_id
-                        ),
-                    ));
-                }
-            }
-
             // check completed missions
             if player
                 .mission_journal
@@ -121,6 +94,21 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
                         task_def.mission_id
                     ),
                 ));
+            }
+
+            // check map number
+            if let Some(map_num) = task_def.prereq_map_num {
+                if player.get_mapnum() != map_num {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!(
+                            "Tried to start task {} in mapnum {} != {}",
+                            pkt.iTaskNum,
+                            player.get_mapnum(),
+                            map_num
+                        ),
+                    ));
+                }
             }
 
             // all clear, start the task
@@ -142,7 +130,7 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
             let resp = sP_FE2CL_REP_PC_TASK_START_SUCC {
                 iTaskNum: pkt.iTaskNum,
                 iRemainTime: task_def
-                    .time_limit
+                    .obj_time_limit
                     .map(|d| d.as_secs() as i32)
                     .unwrap_or(unused!()),
             };

@@ -432,8 +432,8 @@ impl Player {
         }
     }
 
-    fn get_mapnum(&self) -> i32 {
-        self.instance_id.map_num as i32
+    pub fn get_mapnum(&self) -> u32 {
+        self.instance_id.map_num
     }
 
     pub fn change_nano(&mut self, slot: usize, nano_id: Option<i16>) -> FFResult<()> {
@@ -557,7 +557,7 @@ impl Player {
             iCandy: self.taros as i32,
             iFusionMatter: self.fusion_matter as i32,
             iSpecialState: self.get_special_state_bit_flag(),
-            iMapNum: self.get_mapnum(),
+            iMapNum: self.get_mapnum() as i32,
             iX: self.position.x,
             iY: self.position.y,
             iZ: self.position.z,
@@ -634,7 +634,7 @@ impl Player {
             iSpecialState: self.get_special_state_bit_flag(),
             iLv: self.level,
             iHP: self.hp,
-            iMapNum: self.get_mapnum(),
+            iMapNum: self.get_mapnum() as i32,
             iX: self.position.x,
             iY: self.position.y,
             iZ: self.position.z,

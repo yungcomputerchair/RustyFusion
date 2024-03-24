@@ -129,13 +129,9 @@ struct DbTask {
 }
 impl From<&Task> for DbTask {
     fn from(task: &Task) -> Self {
-        let mut npc_remaining_counts = [0; 3];
-        for (i, count) in task.remaining_enemies.iter().enumerate() {
-            npc_remaining_counts[i] = count.1 as Int;
-        }
         Self {
             task_id: task.get_task_id(),
-            npc_remaining_counts,
+            npc_remaining_counts: task.get_remaining_enemy_defeats().map(|c| c as Int),
         }
     }
 }
@@ -145,7 +141,7 @@ impl TryFrom<DbTask> for Task {
         let npc_remaining_counts = task.npc_remaining_counts.map(|c| c as usize);
         let task_def = tdata_get().get_task_definition(task.task_id)?;
         let mut task: Task = task_def.into();
-        task.set_remaining_enemy_counts(npc_remaining_counts);
+        task.set_remaining_enemy_defeats(npc_remaining_counts);
         Ok(task)
     }
 }

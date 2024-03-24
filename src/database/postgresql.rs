@@ -344,7 +344,7 @@ impl PostgresDatabase {
             let npc_count_2: Int = quest.get("RemainingNPCCount2");
             let npc_count_3: Int = quest.get("RemainingNPCCount3");
             let mut task: Task = task_def.into();
-            task.set_remaining_enemy_counts([
+            task.set_remaining_enemy_defeats([
                 npc_count_1 as usize,
                 npc_count_2 as usize,
                 npc_count_3 as usize,
