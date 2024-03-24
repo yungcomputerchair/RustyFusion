@@ -229,6 +229,23 @@ impl MissionJournal {
         }
     }
 
+    pub fn check_completed_previous_task(&self, task_def: &TaskDefinition) -> bool {
+        let mission_id = task_def.mission_id;
+        let mission_def = tdata_get().get_mission_definition(mission_id).unwrap();
+        if mission_def.first_task_id == task_def.task_id {
+            // first task in the mission, no prereq
+            return true;
+        }
+        for running_task in self.get_task_iter() {
+            let running_task_def = running_task.get_task_def();
+            if running_task_def.succ_task_id == Some(task_def.task_id) && running_task.completed {
+                // previous task is completed
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn start_task(&mut self, task: Task) -> FFResult<bool> {
         let mission_def = task.get_mission_def();
         let mission_existing_task = self

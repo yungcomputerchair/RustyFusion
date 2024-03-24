@@ -127,6 +127,20 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
                 }
             }
 
+            // check previous task for completion
+            if !player
+                .mission_journal
+                .check_completed_previous_task(task_def)
+            {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!(
+                        "Tried to start task {} without completing previous task",
+                        pkt.iTaskNum
+                    ),
+                ));
+            }
+
             // all clear, start the task
             let task: Task = task_def.into();
             let mission_def = task.get_mission_def();
