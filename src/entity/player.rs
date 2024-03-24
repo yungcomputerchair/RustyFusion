@@ -742,7 +742,11 @@ impl Player {
     }
 
     pub fn set_quest_item_count(&mut self, item_id: i16, count: usize) {
-        self.inventory.quest.insert(item_id, count);
+        if count == 0 {
+            self.inventory.quest.remove(&item_id);
+        } else {
+            self.inventory.quest.insert(item_id, count);
+        }
     }
 
     pub fn find_free_slot(&self, location: ItemLocation) -> FFResult<usize> {

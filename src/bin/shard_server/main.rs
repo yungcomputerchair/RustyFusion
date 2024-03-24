@@ -264,6 +264,7 @@ fn handle_packet(
         P_CL2FE_REQ_PC_TIME_TO_GO_WARP => transport::time_to_go_warp(&mut clients, state),
         //
         P_CL2FE_REQ_PC_TASK_START => mission::task_start(clients.get_self(), state),
+        P_CL2FE_REQ_PC_TASK_STOP => mission::task_stop(clients.get_self(), state),
         P_CL2FE_REQ_PC_SET_CURRENT_MISSION_ID => {
             mission::set_current_mission_id(clients.get_self(), state)
         }

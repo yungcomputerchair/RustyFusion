@@ -289,6 +289,53 @@ impl MissionJournal {
         };
         Ok(new_mission)
     }
+
+    pub fn complete_task(&mut self, task_id: i32) -> FFResult<()> {
+        let task = self
+            .get_task_iter_mut()
+            .find(|t| t.get_task_id() == task_id)
+            .ok_or_else(|| {
+                FFError::build(
+                    Severity::Warning,
+                    format!("Tried to complete task {} that is not in progress", task_id),
+                )
+            })?;
+        task.completed = true;
+        Ok(())
+    }
+
+    pub fn remove_task(&mut self, task_id: i32) -> FFResult<Task> {
+        for idx in 0..6 {
+            match idx {
+                0 => {
+                    if let Some(task) = &self.current_nano_mission {
+                        if task.get_task_id() == task_id {
+                            return Ok(self.current_nano_mission.take().unwrap());
+                        }
+                    }
+                }
+                1 => {
+                    if let Some(task) = &self.current_guide_mission {
+                        if task.get_task_id() == task_id {
+                            return Ok(self.current_guide_mission.take().unwrap());
+                        }
+                    }
+                }
+                2..=5 => {
+                    if let Some(task) = self.current_world_missions.get(idx - 2) {
+                        if task.get_task_id() == task_id {
+                            return Ok(self.current_world_missions.remove(idx - 2));
+                        }
+                    }
+                }
+                _ => unreachable!(),
+            }
+        }
+        Err(FFError::build(
+            Severity::Warning,
+            format!("Tried to remove task {} that is not in progress", task_id),
+        ))
+    }
 }
 
 impl Default for sRunningQuest {

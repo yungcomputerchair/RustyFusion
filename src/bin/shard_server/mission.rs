@@ -146,6 +146,22 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
     )
 }
 
+pub fn task_stop(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+    let pkt: sP_CL2FE_REQ_PC_TASK_STOP = *client.get_packet(P_CL2FE_REQ_PC_TASK_STOP)?;
+    let pc_id = client.get_player_id()?;
+    let player = state.get_player_mut(pc_id)?;
+    let task = player.mission_journal.remove_task(pkt.iTaskNum)?;
+
+    for item_id in &task.get_task_def().del_qitems {
+        player.set_quest_item_count(*item_id, 0);
+    }
+
+    let resp = sP_FE2CL_REP_PC_TASK_STOP_SUCC {
+        iTaskNum: pkt.iTaskNum,
+    };
+    client.send_packet(P_FE2CL_REP_PC_TASK_STOP_SUCC, &resp)
+}
+
 pub fn set_current_mission_id(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
     let pkt: sP_CL2FE_REQ_PC_SET_CURRENT_MISSION_ID =
         *client.get_packet(P_CL2FE_REQ_PC_SET_CURRENT_MISSION_ID)?;
