@@ -205,6 +205,23 @@ impl MissionJournal {
         }
     }
 
+    pub fn set_mission_completed(&mut self, mission_id: i32) -> FFResult<()> {
+        const MAX_MISSION_ID: i32 = SIZEOF_QUESTFLAG_NUMBER as i32 * 64;
+        match mission_id {
+            1..=MAX_MISSION_ID => {
+                let offset = mission_id - 1;
+                let flags_idx = offset / 32;
+                let bit_idx = offset % 32;
+                self.completed_mission_flags[flags_idx as usize] |= 1 << bit_idx;
+                Ok(())
+            }
+            _ => Err(FFError::build(
+                Severity::Warning,
+                format!("Invalid mission ID {}", mission_id),
+            )),
+        }
+    }
+
     pub fn set_active_mission_id(&mut self, mission_id: i32) -> FFResult<usize> {
         let mut current_mission_slot = None;
         for idx in 0..6 {
