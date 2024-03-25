@@ -1,7 +1,7 @@
 use rusty_fusion::{
     defines::{RANGE_INTERACT, RANGE_TRIGGER},
     entity::{Combatant, EntityID},
-    enums::TaskType,
+    enums::{ItemLocation, ItemType, TaskType},
     error::*,
     mission::Task,
     net::{
@@ -281,10 +281,36 @@ pub fn task_end(client: &mut FFClient, state: &mut ShardServerState) -> FFResult
             player.mission_journal.complete_task(pkt.iTaskNum)?;
 
             // success qitem changes
-            for (qitem_id, qitem_count_mod) in &task_def.succ_qitems {
-                let curr_count = player.get_quest_item_count(*qitem_id) as isize;
-                let new_count = (curr_count + *qitem_count_mod) as usize;
-                player.set_quest_item_count(*qitem_id, new_count);
+            if !task_def.succ_qitems.is_empty() {
+                let qitem_pkt = sP_FE2CL_REP_REWARD_ITEM {
+                    m_iCandy: player.get_taros() as i32,
+                    m_iFusionMatter: player.get_fusion_matter() as i32,
+                    m_iBatteryN: player.get_nano_potions() as i32,
+                    m_iBatteryW: player.get_weapon_boosts() as i32,
+                    iItemCnt: task_def.succ_qitems.len() as i8,
+                    iFatigue: 100,
+                    iFatigue_Level: 1,
+                    iNPC_TypeID: 0,
+                    iTaskID: task_def.task_id,
+                };
+                client.queue_packet(P_FE2CL_REP_REWARD_ITEM, &qitem_pkt);
+                for (qitem_id, qitem_count_mod) in &task_def.succ_qitems {
+                    let curr_count = player.get_quest_item_count(*qitem_id) as isize;
+                    let new_count = (curr_count + *qitem_count_mod) as usize;
+                    let qitem_slot = player.set_quest_item_count(*qitem_id, new_count);
+                    let qitem_reward = sItemReward {
+                        sItem: sItemBase {
+                            iType: ItemType::Quest as i16,
+                            iID: *qitem_id,
+                            iOpt: new_count as i32,
+                            iTimeLimit: unused!(),
+                        },
+                        eIL: ItemLocation::QInven as i32,
+                        iSlotNum: qitem_slot as i32,
+                    };
+                    client.queue_struct(&qitem_reward);
+                }
+                log_if_failed(client.flush());
             }
 
             // TODO reward

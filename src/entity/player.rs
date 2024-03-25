@@ -212,7 +212,7 @@ impl Default for Nanocom {
 struct PlayerInventory {
     main: [Option<Item>; SIZEOF_INVEN_SLOT as usize],
     equipped: [Option<Item>; SIZEOF_EQUIP_SLOT as usize],
-    quest: HashMap<i16, usize>,
+    quest: [Option<(i16, usize)>; SIZEOF_QINVEN_SLOT as usize],
     bank: [Option<Item>; SIZEOF_BANK_SLOT as usize],
 }
 impl Default for PlayerInventory {
@@ -220,23 +220,22 @@ impl Default for PlayerInventory {
         Self {
             main: [None; SIZEOF_INVEN_SLOT as usize],
             equipped: [None; SIZEOF_EQUIP_SLOT as usize],
-            quest: HashMap::new(),
+            quest: [None; SIZEOF_QINVEN_SLOT as usize],
             bank: [None; SIZEOF_BANK_SLOT as usize],
         }
     }
 }
 impl PlayerInventory {
     fn get_quest_item_arr(&self) -> [sItemBase; SIZEOF_QINVEN_SLOT as usize] {
-        let mut arr = [sItemBase::default(); SIZEOF_QINVEN_SLOT as usize];
-        for (idx, (qitem_id, qitem_quantity)) in self.quest.iter().enumerate() {
-            arr[idx] = sItemBase {
-                iID: *qitem_id,
-                iType: 0,
-                iOpt: *qitem_quantity as i32,
-                iTimeLimit: 0,
-            };
-        }
-        arr
+        self.quest.map(|vals| {
+            let mut item_raw = sItemBase::default();
+            if let Some((id, count)) = vals {
+                item_raw.iType = ItemType::Quest as i16;
+                item_raw.iID = id;
+                item_raw.iOpt = count as i32;
+            }
+            item_raw
+        })
     }
 }
 
@@ -738,15 +737,32 @@ impl Player {
     }
 
     pub fn get_quest_item_count(&self, item_id: i16) -> usize {
-        self.inventory.quest.get(&item_id).copied().unwrap_or(0)
+        self.inventory
+            .quest
+            .iter()
+            .flatten()
+            .find(|(qitem_id, _)| *qitem_id == item_id)
+            .map(|(_, count)| *count)
+            .unwrap_or(0)
     }
 
-    pub fn set_quest_item_count(&mut self, item_id: i16, count: usize) {
-        if count == 0 {
-            self.inventory.quest.remove(&item_id);
-        } else {
-            self.inventory.quest.insert(item_id, count);
+    pub fn set_quest_item_count(&mut self, item_id: i16, count: usize) -> usize {
+        for (idx, slot) in self.inventory.quest.iter_mut().enumerate() {
+            if let Some((qitem_id, _)) = slot {
+                if *qitem_id == item_id {
+                    if count == 0 {
+                        *slot = None;
+                    } else {
+                        *slot = Some((item_id, count));
+                    }
+                    return idx;
+                }
+            } else {
+                *slot = Some((item_id, count));
+                return idx;
+            }
         }
+        panic_log("No free quest item slots");
     }
 
     pub fn find_free_slot(&self, location: ItemLocation) -> FFResult<usize> {
@@ -833,7 +849,11 @@ impl Player {
     }
 
     pub fn get_quest_item_iter(&self) -> impl Iterator<Item = (i16, usize)> + '_ {
-        self.inventory.quest.iter().map(|(id, count)| (*id, *count))
+        self.inventory
+            .quest
+            .iter()
+            .flatten()
+            .map(|(id, count)| (*id, *count))
     }
 
     pub fn get_equipped(&self) -> [Option<Item>; 9] {
