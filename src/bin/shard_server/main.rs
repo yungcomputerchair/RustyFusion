@@ -265,6 +265,7 @@ fn handle_packet(
         //
         P_CL2FE_REQ_PC_TASK_START => mission::task_start(clients.get_self(), state),
         P_CL2FE_REQ_PC_TASK_STOP => mission::task_stop(clients.get_self(), state),
+        P_CL2FE_REQ_PC_TASK_END => mission::task_end(clients.get_self(), state),
         P_CL2FE_REQ_PC_SET_CURRENT_MISSION_ID => {
             mission::set_current_mission_id(clients.get_self(), state)
         }

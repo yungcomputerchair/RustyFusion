@@ -1,6 +1,7 @@
 use rusty_fusion::{
-    defines::RANGE_INTERACT,
+    defines::{RANGE_INTERACT, RANGE_TRIGGER},
     entity::{Combatant, EntityID},
+    enums::TaskType,
     error::*,
     mission::Task,
     net::{
@@ -157,6 +158,8 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
                 );
             }
 
+            // TODO start escort path
+
             let resp = sP_FE2CL_REP_PC_TASK_START_SUCC {
                 iTaskNum: pkt.iTaskNum,
                 iRemainTime: task_def
@@ -190,6 +193,115 @@ pub fn task_stop(client: &mut FFClient, state: &mut ShardServerState) -> FFResul
         iTaskNum: pkt.iTaskNum,
     };
     client.send_packet(P_FE2CL_REP_PC_TASK_STOP_SUCC, &resp)
+}
+
+pub fn task_end(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+    let pkt: sP_CL2FE_REQ_PC_TASK_END = *client.get_packet(P_CL2FE_REQ_PC_TASK_END)?;
+    let error_code = 0; // true failures are handled in player tick
+    catch_fail(
+        (|| {
+            let pc_id = client.get_player_id()?;
+            let player = state.get_player(pc_id)?;
+            let running_tasks = player.mission_journal.get_current_tasks();
+            let task = running_tasks
+                .iter()
+                .find(|t| t.get_task_id() == pkt.iTaskNum)
+                .ok_or(FFError::build(
+                    Severity::Warning,
+                    format!("Tried to end task {} that is not active", pkt.iTaskNum),
+                ))?;
+            let task_def = task.get_task_def();
+
+            // check target npc type + proximity
+            if let Some(target_npc_type) = task_def.obj_npc_type {
+                let target_npc_id = pkt.iNPC_ID;
+                let target_npc = state.get_npc(target_npc_id)?;
+                if target_npc.ty != target_npc_type {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!(
+                            "Tried to end task {} with objective NPC type {}, should be {}",
+                            pkt.iTaskNum, target_npc.ty, target_npc_type
+                        ),
+                    ));
+                }
+                state.entity_map.validate_proximity(
+                    &[EntityID::Player(pc_id), EntityID::NPC(target_npc_id)],
+                    match task_def.task_type {
+                        TaskType::Talk => RANGE_INTERACT,
+                        TaskType::GotoLocation => RANGE_TRIGGER,
+                        _ => RANGE_INTERACT,
+                    },
+                )?;
+            }
+
+            // check qitems
+            for (qitem_id, qitem_count) in &task_def.obj_qitems {
+                let has_count = player.get_quest_item_count(*qitem_id);
+                if has_count < *qitem_count {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!(
+                            "Tried to end task {} with qitem {} count {} (need {})",
+                            pkt.iTaskNum, qitem_id, has_count, qitem_count,
+                        ),
+                    ));
+                }
+            }
+
+            // check enemies
+            let remaining_counts = &task.remaining_enemy_defeats;
+            for enemy_id in task_def.obj_enemies.keys() {
+                let remaining_count = *remaining_counts.get(enemy_id).unwrap();
+                if remaining_count > 0 {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!(
+                            "Tried to end task {} with enemy {} x {} remaining",
+                            pkt.iTaskNum, enemy_id, remaining_count
+                        ),
+                    ));
+                }
+            }
+
+            // TODO check escort path
+
+            // check time limit
+            if let Some(time_limit) = task.fail_time {
+                if time_limit < std::time::SystemTime::now() {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!("Tried to end task {} after time limit", pkt.iTaskNum),
+                    ));
+                }
+            }
+
+            // all clear, mark the task completed. it'll be overwritten by the next task
+            let player = state.get_player_mut(pc_id).unwrap();
+            player.mission_journal.complete_task(pkt.iTaskNum)?;
+
+            // success qitem changes
+            for (qitem_id, qitem_count_mod) in &task_def.succ_qitems {
+                let curr_count = player.get_quest_item_count(*qitem_id) as isize;
+                let new_count = (curr_count + *qitem_count_mod) as usize;
+                player.set_quest_item_count(*qitem_id, new_count);
+            }
+
+            // TODO reward
+
+            let resp = sP_FE2CL_REP_PC_TASK_END_SUCC {
+                iTaskNum: pkt.iTaskNum,
+            };
+            client.send_packet(P_FE2CL_REP_PC_TASK_END_SUCC, &resp)
+        })(),
+        || {
+            let resp = sP_FE2CL_REP_PC_TASK_END_FAIL {
+                iTaskNum: pkt.iTaskNum,
+                iErrorCode: error_code,
+            };
+            client.send_packet(P_FE2CL_REP_PC_TASK_END_FAIL, &resp)
+        },
+    )
 }
 
 pub fn set_current_mission_id(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
