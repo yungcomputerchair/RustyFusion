@@ -665,18 +665,18 @@ mod helpers {
                     ),
                 ));
             }
-            let close_enough = state.entity_map.validate_proximity(
-                &[EntityID::Player(pc_id), EntityID::NPC(npc_id)],
-                RANGE_INTERACT,
-            )?;
-            if close_enough {
-                Ok(())
-            } else {
-                Err(FFError::build(
-                    Severity::Warning,
-                    format!("Vendor {} not close enough", npc_id),
-                ))
-            }
+            state
+                .entity_map
+                .validate_proximity(
+                    &[EntityID::Player(pc_id), EntityID::NPC(npc_id)],
+                    RANGE_INTERACT,
+                )
+                .map_err(|e| {
+                    e.chain(FFError::build(
+                        Severity::Warning,
+                        format!("Vendor {} not close enough", npc_id),
+                    ))
+                })
         }
     }
 }

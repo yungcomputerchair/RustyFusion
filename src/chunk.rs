@@ -240,7 +240,7 @@ impl EntityMap {
         })
     }
 
-    pub fn validate_proximity(&self, ids: &[EntityID], range: u32) -> FFResult<bool> {
+    pub fn validate_proximity(&self, ids: &[EntityID], range: u32) -> FFResult<()> {
         let mut locations = Vec::with_capacity(ids.len());
         for id in ids {
             if let Some(entry) = self.registry.get(id) {
@@ -261,32 +261,30 @@ impl EntityMap {
                 let inst1 = locations[i].1;
                 let inst2 = locations[j].1;
                 if inst1 != inst2 {
-                    log(
+                    return Err(FFError::build(
                         Severity::Warning,
-                        &format!(
+                        format!(
                             "Entity with ID {:?} is in a different instance than entity with ID {:?} ({} != {})",
                             ids[i], ids[j], inst1, inst2
                         ),
-                    );
-                    return Ok(false);
+                    ));
                 }
 
                 let pos1 = locations[i].0;
                 let pos2 = locations[j].0;
                 let distance = pos1.distance_to(&pos2);
                 if distance > range {
-                    log(
+                    return Err(FFError::build(
                         Severity::Warning,
-                        &format!(
+                        format!(
                             "Entity with ID {:?} is too far from entity with ID {:?} ({} > {})",
                             ids[i], ids[j], distance, range
                         ),
-                    );
-                    return Ok(false);
+                    ));
                 }
             }
         }
-        Ok(true)
+        Ok(())
     }
 
     pub fn gen_next_pc_id(&mut self) -> i32 {
