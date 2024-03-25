@@ -190,36 +190,35 @@ impl MissionJournal {
     }
 
     pub fn is_mission_completed(&self, mission_id: i32) -> FFResult<bool> {
-        const MAX_MISSION_ID: i32 = SIZEOF_QUESTFLAG_NUMBER as i32 * 64;
-        match mission_id {
-            1..=MAX_MISSION_ID => {
-                let offset = mission_id - 1;
-                let flags_idx = offset / 32;
-                let bit_idx = offset % 32;
-                Ok((self.completed_mission_flags[flags_idx as usize] & (1 << bit_idx)) != 0)
-            }
-            _ => Err(FFError::build(
+        const BITFIELD_CHUNK_SIZE: i32 = i64::BITS as i32;
+        const MAX_MISSION_ID: i32 = (SIZEOF_QUESTFLAG_NUMBER as i32) * BITFIELD_CHUNK_SIZE;
+        if mission_id >= MAX_MISSION_ID {
+            return Err(FFError::build(
                 Severity::Warning,
                 format!("Invalid mission ID {}", mission_id),
-            )),
+            ));
         }
+        let offset = mission_id - 1;
+        let chunk_idx = offset / BITFIELD_CHUNK_SIZE;
+        let bit_idx = offset % BITFIELD_CHUNK_SIZE;
+        let bitfield = self.completed_mission_flags[chunk_idx as usize];
+        Ok((bitfield & (1 << bit_idx)) != 0)
     }
 
     pub fn set_mission_completed(&mut self, mission_id: i32) -> FFResult<()> {
-        const MAX_MISSION_ID: i32 = SIZEOF_QUESTFLAG_NUMBER as i32 * 64;
-        match mission_id {
-            1..=MAX_MISSION_ID => {
-                let offset = mission_id - 1;
-                let flags_idx = offset / 32;
-                let bit_idx = offset % 32;
-                self.completed_mission_flags[flags_idx as usize] |= 1 << bit_idx;
-                Ok(())
-            }
-            _ => Err(FFError::build(
+        const BITFIELD_CHUNK_SIZE: i32 = i64::BITS as i32;
+        const MAX_MISSION_ID: i32 = (SIZEOF_QUESTFLAG_NUMBER as i32) * BITFIELD_CHUNK_SIZE;
+        if mission_id >= MAX_MISSION_ID {
+            return Err(FFError::build(
                 Severity::Warning,
                 format!("Invalid mission ID {}", mission_id),
-            )),
+            ));
         }
+        let offset = mission_id - 1;
+        let chunk_idx = offset / BITFIELD_CHUNK_SIZE;
+        let bit_idx = offset % BITFIELD_CHUNK_SIZE;
+        self.completed_mission_flags[chunk_idx as usize] |= 1 << bit_idx;
+        Ok(())
     }
 
     pub fn set_active_mission_id(&mut self, mission_id: i32) -> FFResult<usize> {
