@@ -17,7 +17,7 @@ use crate::{
     enums::*,
     error::{log, panic_log, FFError, FFResult, Severity},
     item::{CrocPotData, Item, ItemStats, VendorData, VendorItem},
-    mission::{MissionDefinition, TaskDefinition},
+    mission::{MissionDefinition, MissionReward, TaskDefinition},
     nano::{NanoStats, NanoTuning},
     path::{Path, PathPoint},
     util, Position,
@@ -127,6 +127,7 @@ struct NanoData {
 struct MissionData {
     mission_definitions: HashMap<i32, MissionDefinition>,
     task_definitions: HashMap<i32, TaskDefinition>,
+    rewards: HashMap<i32, MissionReward>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -503,6 +504,17 @@ impl TableData {
             .ok_or(FFError::build(
                 Severity::Warning,
                 format!("Mission with id {} doesn't exist", mission_id),
+            ))
+    }
+
+    pub fn get_mission_reward(&self, reward_id: i32) -> FFResult<&MissionReward> {
+        self.xdt_data
+            .mission_data
+            .rewards
+            .get(&reward_id)
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Reward with id {} doesn't exist", reward_id),
             ))
     }
 }
@@ -1081,6 +1093,7 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
     const MISSION_TABLE_KEY: &str = "m_pMissionTable";
     const MISSION_TABLE_MISSION_DATA_KEY: &str = "m_pMissionData";
     const MISSION_TABLE_MISSION_STRINGS_KEY: &str = "m_pMissionStringData";
+    const MISSION_TABLE_REWARD_DATA_KEY: &str = "m_pRewardData";
 
     #[derive(Debug, Deserialize)]
     struct MissionDataEntry {
@@ -1093,6 +1106,7 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
         m_iSUOutgoingTask: i32,
         m_iSUItem: [i16; MAX_NEED_SORT_OF_ITEM as usize],
         m_iSUInstancename: [isize; MAX_NEED_SORT_OF_ITEM as usize],
+        m_iSUReward: i32,
         m_iFOutgoingTask: i32,
         m_iFItemID: [i16; MAX_NEED_SORT_OF_ITEM as usize],
         m_iFItemNumNeeded: [isize; MAX_NEED_SORT_OF_ITEM as usize],
@@ -1116,9 +1130,19 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
         m_pstrNameString: String,
     }
 
+    #[derive(Debug, Deserialize)]
+    struct MissionRewardEntry {
+        m_iMissionRewardID: i32,
+        m_iCash: u32,
+        m_iFusionMatter: u32,
+        m_iMissionRewardItemID: Vec<i16>,
+        m_iMissionRewarItemType: Vec<i16>,
+    }
+
     let table = get_object(root, MISSION_TABLE_KEY)?;
     let mission_data = get_array(table, MISSION_TABLE_MISSION_DATA_KEY)?;
     let mission_strings = get_array(table, MISSION_TABLE_MISSION_STRINGS_KEY)?;
+    let reward_data = get_array(table, MISSION_TABLE_REWARD_DATA_KEY)?;
 
     let mut mission_defs = HashMap::new();
     let mut task_defs = HashMap::new();
@@ -1254,6 +1278,10 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
                     x => Some((*x, *num)),
                 })
                 .collect(),
+            succ_reward: match entry.m_iSUReward {
+                0 => None,
+                x => Some(x),
+            },
             del_qitems: entry
                 .m_iDelItemID
                 .iter()
@@ -1266,9 +1294,35 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
         task_defs.insert(task_id, task_def);
     }
 
+    let mut rewards = HashMap::new();
+    for v in reward_data {
+        let entry: MissionRewardEntry = serde_json::from_value(v.clone())
+            .map_err(|e| format!("Malformed reward data entry: {} {}", e, v))?;
+        let mut item_types = Vec::with_capacity(entry.m_iMissionRewarItemType.len());
+        for ty in entry.m_iMissionRewarItemType.iter() {
+            let item_type: ItemType = (*ty)
+                .try_into()
+                .map_err(|e: FFError| e.get_msg().to_string())?;
+            item_types.push(item_type);
+        }
+        let reward_id = entry.m_iMissionRewardID;
+        let reward = MissionReward {
+            taros: entry.m_iCash,
+            fusion_matter: entry.m_iFusionMatter,
+            items: entry
+                .m_iMissionRewardItemID
+                .iter()
+                .zip(item_types.iter())
+                .map(|(id, ty)| (*ty, *id))
+                .collect(),
+        };
+        rewards.insert(reward_id, reward);
+    }
+
     Ok(MissionData {
         mission_definitions: mission_defs,
         task_definitions: task_defs,
+        rewards,
     })
 }
 
