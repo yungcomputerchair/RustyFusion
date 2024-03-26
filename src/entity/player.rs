@@ -765,6 +765,35 @@ impl Player {
         panic_log("No free quest item slots");
     }
 
+    pub fn get_free_slots(&self, location: ItemLocation) -> usize {
+        match location {
+            ItemLocation::Equip => self
+                .inventory
+                .equipped
+                .iter()
+                .filter(|slot| slot.is_none())
+                .count(),
+            ItemLocation::Inven => self
+                .inventory
+                .main
+                .iter()
+                .filter(|slot| slot.is_none())
+                .count(),
+            ItemLocation::QInven => self
+                .inventory
+                .quest
+                .iter()
+                .filter(|slot| slot.is_none())
+                .count(),
+            ItemLocation::Bank => self
+                .inventory
+                .bank
+                .iter()
+                .filter(|slot| slot.is_none())
+                .count(),
+        }
+    }
+
     pub fn find_free_slot(&self, location: ItemLocation) -> FFResult<usize> {
         let inven = match location {
             ItemLocation::Equip => self.inventory.equipped.as_slice(),

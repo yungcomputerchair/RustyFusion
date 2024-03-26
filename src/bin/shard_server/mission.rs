@@ -3,6 +3,7 @@ use rusty_fusion::{
     entity::{Combatant, EntityID},
     enums::{ItemLocation, ItemType, TaskType},
     error::*,
+    item::Item,
     mission::Task,
     net::{
         packet::{PacketID::*, *},
@@ -197,7 +198,7 @@ pub fn task_stop(client: &mut FFClient, state: &mut ShardServerState) -> FFResul
 
 pub fn task_end(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
     let pkt: sP_CL2FE_REQ_PC_TASK_END = *client.get_packet(P_CL2FE_REQ_PC_TASK_END)?;
-    let error_code = 0; // true failures are handled in player tick
+    let mut error_code = 0; // true failures are handled in player tick
     catch_fail(
         (|| {
             let pc_id = client.get_player_id()?;
@@ -276,6 +277,24 @@ pub fn task_end(client: &mut FFClient, state: &mut ShardServerState) -> FFResult
                 }
             }
 
+            // check for inventory space for rewards
+            if let Some(reward_id) = task_def.succ_reward {
+                let reward = tdata_get().get_mission_reward(reward_id)?;
+                let inv_space = player.get_free_slots(ItemLocation::Inven);
+                if reward.items.len() as usize > inv_space {
+                    error_code = 13;
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!(
+                            "Tried to end task {} with {} items but only {} inventory space",
+                            pkt.iTaskNum,
+                            reward.items.len(),
+                            inv_space
+                        ),
+                    ));
+                }
+            }
+
             // all clear, mark the task completed. it'll be overwritten by the next task
             let player = state.get_player_mut(pc_id).unwrap();
             player.mission_journal.complete_task(pkt.iTaskNum)?;
@@ -311,6 +330,42 @@ pub fn task_end(client: &mut FFClient, state: &mut ShardServerState) -> FFResult
                     client.queue_struct(&qitem_reward);
                 }
                 log_if_failed(client.flush());
+            }
+
+            if let Some(reward_id) = task_def.succ_reward {
+                match tdata_get().get_mission_reward(reward_id) {
+                    Err(e) => log_error(&e),
+                    Ok(reward) => {
+                        let taros_new = player.get_taros() + reward.taros;
+                        let fm_new = player.get_fusion_matter() + reward.fusion_matter;
+                        let reward_pkt = sP_FE2CL_REP_REWARD_ITEM {
+                            m_iCandy: player.set_taros(taros_new) as i32,
+                            m_iFusionMatter: player.set_fusion_matter(fm_new) as i32,
+                            m_iBatteryN: player.get_nano_potions() as i32,
+                            m_iBatteryW: player.get_weapon_boosts() as i32,
+                            iItemCnt: reward.items.len() as i8,
+                            iFatigue: 100,
+                            iFatigue_Level: 1,
+                            iNPC_TypeID: 0,
+                            iTaskID: task_def.task_id,
+                        };
+                        client.queue_packet(P_FE2CL_REP_REWARD_ITEM, &reward_pkt);
+                        for item in &reward.items {
+                            let slot_num = player.find_free_slot(ItemLocation::Inven).unwrap();
+                            let item_reward = Item::new(item.0, item.1);
+                            player
+                                .set_item(ItemLocation::Inven, slot_num, Some(item_reward))
+                                .unwrap();
+                            let item_reward = sItemReward {
+                                sItem: Some(item_reward).into(),
+                                eIL: ItemLocation::Inven as i32,
+                                iSlotNum: slot_num as i32,
+                            };
+                            client.queue_struct(&item_reward);
+                        }
+                        log_if_failed(client.flush());
+                    }
+                }
             }
 
             if task_def.succ_task_id.is_none() {

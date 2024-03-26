@@ -48,6 +48,7 @@ pub struct TaskDefinition {
     // success
     pub succ_task_id: Option<i32>,        // m_iSUOutgoingTask
     pub succ_qitems: HashMap<i16, isize>, // m_iSUItem -> m_iSUInstancename
+    pub succ_reward: Option<i32>,         // m_iSUReward
 
     // delete
     pub del_qitems: HashSet<i16>, // m_iDelItemID
@@ -369,6 +370,25 @@ impl MissionJournal {
             format!("Tried to remove task {} that is not in progress", task_id),
         ))
     }
+
+    pub fn mark_enemy_defeated(&mut self, enemy_type: i32, count: usize) -> bool {
+        let mut updated = false;
+        for task in self.get_task_iter_mut() {
+            let remaining_count = task.remaining_enemy_defeats.get_mut(&enemy_type);
+            if let Some(remaining_count) = remaining_count {
+                *remaining_count = remaining_count.saturating_sub(count);
+                updated = true;
+            }
+        }
+        updated
+    }
+}
+
+#[derive(Debug)]
+pub struct MissionReward {
+    pub taros: u32,
+    pub fusion_matter: u32,
+    pub items: Vec<(ItemType, i16)>,
 }
 
 impl Default for sRunningQuest {
