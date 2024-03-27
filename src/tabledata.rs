@@ -4,7 +4,7 @@
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::{Map, Value};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::OnceLock,
     time::{Duration, SystemTime},
 };
@@ -1167,14 +1167,26 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
         };
 
         // create mission entry if this is the first time we've seen it
-        mission_defs
+        let mission_def = mission_defs
             .entry(mission_id)
             .or_insert_with(|| MissionDefinition {
                 mission_id,
                 mission_name,
                 first_task_id: task_id,
                 mission_type,
+                del_qitems: HashSet::new(),
             });
+
+        // WORKAROUND: for whatever reason, some tasks are missing the deletion qitem ids
+        // that the rest of the tasks in the mission have. This happens most often in "Enter the lair" tasks.
+        // Since quest items are isolated between missions, we can store the deletion qitems from all child
+        // tasks in the mission definition to avoid desync if the player happens to delete one of these tasks.
+        mission_def
+            .del_qitems
+            .extend(entry.m_iDelItemID.iter().flat_map(|id| match id {
+                0 => None,
+                x => Some(*x),
+            }));
 
         // create task definition
         let task_def = TaskDefinition {
@@ -1288,14 +1300,6 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
                 0 => None,
                 x => Some((x, entry.m_iSTItemDropRate[0] as f32 / 100.0)),
             },
-            del_qitems: entry
-                .m_iDelItemID
-                .iter()
-                .flat_map(|id| match id {
-                    0 => None,
-                    x => Some(*x),
-                })
-                .collect(),
         };
         task_defs.insert(task_id, task_def);
     }

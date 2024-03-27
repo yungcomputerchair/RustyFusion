@@ -17,6 +17,7 @@ pub struct MissionDefinition {
     pub mission_name: String,
     pub first_task_id: i32,
     pub mission_type: MissionType,
+    pub del_qitems: HashSet<i16>, // m_iDelItemID from child tasks
 }
 
 #[derive(Debug)]
@@ -52,7 +53,6 @@ pub struct TaskDefinition {
 
     // misc
     pub drop_qitem: Option<(i16, f32)>, // m_iSTItemID[0], m_iSTItemDropRate[0] / 100
-    pub del_qitems: HashSet<i16>,       // m_iDelItemID
 }
 
 #[derive(Debug, Clone)]

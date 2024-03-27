@@ -186,7 +186,7 @@ pub fn task_stop(client: &mut FFClient, state: &mut ShardServerState) -> FFResul
     let player = state.get_player_mut(pc_id)?;
     let task = player.mission_journal.remove_task(pkt.iTaskNum)?;
 
-    for item_id in &task.get_task_def().del_qitems {
+    for item_id in &task.get_mission_def().del_qitems {
         let qitem_slot = player.set_quest_item_count(*item_id, 0);
         // client doesn't automatically delete qitems clientside
         let pkt = sP_FE2CL_REP_PC_ITEM_DELETE_SUCC {
@@ -287,7 +287,7 @@ pub fn task_end(client: &mut FFClient, state: &mut ShardServerState) -> FFResult
             if let Some(reward_id) = task_def.succ_reward {
                 let reward = tdata_get().get_mission_reward(reward_id)?;
                 let inv_space = player.get_free_slots(ItemLocation::Inven);
-                if reward.items.len() as usize > inv_space {
+                if reward.items.len() > inv_space {
                     error_code = 13;
                     return Err(FFError::build(
                         Severity::Warning,
