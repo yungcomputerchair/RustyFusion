@@ -502,18 +502,45 @@ pub fn pc_special_state_switch(
     let special_state_flags = player.get_special_state_bit_flag();
 
     let resp = sP_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC {
-        iPC_ID: pkt.iPC_ID,
+        iPC_ID: pc_id,
         iReqSpecialStateFlag: pkt.iSpecialStateFlag,
         iSpecialState: special_state_flags,
     };
     state
         .entity_map
-        .for_each_around(EntityID::Player(pkt.iPC_ID), clients, |c| {
+        .for_each_around(EntityID::Player(pc_id), clients, |c| {
             c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp)
         });
     clients
         .get_self()
         .send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp)
+}
+
+pub fn pc_combat_begin_end(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+    in_combat: bool,
+) -> FFResult<()> {
+    let client = clients.get_self();
+    let pc_id = client.get_player_id()?;
+    let _pkt: &sP_CL2FE_REQ_PC_COMBAT_BEGIN = client.get_packet(P_CL2FE_REQ_PC_COMBAT_BEGIN)?;
+
+    let player = state.get_player_mut(pc_id)?;
+    player.in_combat = in_combat;
+
+    let special_state_flags = player.get_special_state_bit_flag();
+
+    let resp = sP_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC {
+        iPC_ID: pc_id,
+        iReqSpecialStateFlag: CN_SPECIAL_STATE_FLAG__COMBAT as i8,
+        iSpecialState: special_state_flags,
+    };
+    state
+        .entity_map
+        .for_each_around(EntityID::Player(pc_id), clients, |c| {
+            c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp)
+        });
+    Ok(())
 }
 
 pub fn pc_first_use_flag_set(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {

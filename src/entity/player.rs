@@ -344,6 +344,7 @@ pub struct Player {
     pub invisible: bool,
     pub invulnerable: bool,
     pub in_menu: bool,
+    pub in_combat: bool,
     pub freechat_muted: bool,
     pub reward_data: RewardData,
     position: Position,
@@ -617,7 +618,9 @@ impl Player {
         if self.in_menu {
             flags |= CN_SPECIAL_STATE_FLAG__FULL_UI;
         }
-        // TODO combat flag
+        if self.in_combat {
+            flags |= CN_SPECIAL_STATE_FLAG__COMBAT;
+        }
         if self.freechat_muted {
             flags |= CN_SPECIAL_STATE_FLAG__MUTE_FREECHAT;
         }
