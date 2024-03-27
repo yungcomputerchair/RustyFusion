@@ -226,11 +226,16 @@ impl PostgresDatabase {
         }
 
         Self::exec(client, "clear_quest_items", &[&pc_uid])?;
-        for (item_id, count) in player.get_quest_item_iter() {
+        for (virtual_slot, (item_id, count)) in player.get_quest_item_iter().enumerate() {
             client
                 .execute(
                     &save_quest_item,
-                    &[&pc_uid, &(item_id as Int), &(count as Int)],
+                    &[
+                        &pc_uid,
+                        &(item_id as Int),
+                        &(count as Int),
+                        &(virtual_slot as Int),
+                    ],
                 )
                 .map_err(FFError::from_db_err)?;
         }
