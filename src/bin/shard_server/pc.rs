@@ -523,7 +523,6 @@ pub fn pc_combat_begin_end(
 ) -> FFResult<()> {
     let client = clients.get_self();
     let pc_id = client.get_player_id()?;
-    let _pkt: &sP_CL2FE_REQ_PC_COMBAT_BEGIN = client.get_packet(P_CL2FE_REQ_PC_COMBAT_BEGIN)?;
 
     let player = state.get_player_mut(pc_id)?;
     player.in_combat = in_combat;

@@ -276,8 +276,8 @@ pub fn item_chest_open(client: &mut FFClient, state: &mut ShardServerState) -> F
                 m_iBatteryN: player.get_nano_potions() as i32,
                 m_iBatteryW: player.get_weapon_boosts() as i32,
                 iItemCnt: 1,
-                iFatigue: unused!(),
-                iFatigue_Level: unused!(),
+                iFatigue: 100,
+                iFatigue_Level: 1,
                 iNPC_TypeID: unused!(),
                 iTaskID: unused!(),
             };

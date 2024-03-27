@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
+use rand::{thread_rng, Rng};
 use rusty_fusion::{
     entity::{Combatant, EntityID},
+    enums::{ItemLocation, ItemType},
     error::{log, log_if_failed, FFResult, Severity},
     net::{
         packet::{PacketID::*, *},
@@ -9,6 +11,8 @@ use rusty_fusion::{
     },
     placeholder,
     state::ShardServerState,
+    tabledata::tdata_get,
+    unused,
 };
 
 #[allow(non_camel_case_types)]
@@ -22,6 +26,8 @@ struct sTargetNpcId {
 impl FFPacket for sTargetNpcId {}
 
 pub fn pc_attack_npcs(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let mut rng = thread_rng();
+
     let client = clients.get_self();
     let pc_id = client.get_player_id()?;
     let pkt: sP_CL2FE_REQ_PC_ATTACK_NPCs = *client.get_packet(P_CL2FE_REQ_PC_ATTACK_NPCs)?;
@@ -77,10 +83,80 @@ pub fn pc_attack_npcs(clients: &mut ClientMap, state: &mut ShardServerState) -> 
     log_if_failed(client.flush());
 
     // kills
+    let active_task_id = player.mission_journal.get_active_task_id().unwrap_or(0);
     for (ty, count) in defeated_types {
-        if player.mission_journal.mark_enemy_defeated(ty, count) {
-            let kill_pkt = sP_FE2CL_REP_PC_KILL_QUEST_NPCs_SUCC { iNPCID: ty };
-            log_if_failed(client.send_packet(P_FE2CL_REP_PC_KILL_QUEST_NPCs_SUCC, &kill_pkt));
+        for _ in 0..count {
+            let mut item_rewards = Vec::new();
+            let (enemy_in_tasks, count_updated) = player.mission_journal.mark_enemy_defeated(ty);
+
+            // if this kill reduced the remaining enemy count in any tasks, notify the client
+            if count_updated {
+                let kill_pkt = sP_FE2CL_REP_PC_KILL_QUEST_NPCs_SUCC { iNPCID: ty };
+                log_if_failed(client.send_packet(P_FE2CL_REP_PC_KILL_QUEST_NPCs_SUCC, &kill_pkt));
+            }
+
+            // go through each task that has this enemy as a target and drop quest items
+            for task_id in &enemy_in_tasks {
+                let task_def = tdata_get().get_task_definition(*task_id).unwrap();
+                if let Some((qitem_id, drop_chance)) = task_def.drop_qitem {
+                    let roll: f32 = rng.gen();
+                    log(
+                        Severity::Debug,
+                        &format!(
+                            "Rolled {} against {} ({:?}) for qitem {}",
+                            roll,
+                            drop_chance,
+                            roll < drop_chance,
+                            qitem_id
+                        ),
+                    );
+                    if roll < drop_chance {
+                        let new_qitem_count = player.get_quest_item_count(qitem_id) + 1;
+                        let qitem_slot = player.set_quest_item_count(qitem_id, new_qitem_count);
+                        let qitem_drop = sItemReward {
+                            sItem: sItemBase {
+                                iType: ItemType::Quest as i16,
+                                iID: qitem_id,
+                                iOpt: new_qitem_count as i32,
+                                iTimeLimit: unused!(),
+                            },
+                            eIL: ItemLocation::QInven as i32,
+                            iSlotNum: qitem_slot as i32,
+                        };
+                        if active_task_id == *task_id {
+                            // active task rewards should show up first
+                            item_rewards.insert(0, qitem_drop);
+                        } else {
+                            item_rewards.push(qitem_drop);
+                        }
+                    }
+                }
+            }
+
+            // TODO get mob drops from tdata
+            let gained_taros = placeholder!(0);
+            let gained_fm = placeholder!(0);
+            let gained_potions = placeholder!(0);
+            let gained_boosts = placeholder!(0);
+            let reward_pkt = sP_FE2CL_REP_REWARD_ITEM {
+                m_iCandy: player.set_taros(player.get_taros() + gained_taros) as i32,
+                m_iFusionMatter: player.set_fusion_matter(player.get_fusion_matter() + gained_fm)
+                    as i32,
+                m_iBatteryN: player.set_nano_potions(player.get_nano_potions() + gained_potions)
+                    as i32,
+                m_iBatteryW: player.set_weapon_boosts(player.get_weapon_boosts() + gained_boosts)
+                    as i32,
+                iItemCnt: item_rewards.len() as i8,
+                iFatigue: 100,
+                iFatigue_Level: 1,
+                iNPC_TypeID: ty,
+                iTaskID: active_task_id,
+            };
+            client.queue_packet(P_FE2CL_REP_REWARD_ITEM, &reward_pkt);
+            for item in &item_rewards {
+                client.queue_struct(item);
+            }
+            log_if_failed(client.flush());
         }
     }
 

@@ -352,7 +352,7 @@ pub fn task_end(client: &mut FFClient, state: &mut ShardServerState) -> FFResult
                             iItemCnt: reward.items.len() as i8,
                             iFatigue: 100,
                             iFatigue_Level: 1,
-                            iNPC_TypeID: 0,
+                            iNPC_TypeID: unused!(),
                             iTaskID: task_def.task_id,
                         };
                         client.queue_packet(P_FE2CL_REP_REWARD_ITEM, &reward_pkt);

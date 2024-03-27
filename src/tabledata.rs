@@ -1122,6 +1122,8 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
         m_iCSUItemNumNeeded: [usize; MAX_NEED_SORT_OF_ITEM as usize],
         m_iCSUEnemyID: [i32; MAX_NEED_SORT_OF_ENEMY as usize],
         m_iCSUNumToKill: [usize; MAX_NEED_SORT_OF_ENEMY as usize],
+        m_iSTItemID: [i16; 3],
+        m_iSTItemDropRate: [i16; 3],
         m_iDelItemID: [i16; 4],
     }
 
@@ -1281,6 +1283,10 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
             succ_reward: match entry.m_iSUReward {
                 0 => None,
                 x => Some(x),
+            },
+            drop_qitem: match entry.m_iSTItemID[0] {
+                0 => None,
+                x => Some((x, entry.m_iSTItemDropRate[0] as f32 / 100.0)),
             },
             del_qitems: entry
                 .m_iDelItemID

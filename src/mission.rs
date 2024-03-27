@@ -50,8 +50,9 @@ pub struct TaskDefinition {
     pub succ_qitems: HashMap<i16, isize>, // m_iSUItem -> m_iSUInstancename
     pub succ_reward: Option<i32>,         // m_iSUReward
 
-    // delete
-    pub del_qitems: HashSet<i16>, // m_iDelItemID
+    // misc
+    pub drop_qitem: Option<(i16, f32)>, // m_iSTItemID[0], m_iSTItemDropRate[0] / 100
+    pub del_qitems: HashSet<i16>,       // m_iDelItemID
 }
 
 #[derive(Debug, Clone)]
@@ -172,6 +173,12 @@ impl MissionJournal {
             }
         }
         running_quests
+    }
+
+    pub fn get_active_task_id(&self) -> Option<i32> {
+        let idx = self.active_mission_slot?;
+        let active_task = self.get_current_task_by_idx(idx)?;
+        Some(active_task.get_task_id())
     }
 
     pub fn get_active_mission_id(&self) -> Option<i32> {
@@ -371,16 +378,21 @@ impl MissionJournal {
         ))
     }
 
-    pub fn mark_enemy_defeated(&mut self, enemy_type: i32, count: usize) -> bool {
-        let mut updated = false;
+    pub fn mark_enemy_defeated(&mut self, enemy_type: i32) -> (HashSet<i32>, bool) {
+        let mut enemy_in_tasks = HashSet::with_capacity(3);
+        let mut count_updated = false;
         for task in self.get_task_iter_mut() {
+            let task_id = task.get_task_id();
             let remaining_count = task.remaining_enemy_defeats.get_mut(&enemy_type);
             if let Some(remaining_count) = remaining_count {
-                *remaining_count = remaining_count.saturating_sub(count);
-                updated = true;
+                enemy_in_tasks.insert(task_id);
+                if *remaining_count > 0 {
+                    *remaining_count -= 1;
+                    count_updated = true;
+                }
             }
         }
-        updated
+        (enemy_in_tasks, count_updated)
     }
 }
 
