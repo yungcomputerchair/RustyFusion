@@ -61,13 +61,14 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
     - [ ] Passive skills (including nano)
     - [ ] Active skills (including nano)
     - [ ] Gumballs & other usables
-  - [ ] Mob drops
+  - [ ] ***Mob drops***
 - [ ] E.G.G.s (the ones on the ground that buff you)
 - [ ] Missions
-  - [x] Starting tasks +
+  - [ ] ***Starting tasks +***
   - [x] Switching active mission
+  - [x] Quest items
   - [ ] ***Completing tasks +***
-  - [ ] Mission rewards
+  - [ ] ***Mission rewards***
 - [x] Entity pathing
 - [ ] Infected Zone races
 - [x] Guide changing
@@ -91,7 +92,7 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
 ### Known Issues
 None currently
 
-Items that are ***highlighted*** are in planning or WIP. Items marked with `+` are either new and not present in OpenFusion or enhanced from OpenFusion. Some items have dependencies in other categories, so the list won't get completed in order.
+Items that are ***highlighted*** are in planning or WIP. Items marked with `+` are either new and not present in OpenFusion or enhanced from OpenFusion (bug fixes not included). Some items have dependencies in other categories, so the list won't get completed in order.
 
 ## Developing
 **RustyFusion requires an instance of a supported database backend to connect to for database operations.** You can manually configure an instance and set the connection parameters in `config.toml` or, for PostgreSQL specifically, use `docker compose` to spawn a container with the default parameters.
