@@ -187,7 +187,13 @@ pub fn task_stop(client: &mut FFClient, state: &mut ShardServerState) -> FFResul
     let task = player.mission_journal.remove_task(pkt.iTaskNum)?;
 
     for item_id in &task.get_task_def().del_qitems {
-        player.set_quest_item_count(*item_id, 0);
+        let qitem_slot = player.set_quest_item_count(*item_id, 0);
+        // client doesn't automatically delete qitems clientside
+        let pkt = sP_FE2CL_REP_PC_ITEM_DELETE_SUCC {
+            eIL: ItemLocation::QInven as i32,
+            iSlotNum: qitem_slot as i32,
+        };
+        log_if_failed(client.send_packet(P_FE2CL_REP_PC_ITEM_DELETE_SUCC, &pkt));
     }
 
     let resp = sP_FE2CL_REP_PC_TASK_STOP_SUCC {
