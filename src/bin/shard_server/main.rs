@@ -154,6 +154,7 @@ fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>, state: 
 }
 
 mod chat;
+mod combat;
 mod gm;
 mod item;
 mod login;
@@ -224,6 +225,8 @@ fn handle_packet(
         P_CL2FE_REQ_SEND_FREECHAT_MESSAGE => chat::send_freechat_message(&mut clients, state),
         P_CL2FE_REQ_SEND_MENUCHAT_MESSAGE => chat::send_menuchat_message(&mut clients, state),
         P_CL2FE_REQ_PC_AVATAR_EMOTES_CHAT => chat::pc_avatar_emotes_chat(&mut clients, state),
+        //
+        P_CL2FE_REQ_PC_ATTACK_NPCs => combat::pc_attack_npcs(&mut clients, state),
         //
         P_CL2FE_REQ_ITEM_MOVE => item::item_move(&mut clients, state),
         P_CL2FE_REQ_PC_ITEM_DELETE => item::item_delete(clients.get_self(), state),
