@@ -7,6 +7,7 @@ use crate::{
     database::*,
     defines::*,
     entity::{Combatant, Entity, PlayerFlags, PlayerStyle},
+    enums::PlayerGuide,
     item::Item,
     mission::Task,
     nano::Nano,
@@ -327,6 +328,12 @@ impl PostgresDatabase {
         player_flags.tutorial_flag = row.get::<_, Int>("TutorialFlag") != 0;
         player_flags.name_check_flag = row.get::<_, Int>("NameCheck") != 0;
         player.flags = player_flags;
+
+        let guide: PlayerGuide = (row.get::<_, Int>("Mentor") as i16).try_into()?;
+        // TODO get total number of guides from DB (currently not stored)
+        if guide != PlayerGuide::Computress {
+            player.update_guide(guide);
+        }
 
         let skyway_bytes: &[u8] = row.get("SkywayLocationFlag");
         player.set_skyway_flags([

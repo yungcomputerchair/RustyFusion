@@ -10,6 +10,7 @@ use crate::{
     database::*,
     defines::*,
     entity::{Combatant, Entity, PlayerFlags, PlayerStyle},
+    enums::PlayerGuide,
     item::Item,
     mission::Task,
     nano::Nano,
@@ -352,6 +353,12 @@ impl TryFrom<DbPlayer> for Player {
             payzone_flag: db_player.payzone_flag != 0,
             tip_flags: i128::from_le_bytes(first_use_bytes[..16].try_into().unwrap()),
         };
+
+        // TODO get total number of guides from DB (currently not stored)
+        let guide: PlayerGuide = (db_player.guide as i16).try_into()?;
+        if guide != PlayerGuide::Computress {
+            player.update_guide(guide);
+        }
 
         let skyway_bytes: &[u8] = &db_player.skyway_bytes;
         player.set_skyway_flags([

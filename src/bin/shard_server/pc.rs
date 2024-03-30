@@ -5,7 +5,7 @@ use rusty_fusion::{
     config::config_get,
     database::db_get,
     defines::*,
-    entity::{Entity, EntityID, Player},
+    entity::{Combatant, Entity, EntityID, Player},
     enums::*,
     error::*,
     net::{
@@ -557,6 +557,13 @@ pub fn pc_change_mentor(client: &mut FFClient, state: &mut ShardServerState) -> 
     catch_fail(
         (|| {
             let player = state.get_player_mut(client.get_player_id()?)?;
+            if player.get_level() < 4 {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    "Player tried to change mentor before level 4".to_string(),
+                ));
+            }
+
             let guide_count = player.update_guide(pkt.iMentor.try_into()?);
 
             let resp = sP_FE2CL_REP_PC_CHANGE_MENTOR_SUCC {

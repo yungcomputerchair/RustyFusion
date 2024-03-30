@@ -1,7 +1,7 @@
 SELECT
     p.PlayerID, p.Slot, p.FirstName, p.LastName, p.NameCheck,
     p.Level, p.HP, p.FusionMatter, p.Taros, p.BatteryW, p.BatteryN,
-    p.AppearanceFlag, p.TutorialFlag, p.PayZoneFlag, p.FirstUseFlag,
+    p.AppearanceFlag, p.TutorialFlag, p.PayZoneFlag, p.FirstUseFlag, p.Mentor,
     p.WarpLocationFlag, p.SkywayLocationFlag,
     p.CurrentMissionID, p.Quests,
     p.XCoordinate, p.YCoordinate, p.ZCoordinate, p.Angle,
