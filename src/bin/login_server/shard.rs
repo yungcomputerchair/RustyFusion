@@ -121,7 +121,7 @@ pub fn update_pc_shard(client: &mut FFClient, state: &mut LoginServerState) -> F
         let pc_uid = pkt.iPC_UID;
         let status: PlayerShardStatus = pkt.ePSS.try_into()?;
         log(
-            Severity::Debug,
+            Severity::Info,
             &format!("Player {} moved (shard {}, {:?})", pc_uid, shard_id, status),
         );
 
