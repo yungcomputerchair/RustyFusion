@@ -229,7 +229,7 @@ pub fn pc_exit_duplicate(
     } else {
         // kick login server session
         for client in clients.values_mut() {
-            if matches!(client.client_type, ClientType::GameClient { account_id, .. } if state.get_username(account_id) == username)
+            if matches!(client.client_type, ClientType::GameClient { account_id, .. } if state.get_username(account_id)? == username)
             {
                 let pkt = sP_LS2CL_REP_PC_EXIT_DUPLICATE {
                     iErrorCode: unused!(),
@@ -293,7 +293,7 @@ pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> FF
         szLastName: style.szLastName,
     };
     client.send_packet(P_LS2CL_REP_SAVE_CHAR_NAME_SUCC, &resp)?;
-    state.get_players_mut(acc_id).insert(pc_uid, player);
+    state.get_players_mut(acc_id)?.insert(pc_uid, player);
 
     Ok(())
 }
@@ -303,7 +303,7 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
     let pkt: &sP_CL2LS_REQ_CHAR_CREATE = client.get_packet(P_CL2LS_REQ_CHAR_CREATE)?;
 
     let pc_uid = pkt.PCStyle.iPC_UID;
-    if let Some(player) = state.get_players_mut(acc_id).get_mut(&pc_uid) {
+    if let Some(player) = state.get_players_mut(acc_id)?.get_mut(&pc_uid) {
         player.style = Some(pkt.PCStyle.try_into()?);
         let mut db = db_get();
         db.update_player_appearance(player)?;
@@ -346,7 +346,7 @@ pub fn char_delete(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
     let pkt: &sP_CL2LS_REQ_CHAR_DELETE = client.get_packet(P_CL2LS_REQ_CHAR_DELETE)?;
     let pc_uid = pkt.iPC_UID;
     let player = state
-        .get_players_mut(acc_id)
+        .get_players_mut(acc_id)?
         .remove(&pc_uid)
         .ok_or(FFError::build(
             Severity::Warning,
@@ -365,7 +365,7 @@ pub fn save_char_tutor(client: &mut FFClient, state: &mut LoginServerState) -> F
     let pkt: &sP_CL2LS_REQ_SAVE_CHAR_TUTOR = client.get_packet(P_CL2LS_REQ_SAVE_CHAR_TUTOR)?;
     let pc_uid = pkt.iPC_UID;
     let player = state
-        .get_players_mut(acc_id)
+        .get_players_mut(acc_id)?
         .get_mut(&pc_uid)
         .ok_or(FFError::build(
             Severity::Warning,
@@ -392,7 +392,7 @@ pub fn char_select(
     if let ClientType::GameClient { account_id, .. } = client.client_type {
         let pkt: &sP_CL2LS_REQ_CHAR_SELECT = client.get_packet(P_CL2LS_REQ_CHAR_SELECT)?;
         let pc_uid = pkt.iPC_UID;
-        let players = state.get_players_mut(account_id);
+        let players = state.get_players_mut(account_id)?;
         let player = players.get(&pc_uid).ok_or(FFError::build(
             Severity::Warning,
             format!("Couldn't get player {}", pc_uid),
@@ -406,7 +406,7 @@ pub fn char_select(
             ));
         }
 
-        state.set_selected_player_id(account_id, pc_uid);
+        log_if_failed(state.set_selected_player_id(account_id, pc_uid));
 
         let mut db = db_get();
         db.update_selected_player(account_id, slot_num as i32)?;
@@ -453,7 +453,7 @@ pub fn shard_select(
             (|| {
                 let client = clients.get_mut(&client_key).unwrap();
                 let fe_key = client.get_fe_key_uint();
-                let pc_uid = match state.get_selected_player_id(account_id) {
+                let pc_uid = match state.get_selected_player_id(account_id)? {
                     Some(pc_uid) => pc_uid,
                     None => {
                         error_code = 2; // "Selected character error"

@@ -12,8 +12,8 @@ use rusty_fusion::{
     config::config_init,
     database::db_init,
     error::{
-        log, log_error, logger_flush, logger_flush_scheduled, logger_init, panic_log, FFError,
-        FFResult, Severity,
+        log, log_error, log_if_failed, logger_flush, logger_flush_scheduled, logger_init,
+        panic_log, FFError, FFResult, Severity,
     },
     net::{
         packet::{
@@ -113,7 +113,7 @@ fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>, state: 
             );
         }
         ClientType::GameClient { account_id, .. } => {
-            state.end_session(account_id);
+            log_if_failed(state.end_session(account_id));
             log(
                 Severity::Debug,
                 &format!("Login session ended for account #{}", account_id),

@@ -98,28 +98,35 @@ impl LoginServerState {
         );
     }
 
-    pub fn end_session(&mut self, acc_id: i64) {
-        self.sessions.remove(&acc_id);
+    pub fn end_session(&mut self, acc_id: i64) -> FFResult<()> {
+        if self.sessions.remove(&acc_id).is_none() {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Account {} not logged in", acc_id),
+            ));
+        }
+        Ok(())
     }
 
-    pub fn set_selected_player_id(&mut self, acc_id: i64, player_uid: i64) {
-        let session = self.sessions.get_mut(&acc_id).unwrap();
+    pub fn set_selected_player_id(&mut self, acc_id: i64, player_uid: i64) -> FFResult<()> {
+        let session = self.get_session_mut(acc_id)?;
         session.selected_player_uid = Some(player_uid);
+        Ok(())
     }
 
-    pub fn get_selected_player_id(&self, acc_id: i64) -> Option<i64> {
-        let session = self.get_session(acc_id).unwrap();
-        session.selected_player_uid
+    pub fn get_selected_player_id(&self, acc_id: i64) -> FFResult<Option<i64>> {
+        let session = self.get_session(acc_id)?;
+        Ok(session.selected_player_uid)
     }
 
-    pub fn get_username(&self, acc_id: i64) -> String {
-        let session = self.get_session(acc_id).unwrap();
-        session.account.username.clone()
+    pub fn get_username(&self, acc_id: i64) -> FFResult<String> {
+        let session = self.get_session(acc_id)?;
+        Ok(session.account.username.clone())
     }
 
-    pub fn get_players_mut(&mut self, acc_id: i64) -> &mut HashMap<i64, Player> {
-        let acc = self.get_session_mut(acc_id).unwrap();
-        &mut acc.players
+    pub fn get_players_mut(&mut self, acc_id: i64) -> FFResult<&mut HashMap<i64, Player>> {
+        let acc = self.get_session_mut(acc_id)?;
+        Ok(&mut acc.players)
     }
 
     pub fn get_lowest_pop_shard_id(&mut self) -> Option<i32> {
