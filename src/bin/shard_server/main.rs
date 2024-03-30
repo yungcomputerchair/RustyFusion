@@ -206,7 +206,7 @@ fn handle_packet(
         P_CL2FE_REQ_PC_EXIT => pc::pc_exit(&mut clients, state),
         //
         P_CL2FE_REQ_PC_GIVE_ITEM => gm::gm_pc_give_item(clients.get_self(), state),
-        P_CL2FE_GM_REQ_PC_SET_VALUE => gm::gm_pc_set_value(clients.get_self(), state),
+        P_CL2FE_GM_REQ_PC_SET_VALUE => gm::gm_pc_set_value(&mut clients, state),
         P_CL2FE_REQ_PC_GIVE_NANO => gm::gm_pc_give_nano(&mut clients, state),
         P_CL2FE_REQ_PC_GOTO => gm::gm_pc_goto(&mut clients, state),
         P_CL2FE_GM_REQ_PC_SPECIAL_STATE_SWITCH => {
@@ -270,7 +270,7 @@ fn handle_packet(
         //
         P_CL2FE_REQ_PC_TASK_START => mission::task_start(clients.get_self(), state),
         P_CL2FE_REQ_PC_TASK_STOP => mission::task_stop(clients.get_self(), state),
-        P_CL2FE_REQ_PC_TASK_END => mission::task_end(clients.get_self(), state),
+        P_CL2FE_REQ_PC_TASK_END => mission::task_end(&mut clients, state),
         P_CL2FE_REQ_PC_SET_CURRENT_MISSION_ID => {
             mission::set_current_mission_id(clients.get_self(), state)
         }

@@ -234,6 +234,7 @@ pub fn nano_tune(client: &mut FFClient, state: &mut ShardServerState) -> FFResul
                 }
                 player_working.set_fusion_matter(
                     player_working.get_fusion_matter() - tuning.fusion_matter_cost,
+                    None, // no broadcast since there's no chance of leveling up
                 );
             }
 

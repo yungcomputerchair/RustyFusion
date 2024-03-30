@@ -92,7 +92,11 @@ pub fn pc_attack_npcs(clients: &mut ClientMap, state: &mut ShardServerState) -> 
             // if this kill reduced the remaining enemy count in any tasks, notify the client
             if count_updated {
                 let kill_pkt = sP_FE2CL_REP_PC_KILL_QUEST_NPCs_SUCC { iNPCID: ty };
-                log_if_failed(client.send_packet(P_FE2CL_REP_PC_KILL_QUEST_NPCs_SUCC, &kill_pkt));
+                log_if_failed(
+                    clients
+                        .get_self()
+                        .send_packet(P_FE2CL_REP_PC_KILL_QUEST_NPCs_SUCC, &kill_pkt),
+                );
             }
 
             // go through each task that has this enemy as a target and drop quest items
@@ -162,7 +166,8 @@ pub fn pc_attack_npcs(clients: &mut ClientMap, state: &mut ShardServerState) -> 
 
             let reward_pkt = sP_FE2CL_REP_REWARD_ITEM {
                 m_iCandy: player.set_taros(player.get_taros() + gained_taros) as i32,
-                m_iFusionMatter: player.set_fusion_matter(player.get_fusion_matter() + gained_fm)
+                m_iFusionMatter: player
+                    .set_fusion_matter(player.get_fusion_matter() + gained_fm, Some(clients))
                     as i32,
                 m_iBatteryN: player.set_nano_potions(player.get_nano_potions() + gained_potions)
                     as i32,
@@ -174,6 +179,7 @@ pub fn pc_attack_npcs(clients: &mut ClientMap, state: &mut ShardServerState) -> 
                 iNPC_TypeID: ty,
                 iTaskID: active_task_id,
             };
+            let client = clients.get_self();
             client.queue_packet(P_FE2CL_REP_REWARD_ITEM, &reward_pkt);
             for item in &item_rewards {
                 client.queue_struct(item);

@@ -298,7 +298,7 @@ impl PostgresDatabase {
         player.set_rotation(row.get("Angle"));
 
         player.set_taros(row.get::<_, Int>("Taros") as u32);
-        player.set_fusion_matter(row.get::<_, Int>("FusionMatter") as u32);
+        player.set_fusion_matter(row.get::<_, Int>("FusionMatter") as u32, None);
         player.set_level(row.get::<_, Int>("Level") as i16);
         player.set_hp(row.get("HP"));
         player.set_weapon_boosts(row.get::<_, Int>("BatteryW") as u32);

@@ -16,7 +16,8 @@ use rusty_fusion::{
     unused, util, Position,
 };
 
-pub fn gm_pc_set_value(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+pub fn gm_pc_set_value(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let client = clients.get_self();
     helpers::validate_gm(client, state)?;
 
     let pkt: sP_CL2FE_GM_REQ_PC_SET_VALUE = *client.get_packet(P_CL2FE_GM_REQ_PC_SET_VALUE)?;
@@ -29,7 +30,9 @@ pub fn gm_pc_set_value(client: &mut FFClient, state: &mut ShardServerState) -> F
         CN_GM_SET_VALUE_TYPE__HP => player.set_hp(value),
         CN_GM_SET_VALUE_TYPE__WEAPON_BATTERY => player.set_weapon_boosts(value as u32) as i32,
         CN_GM_SET_VALUE_TYPE__NANO_BATTERY => player.set_nano_potions(value as u32) as i32,
-        CN_GM_SET_VALUE_TYPE__FUSION_MATTER => player.set_fusion_matter(value as u32) as i32,
+        CN_GM_SET_VALUE_TYPE__FUSION_MATTER => {
+            player.set_fusion_matter(value as u32, Some(clients)) as i32
+        }
         CN_GM_SET_VALUE_TYPE__CANDY => player.set_taros(value as u32) as i32,
         CN_GM_SET_VALUE_TYPE__SPEED => placeholder!(value),
         CN_GM_SET_VALUE_TYPE__JUMP => placeholder!(value),
@@ -46,7 +49,9 @@ pub fn gm_pc_set_value(client: &mut FFClient, state: &mut ShardServerState) -> F
         iSetValue: value,
         iSetValueType: value_type,
     };
-    client.send_packet(P_FE2CL_GM_REP_PC_SET_VALUE, &resp)
+    clients
+        .get_self()
+        .send_packet(P_FE2CL_GM_REP_PC_SET_VALUE, &resp)
 }
 
 pub fn gm_pc_give_item(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {

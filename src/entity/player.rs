@@ -1006,8 +1006,50 @@ impl Player {
         self.level
     }
 
-    pub fn set_fusion_matter(&mut self, fusion_matter: u32) -> u32 {
+    pub fn set_fusion_matter(
+        &mut self,
+        fusion_matter: u32,
+        clients: Option<&mut ClientMap>,
+    ) -> u32 {
         self.fusion_matter = clamp(fusion_matter, 0, PC_FUSIONMATTER_MAX);
+
+        if let Some(clients) = clients {
+            let level_up_fusion_matter = placeholder!(300);
+            let level_up_task_id = placeholder!(999);
+            if self.fusion_matter >= level_up_fusion_matter
+                && !self
+                    .mission_journal
+                    .get_current_task_ids()
+                    .iter()
+                    .any(|tid| *tid == level_up_task_id)
+            {
+                let Ok(level_up_task_def) = tdata_get().get_task_definition(level_up_task_id)
+                else {
+                    log(
+                        Severity::Warning,
+                        &format!("Level up task with ID {} doesn't exist!", level_up_task_id),
+                    );
+                    return self.fusion_matter;
+                };
+                self.mission_journal
+                    .start_task(level_up_task_def.into())
+                    .unwrap();
+
+                let pkt = sP_FE2CL_REP_PC_TASK_START_SUCC {
+                    iTaskNum: level_up_task_id,
+                    iRemainTime: level_up_task_def
+                        .obj_time_limit
+                        .map(|d| d.as_secs() as i32)
+                        .unwrap_or(unused!()),
+                };
+                log_if_failed(
+                    self.get_client(clients)
+                        .unwrap()
+                        .send_packet(P_FE2CL_REP_PC_TASK_START_SUCC, &pkt),
+                );
+            }
+        }
+
         self.fusion_matter
     }
 

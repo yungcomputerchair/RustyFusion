@@ -7,7 +7,7 @@ use rusty_fusion::{
     mission::Task,
     net::{
         packet::{PacketID::*, *},
-        FFClient,
+        ClientMap, FFClient,
     },
     state::ShardServerState,
     tabledata::tdata_get,
@@ -202,12 +202,12 @@ pub fn task_stop(client: &mut FFClient, state: &mut ShardServerState) -> FFResul
     client.send_packet(P_FE2CL_REP_PC_TASK_STOP_SUCC, &resp)
 }
 
-pub fn task_end(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
-    let pkt: sP_CL2FE_REQ_PC_TASK_END = *client.get_packet(P_CL2FE_REQ_PC_TASK_END)?;
+pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let pkt: sP_CL2FE_REQ_PC_TASK_END = *clients.get_self().get_packet(P_CL2FE_REQ_PC_TASK_END)?;
     let mut error_code = 0; // true failures are handled in player tick
     catch_fail(
         (|| {
-            let pc_id = client.get_player_id()?;
+            let pc_id = clients.get_self().get_player_id()?;
             let player = state.get_player(pc_id)?;
             let running_tasks = player.mission_journal.get_current_tasks();
             let task = running_tasks
@@ -318,7 +318,9 @@ pub fn task_end(client: &mut FFClient, state: &mut ShardServerState) -> FFResult
                     iNPC_TypeID: 0,
                     iTaskID: task_def.task_id,
                 };
-                client.queue_packet(P_FE2CL_REP_REWARD_ITEM, &qitem_pkt);
+                clients
+                    .get_self()
+                    .queue_packet(P_FE2CL_REP_REWARD_ITEM, &qitem_pkt);
                 for (qitem_id, qitem_count_mod) in &task_def.succ_qitems {
                     let curr_count = player.get_quest_item_count(*qitem_id) as isize;
                     let new_count = (curr_count + *qitem_count_mod) as usize;
@@ -333,9 +335,9 @@ pub fn task_end(client: &mut FFClient, state: &mut ShardServerState) -> FFResult
                         eIL: ItemLocation::QInven as i32,
                         iSlotNum: qitem_slot as i32,
                     };
-                    client.queue_struct(&qitem_reward);
+                    clients.get_self().queue_struct(&qitem_reward);
                 }
-                log_if_failed(client.flush());
+                log_if_failed(clients.get_self().flush());
             }
 
             if let Some(reward_id) = task_def.succ_reward {
@@ -346,7 +348,7 @@ pub fn task_end(client: &mut FFClient, state: &mut ShardServerState) -> FFResult
                         let fm_new = player.get_fusion_matter() + reward.fusion_matter;
                         let reward_pkt = sP_FE2CL_REP_REWARD_ITEM {
                             m_iCandy: player.set_taros(taros_new) as i32,
-                            m_iFusionMatter: player.set_fusion_matter(fm_new) as i32,
+                            m_iFusionMatter: player.set_fusion_matter(fm_new, Some(clients)) as i32,
                             m_iBatteryN: player.get_nano_potions() as i32,
                             m_iBatteryW: player.get_weapon_boosts() as i32,
                             iItemCnt: reward.items.len() as i8,
@@ -355,7 +357,9 @@ pub fn task_end(client: &mut FFClient, state: &mut ShardServerState) -> FFResult
                             iNPC_TypeID: unused!(),
                             iTaskID: task_def.task_id,
                         };
-                        client.queue_packet(P_FE2CL_REP_REWARD_ITEM, &reward_pkt);
+                        clients
+                            .get_self()
+                            .queue_packet(P_FE2CL_REP_REWARD_ITEM, &reward_pkt);
                         for item in &reward.items {
                             let slot_num = player.find_free_slot(ItemLocation::Inven).unwrap();
                             let item_reward = Item::new(item.0, item.1);
@@ -367,9 +371,9 @@ pub fn task_end(client: &mut FFClient, state: &mut ShardServerState) -> FFResult
                                 eIL: ItemLocation::Inven as i32,
                                 iSlotNum: slot_num as i32,
                             };
-                            client.queue_struct(&item_reward);
+                            clients.get_self().queue_struct(&item_reward);
                         }
-                        log_if_failed(client.flush());
+                        log_if_failed(clients.get_self().flush());
                     }
                 }
             }
@@ -389,14 +393,18 @@ pub fn task_end(client: &mut FFClient, state: &mut ShardServerState) -> FFResult
             let resp = sP_FE2CL_REP_PC_TASK_END_SUCC {
                 iTaskNum: pkt.iTaskNum,
             };
-            client.send_packet(P_FE2CL_REP_PC_TASK_END_SUCC, &resp)
+            clients
+                .get_self()
+                .send_packet(P_FE2CL_REP_PC_TASK_END_SUCC, &resp)
         })(),
         || {
             let resp = sP_FE2CL_REP_PC_TASK_END_FAIL {
                 iTaskNum: pkt.iTaskNum,
                 iErrorCode: error_code,
             };
-            client.send_packet(P_FE2CL_REP_PC_TASK_END_FAIL, &resp)
+            clients
+                .get_self()
+                .send_packet(P_FE2CL_REP_PC_TASK_END_FAIL, &resp)
         },
     )
 }
