@@ -359,12 +359,12 @@ mod helpers {
                     format!("Player {} tried to warp with the wrong NPC type", pc_id),
                 ));
             }
+            to_past = npc.ty == TYPE_TIME_MACHINE;
 
             // proximity check.
             // for some reason, the time machine NPC's range is HUGE
             // but we don't need to check anyway since it's a special case
             if npc.ty != TYPE_TIME_MACHINE {
-                to_past = true;
                 state
                     .entity_map
                     .validate_proximity(&[EntityID::Player(pc_id), npc.get_id()], RANGE_INTERACT)?;
@@ -438,6 +438,23 @@ mod helpers {
 
         if to_past {
             player.set_future_done();
+
+            // remove all active tasks
+            for task_id in player.mission_journal.get_current_task_ids() {
+                let task = player.mission_journal.remove_task(task_id).unwrap();
+                for item_id in &task.get_task_def().del_qitems {
+                    let qitem_slot = player.set_quest_item_count(*item_id, 0);
+                    // client doesn't automatically delete qitems clientside
+                    let pkt = sP_FE2CL_REP_PC_ITEM_DELETE_SUCC {
+                        eIL: ItemLocation::QInven as i32,
+                        iSlotNum: qitem_slot as i32,
+                    };
+                    log_if_failed(client.send_packet(P_FE2CL_REP_PC_ITEM_DELETE_SUCC, &pkt));
+                }
+
+                let resp = sP_FE2CL_REP_PC_TASK_STOP_SUCC { iTaskNum: task_id };
+                log_if_failed(client.send_packet(P_FE2CL_REP_PC_TASK_STOP_SUCC, &resp));
+            }
         }
 
         player.set_taros(player.get_taros() - warp_data.cost);

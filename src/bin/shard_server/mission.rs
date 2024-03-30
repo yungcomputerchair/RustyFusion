@@ -384,7 +384,6 @@ pub fn task_end(client: &mut FFClient, state: &mut ShardServerState) -> FFResult
                     .mission_journal
                     .set_mission_completed(task_def.mission_id)
                     .unwrap();
-                // TODO reward
             }
 
             let resp = sP_FE2CL_REP_PC_TASK_END_SUCC {

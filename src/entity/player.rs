@@ -962,7 +962,6 @@ impl Player {
             Some(Item::new(ItemType::Hand, ID_LIGHTNING_GUN)),
         )
         .unwrap();
-        // TODO delete all active missions
         // place in Sector V future
         let mut rand = rand::thread_rng();
         let range = 0; //PC_START_LOCATION_RANDOM_RANGE as i32 / 2;
@@ -986,7 +985,6 @@ impl Player {
 
     pub fn set_future_done(&mut self) {
         self.flags.payzone_flag = true;
-        // TODO delete all active missions
     }
 
     pub fn is_future_done(&self) -> bool {
