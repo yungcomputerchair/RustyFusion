@@ -271,9 +271,9 @@ pub fn item_chest_open(client: &mut FFClient, state: &mut ShardServerState) -> F
                     // This idea was taken from OpenFusion <3
                     log_error(&e);
                     let gumballs = [
-                        Item::new(ItemType::General, 119),
-                        Item::new(ItemType::General, 120),
-                        Item::new(ItemType::General, 121),
+                        Item::new(ItemType::General, ID_GUMBALL),
+                        Item::new(ItemType::General, ID_GUMBALL + 1),
+                        Item::new(ItemType::General, ID_GUMBALL + 2),
                     ];
                     let choice = thread_rng().gen_range(0..gumballs.len());
                     gumballs[choice]
