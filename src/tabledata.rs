@@ -149,6 +149,26 @@ struct CrateData {
 }
 
 #[derive(Debug, Deserialize)]
+struct MiscDropChance {
+    PotionDropChance: usize,
+    PotionDropChanceTotal: usize,
+    BoostDropChance: usize,
+    BoostDropChanceTotal: usize,
+    TaroDropChance: usize,
+    TaroDropChanceTotal: usize,
+    FMDropChance: usize,
+    FMDropChanceTotal: usize,
+}
+
+#[derive(Debug, Deserialize)]
+struct MiscDropType {
+    PotionAmount: u32,
+    BoostAmount: u32,
+    TaroAmount: u32,
+    FMAmount: u32,
+}
+
+#[derive(Debug, Deserialize)]
 struct RarityWeights {
     Weights: Vec<i32>,
 }
@@ -174,6 +194,8 @@ struct DropData {
     crate_drop_chances: HashMap<i32, CrateDropChance>,
     crate_drop_types: HashMap<i32, CrateDropType>,
     crate_data: HashMap<i32, CrateData>,
+    misc_drop_chances: HashMap<i32, MiscDropChance>,
+    misc_drop_types: HashMap<i32, MiscDropType>,
     rarity_weights: HashMap<i32, RarityWeights>,
     item_sets: HashMap<i32, ItemSet>,
     item_refs: HashMap<i32, ItemReference>,
@@ -1406,6 +1428,8 @@ fn load_drop_data() -> Result<DropData, String> {
     const CRATE_DROP_CHANCES_TABLE_KEY: &str = "CrateDropChances";
     const CRATE_DROP_TYPES_TABLE_KEY: &str = "CrateDropTypes";
     const CRATE_DATA_TABLE_KEY: &str = "Crates";
+    const MISC_DROP_CHANCES_TABLE_KEY: &str = "MiscDropChances";
+    const MISC_DROP_TYPES_TABLE_KEY: &str = "MiscDropTypes";
     const RARITY_WEIGHTS_TABLE_KEY: &str = "RarityWeights";
     const ITEM_SETS_TABLE_KEY: &str = "ItemSets";
     const ITEM_REFERENCES_TABLE_KEY: &str = "ItemReferences";
@@ -1413,6 +1437,8 @@ fn load_drop_data() -> Result<DropData, String> {
     const CRATE_DROP_CHANCES_ID_KEY: &str = "CrateDropChanceID";
     const CRATE_DROP_TYPES_ID_KEY: &str = "CrateDropTypeID";
     const CRATE_DATA_ID_KEY: &str = "CrateID";
+    const MISC_DROP_CHANCES_ID_KEY: &str = "MiscDropChanceID";
+    const MISC_DROP_TYPES_ID_KEY: &str = "MiscDropTypeID";
     const RARITY_WEIGHTS_ID_KEY: &str = "RarityWeightID";
     const ITEM_SETS_ID_KEY: &str = "ItemSetID";
     const ITEM_REFERENCES_ID_KEY: &str = "ItemReferenceID";
@@ -1440,6 +1466,10 @@ fn load_drop_data() -> Result<DropData, String> {
     let crate_drop_chances_table = get_object(&drop_root, CRATE_DROP_CHANCES_TABLE_KEY)?;
     let crate_drop_types_table = get_object(&drop_root, CRATE_DROP_TYPES_TABLE_KEY)?;
     let crate_data_table = get_object(&drop_root, CRATE_DATA_TABLE_KEY)?;
+
+    let misc_drop_chances_table = get_object(&drop_root, MISC_DROP_CHANCES_TABLE_KEY)?;
+    let misc_drop_types_table = get_object(&drop_root, MISC_DROP_TYPES_TABLE_KEY)?;
+
     let rarity_weights_table = get_object(&drop_root, RARITY_WEIGHTS_TABLE_KEY)?;
     let item_sets_table = get_object(&drop_root, ITEM_SETS_TABLE_KEY)?;
     let item_references_table = get_object(&drop_root, ITEM_REFERENCES_TABLE_KEY)?;
@@ -1447,6 +1477,10 @@ fn load_drop_data() -> Result<DropData, String> {
         crate_drop_chances: load_drop_table(crate_drop_chances_table, CRATE_DROP_CHANCES_ID_KEY)?,
         crate_drop_types: load_drop_table(crate_drop_types_table, CRATE_DROP_TYPES_ID_KEY)?,
         crate_data: load_drop_table(crate_data_table, CRATE_DATA_ID_KEY)?,
+
+        misc_drop_chances: load_drop_table(misc_drop_chances_table, MISC_DROP_CHANCES_ID_KEY)?,
+        misc_drop_types: load_drop_table(misc_drop_types_table, MISC_DROP_TYPES_ID_KEY)?,
+
         rarity_weights: load_drop_table(rarity_weights_table, RARITY_WEIGHTS_ID_KEY)?,
         item_sets: load_drop_table(item_sets_table, ITEM_SETS_ID_KEY)?,
         item_refs: load_drop_table(item_references_table, ITEM_REFERENCES_ID_KEY)?,
