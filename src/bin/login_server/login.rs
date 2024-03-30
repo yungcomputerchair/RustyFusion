@@ -464,6 +464,14 @@ pub fn shard_select(
                     }
                 };
 
+                if let Some(shard_id_existing) = state.get_player_shard(pc_uid) {
+                    error_code = 2; // "Selected character error"
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!("Player {} already in shard {}", pc_uid, shard_id_existing),
+                    ));
+                }
+
                 let shard_id = if req_shard_id == 0 {
                     // pick the shard with the lowest population
                     match state.get_lowest_pop_shard_id() {
