@@ -61,8 +61,8 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
     - [ ] Passive skills (including nano)
     - [ ] Active skills (including nano)
     - [ ] Gumballs & other usables
-  - [ ] ***Mob drops***
-- [ ] E.G.G.s (the ones on the ground that buff you)
+    - [ ] E.G.G.s (the ones on the ground that buff you)
+  - [x] Mob drops
 - [ ] Missions
   - [ ] ***Starting tasks +***
   - [x] Switching active mission
