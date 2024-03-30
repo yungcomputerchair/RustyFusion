@@ -1027,11 +1027,7 @@ impl Player {
             };
 
             if self.fusion_matter >= level_up_fusion_matter
-                && !self
-                    .mission_journal
-                    .get_current_task_ids()
-                    .iter()
-                    .any(|tid| *tid == level_up_task_id)
+                && !self.mission_journal.has_nano_mission()
             {
                 let Ok(level_up_task_def) = tdata_get().get_task_definition(level_up_task_id)
                 else {

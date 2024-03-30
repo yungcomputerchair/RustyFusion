@@ -197,6 +197,10 @@ impl MissionJournal {
         task_ids
     }
 
+    pub fn has_nano_mission(&self) -> bool {
+        self.current_nano_mission.is_some()
+    }
+
     pub fn is_mission_completed(&self, mission_id: i32) -> FFResult<bool> {
         const BITFIELD_CHUNK_SIZE: i32 = i64::BITS as i32;
         const MAX_MISSION_ID: i32 = (SIZEOF_QUESTFLAG_NUMBER as i32) * BITFIELD_CHUNK_SIZE;
