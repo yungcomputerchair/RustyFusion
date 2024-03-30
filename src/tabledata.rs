@@ -34,6 +34,7 @@ struct XDTData {
     instance_data: InstanceData,
     nano_data: NanoData,
     mission_data: MissionData,
+    player_data: HashMap<i16, PlayerStats>,
 }
 impl XDTData {
     fn load() -> Result<Self, String> {
@@ -53,6 +54,8 @@ impl XDTData {
                 .map_err(|e| format!("Error loading nano data: {}", e))?,
             mission_data: load_mission_data(&root)
                 .map_err(|e| format!("Error loading mission data: {}", e))?,
+            player_data: load_player_data(&root)
+                .map_err(|e| format!("Error loading player data: {}", e))?,
         })
     }
 }
@@ -129,6 +132,23 @@ struct MissionData {
     mission_definitions: HashMap<i32, MissionDefinition>,
     task_definitions: HashMap<i32, TaskDefinition>,
     rewards: HashMap<i32, MissionReward>,
+}
+
+pub struct PlayerStats {
+    pub hp_up: u32,
+    pub max_hp: u32,
+    pub accuracy: u32,
+    pub dodge: u32,
+    pub power: u32,
+    pub protection: u32,
+    pub req_fm_nano_create: u32,
+    pub req_fm_nano_tune: u32,
+    pub fm_limit: u32,
+    pub mob_fm: u32,
+    pub nano_quest_task_id: Option<i32>,
+    pub nano_id: i16,
+    pub bonus_fm: u32,
+    pub death_fm: u32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -640,6 +660,13 @@ impl TableData {
                 Severity::Warning,
                 format!("Mission with id {} doesn't exist", mission_id),
             ))
+    }
+
+    pub fn get_player_stats(&self, level: i16) -> FFResult<&PlayerStats> {
+        self.xdt_data.player_data.get(&level).ok_or(FFError::build(
+            Severity::Warning,
+            format!("Player stats for level {} don't exist", level),
+        ))
     }
 
     pub fn get_mission_reward(&self, reward_id: i32) -> FFResult<&MissionReward> {
@@ -1468,6 +1495,62 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
         task_definitions: task_defs,
         rewards,
     })
+}
+
+fn load_player_data(
+    root: &Map<std::string::String, Value>,
+) -> Result<HashMap<i16, PlayerStats>, String> {
+    const PLAYER_TABLE_KEY: &str = "m_pAvatarTable";
+    const PLAYER_TABLE_PLAYER_DATA_KEY: &str = "m_pAvatarGrowData";
+
+    #[derive(Debug, Deserialize)]
+    struct PlayerStatsEntry {
+        m_iLevel: i16,
+        m_iHpUp: u32,
+        m_iMaxHP: u32,
+        m_iAccuracy: u32,
+        m_iDodge: u32,
+        m_iPower: u32,
+        m_iProtection: u32,
+        m_iReqBlob_NanoCreate: u32,
+        m_iReqBlob_NanoTune: u32,
+        m_iFMLimit: u32,
+        m_iMobFM: u32,
+        m_iNanoQuestTaskID: i32,
+        m_iNanoID: i16,
+        m_iBonusFM: u32,
+        m_iDeathFM: u32,
+    }
+
+    let table = get_object(root, PLAYER_TABLE_KEY)?;
+    let player_data = get_array(table, PLAYER_TABLE_PLAYER_DATA_KEY)?;
+    let mut player_stats_table = HashMap::new();
+    for v in player_data {
+        let entry: PlayerStatsEntry = serde_json::from_value(v.clone())
+            .map_err(|e| format!("Malformed player data entry: {} {}", e, v))?;
+        let key = entry.m_iLevel;
+        let player_stats = PlayerStats {
+            hp_up: entry.m_iHpUp,
+            max_hp: entry.m_iMaxHP,
+            accuracy: entry.m_iAccuracy,
+            dodge: entry.m_iDodge,
+            power: entry.m_iPower,
+            protection: entry.m_iProtection,
+            req_fm_nano_create: entry.m_iReqBlob_NanoCreate,
+            req_fm_nano_tune: entry.m_iReqBlob_NanoTune,
+            fm_limit: entry.m_iFMLimit,
+            mob_fm: entry.m_iMobFM,
+            nano_quest_task_id: match entry.m_iNanoQuestTaskID {
+                0 => None,
+                tid => Some(tid),
+            },
+            nano_id: entry.m_iNanoID,
+            bonus_fm: entry.m_iBonusFM,
+            death_fm: entry.m_iDeathFM,
+        };
+        player_stats_table.insert(key, player_stats);
+    }
+    Ok(player_stats_table)
 }
 
 fn load_npc_data() -> Result<Vec<NPCData>, String> {
