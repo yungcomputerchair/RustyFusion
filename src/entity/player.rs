@@ -1011,11 +1011,21 @@ impl Player {
         fusion_matter: u32,
         clients: Option<&mut ClientMap>,
     ) -> u32 {
-        self.fusion_matter = clamp(fusion_matter, 0, PC_FUSIONMATTER_MAX);
+        let player_stats = tdata_get().get_player_stats(self.level).unwrap();
+        let fm_max = if self.get_perms() == CN_ACCOUNT_LEVEL__GM as i16 {
+            PC_FUSIONMATTER_MAX
+        } else {
+            player_stats.fm_limit
+        };
+        self.fusion_matter = clamp(fusion_matter, 0, fm_max);
 
         if let Some(clients) = clients {
-            let level_up_fusion_matter = placeholder!(300);
-            let level_up_task_id = placeholder!(999);
+            let level_up_fusion_matter = player_stats.req_fm_nano_create;
+            let Some(level_up_task_id) = player_stats.nano_quest_task_id else {
+                // no level up task
+                return self.fusion_matter;
+            };
+
             if self.fusion_matter >= level_up_fusion_matter
                 && !self
                     .mission_journal
