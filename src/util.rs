@@ -4,8 +4,9 @@ use rand::{distributions::uniform::SampleUniform, Rng};
 
 use crate::{
     defines::*,
-    enums::ItemLocation,
+    enums::{ItemLocation, ItemType},
     error::{panic_log, FFError, FFResult, Severity},
+    item::Item,
 };
 
 pub fn clamp<T: Ord>(val: T, min: T, max: T) -> T {
@@ -156,4 +157,14 @@ pub fn rand_range_inclusive<T: SampleUniform + Ord>(min: T, max: T) -> T {
 
 pub fn rand_range_exclusive<T: SampleUniform + Ord>(min: T, max: T) -> T {
     rand::thread_rng().gen_range(min..max)
+}
+
+pub fn get_random_gumball() -> Item {
+    let gumballs = [
+        Item::new(ItemType::General, ID_GUMBALL),
+        Item::new(ItemType::General, ID_GUMBALL + 1),
+        Item::new(ItemType::General, ID_GUMBALL + 2),
+    ];
+    let choice = rand_range_exclusive(0, gumballs.len());
+    gumballs[choice]
 }

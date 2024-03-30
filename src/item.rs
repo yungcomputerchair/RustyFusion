@@ -218,3 +218,23 @@ pub struct CrocPotData {
     pub price_multiplier_looks: u32,
     pub price_multiplier_stats: u32,
 }
+
+#[derive(Debug)]
+pub struct Reward {
+    pub taros: u32,
+    pub fusion_matter: u32,
+    pub weapon_boosts: u32,
+    pub nano_potions: u32,
+    pub items: Vec<Item>,
+}
+impl Default for Reward {
+    fn default() -> Self {
+        Self {
+            taros: 0,
+            fusion_matter: 0,
+            weapon_boosts: 0,
+            nano_potions: 0,
+            items: Vec::new(),
+        }
+    }
+}

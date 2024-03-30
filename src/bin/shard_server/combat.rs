@@ -4,7 +4,7 @@ use rand::{thread_rng, Rng};
 use rusty_fusion::{
     entity::{Combatant, EntityID},
     enums::{ItemLocation, ItemType},
-    error::{log, log_if_failed, FFResult, Severity},
+    error::{log, log_error, log_if_failed, FFResult, Severity},
     net::{
         packet::{PacketID::*, *},
         ClientMap,
@@ -133,11 +133,30 @@ pub fn pc_attack_npcs(clients: &mut ClientMap, state: &mut ShardServerState) -> 
                 }
             }
 
-            // TODO get mob drops from tdata
-            let gained_taros = placeholder!(0);
-            let gained_fm = placeholder!(0);
-            let gained_potions = placeholder!(0);
-            let gained_boosts = placeholder!(0);
+            let mut gained_taros = placeholder!(0);
+            let mut gained_fm = placeholder!(0);
+            let mut gained_potions = placeholder!(0);
+            let mut gained_boosts = placeholder!(0);
+            match tdata_get().get_mob_reward(ty, player.get_style().iGender as i32) {
+                Ok(reward) => {
+                    gained_taros = reward.taros;
+                    gained_fm = reward.fusion_matter;
+                    gained_potions = reward.nano_potions;
+                    gained_boosts = reward.weapon_boosts;
+                    for item in reward.items {
+                        if let Ok(slot) = player.find_free_slot(ItemLocation::Inven) {
+                            let item_reward = sItemReward {
+                                sItem: Some(item).into(),
+                                eIL: ItemLocation::Inven as i32,
+                                iSlotNum: slot as i32,
+                            };
+                            item_rewards.push(item_reward);
+                        }
+                    }
+                }
+                Err(e) => log_error(&e),
+            }
+
             let reward_pkt = sP_FE2CL_REP_REWARD_ITEM {
                 m_iCandy: player.set_taros(player.get_taros() + gained_taros) as i32,
                 m_iFusionMatter: player.set_fusion_matter(player.get_fusion_matter() + gained_fm)

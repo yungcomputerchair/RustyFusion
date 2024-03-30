@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
+use rand::{rngs::ThreadRng, thread_rng, Rng};
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::{Map, Value};
 use std::{
@@ -15,8 +16,8 @@ use crate::{
     defines::*,
     entity::NPC,
     enums::*,
-    error::{log, panic_log, FFError, FFResult, Severity},
-    item::{CrocPotData, Item, ItemStats, VendorData, VendorItem},
+    error::{log, log_error, log_if_failed, panic_log, FFError, FFResult, Severity},
+    item::{CrocPotData, Item, ItemStats, Reward, VendorData, VendorItem},
     mission::{MissionDefinition, MissionReward, TaskDefinition},
     nano::{NanoStats, NanoTuning},
     path::{Path, PathPoint},
@@ -501,6 +502,109 @@ impl TableData {
             (rolled_item_ref.Type as i16).try_into()?,
             rolled_item_ref.ItemID as i16,
         ))
+    }
+
+    pub fn get_mob_reward(&self, mob_type: i32, gender: i32) -> FFResult<Reward> {
+        let mut rng = thread_rng();
+        let mut reward = Reward::default();
+
+        let mapping = self
+            .drop_data
+            .mob_drop_data
+            .get(&mob_type)
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("No mob drop data for mob type {}", mob_type),
+            ))?;
+
+        let mob_drop = self
+            .drop_data
+            .mob_drops
+            .get(&mapping.MobDropID)
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("No mob drop for mob drop id {}", mapping.MobDropID),
+            ))?;
+
+        let apply_misc_drop = |rng: &mut ThreadRng, reward: &mut Reward| {
+            let misc_drop_type = self
+                .drop_data
+                .misc_drop_types
+                .get(&mob_drop.MiscDropTypeID)
+                .ok_or(FFError::build(
+                    Severity::Warning,
+                    format!("No such misc drop type {}", mob_drop.MiscDropTypeID),
+                ))?;
+            let misc_drop_chance = self
+                .drop_data
+                .misc_drop_chances
+                .get(&mob_drop.MiscDropChanceID)
+                .ok_or(FFError::build(
+                    Severity::Warning,
+                    format!("No such misc drop chance {}", mob_drop.MiscDropChanceID),
+                ))?;
+            if rng.gen_range(0..misc_drop_chance.TaroDropChanceTotal)
+                < misc_drop_chance.TaroDropChance
+            {
+                reward.taros = misc_drop_type.TaroAmount;
+            }
+            if rng.gen_range(0..misc_drop_chance.FMDropChanceTotal) < misc_drop_chance.FMDropChance
+            {
+                reward.fusion_matter = misc_drop_type.FMAmount;
+            }
+            if rng.gen_range(0..misc_drop_chance.PotionDropChanceTotal)
+                < misc_drop_chance.PotionDropChance
+            {
+                reward.nano_potions = misc_drop_type.PotionAmount;
+            }
+            if rng.gen_range(0..misc_drop_chance.BoostDropChanceTotal)
+                < misc_drop_chance.BoostDropChance
+            {
+                reward.weapon_boosts = misc_drop_type.BoostAmount;
+            }
+            Ok(())
+        };
+
+        let apply_crate_drop = |rng: &mut ThreadRng, reward: &mut Reward| {
+            // TODO event crate drops
+            let crate_drop_type = self
+                .drop_data
+                .crate_drop_types
+                .get(&mob_drop.CrateDropTypeID)
+                .ok_or(FFError::build(
+                    Severity::Warning,
+                    format!("No such crate drop type {}", mob_drop.CrateDropTypeID),
+                ))?;
+            let crate_drop_chance = self
+                .drop_data
+                .crate_drop_chances
+                .get(&mob_drop.CrateDropChanceID)
+                .ok_or(FFError::build(
+                    Severity::Warning,
+                    format!("No such crate drop chance {}", mob_drop.CrateDropChanceID),
+                ))?;
+            if rng.gen_range(0..crate_drop_chance.DropChanceTotal) < crate_drop_chance.DropChance {
+                let crate_id = crate_drop_type.CrateIDs
+                    [util::weighted_rand(&crate_drop_chance.CrateTypeDropWeights)];
+                match self.get_item_from_crate(crate_id as i16, gender) {
+                    Ok(item) => {
+                        reward.items.push(item);
+                        Ok(())
+                    }
+                    Err(e) => Err(e),
+                }
+            } else {
+                Ok(()) // failed roll but no error
+            }
+        };
+
+        log_if_failed(apply_misc_drop(&mut rng, &mut reward));
+        if let Err(e) = apply_crate_drop(&mut rng, &mut reward) {
+            log_error(&e);
+            reward.items.push(util::get_random_gumball());
+        }
+
+        Ok(reward)
     }
 
     pub fn get_npc_path(&self, npc_type: i32) -> Option<Path> {

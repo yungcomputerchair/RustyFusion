@@ -3,7 +3,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use rand::{random, thread_rng, Rng};
+use rand::random;
 
 use rusty_fusion::{
     config::config_get,
@@ -18,7 +18,7 @@ use rusty_fusion::{
     },
     state::ShardServerState,
     tabledata::tdata_get,
-    unused,
+    unused, util,
 };
 
 pub fn item_move(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
@@ -270,13 +270,7 @@ pub fn item_chest_open(client: &mut FFClient, state: &mut ShardServerState) -> F
                     // give the player a random gumball instead.
                     // This idea was taken from OpenFusion <3
                     log_error(&e);
-                    let gumballs = [
-                        Item::new(ItemType::General, ID_GUMBALL),
-                        Item::new(ItemType::General, ID_GUMBALL + 1),
-                        Item::new(ItemType::General, ID_GUMBALL + 2),
-                    ];
-                    let choice = thread_rng().gen_range(0..gumballs.len());
-                    gumballs[choice]
+                    util::get_random_gumball()
                 });
 
             player.set_item(location, pkt.iSlotNum as usize, Some(reward_item))?;
