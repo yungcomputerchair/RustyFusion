@@ -1078,9 +1078,12 @@ impl Player {
     }
 
     pub fn set_pre_warp(&mut self) {
-        self.pre_warp_data = PreWarpData {
-            instance_id: self.instance_id,
-            position: self.position,
+        // we only save pre-warp when we're not in an instance
+        if self.instance_id.instance_num.is_none() {
+            self.pre_warp_data = PreWarpData {
+                instance_id: self.instance_id,
+                position: self.position,
+            }
         }
     }
 
