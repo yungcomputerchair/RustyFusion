@@ -26,12 +26,36 @@ pub fn pc_enter(
     time: SystemTime,
 ) -> FFResult<()> {
     let client = clients.get_self();
-    let pkt: &sP_CL2FE_REQ_PC_ENTER = client.get_packet(P_CL2FE_REQ_PC_ENTER)?;
+    let pkt: sP_CL2FE_REQ_PC_ENTER = *client.get_packet(P_CL2FE_REQ_PC_ENTER)?;
     let serial_key: i64 = pkt.iEnterSerialKey;
     let login_data = state.login_data.remove(&serial_key).unwrap();
-    let pc_id = state.entity_map.gen_next_pc_id();
+
+    // check if this player is already in the shard and kick if so.
+    // important that we save the current player to DB first to avoid state desync
+    if let Some(existing_pc_id) = state
+        .entity_map
+        .find_players(|p| p.get_uid() == login_data.iPC_UID)
+        .first()
+        .copied()
+    {
+        log(
+            Severity::Warning,
+            &format!(
+                "Player with UID {} already in the shard as player {}; kicking...",
+                login_data.iPC_UID, existing_pc_id
+            ),
+        );
+        let existing_player = state.get_player(existing_pc_id).unwrap();
+        let existing_client = existing_player.get_client(clients).unwrap();
+        let pkt = sP_FE2CL_REP_PC_EXIT_DUPLICATE {
+            iErrorCode: unused!(),
+        };
+        log_if_failed(existing_client.send_packet(P_FE2CL_REP_PC_EXIT_DUPLICATE, &pkt));
+        Player::disconnect(existing_pc_id, state, clients); // saves to DB synchronously
+    }
 
     let mut db = db_get();
+    let pc_id = state.entity_map.gen_next_pc_id();
     let mut player = db.load_player(login_data.iAccountID, login_data.iPC_UID)?;
     player.set_player_id(pc_id);
     player.set_client_id(key);
@@ -45,6 +69,7 @@ pub fn pc_enter(
         uiSvrTime: util::get_timestamp_ms(time),
     };
 
+    let client = clients.get_self();
     client.client_type = ClientType::GameClient {
         account_id: login_data.iAccountID,
         serial_key: pkt.iEnterSerialKey,

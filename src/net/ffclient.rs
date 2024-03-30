@@ -75,6 +75,7 @@ impl FFClient {
     }
 
     pub fn disconnect(&mut self) {
+        self.client_type = ClientType::Unknown;
         self.should_dc = true;
     }
 
