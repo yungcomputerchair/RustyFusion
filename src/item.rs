@@ -3,7 +3,7 @@ use std::{cmp::min, time::SystemTime};
 use crate::{
     defines::*,
     enums::ItemType,
-    error::{FFError, FFResult},
+    error::{panic_log, FFError, FFResult},
     net::packet::*,
     tabledata::tdata_get,
     util,
@@ -19,6 +19,10 @@ pub struct Item {
 }
 impl Item {
     pub fn new(ty: ItemType, id: i16) -> Self {
+        if id == 0 {
+            panic_log("Item ID cannot be 0");
+        }
+
         Self {
             ty,
             id,

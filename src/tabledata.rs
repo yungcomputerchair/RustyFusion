@@ -1460,7 +1460,10 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
                 .m_iMissionRewardItemID
                 .iter()
                 .zip(item_types.iter())
-                .map(|(id, ty)| (*ty, *id))
+                .flat_map(|(id, ty)| match id {
+                    0 => None,
+                    _ => Some((*ty, *id)),
+                })
                 .collect(),
         };
         rewards.insert(reward_id, reward);
