@@ -137,7 +137,7 @@ pub fn pc_attack_npcs(clients: &mut ClientMap, state: &mut ShardServerState) -> 
             let mut gained_fm = placeholder!(0);
             let mut gained_potions = placeholder!(0);
             let mut gained_boosts = placeholder!(0);
-            match tdata_get().get_mob_reward(ty, player.get_style().iGender as i32) {
+            match tdata_get().get_mob_reward(ty) {
                 Ok(reward) => {
                     gained_taros = reward.taros;
                     gained_fm = reward.fusion_matter;
@@ -145,6 +145,9 @@ pub fn pc_attack_npcs(clients: &mut ClientMap, state: &mut ShardServerState) -> 
                     gained_boosts = reward.weapon_boosts;
                     for item in reward.items {
                         if let Ok(slot) = player.find_free_slot(ItemLocation::Inven) {
+                            player
+                                .set_item(ItemLocation::Inven, slot, Some(item))
+                                .unwrap();
                             let item_reward = sItemReward {
                                 sItem: Some(item).into(),
                                 eIL: ItemLocation::Inven as i32,

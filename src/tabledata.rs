@@ -504,7 +504,7 @@ impl TableData {
         ))
     }
 
-    pub fn get_mob_reward(&self, mob_type: i32, gender: i32) -> FFResult<Reward> {
+    pub fn get_mob_reward(&self, mob_type: i32) -> FFResult<Reward> {
         let mut rng = thread_rng();
         let mut reward = Reward::default();
 
@@ -586,16 +586,10 @@ impl TableData {
             if rng.gen_range(0..crate_drop_chance.DropChanceTotal) < crate_drop_chance.DropChance {
                 let crate_id = crate_drop_type.CrateIDs
                     [util::weighted_rand(&crate_drop_chance.CrateTypeDropWeights)];
-                match self.get_item_from_crate(crate_id as i16, gender) {
-                    Ok(item) => {
-                        reward.items.push(item);
-                        Ok(())
-                    }
-                    Err(e) => Err(e),
-                }
-            } else {
-                Ok(()) // failed roll but no error
+                let crate_item = Item::new(ItemType::Chest, crate_id as i16);
+                reward.items.push(crate_item);
             }
+            Ok(())
         };
 
         log_if_failed(apply_misc_drop(&mut rng, &mut reward));
