@@ -3,7 +3,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use rand::random;
+use rand::{random, thread_rng, Rng};
 
 use rusty_fusion::{
     config::config_get,
@@ -16,7 +16,6 @@ use rusty_fusion::{
         packet::{PacketID::*, *},
         ClientMap, FFClient,
     },
-    placeholder,
     state::ShardServerState,
     tabledata::tdata_get,
     unused,
@@ -266,7 +265,19 @@ pub fn item_chest_open(client: &mut FFClient, state: &mut ShardServerState) -> F
 
             let reward_item = tdata_get()
                 .get_item_from_crate(chest.id, player.get_style().iGender as i32)
-                .unwrap_or(placeholder!(Item::new(ItemType::General, 119)));
+                .unwrap_or_else(|e| {
+                    // If for some reason we can't find a valid drop for the crate,
+                    // give the player a random gumball instead.
+                    // This idea was taken from OpenFusion <3
+                    log_error(&e);
+                    let gumballs = [
+                        Item::new(ItemType::General, 119),
+                        Item::new(ItemType::General, 120),
+                        Item::new(ItemType::General, 121),
+                    ];
+                    let choice = thread_rng().gen_range(0..gumballs.len());
+                    gumballs[choice]
+                });
 
             player.set_item(location, pkt.iSlotNum as usize, Some(reward_item))?;
 
