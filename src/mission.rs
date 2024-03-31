@@ -61,6 +61,7 @@ pub struct Task {
     pub remaining_enemy_defeats: HashMap<i32, usize>,
     pub fail_time: Option<SystemTime>,
     pub completed: bool,
+    pub failed: bool,
 }
 impl Task {
     pub fn get_task_id(&self) -> i32 {
@@ -105,6 +106,7 @@ impl From<&TaskDefinition> for Task {
             remaining_enemy_defeats: task_def.obj_enemies.clone(),
             fail_time: task_def.obj_time_limit.map(|d| SystemTime::now() + d),
             completed: false,
+            failed: false,
         }
     }
 }
@@ -274,13 +276,24 @@ impl MissionJournal {
         false
     }
 
+    pub fn check_failed_previous_task(&self, task_def: &TaskDefinition) -> bool {
+        for running_task in self.get_task_iter() {
+            let running_task_def = running_task.get_task_def();
+            if running_task_def.fail_task_id == Some(task_def.task_id) && running_task.failed {
+                // previous task is failed
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn start_task(&mut self, task: Task) -> FFResult<bool> {
         let mission_def = task.get_mission_def();
         let mission_existing_task = self
             .get_task_iter_mut()
             .find(|t| t.get_task_def().mission_id == mission_def.mission_id);
         let new_mission = if let Some(existing_task) = mission_existing_task {
-            if !existing_task.completed {
+            if !existing_task.completed && !existing_task.failed {
                 return Err(FFError::build(
                     Severity::Warning,
                     format!(
@@ -346,6 +359,20 @@ impl MissionJournal {
                 )
             })?;
         task.completed = true;
+        Ok(())
+    }
+
+    pub fn fail_task(&mut self, task_id: i32) -> FFResult<()> {
+        let task = self
+            .get_task_iter_mut()
+            .find(|t| t.get_task_id() == task_id)
+            .ok_or_else(|| {
+                FFError::build(
+                    Severity::Warning,
+                    format!("Tried to fail task {} that is not in progress", task_id),
+                )
+            })?;
+        task.failed = true;
         Ok(())
     }
 

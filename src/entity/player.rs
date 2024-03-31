@@ -11,9 +11,9 @@ use crate::{
     defines::*,
     entity::{Combatant, Entity, EntityID},
     enums::{ItemLocation, ItemType, PlayerGuide, PlayerShardStatus, RewardType, RideType},
-    error::{log, log_if_failed, panic_log, FFError, FFResult, Severity},
+    error::{codes, log, log_if_failed, panic_log, FFError, FFResult, Severity},
     item::Item,
-    mission::MissionJournal,
+    mission::{MissionJournal, Task, TaskDefinition},
     nano::Nano,
     net::{
         packet::{
@@ -1141,6 +1141,144 @@ impl Player {
             }
         }
     }
+
+    fn tick_skyway_ride(
+        &mut self,
+        time: SystemTime,
+        clients: &mut ClientMap,
+        state: &mut ShardServerState,
+    ) {
+        let pc_id = self.id.unwrap();
+        // Skyway ride
+        if let Some(ref mut ride) = self.transport_data.skyway_ride {
+            if ride.resume_time > time {
+                return;
+            }
+
+            if ride.path.is_done() {
+                // we're done!
+                let final_pos = ride.monkey_pos;
+                let cost = ride.trip_data.cost;
+                self.set_taros(self.taros - cost);
+                self.set_position(final_pos);
+                self.transport_data.skyway_ride = None;
+                crate::helpers::broadcast_monkey(pc_id, RideType::None, clients, state);
+                return;
+            }
+
+            // N.B. the client doesn't treat monkey movement like every other movement.
+            // instead of using the speed value from the packet, it uses the distance between the
+            // current position and the target position. so we can only send move packets once we've
+            // covered about the same distance as the speed.
+            // 100% causes the client to go too fast and pause, but 80% seems to work fine.
+            const SPEED_TO_DISTANCE_FACTOR: f32 = 1.0;
+
+            // tick the path until we've covered the same distance as the speed
+            let speed = ride.path.get_speed() as u32;
+            let distance_to_cover = (speed as f32 * SPEED_TO_DISTANCE_FACTOR) as u32;
+            let mut distance = 0;
+            while distance < distance_to_cover {
+                let old_pos = ride.monkey_pos;
+                ride.path.tick(&mut ride.monkey_pos);
+                distance += old_pos.distance_to(&ride.monkey_pos);
+                if ride.path.is_done() {
+                    break;
+                }
+            }
+
+            // update the player's chunk.
+            // We don't actually update their position until they land
+            let chunk_coords = ChunkCoords::from_pos_inst(ride.monkey_pos, self.instance_id);
+            state
+                .entity_map
+                .update(EntityID::Player(pc_id), Some(chunk_coords), Some(clients));
+
+            // send the move packet
+            let pkt = sP_FE2CL_PC_BROOMSTICK_MOVE {
+                iPC_ID: pc_id,
+                iToX: ride.monkey_pos.x,
+                iToY: ride.monkey_pos.y,
+                iToZ: ride.monkey_pos.z,
+                iSpeed: unused!(),
+            };
+            state
+                .entity_map
+                .for_each_around(EntityID::Player(pc_id), clients, |c| {
+                    c.send_packet(PacketID::P_FE2CL_PC_BROOMSTICK_MOVE, &pkt)
+                });
+
+            // wait for the client to catch up. in theory, takes one second.
+            ride.resume_time = time + Duration::from_secs(1);
+        }
+    }
+
+    fn tick_missions(&mut self, time: SystemTime, clients: &mut ClientMap) {
+        let check_task_failure = |player: &Player, task: &Task, task_def: &TaskDefinition| {
+            if let Some(fail_time) = task.fail_time {
+                if time > fail_time {
+                    return Some(codes::TaskEndErr::TimeLimitExceeded);
+                }
+            }
+
+            if let Some(req_map_num) = task_def.prereq_map_num {
+                if player.get_mapnum() != req_map_num {
+                    return Some(codes::TaskEndErr::InstanceLeft);
+                }
+            }
+
+            // TODO check for escort NPC death
+
+            None
+        };
+
+        let client = self.get_client(clients).unwrap();
+        for task in self.mission_journal.get_current_tasks() {
+            let task_def = tdata_get().get_task_definition(task.get_task_id()).unwrap();
+            let fail_code = check_task_failure(self, &task, task_def);
+            if let Some(fail_code) = fail_code {
+                self.mission_journal.fail_task(task.get_task_id()).unwrap();
+
+                // failure qitem changes
+                if !task_def.fail_qitems.is_empty() {
+                    let qitem_pkt = sP_FE2CL_REP_REWARD_ITEM {
+                        m_iCandy: self.get_taros() as i32,
+                        m_iFusionMatter: self.get_fusion_matter() as i32,
+                        m_iBatteryN: self.get_nano_potions() as i32,
+                        m_iBatteryW: self.get_weapon_boosts() as i32,
+                        iItemCnt: task_def.fail_qitems.len() as i8,
+                        iFatigue: 100,
+                        iFatigue_Level: 1,
+                        iNPC_TypeID: 0,
+                        iTaskID: task_def.task_id,
+                    };
+                    client.queue_packet(P_FE2CL_REP_REWARD_ITEM, &qitem_pkt);
+                    for (qitem_id, qitem_count_mod) in &task_def.succ_qitems {
+                        let curr_count = self.get_quest_item_count(*qitem_id) as isize;
+                        let new_count = (curr_count + *qitem_count_mod) as usize;
+                        let qitem_slot = self.set_quest_item_count(*qitem_id, new_count);
+                        let qitem_reward = sItemReward {
+                            sItem: sItemBase {
+                                iType: ItemType::Quest as i16,
+                                iID: *qitem_id,
+                                iOpt: new_count as i32,
+                                iTimeLimit: unused!(),
+                            },
+                            eIL: ItemLocation::QInven as i32,
+                            iSlotNum: qitem_slot as i32,
+                        };
+                        client.queue_struct(&qitem_reward);
+                    }
+                    log_if_failed(client.flush());
+                }
+
+                let pkt = sP_FE2CL_REP_PC_TASK_END_FAIL {
+                    iTaskNum: task.get_task_id(),
+                    iErrorCode: fail_code as i32,
+                };
+                log_if_failed(client.send_packet(P_FE2CL_REP_PC_TASK_END_FAIL, &pkt));
+            }
+        }
+    }
 }
 impl Combatant for Player {
     fn get_condition_bit_flag(&self) -> i32 {
@@ -1230,68 +1368,8 @@ impl Entity for Player {
     }
 
     fn tick(&mut self, time: SystemTime, clients: &mut ClientMap, state: &mut ShardServerState) {
-        let pc_id = self.id.unwrap();
-        // Skyway ride
-        if let Some(ref mut ride) = self.transport_data.skyway_ride {
-            if ride.resume_time > time {
-                return;
-            }
-
-            if ride.path.is_done() {
-                // we're done!
-                let final_pos = ride.monkey_pos;
-                let cost = ride.trip_data.cost;
-                self.set_taros(self.taros - cost);
-                self.set_position(final_pos);
-                self.transport_data.skyway_ride = None;
-                crate::helpers::broadcast_monkey(pc_id, RideType::None, clients, state);
-                return;
-            }
-
-            // N.B. the client doesn't treat monkey movement like every other movement.
-            // instead of using the speed value from the packet, it uses the distance between the
-            // current position and the target position. so we can only send move packets once we've
-            // covered about the same distance as the speed.
-            // 100% causes the client to go too fast and pause, but 80% seems to work fine.
-            const SPEED_TO_DISTANCE_FACTOR: f32 = 1.0;
-
-            // tick the path until we've covered the same distance as the speed
-            let speed = ride.path.get_speed() as u32;
-            let distance_to_cover = (speed as f32 * SPEED_TO_DISTANCE_FACTOR) as u32;
-            let mut distance = 0;
-            while distance < distance_to_cover {
-                let old_pos = ride.monkey_pos;
-                ride.path.tick(&mut ride.monkey_pos);
-                distance += old_pos.distance_to(&ride.monkey_pos);
-                if ride.path.is_done() {
-                    break;
-                }
-            }
-
-            // update the player's chunk.
-            // We don't actually update their position until they land
-            let chunk_coords = ChunkCoords::from_pos_inst(ride.monkey_pos, self.instance_id);
-            state
-                .entity_map
-                .update(EntityID::Player(pc_id), Some(chunk_coords), Some(clients));
-
-            // send the move packet
-            let pkt = sP_FE2CL_PC_BROOMSTICK_MOVE {
-                iPC_ID: pc_id,
-                iToX: ride.monkey_pos.x,
-                iToY: ride.monkey_pos.y,
-                iToZ: ride.monkey_pos.z,
-                iSpeed: unused!(),
-            };
-            state
-                .entity_map
-                .for_each_around(EntityID::Player(pc_id), clients, |c| {
-                    c.send_packet(PacketID::P_FE2CL_PC_BROOMSTICK_MOVE, &pkt)
-                });
-
-            // wait for the client to catch up. in theory, takes one second.
-            ride.resume_time = time + Duration::from_secs(1);
-        }
+        self.tick_skyway_ride(time, clients, state);
+        self.tick_missions(time, clients);
     }
 
     fn as_any(&self) -> &dyn Any {
