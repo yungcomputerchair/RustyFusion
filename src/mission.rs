@@ -61,6 +61,7 @@ pub struct Task {
     task_id: i32,
     pub remaining_enemy_defeats: HashMap<i32, usize>,
     pub fail_time: Option<SystemTime>,
+    pub escort_npc_id: Option<i32>,
     pub completed: bool,
     pub failed: bool,
 }
@@ -106,6 +107,7 @@ impl From<&TaskDefinition> for Task {
             task_id: task_def.task_id,
             remaining_enemy_defeats: task_def.obj_enemies.clone(),
             fail_time: task_def.obj_time_limit.map(|d| SystemTime::now() + d),
+            escort_npc_id: None,
             completed: false,
             failed: false,
         }

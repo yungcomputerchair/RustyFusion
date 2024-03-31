@@ -144,9 +144,51 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
                 ));
             }
 
+            // check escort npc
+            if let Some(escort_npc_type) = task_def.obj_escort_npc_type {
+                let escort_npc_id = pkt.iEscortNPC_ID;
+                let escort_npc = state.get_npc(escort_npc_id)?;
+                if escort_npc.instance_id != player.instance_id {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!(
+                            "Tried to start task {} with escort NPC instance {} != player instance {}",
+                            pkt.iTaskNum, escort_npc.instance_id, player.instance_id
+                        ),
+                    ));
+                }
+                if escort_npc.ty != escort_npc_type {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!(
+                            "Tried to start task {} with escort NPC type {}, should be {}",
+                            pkt.iTaskNum, escort_npc.ty, escort_npc_type
+                        ),
+                    ));
+                }
+                if escort_npc.path.is_none() {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!("Escort NPC {} has no path", escort_npc_id),
+                    ));
+                }
+                state.entity_map.validate_proximity(
+                    &[EntityID::Player(pc_id), EntityID::NPC(escort_npc_id)],
+                    RANGE_TRIGGER,
+                )?;
+            }
+
             // all clear, start the task
-            let task: Task = task_def.into();
+            let mut task: Task = task_def.into();
             let mission_def = task.get_mission_def();
+
+            // start escort path
+            if task_def.obj_escort_npc_type.is_some() {
+                let escort_npc_id = pkt.iNPC_ID;
+                let escort_npc = state.get_npc_mut(pkt.iNPC_ID).unwrap();
+                escort_npc.path.as_mut().unwrap().start();
+                task.escort_npc_id = Some(escort_npc_id);
+            }
 
             let player = state.get_player_mut(pc_id)?;
             if player.mission_journal.start_task(task)? {
@@ -159,8 +201,6 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
                     ),
                 );
             }
-
-            // TODO start escort path
 
             let resp = sP_FE2CL_REP_PC_TASK_START_SUCC {
                 iTaskNum: pkt.iTaskNum,
@@ -278,7 +318,19 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
                 }
             }
 
-            // TODO check escort path
+            // check escort path
+            if let Some(escort_npc_id) = task.escort_npc_id {
+                let escort_npc = state.get_npc(escort_npc_id)?;
+                if !escort_npc.path.as_ref().unwrap().is_done() {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!(
+                            "Tried to end task {} with escort NPC {} not at destination",
+                            pkt.iTaskNum, escort_npc_id
+                        ),
+                    ));
+                }
+            }
 
             // check time limit
             if let Some(time_limit) = task.fail_time {
