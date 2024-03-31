@@ -149,7 +149,22 @@ fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>, state: 
             // dirty exit; clean exit happens in P_CL2FE_REQ_PC_EXIT handler
             Player::disconnect(pc_id, state, &mut clients);
         }
-        _ => (),
+        ClientType::Unknown => {
+            log(
+                Severity::Debug,
+                &format!("Client disconnected: {}", client.get_addr()),
+            );
+        }
+        _ => {
+            log(
+                Severity::Warning,
+                &format!(
+                    "Unhandled disconnect for client {} (type {:?})",
+                    client.get_addr(),
+                    client.client_type
+                ),
+            );
+        }
     }
 }
 
@@ -183,6 +198,7 @@ fn handle_packet(
         P_LS2FE_REP_PC_LOCATION_SUCC => login::login_pc_location_succ(&mut clients, state),
         P_LS2FE_REP_PC_LOCATION_FAIL => login::login_pc_location_fail(&mut clients, state),
         P_LS2FE_REQ_PC_EXIT_DUPLICATE => login::login_pc_exit_duplicate(&mut clients, state),
+        P_LS2FE_REP_LIVE_CHECK => Ok(()),
         //
         P_CL2LS_REQ_LOGIN => wrong_server(clients.get_self()),
         //
@@ -328,6 +344,12 @@ fn send_live_check(client: &mut FFClient) -> FFResult<()> {
                 iTempValue: unused!(),
             };
             client.send_packet(P_FE2CL_REQ_LIVE_CHECK, &pkt)
+        }
+        ClientType::LoginServer => {
+            let pkt = sP_FE2LS_REQ_LIVE_CHECK {
+                iTempValue: unused!(),
+            };
+            client.send_packet(P_FE2LS_REQ_LIVE_CHECK, &pkt)
         }
         _ => Ok(()),
     }

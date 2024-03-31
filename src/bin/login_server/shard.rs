@@ -14,7 +14,7 @@ use rusty_fusion::{
         ClientType, FFClient,
     },
     state::{LoginServerState, PlayerSearchRequest},
-    util,
+    unused, util,
 };
 
 pub fn connect(
@@ -60,6 +60,14 @@ pub fn connect(
     Ok(())
 }
 
+pub fn shard_live_check(client: &mut FFClient) -> FFResult<()> {
+    let resp = sP_LS2FE_REP_LIVE_CHECK {
+        iTempValue: unused!(),
+    };
+    client.send_packet(P_LS2FE_REP_LIVE_CHECK, &resp)?;
+    Ok(())
+}
+
 pub fn update_login_info_succ(
     shard_key: usize,
     clients: &mut HashMap<usize, FFClient>,
@@ -84,6 +92,7 @@ pub fn update_login_info_succ(
         })
         .unwrap();
     client.send_packet(P_LS2CL_REP_SHARD_SELECT_SUCC, &resp)?;
+    client.disconnect();
 
     Ok(())
 }

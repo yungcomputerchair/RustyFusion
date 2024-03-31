@@ -70,19 +70,37 @@ impl FFServer {
     }
 
     pub fn poll(&mut self, state: &mut ServerState, live_check_interval: Duration) -> Result<()> {
+        let time_now = SystemTime::now();
         let client_keys: Vec<usize> = self.clients.keys().copied().collect();
         for key in client_keys {
             let client = self.clients.get_mut(&key).unwrap();
-
             // live check
-            if let Some(callback) = self.live_check_handler {
-                let time_since_last_heartbeat = client.last_heartbeat.elapsed().unwrap();
-                if time_since_last_heartbeat > 2 * live_check_interval {
-                    // client didn't respond to live check
-                    client.disconnect();
-                } else if time_since_last_heartbeat > live_check_interval {
-                    // send live check
-                    log_if_failed(callback(client));
+            if let Some(lc_callback) = self.live_check_handler {
+                match client.live_check_time {
+                    Some(dc_time) => {
+                        if dc_time < time_now {
+                            log(
+                                Severity::Info,
+                                &format!(
+                                    "Client {} didn't respond to live check; disconnecting",
+                                    client.get_addr()
+                                ),
+                            );
+                            client.disconnect();
+                        }
+                    }
+                    None => {
+                        let time_since_last_heartbeat =
+                            time_now.duration_since(client.last_heartbeat).unwrap();
+                        if time_since_last_heartbeat > live_check_interval {
+                            log(
+                                Severity::Debug,
+                                &format!("Sending live check to client {}", client.get_addr()),
+                            );
+                            log_if_failed(lc_callback(client));
+                            client.live_check_time = Some(time_now + live_check_interval);
+                        }
+                    }
                 }
             }
 
@@ -91,7 +109,6 @@ impl FFServer {
             }
         }
 
-        let time_now = SystemTime::now();
         let mut events: Vec<Event> = Vec::new();
         if let Err(e) = self.poller.wait(&mut events, self.poll_timeout) {
             match e.kind() {

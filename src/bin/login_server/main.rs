@@ -119,7 +119,22 @@ fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>, state: 
                 &format!("Login session ended for account #{}", account_id),
             );
         }
-        _ => (),
+        ClientType::Unknown => {
+            log(
+                Severity::Debug,
+                &format!("Client disconnected: {}", client.get_addr()),
+            );
+        }
+        _ => {
+            log(
+                Severity::Warning,
+                &format!(
+                    "Unhandled disconnect for client {} (type {:?})",
+                    client.get_addr(),
+                    client.client_type
+                ),
+            );
+        }
     }
 }
 
@@ -147,6 +162,7 @@ fn handle_packet(
         P_FE2LS_REQ_PC_LOCATION => shard::pc_location(key, clients, state),
         P_FE2LS_REP_PC_LOCATION_SUCC => shard::pc_location_succ(key, clients, state),
         P_FE2LS_REP_PC_LOCATION_FAIL => shard::pc_location_fail(key, clients, state),
+        P_FE2LS_REQ_LIVE_CHECK => shard::shard_live_check(client),
         //
         P_CL2LS_REQ_LOGIN => login::login(client, state, time),
         P_CL2LS_REQ_PC_EXIT_DUPLICATE => login::pc_exit_duplicate(key, clients, state),

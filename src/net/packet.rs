@@ -532,6 +532,7 @@ pub enum PacketID {
     P_LS2FE_REP_PC_LOCATION_FAIL = 0x23000008,  // 587202568
     P_LS2FE_REQ_PC_LOCATION = 0x23000009,       // 587202569
     P_LS2FE_REQ_PC_EXIT_DUPLICATE = 0x2300000a, // 587202570
+    P_LS2FE_REP_LIVE_CHECK = 0x2300000b,        // 587202571
 
     P_FE2LS_REQ_CONNECT = 0x32000001,                // 838860801
     P_FE2LS_REP_LIVE_CHECK = 0x32000002,             // 838860802
@@ -545,6 +546,7 @@ pub enum PacketID {
     P_FE2LS_REQ_PC_LOCATION = 0x3200000a,            // 838860810
     P_FE2LS_REP_PC_LOCATION_SUCC = 0x3200000b,       // 838860811
     P_FE2LS_REP_PC_LOCATION_FAIL = 0x3200000c,       // 838860812
+    P_FE2LS_REQ_LIVE_CHECK = 0x3200000d,             // 838860813
 }
 
 pub trait FFPacket: std::fmt::Debug {}
@@ -6613,6 +6615,14 @@ impl FFPacket for sP_LS2FE_REQ_PC_EXIT_DUPLICATE {}
 #[repr(packed(4))]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
+pub struct sP_LS2FE_REP_LIVE_CHECK {
+    pub iTempValue: i32,
+}
+impl FFPacket for sP_LS2FE_REP_LIVE_CHECK {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2LS_REQ_CONNECT {
     pub iTempValue: i32,
 }
@@ -6715,3 +6725,11 @@ pub struct sP_FE2LS_REP_PC_LOCATION_FAIL {
     pub iErrorCode: i32,
 }
 impl FFPacket for sP_FE2LS_REP_PC_LOCATION_FAIL {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_REQ_LIVE_CHECK {
+    pub iTempValue: i32,
+}
+impl FFPacket for sP_FE2LS_REQ_LIVE_CHECK {}
