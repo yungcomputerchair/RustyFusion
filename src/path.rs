@@ -89,11 +89,13 @@ impl Path {
         }
     }
 
+    pub fn start(&mut self) {
+        self.state = PathState::Moving;
+    }
+
     pub fn tick(&mut self, pos: &mut Position) -> bool {
         match self.state {
-            PathState::Pending => {
-                self.state = PathState::Moving;
-            }
+            PathState::Pending => {}
             PathState::Moving => {
                 let dist = self.points[self.idx].speed as f32 / SHARD_TICKS_PER_SECOND as f32;
                 let target_point = self.points[self.idx];

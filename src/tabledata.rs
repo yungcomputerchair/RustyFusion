@@ -1828,7 +1828,15 @@ fn load_path_data() -> Result<PathData, String> {
             };
             let npc_path = Path::new(points, cycle);
             for npc_type in &npc_path_entry.aNPCTypes {
-                npc_paths.insert(*npc_type, npc_path.clone());
+                // currently, OpenFusion tabledata for paths does not
+                // have a field for initial path state; however,
+                // we really only want non-cyclic paths to wait,
+                // so we can auto-start the rest.
+                let mut path_cloned = npc_path.clone();
+                if cycle {
+                    path_cloned.start();
+                }
+                npc_paths.insert(*npc_type, path_cloned);
             }
         }
         Ok(npc_paths)
