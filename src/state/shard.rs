@@ -48,7 +48,7 @@ impl Default for ShardServerState {
         }
         for channel_num in 1..=num_channels {
             for mut npc in tdata_get().get_npcs(&mut state.entity_map, channel_num) {
-                let mut needs_tick = false;
+                let mut needs_tick = npc.is_mob;
                 if let Some(path) = tdata_get().get_npc_path(npc.ty) {
                     npc.set_path(path);
                     needs_tick = true;

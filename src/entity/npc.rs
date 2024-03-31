@@ -25,9 +25,17 @@ pub struct NPC {
     pub follower_ids: HashSet<i32>,
     pub leader_id: Option<i32>,
     pub path: Option<Path>,
+    pub is_mob: bool,
 }
 impl NPC {
-    pub fn new(id: i32, ty: i32, position: Position, angle: i32, instance_id: InstanceID) -> Self {
+    pub fn new(
+        id: i32,
+        ty: i32,
+        position: Position,
+        angle: i32,
+        instance_id: InstanceID,
+        is_mob: bool,
+    ) -> Self {
         Self {
             id,
             ty,
@@ -37,6 +45,7 @@ impl NPC {
             follower_ids: HashSet::new(),
             leader_id: None,
             path: None,
+            is_mob,
         }
     }
 

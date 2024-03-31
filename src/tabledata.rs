@@ -67,6 +67,7 @@ struct NPCData {
     angle: i32,
     map_num: Option<u32>,
     followers: Vec<FollowerData>,
+    is_mob: bool,
 }
 
 #[derive(Debug)]
@@ -395,6 +396,7 @@ impl TableData {
                     map_num: dat.map_num.unwrap_or(ID_OVERWORLD),
                     instance_num: None,
                 },
+                dat.is_mob,
             );
             for follower in &dat.followers {
                 let id = entity_map.gen_next_npc_id();
@@ -412,6 +414,7 @@ impl TableData {
                         map_num: dat.map_num.unwrap_or(ID_OVERWORLD),
                         instance_num: None,
                     },
+                    dat.is_mob,
                 );
                 follower.leader_id = Some(npc.id);
                 npcs.push(follower);
@@ -1563,7 +1566,10 @@ fn load_npc_data() -> Result<Vec<NPCData>, String> {
     const MOB_TABLE_KEY: &str = "mobs";
     const MOB_GROUP_TABLE_KEY: &str = "groups";
 
-    fn load_npc_table(table: &Map<std::string::String, Value>) -> Result<Vec<NPCData>, String> {
+    fn load_npc_table(
+        table: &Map<std::string::String, Value>,
+        is_mob: bool,
+    ) -> Result<Vec<NPCData>, String> {
         #[derive(Deserialize)]
         struct FollowerDataEntry {
             iNPCType: i32,
@@ -1588,6 +1594,7 @@ fn load_npc_data() -> Result<Vec<NPCData>, String> {
                 .map_err(|e| format!("Malformed NPC data entry: {}", e))?;
             let npc_data_entry = NPCData {
                 npc_type: npc_data_entry.iNPCType,
+                is_mob,
                 pos: Position {
                     x: npc_data_entry.iX,
                     y: npc_data_entry.iY,
@@ -1617,13 +1624,13 @@ fn load_npc_data() -> Result<Vec<NPCData>, String> {
 
     let npc_root = load_json("NPCs.json")?;
     let npc_table = get_object(&npc_root, NPC_TABLE_KEY)?;
-    npc_data.extend(load_npc_table(npc_table)?);
+    npc_data.extend(load_npc_table(npc_table, false)?);
 
     let mob_root = load_json("mobs.json")?;
     let mob_table = get_object(&mob_root, MOB_TABLE_KEY)?;
-    npc_data.extend(load_npc_table(mob_table)?);
+    npc_data.extend(load_npc_table(mob_table, true)?);
     let grouped_mob_table = get_object(&mob_root, MOB_GROUP_TABLE_KEY)?;
-    npc_data.extend(load_npc_table(grouped_mob_table)?);
+    npc_data.extend(load_npc_table(grouped_mob_table, true)?);
 
     Ok(npc_data)
 }

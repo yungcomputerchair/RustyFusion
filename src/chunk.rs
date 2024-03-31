@@ -565,6 +565,7 @@ impl EntityMap {
             for x in 0..NCHUNKS {
                 for y in 0..NCHUNKS {
                     for id in template_chunks[x][y].get_all() {
+                        let tick = self.registry[&id].tick;
                         if let EntityID::NPC(npc_id) = *id {
                             let mut npc = self.get_npc(npc_id).unwrap().clone();
                             npc.instance_id = instance_id;
@@ -584,7 +585,7 @@ impl EntityMap {
                             npc.leader_id = None;
 
                             let chunk_pos = npc.get_chunk_coords();
-                            let new_npc_id = self.track(Box::new(npc), false);
+                            let new_npc_id = self.track(Box::new(npc), tick);
                             self.update(new_npc_id, Some(chunk_pos), None);
                             npc_count += 1;
                         }
