@@ -99,6 +99,7 @@ impl FFError {
         Self {
             severity: match error.kind() {
                 std::io::ErrorKind::UnexpectedEof => Severity::Debug,
+                std::io::ErrorKind::BrokenPipe => Severity::Debug,
                 _ => Severity::Warning,
             },
             msg: format!("I/O error ({:?})", error.kind()),
