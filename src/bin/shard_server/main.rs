@@ -242,7 +242,6 @@ fn handle_packet(
         P_CL2FE_REQ_PC_VENDOR_BATTERY_BUY => item::vendor_battery_buy(clients.get_self(), state),
         P_CL2FE_PC_STREETSTALL_REQ_CANCEL => item::streetstall_cancel(clients.get_self()),
         //
-        P_CL2FE_REQ_PC_NANO_CREATE => nano::nano_create(&mut clients, state),
         P_CL2FE_REQ_NANO_EQUIP => nano::nano_equip(&mut clients, state),
         P_CL2FE_REQ_NANO_UNEQUIP => nano::nano_unequip(&mut clients, state),
         P_CL2FE_REQ_NANO_ACTIVE => nano::nano_active(&mut clients, state),

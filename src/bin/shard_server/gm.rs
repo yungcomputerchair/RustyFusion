@@ -109,7 +109,7 @@ pub fn gm_pc_give_nano(clients: &mut ClientMap, state: &mut ShardServerState) ->
 
             let resp = sP_FE2CL_REP_PC_NANO_CREATE_SUCC {
                 iPC_FusionMatter: player.get_fusion_matter() as i32,
-                iQuestItemSlotNum: 0,
+                iQuestItemSlotNum: -1,
                 QuestItem: None.into(),
                 Nano: Some(nano).into(),
                 iPC_Level: player.get_level(),
