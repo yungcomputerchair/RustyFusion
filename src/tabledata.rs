@@ -1286,6 +1286,7 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
         m_iCSUNumToKill: [usize; MAX_NEED_SORT_OF_ENEMY as usize],
         m_iSTItemID: [i16; 3],
         m_iSTItemDropRate: [i16; 3],
+        m_iSTNanoID: i16,
         m_iDelItemID: [i16; 4],
     }
 
@@ -1443,6 +1444,10 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
                 })
                 .collect(),
             succ_reward: match entry.m_iSUReward {
+                0 => None,
+                x => Some(x),
+            },
+            succ_nano_id: match entry.m_iSTNanoID {
                 0 => None,
                 x => Some(x),
             },

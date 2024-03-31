@@ -49,6 +49,7 @@ pub struct TaskDefinition {
     pub succ_task_id: Option<i32>,        // m_iSUOutgoingTask
     pub succ_qitems: HashMap<i16, isize>, // m_iSUItem -> m_iSUInstancename
     pub succ_reward: Option<i32>,         // m_iSUReward
+    pub succ_nano_id: Option<i16>,        // m_iSTNanoID
 
     // misc
     pub drop_qitem: Option<(i16, f32)>, // m_iSTItemID[0], m_iSTItemDropRate[0] / 100

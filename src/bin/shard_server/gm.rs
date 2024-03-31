@@ -91,17 +91,6 @@ pub fn gm_pc_give_nano(clients: &mut ClientMap, state: &mut ShardServerState) ->
             let client = clients.get_self();
             let pc_id = helpers::validate_gm(client, state)?;
             let nano_id = pkt.iNanoID;
-
-            let bcast = sP_FE2CL_REP_PC_NANO_CREATE {
-                iPC_ID: pc_id,
-                iNanoID: pkt.iNanoID,
-            };
-            state
-                .entity_map
-                .for_each_around(EntityID::Player(pc_id), clients, |c| {
-                    c.send_packet(P_FE2CL_REP_PC_NANO_CREATE, &bcast)
-                });
-
             let player = state.get_player_mut(pc_id)?;
             let new_level = max(player.get_level(), nano_id);
             player.set_level(new_level);
@@ -112,12 +101,25 @@ pub fn gm_pc_give_nano(clients: &mut ClientMap, state: &mut ShardServerState) ->
                 iQuestItemSlotNum: -1,
                 QuestItem: None.into(),
                 Nano: Some(nano).into(),
-                iPC_Level: player.get_level(),
+                iPC_Level: new_level,
             };
 
-            clients
-                .get_self()
-                .send_packet(P_FE2CL_REP_PC_NANO_CREATE_SUCC, &resp)
+            log_if_failed(
+                clients
+                    .get_self()
+                    .send_packet(P_FE2CL_REP_PC_NANO_CREATE_SUCC, &resp),
+            );
+
+            let bcast = sP_FE2CL_REP_PC_CHANGE_LEVEL {
+                iPC_ID: pc_id,
+                iPC_Level: new_level,
+            };
+            state
+                .entity_map
+                .for_each_around(EntityID::Player(pc_id), clients, |c| {
+                    c.send_packet(P_FE2CL_REP_PC_CHANGE_LEVEL, &bcast)
+                });
+            Ok(())
         })(),
         || {
             let client = clients.get_self();
