@@ -20,7 +20,7 @@ use crate::{
             PacketID::{self, *},
             *,
         },
-        ClientMap, FFClient,
+        ClientMap, ClientType, FFClient,
     },
     path::Path,
     state::ShardServerState,
@@ -1119,7 +1119,9 @@ impl Player {
         entity_map.update(id, None, Some(clients));
         let mut player = entity_map.untrack(id);
         player.cleanup(clients, state);
-        player.get_client(clients).unwrap().disconnect();
+        let client = player.get_client(clients).unwrap();
+        client.client_type = ClientType::Unknown;
+        client.disconnect();
 
         let pkt_pc = sP_FE2LS_UPDATE_PC_SHARD {
             iPC_UID: pc_uid,
