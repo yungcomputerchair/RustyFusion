@@ -64,11 +64,12 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
     - [ ] E.G.G.s (the ones on the ground that buff you)
   - [x] Mob drops
 - [ ] Missions
-  - [ ] ***Starting tasks +***
+  - [x] Starting tasks +
   - [x] Switching active mission
   - [x] Quest items
-  - [ ] ***Completing tasks +***
+  - [x] Completing tasks +
   - [x] Mission rewards
+  - [ ] Escort mission paths
 - [x] Entity pathing
 - [ ] Infected Zone races
 - [x] Guide changing
@@ -90,7 +91,7 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
   - [ ] Code redemption
 
 ### Known Issues
-None currently
+- Login server session sometimes gets lost when new shard connects
 
 Items that are ***highlighted*** are in planning or WIP. Items marked with `+` are either new and not present in OpenFusion or enhanced from OpenFusion (bug fixes not included). Some items have dependencies in other categories, so the list won't get completed in order.
 
