@@ -69,7 +69,11 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
   - [x] Quest items
   - [x] Completing tasks +
   - [x] Mission rewards
-  - [ ] Escort mission paths
+  - [ ] ***Escort mission paths +***
+      - [x] Eduardo (Scary Monsters)
+      - [ ] Professor Utonium (New Creep in Town (Part 3 of 3))
+      - [ ] Billy (Carnival Collection)
+      - [ ] Grim (Don't Fear the Reaper (Part 4 of 4))
 - [x] Entity pathing
 - [ ] Infected Zone races
 - [x] Guide changing
