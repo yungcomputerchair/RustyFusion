@@ -22,6 +22,17 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
             let player = state.get_player(pc_id)?;
             let task_def = tdata_get().get_task_definition(pkt.iTaskNum)?;
 
+            // check if already started
+            if player
+                .mission_journal
+                .get_current_tasks()
+                .iter()
+                .any(|t| t.get_task_id() == pkt.iTaskNum)
+            {
+                // benign client bug; ignore
+                return Ok(());
+            }
+
             // check giver NPC type + proximity
             if let Some(giver_npc_type) = task_def.prereq_npc_type {
                 let req_npc_id = pkt.iNPC_ID;
@@ -284,6 +295,7 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
                     match task_def.task_type {
                         TaskType::Talk => RANGE_INTERACT,
                         TaskType::GotoLocation => RANGE_TRIGGER,
+                        TaskType::EscortDefence => RANGE_TRIGGER,
                         _ => RANGE_INTERACT,
                     },
                 )?;
@@ -496,7 +508,10 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
         || {
             let resp = sP_FE2CL_REP_PC_TASK_END_FAIL {
                 iTaskNum: pkt.iTaskNum,
-                iErrorCode: error_code.unwrap() as i32,
+                iErrorCode: error_code.unwrap_or_else(|| {
+                    log(Severity::Warning, "Task end failed with no error code");
+                    codes::TaskEndErr::Unknown
+                }) as i32,
             };
             clients
                 .get_self()
