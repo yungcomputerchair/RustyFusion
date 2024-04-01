@@ -184,8 +184,8 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
 
             // start escort path
             if task_def.obj_escort_npc_type.is_some() {
-                let escort_npc_id = pkt.iNPC_ID;
-                let escort_npc = state.get_npc_mut(pkt.iNPC_ID).unwrap();
+                let escort_npc_id = pkt.iEscortNPC_ID;
+                let escort_npc = state.get_npc_mut(pkt.iEscortNPC_ID).unwrap();
                 escort_npc.path.as_mut().unwrap().start();
                 task.escort_npc_id = Some(escort_npc_id);
             }
