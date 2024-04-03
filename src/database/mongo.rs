@@ -393,7 +393,8 @@ impl TryFrom<DbPlayer> for Player {
         }
 
         for task in db_player.running_quests.unwrap_or_default() {
-            let task: Task = task.try_into()?;
+            let mut task: Task = task.try_into()?;
+            task.fail_time = None;
             player.mission_journal.start_task(task)?;
         }
 

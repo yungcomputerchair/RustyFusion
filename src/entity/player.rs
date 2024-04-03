@@ -1223,9 +1223,17 @@ impl Player {
 
     fn tick_missions(&mut self, time: SystemTime, clients: &mut ClientMap) {
         let check_task_failure = |player: &Player, task: &Task, task_def: &TaskDefinition| {
-            if let Some(fail_time) = task.fail_time {
-                if time > fail_time {
-                    return Some(codes::TaskEndErr::TimeLimitExceeded);
+            if task_def.obj_time_limit.is_some() {
+                match task.fail_time {
+                    Some(fail_time) => {
+                        if time > fail_time {
+                            return Some(codes::TaskEndErr::TimeLimitExceeded);
+                        }
+                    }
+                    None => {
+                        // user re-logged; auto-fail
+                        return Some(codes::TaskEndErr::TimeLimitExceeded);
+                    }
                 }
             }
 
