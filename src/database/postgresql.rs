@@ -398,7 +398,7 @@ impl PostgresDatabase {
         for quest_item in quest_items {
             let item_id: Int = quest_item.get("ID");
             let count: Int = quest_item.get("Opt");
-            player.set_quest_item_count(item_id as i16, count as usize);
+            player.set_quest_item_count(item_id as i16, count as usize)?;
         }
 
         Ok(player)

@@ -383,7 +383,7 @@ impl TryFrom<DbPlayer> for Player {
         }
 
         for quest_item in db_player.quest_items.unwrap_or_default() {
-            player.set_quest_item_count(quest_item.id as i16, quest_item.count as usize);
+            player.set_quest_item_count(quest_item.id as i16, quest_item.count as usize)?;
         }
 
         let quest_bytes: &[u8] = &db_player.quest_bytes;

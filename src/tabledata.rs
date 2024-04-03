@@ -1287,8 +1287,9 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
         m_iCSUItemNumNeeded: [usize; MAX_NEED_SORT_OF_ITEM as usize],
         m_iCSUEnemyID: [i32; MAX_NEED_SORT_OF_ENEMY as usize],
         m_iCSUNumToKill: [usize; MAX_NEED_SORT_OF_ENEMY as usize],
-        m_iSTItemID: [i16; 3],
-        m_iSTItemDropRate: [i16; 3],
+        m_iSTItemID: [i16; MAX_NEED_SORT_OF_ITEM as usize],
+        m_iSTItemNumNeeded: [isize; MAX_NEED_SORT_OF_ITEM as usize],
+        m_iSTItemDropRate: [i16; MAX_NEED_SORT_OF_ITEM as usize],
         m_iSTNanoID: i16,
         m_iDelItemID: [i16; 4],
     }
@@ -1454,11 +1455,32 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
                 0 => None,
                 x => Some(x),
             },
-            drop_qitem: match entry.m_iSTItemID[0] {
-                0 => None,
-                x => Some((x, entry.m_iSTItemDropRate[0] as f32 / 100.0)),
-            },
-            del_qitems: entry
+            given_qitems: entry
+                .m_iSTItemID
+                .iter()
+                .zip(entry.m_iSTItemNumNeeded.iter())
+                .flat_map(|(id, num)| {
+                    if *id != 0 && *num != 0 {
+                        Some((*id, *num))
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+            dropped_qitems: entry
+                .m_iSTItemID
+                .iter()
+                .zip(entry.m_iSTItemDropRate.iter())
+                .flat_map(|(id, rate)| {
+                    if *id != 0 && *rate != 0 {
+                        let drop_rate = *rate as f32 / 100.0;
+                        Some((*id, drop_rate))
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+            delete_qitems: entry
                 .m_iDelItemID
                 .iter()
                 .flat_map(|id| match id {

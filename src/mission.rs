@@ -52,8 +52,9 @@ pub struct TaskDefinition {
     pub succ_nano_id: Option<i16>,        // m_iSTNanoID
 
     // misc
-    pub drop_qitem: Option<(i16, f32)>, // m_iSTItemID[0], m_iSTItemDropRate[0] / 100
-    pub del_qitems: HashSet<i16>,       // m_iDelItemID
+    pub given_qitems: HashMap<i16, isize>, // m_iSTItemID -> m_iSTItemNum
+    pub dropped_qitems: HashMap<i16, f32>, // m_iSTItemID -> m_iSTItemDropRate / 100
+    pub delete_qitems: HashSet<i16>,       // m_iDelItemID
 }
 
 #[derive(Debug, Clone)]

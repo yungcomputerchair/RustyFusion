@@ -442,8 +442,8 @@ mod helpers {
             // remove all active tasks
             for task_id in player.mission_journal.get_current_task_ids() {
                 let task = player.mission_journal.remove_task(task_id).unwrap();
-                for item_id in &task.get_task_def().del_qitems {
-                    let qitem_slot = player.set_quest_item_count(*item_id, 0);
+                for item_id in &task.get_task_def().delete_qitems {
+                    let qitem_slot = player.set_quest_item_count(*item_id, 0).unwrap();
                     // client doesn't automatically delete qitems clientside
                     let pkt = sP_FE2CL_REP_PC_ITEM_DELETE_SUCC {
                         eIL: ItemLocation::QInven as i32,

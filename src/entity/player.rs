@@ -749,23 +749,30 @@ impl Player {
             .unwrap_or(0)
     }
 
-    pub fn set_quest_item_count(&mut self, item_id: i16, count: usize) -> usize {
+    pub fn set_quest_item_count(&mut self, item_id: i16, count: usize) -> FFResult<usize> {
+        let new_qitem = if count == 0 {
+            None
+        } else {
+            Some((item_id, count))
+        };
         for (idx, slot) in self.inventory.quest.iter_mut().enumerate() {
             if let Some((qitem_id, _)) = slot {
                 if *qitem_id == item_id {
-                    if count == 0 {
-                        *slot = None;
-                    } else {
-                        *slot = Some((item_id, count));
-                    }
-                    return idx;
+                    *slot = new_qitem;
+                    return Ok(idx);
                 }
             } else {
-                *slot = Some((item_id, count));
-                return idx;
+                *slot = new_qitem;
+                return Ok(idx);
             }
         }
-        panic_log("No free quest item slots");
+        Err(FFError::build(
+            Severity::Warning,
+            format!(
+                "No free quest item slots for player {}",
+                self.get_player_id()
+            ),
+        ))
     }
 
     pub fn get_free_slots(&self, location: ItemLocation) -> usize {
@@ -1257,7 +1264,7 @@ impl Player {
                     for (qitem_id, qitem_count_mod) in &task_def.succ_qitems {
                         let curr_count = self.get_quest_item_count(*qitem_id) as isize;
                         let new_count = (curr_count + *qitem_count_mod) as usize;
-                        let qitem_slot = self.set_quest_item_count(*qitem_id, new_count);
+                        let qitem_slot = self.set_quest_item_count(*qitem_id, new_count).unwrap();
                         let qitem_reward = sItemReward {
                             sItem: sItemBase {
                                 iType: ItemType::Quest as i16,

@@ -189,11 +189,25 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
                 )?;
             }
 
+            // check for free qitem slots. this is stricter than it needs to be but
+            // we can keep it as long as we don't run into problems
+            if task_def.given_qitems.len() > player.get_free_slots(ItemLocation::QInven) {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!(
+                        "Tried to start task {} with {} qitems but only {} qitem slots",
+                        pkt.iTaskNum,
+                        task_def.given_qitems.len(),
+                        player.get_free_slots(ItemLocation::QInven)
+                    ),
+                ));
+            }
+
             // all clear, start the task
             let mut task: Task = task_def.into();
             let mission_def = task.get_mission_def();
 
-            // start escort path
+            // start escort path (non-destructive if start_task fails)
             if task_def.obj_escort_npc_type.is_some() {
                 let escort_npc_id = pkt.iEscortNPC_ID;
                 let escort_npc = state.get_npc_mut(pkt.iEscortNPC_ID).unwrap();
@@ -201,16 +215,50 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
                 task.escort_npc_id = Some(escort_npc_id);
             }
 
-            let player = state.get_player_mut(pc_id)?;
+            let player = state.get_player_mut(pc_id).unwrap();
             if player.mission_journal.start_task(task)? {
                 log(
                     Severity::Debug,
                     &format!(
-                        "Player {} started mission: {}",
+                        "Player {} started mission: {} [{}]",
                         player.get_uid(),
-                        mission_def.mission_name
+                        mission_def.mission_name,
+                        mission_def.mission_id
                     ),
                 );
+            }
+
+            // grant qitems
+            if !task_def.given_qitems.is_empty() {
+                let qitem_pkt = sP_FE2CL_REP_REWARD_ITEM {
+                    m_iCandy: player.get_taros() as i32,
+                    m_iFusionMatter: player.get_fusion_matter() as i32,
+                    m_iBatteryN: player.get_nano_potions() as i32,
+                    m_iBatteryW: player.get_weapon_boosts() as i32,
+                    iItemCnt: task_def.given_qitems.len() as i8,
+                    iFatigue: 100,
+                    iFatigue_Level: 1,
+                    iNPC_TypeID: 0,
+                    iTaskID: task_def.task_id,
+                };
+                client.queue_packet(P_FE2CL_REP_REWARD_ITEM, &qitem_pkt);
+                for (qitem_id, qitem_count_mod) in &task_def.given_qitems {
+                    let curr_count = player.get_quest_item_count(*qitem_id) as isize;
+                    let new_count = (curr_count + *qitem_count_mod) as usize;
+                    let qitem_slot = player.set_quest_item_count(*qitem_id, new_count).unwrap();
+                    let qitem_reward = sItemReward {
+                        sItem: sItemBase {
+                            iType: ItemType::Quest as i16,
+                            iID: *qitem_id,
+                            iOpt: new_count as i32,
+                            iTimeLimit: unused!(),
+                        },
+                        eIL: ItemLocation::QInven as i32,
+                        iSlotNum: qitem_slot as i32,
+                    };
+                    client.queue_struct(&qitem_reward);
+                }
+                log_if_failed(client.flush());
             }
 
             let resp = sP_FE2CL_REP_PC_TASK_START_SUCC {
@@ -248,8 +296,8 @@ pub fn task_stop(client: &mut FFClient, state: &mut ShardServerState) -> FFResul
 
     player.mission_journal.remove_task(pkt.iTaskNum)?;
 
-    for item_id in &task_def.del_qitems {
-        let qitem_slot = player.set_quest_item_count(*item_id, 0);
+    for item_id in &task_def.delete_qitems {
+        let qitem_slot = player.set_quest_item_count(*item_id, 0).unwrap();
         // client doesn't automatically delete qitems clientside
         let pkt = sP_FE2CL_REP_PC_ITEM_DELETE_SUCC {
             eIL: ItemLocation::QInven as i32,
@@ -382,6 +430,20 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
                 }
             }
 
+            // check for free qitem slots for qitem rewards
+            if player.get_free_slots(ItemLocation::QInven) < task_def.succ_qitems.len() {
+                error_code = Some(codes::TaskEndErr::InventoryFull);
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!(
+                        "Tried to end task {} with {} qitems but only {} qitem slots",
+                        pkt.iTaskNum,
+                        task_def.succ_qitems.len(),
+                        player.get_free_slots(ItemLocation::QInven)
+                    ),
+                ));
+            }
+
             // all clear, mark the task completed. it'll be overwritten by the next task
             let player = state.get_player_mut(pc_id).unwrap();
             player.mission_journal.complete_task(pkt.iTaskNum)?;
@@ -405,7 +467,7 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
                 for (qitem_id, qitem_count_mod) in &task_def.succ_qitems {
                     let curr_count = player.get_quest_item_count(*qitem_id) as isize;
                     let new_count = (curr_count + *qitem_count_mod) as usize;
-                    let qitem_slot = player.set_quest_item_count(*qitem_id, new_count);
+                    let qitem_slot = player.set_quest_item_count(*qitem_id, new_count).unwrap();
                     let qitem_reward = sItemReward {
                         sItem: sItemBase {
                             iType: ItemType::Quest as i16,
