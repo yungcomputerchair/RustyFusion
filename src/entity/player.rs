@@ -10,7 +10,9 @@ use crate::{
     database::db_get,
     defines::*,
     entity::{Combatant, Entity, EntityID},
-    enums::{ItemLocation, ItemType, PlayerGuide, PlayerShardStatus, RewardType, RideType},
+    enums::{
+        ItemLocation, ItemType, PlayerGuide, PlayerShardStatus, RewardType, RideType, TaskType,
+    },
     error::{codes, log, log_if_failed, panic_log, FFError, FFResult, Severity},
     item::Item,
     mission::{MissionJournal, Task, TaskDefinition},
@@ -1258,9 +1260,41 @@ impl Player {
             None
         };
 
+        let check_task_repair = |player: &Player, task: &Task, task_def: &TaskDefinition| {
+            // There are rare cases where the clients qitem state gets corrupted, usually due to XDT bugs
+            // (e.g. tasks that don't clean up quest items properly due to a missing iDelItemID entry).
+            // We can attempt to fix this by checking if the player has the required quest items for the
+            // current task and, if so, re-sending one to force a completion request out of the client.
+            // This check is pretty strict to avoid false positives.
+
+            if task.pending_repair {
+                // already sent repair packet
+                return None;
+            }
+
+            if task_def.task_type != TaskType::Defeat {
+                // only "get X item from Y mob" tasks have this issue
+                return None;
+            }
+
+            for (qitem_id, req_count) in &task_def.obj_qitems {
+                if player.get_quest_item_count(*qitem_id) < *req_count {
+                    return None;
+                }
+            }
+
+            let Some((qitem_id, _)) = task_def.dropped_qitems.iter().next() else {
+                return None;
+            };
+
+            Some(*qitem_id)
+        };
+
         let client = self.get_client(clients).unwrap();
         for task in self.mission_journal.get_current_tasks() {
             let task_def = tdata_get().get_task_definition(task.get_task_id()).unwrap();
+
+            // check for task failure
             let fail_code = check_task_failure(self, &task, task_def);
             if let Some(fail_code) = fail_code {
                 self.mission_journal.fail_task(task.get_task_id()).unwrap();
@@ -1303,6 +1337,45 @@ impl Player {
                     iErrorCode: fail_code as i32,
                 };
                 log_if_failed(client.send_packet(P_FE2CL_REP_PC_TASK_END_FAIL, &pkt));
+                continue;
+            }
+
+            // check for repair
+            let repair_qitem_id = check_task_repair(self, &task, task_def);
+            if let Some(repair_qitem_id) = repair_qitem_id {
+                log(
+                    Severity::Warning,
+                    &format!("Detected desync on task {}; repairing...", task_def.task_id),
+                );
+                self.mission_journal.repair_task(task_def.task_id).unwrap();
+                let reward_pkt = sP_FE2CL_REP_REWARD_ITEM {
+                    m_iCandy: self.get_taros() as i32,
+                    m_iFusionMatter: self.get_fusion_matter() as i32,
+                    m_iBatteryN: self.get_nano_potions() as i32,
+                    m_iBatteryW: self.get_weapon_boosts() as i32,
+                    iItemCnt: 1,
+                    iFatigue: 100,
+                    iFatigue_Level: 1,
+                    iNPC_TypeID: 0,
+                    iTaskID: task_def.task_id,
+                };
+                client.queue_packet(P_FE2CL_REP_REWARD_ITEM, &reward_pkt);
+                let qitem_amt = self.get_quest_item_count(repair_qitem_id);
+                let qitem_slot = self
+                    .set_quest_item_count(repair_qitem_id, qitem_amt)
+                    .unwrap(); // no-op
+                let qitem_reward = sItemReward {
+                    sItem: sItemBase {
+                        iType: ItemType::Quest as i16,
+                        iID: repair_qitem_id,
+                        iOpt: qitem_amt as i32,
+                        iTimeLimit: unused!(),
+                    },
+                    eIL: ItemLocation::QInven as i32,
+                    iSlotNum: qitem_slot as i32,
+                };
+                client.queue_struct(&qitem_reward);
+                log_if_failed(client.flush());
             }
         }
     }

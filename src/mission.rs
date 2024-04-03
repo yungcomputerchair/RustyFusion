@@ -65,6 +65,7 @@ pub struct Task {
     pub escort_npc_id: Option<i32>,
     pub completed: bool,
     pub failed: bool,
+    pub pending_repair: bool,
 }
 impl Task {
     pub fn get_task_id(&self) -> i32 {
@@ -111,6 +112,7 @@ impl From<&TaskDefinition> for Task {
             escort_npc_id: None,
             completed: false,
             failed: false,
+            pending_repair: false,
         }
     }
 }
@@ -377,6 +379,20 @@ impl MissionJournal {
                 )
             })?;
         task.failed = true;
+        Ok(())
+    }
+
+    pub fn repair_task(&mut self, task_id: i32) -> FFResult<()> {
+        let task = self
+            .get_task_iter_mut()
+            .find(|t| t.get_task_id() == task_id)
+            .ok_or_else(|| {
+                FFError::build(
+                    Severity::Warning,
+                    format!("Tried to repair task {} that is not in progress", task_id),
+                )
+            })?;
+        task.pending_repair = true;
         Ok(())
     }
 
