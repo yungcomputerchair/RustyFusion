@@ -400,9 +400,11 @@ impl TryFrom<DbPlayer> for Player {
         }
 
         if db_player.active_mission_id != 0 {
-            player
-                .mission_journal
-                .set_active_mission_id(db_player.active_mission_id)?;
+            log_if_failed(
+                player
+                    .mission_journal
+                    .set_active_mission_id(db_player.active_mission_id),
+            );
         }
 
         Ok(player)

@@ -368,9 +368,11 @@ impl PostgresDatabase {
 
         let active_mission_id: Int = row.get("CurrentMissionID");
         if active_mission_id != 0 {
-            player
-                .mission_journal
-                .set_active_mission_id(row.get("CurrentMissionID"))?;
+            log_if_failed(
+                player
+                    .mission_journal
+                    .set_active_mission_id(row.get("CurrentMissionID")),
+            );
         }
 
         let items = Self::query(client, "load_items", &[&pc_uid])?;
