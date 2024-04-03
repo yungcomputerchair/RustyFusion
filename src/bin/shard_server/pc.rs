@@ -425,6 +425,16 @@ pub fn pc_vehicle_on(clients: &mut ClientMap, state: &mut ShardServerState) -> F
             let pc_id = client.get_player_id()?;
             let player = state.get_player_mut(pc_id)?;
 
+            if player.instance_id.map_num != ID_OVERWORLD {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!(
+                        "Player {} tried to mount a vehicle outside the overworld: {}",
+                        pc_id, player.instance_id
+                    ),
+                ));
+            }
+
             let vehicle = player
                 .get_item(ItemLocation::Equip, EQUIP_SLOT_VEHICLE as usize)
                 .unwrap();
