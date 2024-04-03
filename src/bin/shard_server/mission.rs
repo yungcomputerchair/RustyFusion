@@ -1,7 +1,7 @@
 use rusty_fusion::{
     defines::{RANGE_INTERACT, RANGE_TRIGGER},
     entity::{Combatant, EntityID},
-    enums::{ItemLocation, ItemType, TaskType},
+    enums::{ItemLocation, ItemType, MissionType, TaskType},
     error::*,
     item::Item,
     mission::Task,
@@ -236,9 +236,19 @@ pub fn task_stop(client: &mut FFClient, state: &mut ShardServerState) -> FFResul
     let pkt: sP_CL2FE_REQ_PC_TASK_STOP = *client.get_packet(P_CL2FE_REQ_PC_TASK_STOP)?;
     let pc_id = client.get_player_id()?;
     let player = state.get_player_mut(pc_id)?;
-    let task = player.mission_journal.remove_task(pkt.iTaskNum)?;
 
-    for item_id in &task.get_task_def().del_qitems {
+    let task_def = tdata_get().get_task_definition(pkt.iTaskNum)?;
+    let mission_def = tdata_get().get_mission_definition(task_def.mission_id)?;
+    if mission_def.mission_type == MissionType::Nano {
+        return Err(FFError::build(
+            Severity::Warning,
+            "Tried to delete a nano mission".to_string(),
+        ));
+    }
+
+    player.mission_journal.remove_task(pkt.iTaskNum)?;
+
+    for item_id in &task_def.del_qitems {
         let qitem_slot = player.set_quest_item_count(*item_id, 0);
         // client doesn't automatically delete qitems clientside
         let pkt = sP_FE2CL_REP_PC_ITEM_DELETE_SUCC {
