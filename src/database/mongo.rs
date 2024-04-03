@@ -323,8 +323,9 @@ impl TryFrom<DbPlayer> for Player {
         player.set_rotation(db_player.angle);
 
         player.set_taros(db_player.taros as u32);
-        player.set_fusion_matter(db_player.fusion_matter as u32, None);
         player.set_level(db_player.level as i16);
+        // fusion matter must be set after level
+        player.set_fusion_matter(db_player.fusion_matter as u32, None);
         player.set_hp(db_player.hp);
         player.set_weapon_boosts(db_player.weapon_boosts as u32);
         player.set_nano_potions(db_player.nano_potions as u32);
