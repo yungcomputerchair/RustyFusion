@@ -218,12 +218,10 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
             let player = state.get_player_mut(pc_id).unwrap();
             if player.mission_journal.start_task(task)? {
                 log(
-                    Severity::Debug,
+                    Severity::Info,
                     &format!(
-                        "Player {} started mission: {} [{}]",
-                        player.get_uid(),
-                        mission_def.mission_name,
-                        mission_def.mission_id
+                        "{} started mission: {} [{}]",
+                        player, mission_def.mission_name, mission_def.mission_id
                     ),
                 );
             }
@@ -523,6 +521,9 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
 
             if task_def.succ_task_id.is_none() {
                 // Final task, mission complete
+                let mission_def = tdata_get()
+                    .get_mission_definition(task_def.mission_id)
+                    .unwrap();
                 player
                     .mission_journal
                     .remove_task(task_def.task_id)
@@ -531,6 +532,13 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
                     .mission_journal
                     .set_mission_completed(task_def.mission_id)
                     .unwrap();
+                log(
+                    Severity::Info,
+                    &format!(
+                        "{} completed mission: {} [{}]",
+                        player, mission_def.mission_name, task_def.mission_id
+                    ),
+                );
                 if let Some(nano_id) = task_def.succ_nano_id {
                     let player_stats = tdata_get().get_player_stats(player.get_level()).unwrap();
                     match player.unlock_nano(nano_id).cloned() {

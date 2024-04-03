@@ -1044,6 +1044,16 @@ impl Player {
                     );
                     return self.fusion_matter;
                 };
+                let level_up_mission_def = tdata_get()
+                    .get_mission_definition(level_up_task_def.mission_id)
+                    .unwrap();
+                log(
+                    Severity::Info,
+                    &format!(
+                        "{} started nano mission: {} [{}]",
+                        self, level_up_mission_def.mission_name, level_up_mission_def.mission_id
+                    ),
+                );
                 self.mission_journal
                     .start_task(level_up_task_def.into())
                     .unwrap();
