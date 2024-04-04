@@ -31,9 +31,12 @@ impl Slider {
         id: i32,
         position: Position,
         angle: i32,
-        path: Option<Path>,
+        mut path: Option<Path>,
         instance_id: InstanceID,
     ) -> Self {
+        if let Some(ref mut p) = path {
+            p.start();
+        }
         Self {
             id,
             position,
