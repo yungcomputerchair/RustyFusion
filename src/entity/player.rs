@@ -1283,10 +1283,7 @@ impl Player {
                 }
             }
 
-            let Some((qitem_id, _)) = task_def.dropped_qitems.iter().next() else {
-                return None;
-            };
-
+            let (qitem_id, _) = task_def.dropped_qitems.iter().next()?;
             Some(*qitem_id)
         };
 
