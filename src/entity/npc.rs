@@ -25,6 +25,7 @@ pub struct NPC {
     pub follower_ids: HashSet<i32>,
     pub leader_id: Option<i32>,
     pub path: Option<Path>,
+    pub loose_follow: Option<EntityID>,
     pub is_mob: bool,
 }
 impl NPC {
@@ -45,12 +46,17 @@ impl NPC {
             follower_ids: HashSet::new(),
             leader_id: None,
             path: None,
+            loose_follow: None,
             is_mob,
         }
     }
 
     pub fn set_path(&mut self, path: Path) {
         self.path = Some(path);
+    }
+
+    pub fn set_follow(&mut self, entity_id: EntityID) {
+        self.loose_follow = Some(entity_id);
     }
 
     fn get_appearance_data(&self) -> sNPCAppearanceData {
@@ -84,6 +90,14 @@ impl Entity for NPC {
         self.rotation
     }
 
+    fn get_speed(&self) -> i32 {
+        if let Some(path) = &self.path {
+            path.get_speed()
+        } else {
+            placeholder!(400)
+        }
+    }
+
     fn get_chunk_coords(&self) -> ChunkCoords {
         ChunkCoords::from_pos_inst(self.position, self.instance_id)
     }
@@ -110,27 +124,58 @@ impl Entity for NPC {
 
     fn tick(&mut self, _time: SystemTime, clients: &mut ClientMap, state: &mut ShardServerState) {
         const RUN_SPEED: i32 = 400;
-        if let Some(path) = self.path.as_mut() {
-            let speed = path.get_speed();
-            path.tick(&mut self.position);
-            let chunk_pos = self.get_chunk_coords();
-            state
-                .entity_map
-                .update(self.get_id(), Some(chunk_pos), Some(clients));
+        const FOLLOWING_DISTANCE: i32 = 200;
 
-            let pkt = sP_FE2CL_NPC_MOVE {
-                iNPC_ID: self.id,
-                iToX: self.position.x,
-                iToY: self.position.y,
-                iToZ: self.position.z,
-                iSpeed: speed,
-                iMoveStyle: if speed > RUN_SPEED { 1 } else { 0 },
-            };
-            state
-                .entity_map
-                .for_each_around(self.get_id(), clients, |c| {
-                    c.send_packet(PacketID::P_FE2CL_NPC_MOVE, &pkt)
-                });
+        let mut follow_path = if let Some(entity_id) = self.loose_follow {
+            if let Some(entity) = state.entity_map.get_from_id(entity_id) {
+                let target_pos = entity.get_position();
+                let (target_pos, too_close) =
+                    target_pos.interpolate(&self.position, FOLLOWING_DISTANCE as f32);
+                // exceed target speed by 10% to not fall behind
+                let target_speed = entity.get_speed() as f32 * 1.1;
+                let mut path = Path::new_single(target_pos, target_speed as i32);
+                if !too_close {
+                    path.start();
+                }
+                Some(path)
+            } else {
+                // target entity is gone
+                self.loose_follow = None;
+                None
+            }
+        } else {
+            None
+        };
+
+        // If we are following an entity, that takes priority over our own path
+        let ticked_path = if let Some(path) = &mut follow_path {
+            Some(path)
+        } else {
+            self.path.as_mut()
+        };
+
+        if let Some(path) = ticked_path {
+            let speed = path.get_speed();
+            if path.tick(&mut self.position) {
+                let chunk_pos = self.get_chunk_coords();
+                state
+                    .entity_map
+                    .update(self.get_id(), Some(chunk_pos), Some(clients));
+
+                let pkt = sP_FE2CL_NPC_MOVE {
+                    iNPC_ID: self.id,
+                    iToX: self.position.x,
+                    iToY: self.position.y,
+                    iToZ: self.position.z,
+                    iSpeed: speed,
+                    iMoveStyle: if speed > RUN_SPEED { 1 } else { 0 },
+                };
+                state
+                    .entity_map
+                    .for_each_around(self.get_id(), clients, |c| {
+                        c.send_packet(PacketID::P_FE2CL_NPC_MOVE, &pkt)
+                    });
+            }
         }
     }
 

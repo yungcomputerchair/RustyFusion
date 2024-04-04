@@ -177,10 +177,10 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
                         ),
                     ));
                 }
-                if escort_npc.path.is_none() {
+                if task_def.obj_npc_type.is_some() && escort_npc.path.is_none() {
                     return Err(FFError::build(
                         Severity::Warning,
-                        format!("Escort NPC {} has no path", escort_npc_id),
+                        format!("Pathed escort NPC {} has no path", escort_npc_id),
                     ));
                 }
                 state.entity_map.validate_proximity(
@@ -211,7 +211,15 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
             if task_def.obj_escort_npc_type.is_some() {
                 let escort_npc_id = pkt.iEscortNPC_ID;
                 let escort_npc = state.get_npc_mut(pkt.iEscortNPC_ID).unwrap();
-                escort_npc.path.as_mut().unwrap().start();
+                if task_def.obj_npc_type.is_some() {
+                    escort_npc.path.as_mut().unwrap().start();
+                } else {
+                    escort_npc.loose_follow = Some(EntityID::Player(pc_id));
+                    state
+                        .entity_map
+                        .set_tick(EntityID::NPC(escort_npc_id), true)
+                        .unwrap();
+                }
                 task.escort_npc_id = Some(escort_npc_id);
             }
 
@@ -389,15 +397,16 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
             // check escort path
             if let Some(escort_npc_id) = task.escort_npc_id {
                 let escort_npc = state.get_npc(escort_npc_id)?;
-                if !escort_npc.path.as_ref().unwrap().is_done() {
+                if task_def.obj_npc_type.is_some() && !escort_npc.path.as_ref().unwrap().is_done() {
                     return Err(FFError::build(
                         Severity::Warning,
                         format!(
-                            "Tried to end task {} with escort NPC {} not at destination",
+                            "Tried to end task {} with pathed escort NPC {} not at destination",
                             pkt.iTaskNum, escort_npc_id
                         ),
                     ));
                 }
+                // TODO check escort npc alive
             }
 
             // check time limit
@@ -445,6 +454,13 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
             // all clear, mark the task completed. it'll be overwritten by the next task
             let player = state.get_player_mut(pc_id).unwrap();
             player.mission_journal.complete_task(pkt.iTaskNum)?;
+
+            // if escort following, stop it
+            if let Some(escort_npc_id) = task.escort_npc_id {
+                let escort_npc = state.get_npc_mut(escort_npc_id).unwrap();
+                escort_npc.loose_follow = None;
+            }
+            let player = state.get_player_mut(pc_id).unwrap();
 
             // success qitem changes
             if !task_def.succ_qitems.is_empty() {

@@ -71,6 +71,14 @@ impl Entity for Slider {
         self.rotation
     }
 
+    fn get_speed(&self) -> i32 {
+        if let Some(path) = &self.path {
+            path.get_speed()
+        } else {
+            0
+        }
+    }
+
     fn get_chunk_coords(&self) -> ChunkCoords {
         ChunkCoords::from_pos_inst(self.position, self.instance_id)
     }

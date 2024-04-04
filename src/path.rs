@@ -38,6 +38,19 @@ impl Path {
         }
     }
 
+    pub fn new_single(target_pos: Position, speed: i32) -> Self {
+        Self {
+            points: vec![PathPoint {
+                pos: target_pos,
+                speed,
+                stop_ticks: 0,
+            }],
+            cycle: false,
+            idx: 0,
+            state: PathState::Pending,
+        }
+    }
+
     pub fn get_points(&self) -> &[PathPoint] {
         &self.points
     }
@@ -110,9 +123,9 @@ impl Path {
                             PathState::Waiting(target_point.stop_ticks * SHARD_TICKS_PER_SECOND);
                     } else {
                         self.advance();
-                        return true;
                     }
                 }
+                return true;
             }
             PathState::Waiting(ticks_left) => {
                 if ticks_left == 1 {

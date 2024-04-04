@@ -10,6 +10,7 @@ pub const SHARD_TICKS_PER_SECOND: usize = 8;
 
 pub const SIZEOF_NANO_SKILLS: usize = 3;
 
+pub const PLAYER_RUN_SPEED: i32 = 600;
 pub const NANO_STAMINA_MAX: i16 = 150;
 
 pub const ID_LIGHTNING_GUN: i16 = 328;

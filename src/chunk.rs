@@ -414,6 +414,15 @@ impl EntityMap {
         // }
     }
 
+    pub fn set_tick(&mut self, id: EntityID, tick: bool) -> FFResult<()> {
+        let entry = self.registry.get_mut(&id).ok_or(FFError::build(
+            Severity::Warning,
+            format!("Entity with ID {:?} doesn't exist", id),
+        ))?;
+        entry.tick = tick;
+        Ok(())
+    }
+
     pub fn for_each_around(
         &mut self,
         id: EntityID,

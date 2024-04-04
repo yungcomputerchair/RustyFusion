@@ -1411,6 +1411,14 @@ impl Entity for Player {
         self.rotation
     }
 
+    fn get_speed(&self) -> i32 {
+        if let Some(vehicle_speed) = self.vehicle_speed {
+            vehicle_speed
+        } else {
+            PLAYER_RUN_SPEED
+        }
+    }
+
     fn get_chunk_coords(&self) -> ChunkCoords {
         ChunkCoords::from_pos_inst(self.position, self.instance_id)
     }
