@@ -72,6 +72,7 @@ fn main() -> Result<()> {
     );
     let live_check_time = Duration::from_secs(config.general.live_check_time.get());
     while running.load(Ordering::SeqCst) {
+        server.poll(&mut state, live_check_time)?;
         timers
             .check_all(&mut server, &mut state)
             .unwrap_or_else(|e| {
@@ -81,7 +82,6 @@ fn main() -> Result<()> {
                     log_error(&e);
                 }
             });
-        server.poll(&mut state, live_check_time)?;
     }
 
     log(Severity::Info, "Login server shutting down...");
