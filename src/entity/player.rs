@@ -1233,7 +1233,12 @@ impl Player {
         }
     }
 
-    fn tick_missions(&mut self, time: SystemTime, clients: &mut ClientMap) {
+    fn tick_missions(
+        &mut self,
+        time: SystemTime,
+        clients: &mut ClientMap,
+        state: &mut ShardServerState,
+    ) {
         let check_task_failure = |player: &Player, task: &Task, task_def: &TaskDefinition| {
             if task_def.obj_time_limit.is_some() {
                 match task.fail_time {
@@ -1255,7 +1260,15 @@ impl Player {
                 }
             }
 
-            // TODO check for escort NPC death
+            if let Some(escort_npc_id) = task.escort_npc_id {
+                if let Ok(escort_npc) = state.get_npc(escort_npc_id) {
+                    if escort_npc.is_dead() {
+                        return Some(codes::TaskEndErr::EscortFailed);
+                    }
+                } else {
+                    return Some(codes::TaskEndErr::EscortFailed);
+                }
+            }
 
             None
         };
@@ -1393,6 +1406,10 @@ impl Combatant for Player {
     fn get_max_hp(&self) -> i32 {
         placeholder!(400)
     }
+
+    fn is_dead(&self) -> bool {
+        self.hp <= 0
+    }
 }
 impl Entity for Player {
     fn get_client<'a>(&self, client_map: &'a mut ClientMap) -> Option<&'a mut FFClient> {
@@ -1474,7 +1491,7 @@ impl Entity for Player {
 
     fn tick(&mut self, time: SystemTime, clients: &mut ClientMap, state: &mut ShardServerState) {
         self.tick_skyway_ride(time, clients, state);
-        self.tick_missions(time, clients);
+        self.tick_missions(time, clients, state);
     }
 
     fn as_any(&self) -> &dyn Any {

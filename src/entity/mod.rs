@@ -48,4 +48,5 @@ pub trait Combatant {
     fn get_level(&self) -> i16;
     fn get_hp(&self) -> i32;
     fn get_max_hp(&self) -> i32;
+    fn is_dead(&self) -> bool;
 }

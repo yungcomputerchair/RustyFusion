@@ -406,7 +406,15 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
                         ),
                     ));
                 }
-                // TODO check escort npc alive
+                if escort_npc.is_dead() {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!(
+                            "Tried to end task {} with escort NPC {} dead",
+                            pkt.iTaskNum, escort_npc_id
+                        ),
+                    ));
+                }
             }
 
             // check time limit

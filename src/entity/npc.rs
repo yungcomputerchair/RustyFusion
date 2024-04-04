@@ -205,4 +205,8 @@ impl Combatant for NPC {
     fn get_max_hp(&self) -> i32 {
         placeholder!(400)
     }
+
+    fn is_dead(&self) -> bool {
+        self.get_hp() <= 0
+    }
 }
