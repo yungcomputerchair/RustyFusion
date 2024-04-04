@@ -63,15 +63,15 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
     - [ ] Gumballs & other usables
     - [ ] E.G.G.s (the ones on the ground that buff you)
   - [x] Mob drops
-- [ ] Missions
+- [x] Missions
   - [x] Starting tasks +
   - [x] Switching active mission
   - [x] Quest items
   - [x] Completing tasks +
   - [x] Mission rewards
-  - [ ] Escort tasks +
-      - [ ] ***Follow***
-      - [x] Pathed
+  - [x] Escort tasks +
+      - [x] Follow player
+      - [x] Follow path
         - [x] Eduardo (Scary Monsters)
 - [x] Entity pathing
 - [ ] Infected Zone races
