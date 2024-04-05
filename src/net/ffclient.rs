@@ -173,16 +173,15 @@ impl FFClient {
             pkt_id, buffered_pkt_id
         );
         self.in_buf_ptr += 4;
-        let pkt = self.get_struct()?;
-
-        if !SILENCED_PACKETS.contains(&pkt_id) {
-            log(Severity::Debug, &format!("{:#?}", pkt));
-        }
-
+        let pkt = self.get_struct_internal(!SILENCED_PACKETS.contains(&pkt_id))?;
         Ok(pkt)
     }
 
     pub fn get_struct<T: FFPacket>(&mut self) -> FFResult<&T> {
+        self.get_struct_internal(true)
+    }
+
+    fn get_struct_internal<T: FFPacket>(&mut self, log_struct: bool) -> FFResult<&T> {
         let sz: usize = size_of::<T>();
         let from = self.in_buf_ptr;
         let to = from + sz;
@@ -199,6 +198,11 @@ impl FFClient {
         let buf: &[u8] = &self.in_buf[from..to];
         let s = unsafe { bytes_to_struct(buf) };
         self.in_buf_ptr += sz;
+
+        if log_struct {
+            log(Severity::Debug, &format!("{:#?}", s));
+        }
+
         Ok(s)
     }
 
