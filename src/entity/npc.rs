@@ -2,6 +2,7 @@ use std::{collections::HashSet, time::SystemTime};
 
 use crate::{
     chunk::{ChunkCoords, InstanceID},
+    defines::RANGE_INTERACT,
     entity::{Combatant, Entity, EntityID},
     error::FFResult,
     net::{
@@ -26,6 +27,7 @@ pub struct NPC {
     pub leader_id: Option<i32>,
     pub path: Option<Path>,
     pub loose_follow: Option<EntityID>,
+    pub interacting_pcs: HashSet<i32>,
     pub is_mob: bool,
 }
 impl NPC {
@@ -47,6 +49,7 @@ impl NPC {
             leader_id: None,
             path: None,
             loose_follow: None,
+            interacting_pcs: HashSet::new(),
             is_mob,
         }
     }
@@ -72,57 +75,8 @@ impl NPC {
             iBarkerType: unused!(),
         }
     }
-}
-impl Entity for NPC {
-    fn get_id(&self) -> EntityID {
-        EntityID::NPC(self.id)
-    }
 
-    fn get_client<'a>(&self, _client_map: &'a mut ClientMap) -> Option<&'a mut FFClient> {
-        None
-    }
-
-    fn get_position(&self) -> Position {
-        self.position
-    }
-
-    fn get_rotation(&self) -> i32 {
-        self.rotation
-    }
-
-    fn get_speed(&self) -> i32 {
-        if let Some(path) = &self.path {
-            path.get_speed()
-        } else {
-            placeholder!(400)
-        }
-    }
-
-    fn get_chunk_coords(&self) -> ChunkCoords {
-        ChunkCoords::from_pos_inst(self.position, self.instance_id)
-    }
-
-    fn set_position(&mut self, pos: Position) {
-        self.position = pos;
-    }
-
-    fn set_rotation(&mut self, angle: i32) {
-        self.rotation = angle % 360;
-    }
-
-    fn send_enter(&self, client: &mut FFClient) -> FFResult<()> {
-        let pkt = sP_FE2CL_NPC_ENTER {
-            NPCAppearanceData: self.get_appearance_data(),
-        };
-        client.send_packet(PacketID::P_FE2CL_NPC_ENTER, &pkt)
-    }
-
-    fn send_exit(&self, client: &mut FFClient) -> FFResult<()> {
-        let pkt = sP_FE2CL_NPC_EXIT { iNPC_ID: self.id };
-        client.send_packet(PacketID::P_FE2CL_NPC_EXIT, &pkt)
-    }
-
-    fn tick(&mut self, _time: SystemTime, clients: &mut ClientMap, state: &mut ShardServerState) {
+    fn tick_movement(&mut self, clients: &mut ClientMap, state: &mut ShardServerState) {
         const RUN_SPEED: i32 = 400;
         const FOLLOWING_DISTANCE: i32 = 200;
 
@@ -176,6 +130,72 @@ impl Entity for NPC {
                         c.send_packet(PacketID::P_FE2CL_NPC_MOVE, &pkt)
                     });
             }
+        }
+    }
+}
+impl Entity for NPC {
+    fn get_id(&self) -> EntityID {
+        EntityID::NPC(self.id)
+    }
+
+    fn get_client<'a>(&self, _client_map: &'a mut ClientMap) -> Option<&'a mut FFClient> {
+        None
+    }
+
+    fn get_position(&self) -> Position {
+        self.position
+    }
+
+    fn get_rotation(&self) -> i32 {
+        self.rotation
+    }
+
+    fn get_speed(&self) -> i32 {
+        if let Some(path) = &self.path {
+            path.get_speed()
+        } else {
+            placeholder!(400)
+        }
+    }
+
+    fn get_chunk_coords(&self) -> ChunkCoords {
+        ChunkCoords::from_pos_inst(self.position, self.instance_id)
+    }
+
+    fn set_position(&mut self, pos: Position) {
+        self.position = pos;
+    }
+
+    fn set_rotation(&mut self, angle: i32) {
+        self.rotation = angle % 360;
+    }
+
+    fn send_enter(&self, client: &mut FFClient) -> FFResult<()> {
+        let pkt = sP_FE2CL_NPC_ENTER {
+            NPCAppearanceData: self.get_appearance_data(),
+        };
+        client.send_packet(PacketID::P_FE2CL_NPC_ENTER, &pkt)
+    }
+
+    fn send_exit(&self, client: &mut FFClient) -> FFResult<()> {
+        let pkt = sP_FE2CL_NPC_EXIT { iNPC_ID: self.id };
+        client.send_packet(PacketID::P_FE2CL_NPC_EXIT, &pkt)
+    }
+
+    fn tick(&mut self, _time: SystemTime, clients: &mut ClientMap, state: &mut ShardServerState) {
+        let pc_ids: Vec<i32> = self.interacting_pcs.iter().copied().collect();
+        for pc_id in pc_ids {
+            let pc_eid = EntityID::Player(pc_id);
+            if state
+                .entity_map
+                .validate_proximity(&[self.get_id(), pc_eid], RANGE_INTERACT)
+                .is_err()
+            {
+                self.interacting_pcs.remove(&pc_id);
+            }
+        }
+        if self.interacting_pcs.is_empty() {
+            self.tick_movement(clients, state);
         }
     }
 
