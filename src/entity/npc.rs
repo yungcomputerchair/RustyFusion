@@ -23,6 +23,7 @@ pub struct NPC {
     pub ty: i32,
     position: Position,
     rotation: i32,
+    hp: i32,
     pub instance_id: InstanceID,
     pub follower_ids: HashSet<i32>,
     pub leader_id: Option<i32>,
@@ -46,6 +47,7 @@ impl NPC {
             ty,
             position,
             rotation: angle % 360,
+            hp: stats.max_hp as i32,
             instance_id,
             follower_ids: HashSet::new(),
             leader_id: None,
@@ -79,7 +81,6 @@ impl NPC {
     }
 
     fn tick_movement(&mut self, clients: &mut ClientMap, state: &mut ShardServerState) {
-        const RUN_SPEED: i32 = 400;
         const FOLLOWING_DISTANCE: i32 = 200;
 
         let mut follow_path = if let Some(entity_id) = self.loose_follow {
@@ -118,13 +119,14 @@ impl NPC {
                     .entity_map
                     .update(self.get_id(), Some(chunk_pos), Some(clients));
 
+                let run_speed = tdata_get().get_npc_stats(self.ty).unwrap().run_speed;
                 let pkt = sP_FE2CL_NPC_MOVE {
                     iNPC_ID: self.id,
                     iToX: self.position.x,
                     iToY: self.position.y,
                     iToZ: self.position.z,
                     iSpeed: speed,
-                    iMoveStyle: if speed > RUN_SPEED { 1 } else { 0 },
+                    iMoveStyle: if speed > run_speed { 1 } else { 0 },
                 };
                 state
                     .entity_map
@@ -156,7 +158,8 @@ impl Entity for NPC {
         if let Some(path) = &self.path {
             path.get_speed()
         } else {
-            placeholder!(400)
+            let stats = tdata_get().get_npc_stats(self.ty).unwrap();
+            stats.walk_speed
         }
     }
 
@@ -217,15 +220,17 @@ impl Combatant for NPC {
     }
 
     fn get_level(&self) -> i16 {
-        placeholder!(1)
+        let stats = tdata_get().get_npc_stats(self.ty).unwrap();
+        stats.level
     }
 
     fn get_hp(&self) -> i32 {
-        placeholder!(400)
+        self.hp
     }
 
     fn get_max_hp(&self) -> i32 {
-        placeholder!(400)
+        let stats = tdata_get().get_npc_stats(self.ty).unwrap();
+        stats.max_hp as i32
     }
 
     fn is_dead(&self) -> bool {

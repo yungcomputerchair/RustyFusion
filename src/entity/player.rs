@@ -27,7 +27,7 @@ use crate::{
     path::Path,
     state::ShardServerState,
     tabledata::{tdata_get, TripData},
-    util::{self, clamp, clamp_max, clamp_min},
+    util::{self, clamp, clamp_max},
     Position,
 };
 
@@ -1415,7 +1415,7 @@ impl Combatant for Player {
     }
 
     fn get_max_hp(&self) -> i32 {
-        placeholder!(400)
+        tdata_get().get_player_stats(self.level).unwrap().max_hp as i32
     }
 
     fn is_dead(&self) -> bool {
@@ -1515,9 +1515,8 @@ impl Entity for Player {
 }
 impl Display for Player {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let title = match self.perms {
-            0 => Some("GM"),
-            1 => Some("Mod"),
+        let title = match self.perms as u32 {
+            CN_ACCOUNT_LEVEL__GM => Some("GM"),
             _ => None,
         };
         let title = match title {
