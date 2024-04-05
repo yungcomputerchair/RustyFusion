@@ -13,6 +13,7 @@ use crate::{
     },
     path::Path,
     state::ShardServerState,
+    tabledata::tdata_get,
     Position,
 };
 
@@ -38,8 +39,9 @@ impl NPC {
         angle: i32,
         instance_id: InstanceID,
         is_mob: bool,
-    ) -> Self {
-        Self {
+    ) -> FFResult<Self> {
+        let stats = tdata_get().get_npc_stats(ty)?;
+        Ok(Self {
             id,
             ty,
             position,
@@ -51,7 +53,7 @@ impl NPC {
             loose_follow: None,
             interacting_pcs: HashSet::new(),
             is_mob,
-        }
+        })
     }
 
     pub fn set_path(&mut self, path: Path) {

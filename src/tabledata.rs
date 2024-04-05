@@ -394,15 +394,7 @@ impl TableData {
     pub fn get_npcs(&self, entity_map: &mut EntityMap, channel_num: usize) -> Vec<NPC> {
         let mut npcs = Vec::new();
         for dat in &self.npcs {
-            if self.get_npc_stats(dat.npc_type).is_err() {
-                log(
-                    Severity::Warning,
-                    &format!("NPC type {} doesn't have stats; skipping", dat.npc_type),
-                );
-                continue;
-            }
-
-            let mut npc = NPC::new(
+            let mut npc = match NPC::new(
                 entity_map.gen_next_npc_id(),
                 dat.npc_type,
                 Position {
@@ -417,10 +409,19 @@ impl TableData {
                     instance_num: None,
                 },
                 dat.is_mob,
-            );
+            ) {
+                Ok(npc) => npc,
+                Err(e) => {
+                    log(
+                        e.get_severity(),
+                        &format!("Failed to spawn NPC: {}", e.get_msg()),
+                    );
+                    continue;
+                }
+            };
             for follower in &dat.followers {
                 let id = entity_map.gen_next_npc_id();
-                let mut follower = NPC::new(
+                let mut follower = match NPC::new(
                     id,
                     follower.npc_type,
                     Position {
@@ -435,7 +436,16 @@ impl TableData {
                         instance_num: None,
                     },
                     dat.is_mob,
-                );
+                ) {
+                    Ok(follower) => follower,
+                    Err(e) => {
+                        log(
+                            e.get_severity(),
+                            &format!("Failed to spawn NPC follower: {}", e.get_msg()),
+                        );
+                        continue;
+                    }
+                };
                 follower.leader_id = Some(npc.id);
                 npcs.push(follower);
                 npc.follower_ids.insert(id);
