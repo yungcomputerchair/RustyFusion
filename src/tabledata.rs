@@ -1319,6 +1319,7 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
         m_iSTItemDropRate: [i16; MAX_NEED_SORT_OF_ITEM as usize],
         m_iSTNanoID: i16,
         m_iDelItemID: [i16; 4],
+        m_iHBarkerTextID: [i32; 4],
     }
 
     #[derive(Debug, Deserialize)]
@@ -1514,6 +1515,11 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
                     0 => None,
                     x => Some(*x),
                 })
+                .collect(),
+            barks: entry
+                .m_iHBarkerTextID
+                .iter()
+                .flat_map(|id| if *id != 0 { Some(*id) } else { None })
                 .collect(),
         };
         task_defs.insert(task_id, task_def);

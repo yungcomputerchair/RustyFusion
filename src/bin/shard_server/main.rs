@@ -240,6 +240,7 @@ fn handle_packet(
         P_CL2FE_GM_REQ_REWARD_RATE => gm::gm_reward_rate(clients.get_self(), state),
         //
         P_CL2FE_REQ_NPC_INTERACTION => npc::npc_interaction(clients.get_self(), state),
+        P_CL2FE_REQ_BARKER => npc::npc_bark(clients.get_self(), state),
         //
         P_CL2FE_REQ_SEND_FREECHAT_MESSAGE => chat::send_freechat_message(&mut clients, state),
         P_CL2FE_REQ_SEND_MENUCHAT_MESSAGE => chat::send_menuchat_message(&mut clients, state),

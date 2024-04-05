@@ -55,6 +55,7 @@ pub struct TaskDefinition {
     pub given_qitems: HashMap<i16, isize>, // m_iSTItemID -> m_iSTItemNum
     pub dropped_qitems: HashMap<i16, f32>, // m_iSTItemID -> m_iSTItemDropRate / 100
     pub delete_qitems: HashSet<i16>,       // m_iDelItemID
+    pub barks: Vec<i32>,                   // m_iHBarkerTextID
 }
 
 #[derive(Debug, Clone)]
