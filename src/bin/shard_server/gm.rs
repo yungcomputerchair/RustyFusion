@@ -146,19 +146,26 @@ pub fn gm_pc_goto(clients: &mut ClientMap, state: &mut ShardServerState) -> FFRe
     let player = state.get_player_mut(pc_id)?;
     player.set_position(new_pos);
     player.instance_id = InstanceID::default();
+    let taros = player.get_taros();
 
     state
         .entity_map
         .update(EntityID::Player(pc_id), None, Some(clients));
 
-    let resp = sP_FE2CL_REP_PC_GOTO_SUCC {
+    // sP_FE2CL_REP_PC_GOTO_SUCC doesn't reset the clientside instance state,
+    // but we need that to happen so we use the NPC warp packet instead
+    let resp = sP_FE2CL_REP_PC_WARP_USE_NPC_SUCC {
         iX: new_pos.x,
         iY: new_pos.y,
         iZ: new_pos.z,
+        eIL: ItemLocation::end(),
+        iItemSlotNum: unused!(),
+        Item: unused!(),
+        iCandy: taros as i32,
     };
     clients
         .get_self()
-        .send_packet(P_FE2CL_REP_PC_GOTO_SUCC, &resp)
+        .send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp)
 }
 
 pub fn gm_pc_special_state_switch(

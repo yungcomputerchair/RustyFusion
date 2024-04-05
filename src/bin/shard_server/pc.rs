@@ -13,7 +13,6 @@ use rusty_fusion::{
         packet::{PacketID::*, *},
         ClientMap, ClientType, FFClient,
     },
-    placeholder,
     state::ShardServerState,
     tabledata::tdata_get,
     unused, util, Position,
@@ -132,71 +131,51 @@ pub fn pc_exit(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResul
 }
 
 pub fn pc_loading_complete(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_PC_LOADING_COMPLETE = clients
+    let _pkt: &sP_CL2FE_REQ_PC_LOADING_COMPLETE = clients
         .get_self()
         .get_packet(P_CL2FE_REQ_PC_LOADING_COMPLETE)?;
-    let resp = sP_FE2CL_REP_PC_LOADING_COMPLETE_SUCC { iPC_ID: pkt.iPC_ID };
+    let resp = sP_FE2CL_REP_PC_LOADING_COMPLETE_SUCC { iPC_ID: unused!() };
     catch_fail(
         (|| {
             let player = state.get_player(clients.get_self().get_player_id()?)?;
+            let map_num = player.instance_id.map_num;
             let chunk = player.get_chunk_coords();
-            let instance_id = if player.get_pre_warp().instance_id.map_num
-                != player.instance_id.map_num
-                && player.instance_id.map_num != ID_OVERWORLD
-            {
-                Some(player.instance_id)
-            } else {
-                None
-            };
             state
                 .entity_map
                 .update(player.get_id(), Some(chunk), Some(clients));
             let client = clients.get_self();
             client.send_packet(P_FE2CL_REP_PC_LOADING_COMPLETE_SUCC, &resp)?;
 
-            // transmit map info
-            if let Some(instance_id) = instance_id {
-                let map_data = tdata_get().get_map_data(instance_id.map_num)?;
-                let x_min = map_data.map_square.0 * MAP_SQUARE_SIZE;
-                let y_min = map_data.map_square.1 * MAP_SQUARE_SIZE;
-                let pkt = match map_data.ep_id {
-                    Some(ep_id) => sP_FE2CL_INSTANCE_MAP_INFO {
-                        iInstanceMapNum: instance_id.map_num as i32,
-                        iCreateTick: unused!(),
-                        iMapCoordX_Min: x_min,
-                        iMapCoordX_Max: x_min + MAP_SQUARE_SIZE,
-                        iMapCoordY_Min: y_min,
-                        iMapCoordY_Max: y_min + MAP_SQUARE_SIZE,
-                        iMapCoordZ_Min: i32::MIN,
-                        iMapCoordZ_Max: i32::MAX,
-                        iEP_ID: ep_id as i32,
-                        // TODO ep data
-                        iEPTopRecord_Score: placeholder!(0),
-                        iEPTopRecord_Rank: placeholder!(0),
-                        iEPTopRecord_Time: placeholder!(0),
-                        iEPTopRecord_RingCount: placeholder!(0),
-                        iEPSwitch_StatusON_Cnt: placeholder!(0),
-                    },
-                    None => sP_FE2CL_INSTANCE_MAP_INFO {
-                        iInstanceMapNum: instance_id.map_num as i32,
-                        iCreateTick: unused!(),
-                        iMapCoordX_Min: x_min,
-                        iMapCoordX_Max: x_min + MAP_SQUARE_SIZE,
-                        iMapCoordY_Min: y_min,
-                        iMapCoordY_Max: y_min + MAP_SQUARE_SIZE,
-                        iMapCoordZ_Min: i32::MIN,
-                        iMapCoordZ_Max: i32::MAX,
-                        iEP_ID: unused!(),
-                        iEPTopRecord_Score: unused!(),
-                        iEPTopRecord_Rank: unused!(),
-                        iEPTopRecord_Time: unused!(),
-                        iEPTopRecord_RingCount: unused!(),
-                        iEPSwitch_StatusON_Cnt: unused!(),
-                    },
-                };
-                client.send_packet(P_FE2CL_INSTANCE_MAP_INFO, &pkt)?;
+            if map_num == ID_OVERWORLD {
+                return Ok(());
             }
-            Ok(())
+
+            // transmit map info
+            let map_data = tdata_get().get_map_data(map_num)?;
+            let x_min = map_data.map_square.0 * MAP_SQUARE_SIZE;
+            let y_min = map_data.map_square.1 * MAP_SQUARE_SIZE;
+            let mut map_info_pkt = sP_FE2CL_INSTANCE_MAP_INFO {
+                iInstanceMapNum: map_num as i32,
+                iCreateTick: unused!(),
+                iMapCoordX_Min: x_min,
+                iMapCoordX_Max: x_min + MAP_SQUARE_SIZE,
+                iMapCoordY_Min: y_min,
+                iMapCoordY_Max: y_min + MAP_SQUARE_SIZE,
+                iMapCoordZ_Min: i32::MIN,
+                iMapCoordZ_Max: i32::MAX,
+                iEP_ID: unused!(),
+                iEPTopRecord_Score: unused!(),
+                iEPTopRecord_Rank: unused!(),
+                iEPTopRecord_Time: unused!(),
+                iEPTopRecord_RingCount: unused!(),
+                iEPSwitch_StatusON_Cnt: unused!(),
+            };
+
+            if let Some(ep_id) = map_data.ep_id {
+                map_info_pkt.iEP_ID = ep_id as i32;
+                // TODO remaining EP data
+            }
+            client.send_packet(P_FE2CL_INSTANCE_MAP_INFO, &map_info_pkt)
         })(),
         || {
             Err(FFError::build_dc(
