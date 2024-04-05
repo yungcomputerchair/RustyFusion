@@ -61,7 +61,7 @@ impl From<Option<Nano>> for sNano {
 
 #[derive(Debug)]
 pub struct NanoStats {
-    pub style: NanoStyle,
+    pub style: CombatStyle,
     pub skills: [i16; SIZEOF_NANO_SKILLS],
 }
 

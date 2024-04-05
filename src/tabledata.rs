@@ -35,6 +35,7 @@ struct XDTData {
     nano_data: NanoData,
     mission_data: MissionData,
     player_data: HashMap<i16, PlayerStats>,
+    npc_data: HashMap<i32, NPCStats>,
 }
 impl XDTData {
     fn load() -> Result<Self, String> {
@@ -56,12 +57,13 @@ impl XDTData {
                 .map_err(|e| format!("Error loading mission data: {}", e))?,
             player_data: load_player_data(&root)
                 .map_err(|e| format!("Error loading player data: {}", e))?,
+            npc_data: load_npc_data(&root).map_err(|e| format!("Error loading NPC data: {}", e))?,
         })
     }
 }
 
 #[derive(Debug)]
-struct NPCData {
+struct NPCSpawnData {
     npc_type: i32,
     pos: Position,
     angle: i32,
@@ -150,6 +152,16 @@ pub struct PlayerStats {
     pub nano_id: i16,
     pub bonus_fm: u32,
     pub death_fm: u32,
+}
+
+pub struct NPCStats {
+    pub team: NPCTeam,
+    pub style: CombatStyle,
+    pub level: i16,
+    pub max_hp: u32,
+    pub run_speed: i32,
+    pub sight_range: i32,
+    pub bark_type: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -246,7 +258,7 @@ struct PathData {
 
 pub struct TableData {
     xdt_data: XDTData,
-    npc_data: Vec<NPCData>,
+    npcs: Vec<NPCSpawnData>,
     drop_data: DropData,
     path_data: PathData,
 }
@@ -260,7 +272,7 @@ impl TableData {
     fn load() -> Result<Self, String> {
         Ok(Self {
             xdt_data: XDTData::load().map_err(|e| format!("Error loading XDT: {}", e))?,
-            npc_data: load_npc_data().map_err(|e| format!("Error loading NPC data: {}", e))?,
+            npcs: load_npcs().map_err(|e| format!("Error loading NPC data: {}", e))?,
             drop_data: load_drop_data().map_err(|e| format!("Error loading drop data: {}", e))?,
             path_data: load_path_data().map_err(|e| format!("Error loading path data: {}", e))?,
         })
@@ -381,7 +393,15 @@ impl TableData {
 
     pub fn get_npcs(&self, entity_map: &mut EntityMap, channel_num: usize) -> Vec<NPC> {
         let mut npcs = Vec::new();
-        for dat in &self.npc_data {
+        for dat in &self.npcs {
+            if self.get_npc_stats(dat.npc_type).is_err() {
+                log(
+                    Severity::Warning,
+                    &format!("NPC type {} doesn't have stats; skipping", dat.npc_type),
+                );
+                continue;
+            }
+
             let mut npc = NPC::new(
                 entity_map.gen_next_npc_id(),
                 dat.npc_type,
@@ -669,6 +689,13 @@ impl TableData {
         self.xdt_data.player_data.get(&level).ok_or(FFError::build(
             Severity::Warning,
             format!("Player stats for level {} don't exist", level),
+        ))
+    }
+
+    pub fn get_npc_stats(&self, npc_type: i32) -> FFResult<&NPCStats> {
+        self.xdt_data.npc_data.get(&npc_type).ok_or(FFError::build(
+            Severity::Warning,
+            format!("NPC stats for type {} don't exist", npc_type),
         ))
     }
 
@@ -1583,7 +1610,54 @@ fn load_player_data(
     Ok(player_stats_table)
 }
 
-fn load_npc_data() -> Result<Vec<NPCData>, String> {
+fn load_npc_data(root: &Map<std::string::String, Value>) -> Result<HashMap<i32, NPCStats>, String> {
+    const NPC_TABLE_KEY: &str = "m_pNpcTable";
+    const NPC_TABLE_NPC_DATA_KEY: &str = "m_pNpcData";
+
+    #[derive(Deserialize)]
+    struct NPCStatsEntry {
+        m_iNpcNumber: i32,
+        m_iTeam: i32,
+        m_iNpcLevel: i16,
+        m_iHP: u32,
+        m_iNpcStyle: i32,
+        m_iRunSpeed: i32,
+        m_iSightRange: i32,
+        m_iBarkerType: usize,
+    }
+
+    let table = get_object(root, NPC_TABLE_KEY)?;
+    let npc_data = get_array(table, NPC_TABLE_NPC_DATA_KEY)?;
+    let mut npc_stats_table = HashMap::new();
+    for v in npc_data {
+        let entry: NPCStatsEntry = serde_json::from_value(v.clone())
+            .map_err(|e| format!("Malformed NPC data entry: {} {}", e, v))?;
+        let key = entry.m_iNpcNumber;
+        let npc_stats = NPCStats {
+            team: entry
+                .m_iTeam
+                .try_into()
+                .map_err(|e: FFError| e.get_msg().to_string())?,
+            level: entry.m_iNpcLevel,
+            max_hp: entry.m_iHP,
+            run_speed: entry.m_iRunSpeed,
+            sight_range: entry.m_iSightRange,
+            style: entry
+                .m_iNpcStyle
+                .try_into()
+                .map_err(|e: FFError| e.get_msg().to_string())?,
+            bark_type: match entry.m_iBarkerType {
+                0 => None,
+                x => Some(x),
+            },
+        };
+        npc_stats_table.insert(key, npc_stats);
+    }
+
+    Ok(npc_stats_table)
+}
+
+fn load_npcs() -> Result<Vec<NPCSpawnData>, String> {
     const NPC_TABLE_KEY: &str = "NPCs";
     const MOB_TABLE_KEY: &str = "mobs";
     const MOB_GROUP_TABLE_KEY: &str = "groups";
@@ -1591,7 +1665,7 @@ fn load_npc_data() -> Result<Vec<NPCData>, String> {
     fn load_npc_table(
         table: &Map<std::string::String, Value>,
         is_mob: bool,
-    ) -> Result<Vec<NPCData>, String> {
+    ) -> Result<Vec<NPCSpawnData>, String> {
         #[derive(Deserialize)]
         struct FollowerDataEntry {
             iNPCType: i32,
@@ -1600,7 +1674,7 @@ fn load_npc_data() -> Result<Vec<NPCData>, String> {
         }
 
         #[derive(Deserialize)]
-        struct NPCDataEntry {
+        struct NPCSpawnDataEntry {
             aFollowers: Option<Vec<FollowerDataEntry>>,
             iAngle: i32,
             iMapNum: Option<u32>,
@@ -1612,9 +1686,9 @@ fn load_npc_data() -> Result<Vec<NPCData>, String> {
 
         let mut npc_data = Vec::new();
         for (_, v) in table {
-            let npc_data_entry: NPCDataEntry = serde_json::from_value(v.clone())
+            let npc_data_entry: NPCSpawnDataEntry = serde_json::from_value(v.clone())
                 .map_err(|e| format!("Malformed NPC data entry: {}", e))?;
-            let npc_data_entry = NPCData {
+            let npc_data_entry = NPCSpawnData {
                 npc_type: npc_data_entry.iNPCType,
                 is_mob,
                 pos: Position {

@@ -29,7 +29,7 @@ macro_rules! ffenum {
     };
 }
 
-ffenum!(NanoStyle, i32, {
+ffenum!(CombatStyle, i32, {
     Adaptium = NANO_STYLE_CRYSTAL as i32,
     Blastons = NANO_STYLE_ENERGY as i32,
     Cosmix = NANO_STYLE_FLUID as i32,
@@ -66,6 +66,12 @@ ffenum!(TargetSearchBy, i32, {
     PlayerID = 0,
     PlayerName = 1,
     PlayerUID = 2,
+});
+
+ffenum!(NPCTeam, i32, {
+    Unknown = 0,
+    Friendly = 1,
+    Mob = 2,
 });
 
 // eTaskTypeProperty.cs
