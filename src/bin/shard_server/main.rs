@@ -295,9 +295,9 @@ fn handle_packet(
         //
         P_CL2FE_REP_LIVE_CHECK => Ok(()),
         //
-        other => Err(FFError::build(
+        _ => Err(FFError::build(
             Severity::Warning,
-            format!("Unhandled packet: {:?}", other),
+            "Unhandled packet".to_string(),
         )),
     }
 }

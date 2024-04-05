@@ -176,9 +176,9 @@ fn handle_packet(
         P_CL2LS_REQ_SHARD_SELECT => login::shard_select(key, clients, state, time),
         P_CL2LS_REP_LIVE_CHECK => Ok(()),
         //
-        other => Err(FFError::build(
+        _ => Err(FFError::build(
             Severity::Warning,
-            format!("Unhandled packet: {:?}", other),
+            "Unhandled packet".to_string(),
         )),
     }
 }

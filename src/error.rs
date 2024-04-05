@@ -153,7 +153,7 @@ impl FFError {
     pub fn get_formatted(&self, colored: bool) -> String {
         let mut msg = format!("{} {}", self.severity.get_label(colored), self.msg);
         if let Some(parent) = self.parent.as_ref() {
-            msg.push_str(&format!("\nfrom {}", parent.get_formatted(colored)));
+            msg.push_str(&format!("\n\tfrom: {}", parent.get_formatted(colored)));
         }
         msg
     }

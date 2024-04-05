@@ -8,7 +8,7 @@ use std::{
 };
 
 use crate::{
-    error::{log, log_if_failed, Severity},
+    error::{log, log_if_failed, FFError, Severity},
     state::ServerState,
 };
 
@@ -140,7 +140,9 @@ impl FFServer {
                     let client = clients.get_mut(&ev.key).unwrap();
                     client.read_payload()?;
                     let pkt_id = client.peek_packet_id()?;
-                    (self.pkt_handler)(ev.key, clients, pkt_id, state, time_now)
+                    (self.pkt_handler)(ev.key, clients, pkt_id, state, time_now).map_err(|e| {
+                        FFError::build(e.get_severity(), format!("<{:?}> {}", pkt_id, e.get_msg()))
+                    })
                 })(&mut self.clients);
 
                 if let Err(e) = res {
