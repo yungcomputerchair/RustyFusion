@@ -74,7 +74,7 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
       - [x] Follow path
         - [x] Eduardo (Scary Monsters)
         - [x] Billy (Carnival Collection)
-        - [ ] Grim (Don't Fear the Reaper (Part 4 of 4))
+        - [x] Grim (Don't Fear the Reaper (Part 4 of 4))
 - [x] Entity pathing
 - [ ] Infected Zone races
 - [x] Guide changing
