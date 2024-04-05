@@ -268,7 +268,8 @@ impl PostgresDatabase {
     fn load_player_internal(client: &mut impl GenericClient, row: &Row) -> FFResult<Player> {
         let pc_uid = row.get("PlayerId");
         let slot_num: Int = row.get("Slot");
-        let mut player = Player::new(pc_uid, slot_num as usize);
+        let perms: Int = row.get("AccountLevel");
+        let mut player = Player::new(pc_uid, slot_num as usize, perms as i16);
         let appearance_flag: Int = row.get("AppearanceFlag");
         player.style = if appearance_flag != 0 {
             Some(PlayerStyle {
@@ -472,7 +473,7 @@ impl Database for PostgresDatabase {
             username: username.clone(),
             password_hashed: row.get("Password"),
             selected_slot: row.get::<_, Int>("Selected") as u8,
-            account_level: row.get::<_, Int>("AccountLevel") as u8,
+            account_level: row.get::<_, Int>("AccountLevel") as i16,
             banned_until: util::get_systime_from_sec(row.get::<_, Int>("BannedUntil") as u64),
             ban_reason: row.get("BanReason"),
         }))
@@ -480,7 +481,19 @@ impl Database for PostgresDatabase {
 
     fn create_account(&mut self, username: &Text, password_hashed: &Text) -> FFResult<Account> {
         let client = &mut self.client;
-        let updated = Self::exec(client, "create_account", &[username, password_hashed])?;
+
+        let acc_level =
+            if Self::query(client, "enum_account_ids", &[]).is_ok_and(|rows| rows.is_empty()) {
+                CN_ACCOUNT_LEVEL__MASTER
+            } else {
+                config_get().login.default_account_level.get()
+            } as Int;
+
+        let updated = Self::exec(
+            client,
+            "create_account",
+            &[username, password_hashed, &acc_level],
+        )?;
         assert_eq!(updated, 1);
         let new_acc = self.find_account(username)?.unwrap();
         Ok(new_acc)

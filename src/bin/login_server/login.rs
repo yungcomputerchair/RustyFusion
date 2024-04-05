@@ -54,7 +54,10 @@ pub fn login(
                         let new_acc = db.create_account(&username, &password_hashed)?;
                         log(
                             Severity::Info,
-                            &format!("Created account {} with ID {}", username, new_acc.id),
+                            &format!(
+                                "Created account {} with ID {} and level {}",
+                                username, new_acc.id, new_acc.account_level
+                            ),
                         );
                         new_acc
                     } else {
@@ -273,7 +276,7 @@ pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> FF
         ));
     }
 
-    let mut player = Player::new(pc_uid, slot_num);
+    let mut player = Player::new(pc_uid, slot_num, unused!());
     let first_name = util::parse_utf16(&pkt.szFirstName)?;
     let last_name = util::parse_utf16(&pkt.szLastName)?;
     player.first_name = first_name;

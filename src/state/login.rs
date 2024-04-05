@@ -17,7 +17,7 @@ pub struct Account {
     pub username: String,
     pub password_hashed: String,
     pub selected_slot: u8,
-    pub account_level: u8,
+    pub account_level: i16,
     pub banned_until: SystemTime,
     pub ban_reason: String,
 }

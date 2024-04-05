@@ -6,7 +6,9 @@ SELECT
     p.CurrentMissionID, p.Quests,
     p.XCoordinate, p.YCoordinate, p.ZCoordinate, p.Angle,
     p.Nano1, p.Nano2, p.Nano3,
-    a.Body, a.EyeColor, a.FaceStyle, a.Gender, a.HairColor, a.HairStyle, a.Height, a.SkinColor
+    s.Body, s.EyeColor, s.FaceStyle, s.Gender, s.HairColor, s.HairStyle, s.Height, s.SkinColor,
+    a.AccountLevel
 FROM Players as p
-INNER JOIN Appearances as a ON p.PlayerID = a.PlayerID
+INNER JOIN Appearances as s ON p.PlayerID = s.PlayerID
+INNER JOIN Accounts as a ON p.AccountID = a.AccountID
 WHERE p.AccountID = $1;

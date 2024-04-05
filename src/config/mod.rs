@@ -123,6 +123,7 @@ mod tests {
         assert!(login.log_path.is_set());
         assert!(login.listen_addr.is_set());
         assert!(login.auto_create_accounts.is_set());
+        assert!(login.default_account_level.is_set());
         assert!(login.motd_path.is_set());
 
         // Shard server settings

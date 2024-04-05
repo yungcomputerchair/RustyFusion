@@ -372,7 +372,7 @@ pub struct Player {
     pre_warp_data: PreWarpData,
 }
 impl Player {
-    pub fn new(uid: i64, slot_num: usize) -> Self {
+    pub fn new(uid: i64, slot_num: usize, perms: i16) -> Self {
         let start_level = 1;
         let stats = tdata_get().get_player_stats(start_level).unwrap();
         Self {
@@ -380,6 +380,7 @@ impl Player {
             slot_num,
             level: start_level,
             hp: stats.max_hp as i32,
+            perms,
             ..Default::default()
         }
     }
@@ -1008,8 +1009,8 @@ impl Player {
     }
 
     pub fn set_hp(&mut self, hp: i32) -> i32 {
-        let hp_max = if self.get_perms() == CN_ACCOUNT_LEVEL__GM as i16 {
-            i32::MAX // allow overflow for GMs
+        let hp_max = if self.get_perms() <= CN_ACCOUNT_LEVEL__DEVELOPER as i16 {
+            i32::MAX // allow overflow for high perms
         } else {
             self.get_max_hp()
         };
@@ -1032,7 +1033,7 @@ impl Player {
         clients: Option<&mut ClientMap>,
     ) -> u32 {
         let player_stats = tdata_get().get_player_stats(self.level).unwrap();
-        let fm_max = if self.get_perms() == CN_ACCOUNT_LEVEL__GM as i16 {
+        let fm_max = if self.get_perms() <= CN_ACCOUNT_LEVEL__DEVELOPER as i16 {
             PC_FUSIONMATTER_MAX
         } else {
             player_stats.fm_limit
@@ -1515,10 +1516,18 @@ impl Entity for Player {
 }
 impl Display for Player {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let title = match self.perms as u32 {
-            CN_ACCOUNT_LEVEL__GM => Some("GM"),
-            _ => None,
+        let acc_level_to_title = |acc_level| {
+            if acc_level <= CN_ACCOUNT_LEVEL__MASTER as i16 {
+                return Some("Master");
+            } else if acc_level <= CN_ACCOUNT_LEVEL__GM as i16 {
+                return Some("GM");
+            } else if acc_level <= CN_ACCOUNT_LEVEL__CS as i16 {
+                return Some("Mod");
+            }
+            None
         };
+
+        let title = acc_level_to_title(self.perms);
         let title = match title {
             Some(title) => format!("({}) ", title),
             None => String::new(),

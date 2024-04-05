@@ -18,7 +18,7 @@ use rusty_fusion::{
 
 pub fn gm_pc_set_value(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
-    helpers::validate_gm(client, state)?;
+    helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
 
     let pkt: sP_CL2FE_GM_REQ_PC_SET_VALUE = *client.get_packet(P_CL2FE_GM_REQ_PC_SET_VALUE)?;
     let pc_id = pkt.iPC_ID;
@@ -57,7 +57,7 @@ pub fn gm_pc_set_value(clients: &mut ClientMap, state: &mut ShardServerState) ->
 pub fn gm_pc_give_item(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
     catch_fail(
         (|| {
-            let pc_id = helpers::validate_gm(client, state)?;
+            let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
             let pkt: &sP_CL2FE_REQ_PC_GIVE_ITEM = client.get_packet(P_CL2FE_REQ_PC_GIVE_ITEM)?;
             let player = state.get_player_mut(pc_id)?;
             let slot_number = pkt.iSlotNum as usize;
@@ -89,7 +89,7 @@ pub fn gm_pc_give_nano(clients: &mut ClientMap, state: &mut ShardServerState) ->
     catch_fail(
         (|| {
             let client = clients.get_self();
-            let pc_id = helpers::validate_gm(client, state)?;
+            let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
             let nano_id = pkt.iNanoID;
             let player = state.get_player_mut(pc_id)?;
             let new_level = max(player.get_level(), nano_id);
@@ -136,7 +136,7 @@ pub fn gm_pc_give_nano(clients: &mut ClientMap, state: &mut ShardServerState) ->
 
 pub fn gm_pc_goto(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
-    let pc_id = helpers::validate_gm(client, state)?;
+    let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
     let pkt: &sP_CL2FE_REQ_PC_GOTO = client.get_packet(P_CL2FE_REQ_PC_GOTO)?;
     let new_pos = Position {
         x: pkt.iToX,
@@ -173,7 +173,7 @@ pub fn gm_pc_special_state_switch(
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let client = clients.get_self();
-    let pc_id = helpers::validate_gm(client, state)?;
+    let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__GM as i16)?;
     let pkt: &sP_CL2FE_GM_REQ_PC_SPECIAL_STATE_SWITCH =
         client.get_packet(P_CL2FE_GM_REQ_PC_SPECIAL_STATE_SWITCH)?;
 
@@ -219,7 +219,7 @@ pub fn gm_pc_special_state_switch(
 
 pub fn gm_pc_motd_register(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
-    helpers::validate_gm(client, state)?;
+    helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__CS as i16)?;
     let pkt: &sP_CL2FE_GM_REQ_PC_MOTD_REGISTER =
         client.get_packet(P_CL2FE_GM_REQ_PC_MOTD_REGISTER)?;
     let pkt = sP_FE2LS_MOTD_REGISTER {
@@ -234,7 +234,7 @@ pub fn gm_pc_motd_register(clients: &mut ClientMap, state: &mut ShardServerState
 
 pub fn gm_pc_announce(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
-    let pc_id = helpers::validate_gm(client, state)?;
+    let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__CS as i16)?;
     let pkt: &sP_CL2FE_GM_REQ_PC_ANNOUNCE = client.get_packet(P_CL2FE_GM_REQ_PC_ANNOUNCE)?;
     let area_type: AreaType = pkt.iAreaType.try_into()?;
     let pkt = sP_FE2CL_ANNOUNCE_MSG {
@@ -280,7 +280,7 @@ pub fn gm_pc_announce(clients: &mut ClientMap, state: &mut ShardServerState) -> 
 
 pub fn gm_pc_location(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
-    let gm_pc_id = helpers::validate_gm(client, state)?;
+    let gm_pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__CS as i16)?;
     let pkt: sP_CL2FE_GM_REQ_PC_LOCATION = *client.get_packet(P_CL2FE_GM_REQ_PC_LOCATION)?;
     let search_mode: TargetSearchBy = pkt.eTargetSearchBy.try_into()?;
     let search_query = match search_mode {
@@ -334,7 +334,7 @@ pub fn gm_target_pc_special_state_onoff(
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let client = clients.get_self();
-    helpers::validate_gm(client, state)?;
+    helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__CS as i16)?;
     let pkt: sP_CL2FE_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF =
         *client.get_packet(P_CL2FE_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF)?;
 
@@ -391,7 +391,7 @@ pub fn gm_target_pc_teleport(
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let client = clients.get_self();
-    let gm_pc_id = helpers::validate_gm(client, state)?;
+    let gm_pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__CS as i16)?;
     let pkt: sP_CL2FE_GM_REQ_TARGET_PC_TELEPORT =
         *client.get_packet(P_CL2FE_GM_REQ_TARGET_PC_TELEPORT)?;
 
@@ -488,7 +488,7 @@ pub fn gm_target_pc_teleport(
 
 pub fn gm_kick_player(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
-    helpers::validate_gm(client, state)?;
+    helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__CS as i16)?;
     let pkt: sP_CL2FE_GM_REQ_KICK_PLAYER = *client.get_packet(P_CL2FE_GM_REQ_KICK_PLAYER)?;
     let search_mode: TargetSearchBy = pkt.eTargetSearchBy.try_into()?;
     let search_query = match search_mode {
@@ -517,7 +517,7 @@ pub fn gm_kick_player(clients: &mut ClientMap, state: &mut ShardServerState) -> 
 }
 
 pub fn gm_reward_rate(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
-    let pc_id = helpers::validate_gm(client, state)?;
+    let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
     let pkt: &sP_CL2FE_GM_REQ_REWARD_RATE = client.get_packet(P_CL2FE_GM_REQ_REWARD_RATE)?;
     let player = state.get_player_mut(pc_id)?;
 
@@ -546,15 +546,20 @@ pub fn gm_reward_rate(client: &mut FFClient, state: &mut ShardServerState) -> FF
 mod helpers {
     use super::*;
 
-    pub fn validate_gm(client: &mut FFClient, state: &ShardServerState) -> FFResult<i32> {
+    pub fn validate_perms(
+        client: &mut FFClient,
+        state: &ShardServerState,
+        req_perms: i16,
+    ) -> FFResult<i32> {
         let user_pc_id = client.get_player_id()?;
-        let perms = state.get_player(user_pc_id)?.get_perms();
-        if perms > 0 {
+        let player = state.get_player(user_pc_id)?;
+        let perms = player.get_perms();
+        if perms > req_perms {
             return Err(FFError::build(
                 Severity::Warning,
                 format!(
-                    "Player {} tried to use GM commands without sufficient perms {}",
-                    user_pc_id, perms
+                    "{} tried to use cheats without sufficient perms: {}",
+                    player, perms
                 ),
             ));
         }

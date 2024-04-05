@@ -47,7 +47,7 @@ impl From<DbAccount> for Account {
             username: acc.username,
             password_hashed: acc.password_hash,
             selected_slot: acc.selected_slot as u8,
-            account_level: acc.account_level as u8,
+            account_level: acc.account_level as i16,
             banned_until: util::get_systime_from_sec(acc.banned_until_time as u64),
             ban_reason: acc.ban_reason,
         }
@@ -301,11 +301,12 @@ impl From<(BigInt, &Player, Int)> for DbPlayer {
         }
     }
 }
-impl TryFrom<DbPlayer> for Player {
+impl TryFrom<(DbPlayer, i16)> for Player {
     type Error = FFError;
 
-    fn try_from(db_player: DbPlayer) -> FFResult<Self> {
-        let mut player = Player::new(db_player.uid, db_player.slot_number as usize);
+    fn try_from(values: (DbPlayer, i16)) -> FFResult<Self> {
+        let (db_player, perms) = values;
+        let mut player = Player::new(db_player.uid, db_player.slot_number as usize, perms);
         player.style = if let Some(style) = db_player.style {
             Some(style.try_into()?)
         } else {
@@ -533,21 +534,31 @@ impl Database for MongoDatabase {
     fn create_account(&mut self, username: &Text, password_hashed: &Text) -> FFResult<Account> {
         let account_id = util::get_uid();
         let timestamp_now = util::get_timestamp_sec(SystemTime::now()) as Int;
+
+        let accounts = self.db.collection::<DbAccount>("accounts");
+        let account_level = if accounts
+            .estimated_document_count(None)
+            .is_ok_and(|count| count == 0)
+        {
+            CN_ACCOUNT_LEVEL__MASTER
+        } else {
+            config_get().login.default_account_level.get()
+        } as Int;
+
         let account = DbAccount {
             account_id,
             username: username.clone(),
             password_hash: password_hashed.clone(),
             player_uids: Vec::new(),
             selected_slot: 1,
-            account_level: CN_ACCOUNT_LEVEL__USER as Int,
+            account_level,
             creation_time: timestamp_now,
             last_login_time: timestamp_now,
             banned_until_time: 0,
             banned_since_time: 0,
             ban_reason: String::new(),
         };
-        self.db
-            .collection::<DbAccount>("accounts")
+        accounts
             .insert_one(account, None)
             .map_err(FFError::from_db_error)?;
         let new_acc = self.find_account(username)?.unwrap();
@@ -642,6 +653,17 @@ impl Database for MongoDatabase {
     }
 
     fn load_player(&mut self, acc_id: BigInt, pc_uid: BigInt) -> FFResult<Player> {
+        // get the account from the account collection
+        let db_acc = self
+            .db
+            .collection::<DbAccount>("accounts")
+            .find_one(doc! { "_id": acc_id }, None)
+            .map_err(FFError::from_db_error)?
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Account with ID {} not found in database", acc_id),
+            ))?;
+
         // get the player from the player collection
         let db_player = self
             .db
@@ -663,12 +685,12 @@ impl Database for MongoDatabase {
             ));
         }
 
-        db_player.try_into()
+        (db_player, db_acc.account_level as i16).try_into()
     }
 
     fn load_players(&mut self, acc_id: BigInt) -> FFResult<Vec<Player>> {
         // get the player uids from the account
-        let player_uids = self
+        let db_acc = self
             .db
             .collection::<DbAccount>("accounts")
             .find_one(doc! { "_id": acc_id }, None)
@@ -676,8 +698,8 @@ impl Database for MongoDatabase {
             .ok_or(FFError::build(
                 Severity::Warning,
                 format!("Account with ID {} not found in database", acc_id),
-            ))?
-            .player_uids;
+            ))?;
+        let player_uids = db_acc.player_uids;
 
         // get the players from the player collection
         let mut players = Vec::with_capacity(4);
@@ -694,7 +716,7 @@ impl Database for MongoDatabase {
                     Severity::Warning,
                     format!("Player with UID {} not found in database", pc_uid),
                 ))?;
-            let player: FFResult<Player> = player.try_into();
+            let player: FFResult<Player> = (player, db_acc.account_level as i16).try_into();
             if let Err(e) = player {
                 log_error(&e);
                 continue;
