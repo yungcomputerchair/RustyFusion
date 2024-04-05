@@ -156,14 +156,18 @@ pub fn pc_attack_npcs(clients: &mut ClientMap, state: &mut ShardServerState) -> 
                         } else {
                             item_rewards.push(qitem_drop);
                         }
+
+                        // fresh drop so a repair won't be needed.
+                        // to prevent one from happening, we signal that it's already done
+                        player.mission_journal.repair_task(*task_id).unwrap();
                     }
                 }
             }
 
-            let mut gained_taros = placeholder!(0);
-            let mut gained_fm = placeholder!(0);
-            let mut gained_potions = placeholder!(0);
-            let mut gained_boosts = placeholder!(0);
+            let mut gained_taros = 0;
+            let mut gained_fm = 0;
+            let mut gained_potions = 0;
+            let mut gained_boosts = 0;
             match tdata_get().get_mob_reward(ty) {
                 Ok(reward) => {
                     gained_taros = reward.taros;
