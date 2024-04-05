@@ -93,7 +93,7 @@ pub fn gm_pc_give_nano(clients: &mut ClientMap, state: &mut ShardServerState) ->
             let nano_id = pkt.iNanoID;
             let player = state.get_player_mut(pc_id)?;
             let new_level = max(player.get_level(), nano_id);
-            player.set_level(new_level);
+            player.set_level(new_level)?;
             let nano = player.unlock_nano(nano_id)?.clone();
 
             let resp = sP_FE2CL_REP_PC_NANO_CREATE_SUCC {

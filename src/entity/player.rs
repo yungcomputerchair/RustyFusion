@@ -373,11 +373,13 @@ pub struct Player {
 }
 impl Player {
     pub fn new(uid: i64, slot_num: usize) -> Self {
+        let start_level = 1;
+        let stats = tdata_get().get_player_stats(start_level).unwrap();
         Self {
             uid,
             slot_num,
-            hp: placeholder!(400),
-            level: 1,
+            level: start_level,
+            hp: stats.max_hp as i32,
             ..Default::default()
         }
     }
@@ -1006,13 +1008,22 @@ impl Player {
     }
 
     pub fn set_hp(&mut self, hp: i32) -> i32 {
-        self.hp = clamp_min(hp, 0);
+        let hp_max = if self.get_perms() == CN_ACCOUNT_LEVEL__GM as i16 {
+            i32::MAX // allow overflow for GMs
+        } else {
+            self.get_max_hp()
+        };
+        self.hp = clamp(hp, 0, hp_max);
         self.hp
     }
 
-    pub fn set_level(&mut self, level: i16) -> i16 {
-        self.level = clamp(level, 1, PC_LEVEL_MAX as i16);
-        self.level
+    pub fn set_level(&mut self, level: i16) -> FFResult<i16> {
+        let new_level = clamp(level, 1, PC_LEVEL_MAX as i16);
+
+        tdata_get().get_player_stats(new_level)?; // validate
+
+        self.level = new_level;
+        Ok(self.level)
     }
 
     pub fn set_fusion_matter(

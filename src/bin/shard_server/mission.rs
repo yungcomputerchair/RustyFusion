@@ -564,14 +564,18 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
                                 None,
                             );
                             let new_level = std::cmp::max(player.get_level(), nano_id);
-                            player.set_level(new_level);
-
                             let resp = sP_FE2CL_REP_PC_NANO_CREATE_SUCC {
                                 iPC_FusionMatter: player.get_fusion_matter() as i32,
                                 iQuestItemSlotNum: -1,
                                 QuestItem: None.into(),
                                 Nano: Some(nano).into(),
-                                iPC_Level: new_level,
+                                iPC_Level: match player.set_level(new_level) {
+                                    Ok(l) => l,
+                                    Err(e) => {
+                                        log_error(&e);
+                                        player.get_level()
+                                    }
+                                },
                             };
                             log_if_failed(
                                 clients
