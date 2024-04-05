@@ -177,16 +177,6 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
                         ),
                     ));
                 }
-                if escort_npc.path.is_none() {
-                    return Err(FFError::build(
-                        Severity::Warning,
-                        format!("Escort NPC {} has no path", escort_npc_id),
-                    ));
-                }
-                state.entity_map.validate_proximity(
-                    &[EntityID::Player(pc_id), EntityID::NPC(escort_npc_id)],
-                    RANGE_TRIGGER,
-                )?;
             }
 
             // check for free qitem slots. this is stricter than it needs to be but
@@ -211,7 +201,15 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
             if task_def.obj_escort_npc_type.is_some() {
                 let escort_npc_id = pkt.iEscortNPC_ID;
                 let escort_npc = state.get_npc_mut(pkt.iEscortNPC_ID).unwrap();
-                escort_npc.path.as_mut().unwrap().start();
+                if let Some(ref mut path) = escort_npc.path {
+                    path.start();
+                } else {
+                    escort_npc.loose_follow = Some(EntityID::Player(pc_id));
+                    state
+                        .entity_map
+                        .set_tick(EntityID::NPC(escort_npc_id), true)
+                        .unwrap();
+                }
                 task.escort_npc_id = Some(escort_npc_id);
             }
 
@@ -386,10 +384,12 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
                 }
             }
 
-            // check escort path
+            // check escort NPC is alive (and at destination, if pathed)
             if let Some(escort_npc_id) = task.escort_npc_id {
                 let escort_npc = state.get_npc(escort_npc_id)?;
-                if task_def.obj_npc_type.is_some() && !escort_npc.path.as_ref().unwrap().is_done() {
+                if task_def.obj_npc_type.is_some()
+                    && escort_npc.path.as_ref().is_some_and(|path| !path.is_done())
+                {
                     return Err(FFError::build(
                         Severity::Warning,
                         format!(
@@ -454,6 +454,13 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
             // all clear, mark the task completed. it'll be overwritten by the next task
             let player = state.get_player_mut(pc_id).unwrap();
             player.mission_journal.complete_task(pkt.iTaskNum)?;
+
+            // if escort following, stop it
+            if let Some(escort_npc_id) = task.escort_npc_id {
+                let escort_npc = state.get_npc_mut(escort_npc_id).unwrap();
+                escort_npc.loose_follow = None;
+            }
+            let player = state.get_player_mut(pc_id).unwrap();
 
             // success qitem changes
             if !task_def.succ_qitems.is_empty() {
