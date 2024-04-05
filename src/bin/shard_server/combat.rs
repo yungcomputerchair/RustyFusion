@@ -102,12 +102,28 @@ pub fn pc_attack_npcs(clients: &mut ClientMap, state: &mut ShardServerState) -> 
             // go through each task that has this enemy as a target and drop quest items
             for task_id in &enemy_in_tasks {
                 let task_def = tdata_get().get_task_definition(*task_id).unwrap();
-                if !task_def.dropped_qitems.is_empty()
-                    && player.get_free_slots(ItemLocation::QInven) > 0
-                {
-                    let choice: usize = rng.gen_range(0..task_def.dropped_qitems.len());
-                    let (&qitem_id, &drop_chance) =
-                        task_def.dropped_qitems.iter().nth(choice).unwrap();
+                let mut chosen_qitem = None;
+                for qitem in &task_def.dropped_qitems {
+                    let qitem_id = *qitem.0;
+                    let max_qitem_count = *task_def.obj_qitems.get(&qitem_id).unwrap_or(&0);
+                    let qitem_count = player.get_quest_item_count(qitem_id);
+                    if qitem_count < max_qitem_count {
+                        match qitem_count {
+                            0 => {
+                                if player.get_free_slots(ItemLocation::QInven) > 0 {
+                                    chosen_qitem = Some(qitem);
+                                    break;
+                                }
+                            }
+                            _ => {
+                                chosen_qitem = Some(qitem);
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if let Some((&qitem_id, &drop_chance)) = chosen_qitem {
                     let roll: f32 = rng.gen();
                     log(
                         Severity::Debug,
