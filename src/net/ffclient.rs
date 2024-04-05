@@ -187,14 +187,13 @@ impl FFClient {
         let from = self.in_buf_ptr;
         let to = from + sz;
         if to > self.in_data_len {
-            log(
+            return Err(FFError::build(
                 Severity::Warning,
-                &format!(
+                format!(
                     "Bad struct read; not enough bytes came in: {} < {}",
                     self.in_data_len, to
                 ),
-            );
-            // we keep going. Why? because each and every handler should handle corrupt structs.
+            ));
         }
 
         let buf: &[u8] = &self.in_buf[from..to];
