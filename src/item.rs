@@ -2,7 +2,8 @@ use std::{cmp::min, time::SystemTime};
 
 use crate::{
     defines::*,
-    enums::ItemType,
+    entity::RewardData,
+    enums::{ItemType, RewardCategory, RewardType},
     error::{panic_log, FFError, FFResult},
     net::packet::*,
     tabledata::tdata_get,
@@ -223,22 +224,37 @@ pub struct CrocPotData {
     pub price_multiplier_stats: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Reward {
+    category: RewardCategory,
     pub taros: u32,
     pub fusion_matter: u32,
     pub weapon_boosts: u32,
     pub nano_potions: u32,
     pub items: Vec<Item>,
 }
-impl Default for Reward {
-    fn default() -> Self {
+impl Reward {
+    pub fn new(category: RewardCategory) -> Self {
         Self {
+            category,
             taros: 0,
             fusion_matter: 0,
             weapon_boosts: 0,
             nano_potions: 0,
             items: Vec::new(),
         }
+    }
+
+    pub fn with_rates(mut self, reward_data: &RewardData) -> Self {
+        let category = self.category as usize;
+        let taros_factor = reward_data.get_reward_rate(RewardType::Taros, category);
+        let fm_factor = reward_data.get_reward_rate(RewardType::FusionMatter, category);
+        if let Ok(factor) = taros_factor {
+            self.taros = (self.taros as f32 * factor) as u32;
+        }
+        if let Ok(factor) = fm_factor {
+            self.fusion_matter = (self.fusion_matter as f32 * factor) as u32;
+        }
+        self
     }
 }

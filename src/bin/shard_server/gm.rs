@@ -521,14 +521,13 @@ pub fn gm_reward_rate(client: &mut FFClient, state: &mut ShardServerState) -> FF
     let pkt: &sP_CL2FE_GM_REQ_REWARD_RATE = client.get_packet(P_CL2FE_GM_REQ_REWARD_RATE)?;
     let player = state.get_player_mut(pc_id)?;
 
-    let mut set_res = Ok(());
     if pkt.iGetSet != 0 {
         let reward_type: RewardType = pkt.iRewardType.try_into()?;
         let rate_percent = pkt.iSetRateValue as f32;
-        let idx = pkt.iRewardRateIndex as usize;
-        set_res = player
+        let category: RewardCategory = (pkt.iRewardRateIndex as usize).try_into()?;
+        player
             .reward_data
-            .set_reward_rate(reward_type, idx, rate_percent);
+            .set_reward_rate(reward_type, category, rate_percent);
     }
 
     let resp = sP_FE2CL_GM_REP_REWARD_RATE_SUCC {
@@ -537,10 +536,7 @@ pub fn gm_reward_rate(client: &mut FFClient, state: &mut ShardServerState) -> FF
             .reward_data
             .get_rates_as_array(RewardType::FusionMatter),
     };
-    client.send_packet(P_FE2CL_GM_REP_REWARD_RATE_SUCC, &resp)?;
-
-    // we defer the error so the client can still see the current rates
-    set_res
+    client.send_packet(P_FE2CL_GM_REP_REWARD_RATE_SUCC, &resp)
 }
 
 mod helpers {

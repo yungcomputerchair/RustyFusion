@@ -18,7 +18,7 @@ use crate::{
     enums::*,
     error::{log, log_error, log_if_failed, panic_log, FFError, FFResult, Severity},
     item::{CrocPotData, Item, ItemStats, Reward, VendorData, VendorItem},
-    mission::{MissionDefinition, MissionReward, TaskDefinition},
+    mission::{MissionDefinition, TaskDefinition},
     nano::{NanoStats, NanoTuning},
     path::{Path, PathPoint},
     util, Position,
@@ -134,7 +134,7 @@ struct NanoData {
 struct MissionData {
     mission_definitions: HashMap<i32, MissionDefinition>,
     task_definitions: HashMap<i32, TaskDefinition>,
-    rewards: HashMap<i32, MissionReward>,
+    rewards: HashMap<i32, Reward>,
 }
 
 pub struct PlayerStats {
@@ -560,7 +560,7 @@ impl TableData {
 
     pub fn get_mob_reward(&self, mob_type: i32) -> FFResult<Reward> {
         let mut rng = thread_rng();
-        let mut reward = Reward::default();
+        let mut reward = Reward::new(RewardCategory::Combat);
 
         let mapping = self
             .drop_data
@@ -710,11 +710,12 @@ impl TableData {
         ))
     }
 
-    pub fn get_mission_reward(&self, reward_id: i32) -> FFResult<&MissionReward> {
+    pub fn get_mission_reward(&self, reward_id: i32) -> FFResult<Reward> {
         self.xdt_data
             .mission_data
             .rewards
             .get(&reward_id)
+            .cloned()
             .ok_or(FFError::build(
                 Severity::Warning,
                 format!("Reward with id {} doesn't exist", reward_id),
@@ -1548,19 +1549,18 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
             item_types.push(item_type);
         }
         let reward_id = entry.m_iMissionRewardID;
-        let reward = MissionReward {
-            taros: entry.m_iCash,
-            fusion_matter: entry.m_iFusionMatter,
-            items: entry
-                .m_iMissionRewardItemID
-                .iter()
-                .zip(item_types.iter())
-                .flat_map(|(id, ty)| match id {
-                    0 => None,
-                    _ => Some((*ty, *id)),
-                })
-                .collect(),
-        };
+        let mut reward = Reward::new(RewardCategory::Missions);
+        reward.taros = entry.m_iCash;
+        reward.fusion_matter = entry.m_iFusionMatter;
+        for (id, ty) in entry
+            .m_iMissionRewardItemID
+            .iter()
+            .zip(item_types.iter())
+            .filter(|(id, _)| **id != 0)
+        {
+            let item = Item::new(*ty, *id);
+            reward.items.push(item);
+        }
         rewards.insert(reward_id, reward);
     }
 

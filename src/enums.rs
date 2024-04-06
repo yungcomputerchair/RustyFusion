@@ -98,6 +98,14 @@ ffenum!(RewardType, i32, {
     FusionMatter = 1,
 });
 
+ffenum!(RewardCategory, usize, {
+    All = 0,
+    Combat = 1,
+    Missions = 2,
+    Eggs = 3,
+    Racing = 4,
+});
+
 // eItemLocation.cs
 ffenum!(ItemLocation, i32, 4, {
     Equip = 0,  /*eIL_Equip*/

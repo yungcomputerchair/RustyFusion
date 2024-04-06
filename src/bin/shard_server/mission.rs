@@ -3,7 +3,6 @@ use rusty_fusion::{
     entity::{Combatant, EntityID},
     enums::{ItemLocation, ItemType, MissionType, TaskType},
     error::*,
-    item::Item,
     mission::Task,
     net::{
         packet::{PacketID::*, *},
@@ -498,7 +497,10 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
             }
 
             if let Some(reward_id) = task_def.succ_reward {
-                match tdata_get().get_mission_reward(reward_id) {
+                match tdata_get()
+                    .get_mission_reward(reward_id)
+                    .map(|r| r.with_rates(&player.reward_data))
+                {
                     Err(e) => log_error(&e),
                     Ok(reward) => {
                         let taros_new = player.get_taros() + reward.taros;
@@ -519,7 +521,7 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
                             .queue_packet(P_FE2CL_REP_REWARD_ITEM, &reward_pkt);
                         for item in &reward.items {
                             let slot_num = player.find_free_slot(ItemLocation::Inven).unwrap();
-                            let item_reward = Item::new(item.0, item.1);
+                            let item_reward = *item;
                             player
                                 .set_item(ItemLocation::Inven, slot_num, Some(item_reward))
                                 .unwrap();

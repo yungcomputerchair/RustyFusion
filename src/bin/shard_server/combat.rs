@@ -168,7 +168,10 @@ pub fn pc_attack_npcs(clients: &mut ClientMap, state: &mut ShardServerState) -> 
             let mut gained_fm = 0;
             let mut gained_potions = 0;
             let mut gained_boosts = 0;
-            match tdata_get().get_mob_reward(ty) {
+            match tdata_get()
+                .get_mob_reward(ty)
+                .map(|r| r.with_rates(&player.reward_data))
+            {
                 Ok(reward) => {
                     gained_taros = reward.taros;
                     gained_fm = reward.fusion_matter;

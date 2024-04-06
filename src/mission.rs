@@ -448,13 +448,6 @@ impl MissionJournal {
     }
 }
 
-#[derive(Debug)]
-pub struct MissionReward {
-    pub taros: u32,
-    pub fusion_matter: u32,
-    pub items: Vec<(ItemType, i16)>,
-}
-
 impl Default for sRunningQuest {
     fn default() -> Self {
         sRunningQuest {

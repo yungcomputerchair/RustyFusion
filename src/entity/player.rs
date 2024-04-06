@@ -11,7 +11,8 @@ use crate::{
     defines::*,
     entity::{Combatant, Entity, EntityID},
     enums::{
-        ItemLocation, ItemType, PlayerGuide, PlayerShardStatus, RewardType, RideType, TaskType,
+        ItemLocation, ItemType, PlayerGuide, PlayerShardStatus, RewardCategory, RewardType,
+        RideType, TaskType,
     },
     error::{codes, log, log_if_failed, panic_log, FFError, FFResult, Severity},
     item::Item,
@@ -265,49 +266,40 @@ pub struct RewardData {
     fusion_matter: RewardRates,
 }
 impl RewardData {
-    pub fn set_reward_rate(
-        &mut self,
-        reward_type: RewardType,
-        idx: usize,
-        val: f32,
-    ) -> FFResult<()> {
+    pub fn set_reward_rate(&mut self, reward_type: RewardType, category: RewardCategory, val: f32) {
         let reward_rates = match reward_type {
             RewardType::Taros => &mut self.taros,
             RewardType::FusionMatter => &mut self.fusion_matter,
         };
-        let rate = match idx {
-            1 => Ok(&mut reward_rates.combat),
-            2 => Ok(&mut reward_rates.missions),
-            3 => Ok(&mut reward_rates.eggs),
-            4 => Ok(&mut reward_rates.racing),
-            0 => {
-                for idx in 1..5 {
-                    self.set_reward_rate(reward_type, idx, val).unwrap();
+        let rate = match category {
+            RewardCategory::Combat => &mut reward_rates.combat,
+            RewardCategory::Missions => &mut reward_rates.missions,
+            RewardCategory::Eggs => &mut reward_rates.eggs,
+            RewardCategory::Racing => &mut reward_rates.racing,
+            RewardCategory::All => {
+                for cat in 1..5 {
+                    let category: RewardCategory = cat.try_into().unwrap();
+                    self.set_reward_rate(reward_type, category, val);
                 }
-                return Ok(());
+                return;
             }
-            _ => Err(FFError::build(
-                Severity::Warning,
-                format!("Invalid reward rate index: {}", idx),
-            )),
-        }?;
+        };
         *rate = val / 100.0; // val is in percent
-        Ok(())
     }
 
-    pub fn get_reward_rate(&self, reward_type: RewardType, idx: usize) -> FFResult<f32> {
+    pub fn get_reward_rate(&self, reward_type: RewardType, category: usize) -> FFResult<f32> {
         let reward_rates = match reward_type {
             RewardType::Taros => &self.taros,
             RewardType::FusionMatter => &self.fusion_matter,
         };
-        match idx {
+        match category {
             1 => Ok(reward_rates.combat),
             2 => Ok(reward_rates.missions),
             3 => Ok(reward_rates.eggs),
             4 => Ok(reward_rates.racing),
             _ => Err(FFError::build(
                 Severity::Warning,
-                format!("Invalid reward rate index: {}", idx),
+                format!("Invalid reward rate category: {}", category),
             )),
         }
     }
