@@ -548,6 +548,29 @@ pub fn gm_reward_rate(client: &mut FFClient, state: &mut ShardServerState) -> FF
     client.send_packet(P_FE2CL_GM_REP_REWARD_RATE_SUCC, &resp)
 }
 
+pub fn gm_pc_task_complete(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+    let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
+    let pkt: &sP_CL2FE_REQ_PC_TASK_COMPLETE = client.get_packet(P_CL2FE_REQ_PC_TASK_COMPLETE)?;
+    let player = state.get_player_mut(pc_id)?;
+    let task_id = pkt.iTaskNum;
+    player.mission_journal.complete_task(task_id)?;
+    let resp = sP_FE2CL_REP_PC_TASK_END_SUCC { iTaskNum: task_id };
+    client.send_packet(P_FE2CL_REP_PC_TASK_END_SUCC, &resp)
+}
+
+pub fn gm_pc_mission_complete(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+    let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
+    let pkt: &sP_CL2FE_REQ_PC_MISSION_COMPLETE =
+        client.get_packet(P_CL2FE_REQ_PC_MISSION_COMPLETE)?;
+    let player = state.get_player_mut(pc_id)?;
+    let mission_id = pkt.iMissionNum;
+    player.mission_journal.set_mission_completed(mission_id)?;
+    let resp = sP_FE2CL_REP_PC_MISSION_COMPLETE_SUCC {
+        iMissionNum: mission_id,
+    };
+    client.send_packet(P_FE2CL_REP_PC_MISSION_COMPLETE_SUCC, &resp)
+}
+
 mod helpers {
     use super::*;
 
