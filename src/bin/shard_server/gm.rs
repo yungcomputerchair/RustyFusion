@@ -60,16 +60,25 @@ pub fn gm_pc_give_item(client: &mut FFClient, state: &mut ShardServerState) -> F
             let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
             let pkt: &sP_CL2FE_REQ_PC_GIVE_ITEM = client.get_packet(P_CL2FE_REQ_PC_GIVE_ITEM)?;
             let player = state.get_player_mut(pc_id)?;
-            let slot_number = pkt.iSlotNum as usize;
 
-            let location = pkt.eIL.try_into()?;
             let item: Option<Item> = pkt.Item.try_into()?;
-
-            player.set_item(location, slot_number, item)?;
+            let location = pkt.eIL.try_into()?;
+            let slot_number = match location {
+                ItemLocation::QInven => {
+                    let qitem_id = pkt.Item.iID;
+                    let qitem_count = pkt.Item.iOpt as usize;
+                    player.set_quest_item_count(qitem_id, qitem_count)?
+                }
+                other => {
+                    let req_slot_number = pkt.iSlotNum as usize;
+                    player.set_item(other, req_slot_number, item)?;
+                    req_slot_number
+                }
+            };
 
             let resp = sP_FE2CL_REP_PC_GIVE_ITEM_SUCC {
                 eIL: pkt.eIL,
-                iSlotNum: pkt.iSlotNum,
+                iSlotNum: slot_number as i32,
                 Item: item.into(),
             };
             client.send_packet(P_FE2CL_REP_PC_GIVE_ITEM_SUCC, &resp)
