@@ -64,6 +64,7 @@ impl XDTData {
 
 #[derive(Debug)]
 struct NPCSpawnData {
+    group_id: Option<i32>,
     npc_type: i32,
     pos: Position,
     angle: i32,
@@ -392,15 +393,46 @@ impl TableData {
             ))
     }
 
-    pub fn get_npcs(&self, entity_map: &mut EntityMap, channel_num: usize) -> Vec<NPC> {
+    fn make_npcs_from_spawn_data(
+        spawn_data: &NPCSpawnData,
+        entity_map: &mut EntityMap,
+        channel_num: usize,
+    ) -> Vec<NPC> {
+        let dat = spawn_data;
         let mut npcs = Vec::new();
-        for dat in &self.npcs {
-            let mut npc = match NPC::new(
-                entity_map.gen_next_npc_id(),
-                dat.npc_type,
+        let mut npc = match NPC::new(
+            entity_map.gen_next_npc_id(),
+            dat.npc_type,
+            Position {
+                x: dat.pos.x,
+                y: dat.pos.y,
+                z: dat.pos.z,
+            },
+            dat.angle,
+            InstanceID {
+                channel_num,
+                map_num: dat.map_num.unwrap_or(ID_OVERWORLD),
+                instance_num: None,
+            },
+            dat.is_mob,
+        ) {
+            Ok(npc) => npc,
+            Err(e) => {
+                log(
+                    e.get_severity(),
+                    &format!("Failed to spawn NPC: {}", e.get_msg()),
+                );
+                return npcs;
+            }
+        };
+        for follower in &dat.followers {
+            let id = entity_map.gen_next_npc_id();
+            let mut follower = match NPC::new(
+                id,
+                follower.npc_type,
                 Position {
-                    x: dat.pos.x,
-                    y: dat.pos.y,
+                    x: dat.pos.x + follower.offset_x,
+                    y: dat.pos.y + follower.offset_y,
                     z: dat.pos.z,
                 },
                 dat.angle,
@@ -411,47 +443,52 @@ impl TableData {
                 },
                 dat.is_mob,
             ) {
-                Ok(npc) => npc,
+                Ok(follower) => follower,
                 Err(e) => {
                     log(
                         e.get_severity(),
-                        &format!("Failed to spawn NPC: {}", e.get_msg()),
+                        &format!("Failed to spawn NPC follower: {}", e.get_msg()),
                     );
                     continue;
                 }
             };
-            for follower in &dat.followers {
-                let id = entity_map.gen_next_npc_id();
-                let mut follower = match NPC::new(
-                    id,
-                    follower.npc_type,
-                    Position {
-                        x: dat.pos.x + follower.offset_x,
-                        y: dat.pos.y + follower.offset_y,
-                        z: dat.pos.z,
-                    },
-                    dat.angle,
-                    InstanceID {
-                        channel_num,
-                        map_num: dat.map_num.unwrap_or(ID_OVERWORLD),
-                        instance_num: None,
-                    },
-                    dat.is_mob,
-                ) {
-                    Ok(follower) => follower,
-                    Err(e) => {
-                        log(
-                            e.get_severity(),
-                            &format!("Failed to spawn NPC follower: {}", e.get_msg()),
-                        );
-                        continue;
-                    }
-                };
-                follower.leader_id = Some(npc.id);
-                npcs.push(follower);
-                npc.follower_ids.insert(id);
+            follower.leader_id = Some(npc.id);
+            npcs.push(follower);
+            npc.follower_ids.insert(id);
+        }
+        npcs.push(npc);
+        npcs
+    }
+
+    pub fn make_all_npcs(&self, entity_map: &mut EntityMap, channel_num: usize) -> Vec<NPC> {
+        let mut npcs = Vec::new();
+        for dat in &self.npcs {
+            npcs.extend(Self::make_npcs_from_spawn_data(
+                dat,
+                entity_map,
+                channel_num,
+            ));
+        }
+        npcs
+    }
+
+    pub fn make_group_npcs(
+        &self,
+        entity_map: &mut EntityMap,
+        channel_num: usize,
+        group_id: i32,
+    ) -> Vec<NPC> {
+        let mut npcs = Vec::new();
+        for dat in &self.npcs {
+            // inefficient, but not worth having a separate data structure for
+            if dat.group_id == Some(group_id) {
+                npcs.extend(Self::make_npcs_from_spawn_data(
+                    dat,
+                    entity_map,
+                    channel_num,
+                ));
+                break;
             }
-            npcs.push(npc);
         }
         npcs
     }
@@ -1684,6 +1721,7 @@ fn load_npcs() -> Result<Vec<NPCSpawnData>, String> {
     fn load_npc_table(
         table: &Map<std::string::String, Value>,
         is_mob: bool,
+        is_group: bool,
     ) -> Result<Vec<NPCSpawnData>, String> {
         #[derive(Deserialize)]
         struct FollowerDataEntry {
@@ -1704,10 +1742,12 @@ fn load_npcs() -> Result<Vec<NPCSpawnData>, String> {
         }
 
         let mut npc_data = Vec::new();
-        for (_, v) in table {
+        for (k, v) in table {
             let npc_data_entry: NPCSpawnDataEntry = serde_json::from_value(v.clone())
                 .map_err(|e| format!("Malformed NPC data entry: {}", e))?;
+            let key: i32 = k.parse().map_err(|e| format!("Malformed NPC key: {}", e))?;
             let npc_data_entry = NPCSpawnData {
+                group_id: if is_group { Some(key) } else { None },
                 npc_type: npc_data_entry.iNPCType,
                 is_mob,
                 pos: Position {
@@ -1739,13 +1779,13 @@ fn load_npcs() -> Result<Vec<NPCSpawnData>, String> {
 
     let npc_root = load_json("NPCs.json")?;
     let npc_table = get_object(&npc_root, NPC_TABLE_KEY)?;
-    npc_data.extend(load_npc_table(npc_table, false)?);
+    npc_data.extend(load_npc_table(npc_table, false, false)?);
 
     let mob_root = load_json("mobs.json")?;
     let mob_table = get_object(&mob_root, MOB_TABLE_KEY)?;
-    npc_data.extend(load_npc_table(mob_table, true)?);
+    npc_data.extend(load_npc_table(mob_table, true, false)?);
     let grouped_mob_table = get_object(&mob_root, MOB_GROUP_TABLE_KEY)?;
-    npc_data.extend(load_npc_table(grouped_mob_table, true)?);
+    npc_data.extend(load_npc_table(grouped_mob_table, true, true)?);
 
     Ok(npc_data)
 }

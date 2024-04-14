@@ -422,7 +422,7 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
             if let Some(reward_id) = task_def.succ_reward {
                 let reward = tdata_get().get_mission_reward(reward_id)?;
                 let inv_space = player.get_free_slots(ItemLocation::Inven);
-                if reward.items.len() as usize > inv_space {
+                if reward.items.len() > inv_space {
                     error_code = Some(codes::TaskEndErr::InventoryFull);
                     return Err(FFError::build(
                         Severity::Warning,

@@ -47,7 +47,7 @@ impl Default for ShardServerState {
             panic_log("Invalid number of channels");
         }
         for channel_num in 1..=num_channels {
-            for mut npc in tdata_get().get_npcs(&mut state.entity_map, channel_num) {
+            for mut npc in tdata_get().make_all_npcs(&mut state.entity_map, channel_num) {
                 let mut needs_tick = npc.is_mob;
                 if let Some(path) = tdata_get().get_npc_path(npc.ty) {
                     npc.set_path(path);
