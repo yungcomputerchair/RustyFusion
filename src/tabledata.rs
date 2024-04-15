@@ -70,7 +70,6 @@ struct NPCSpawnData {
     angle: i32,
     map_num: Option<u32>,
     followers: Vec<FollowerData>,
-    is_mob: bool,
 }
 
 #[derive(Debug)]
@@ -414,7 +413,6 @@ impl TableData {
                 map_num: dat.map_num.unwrap_or(ID_OVERWORLD),
                 instance_num: None,
             },
-            dat.is_mob,
         ) {
             Ok(npc) => npc,
             Err(e) => {
@@ -441,7 +439,6 @@ impl TableData {
                     map_num: dat.map_num.unwrap_or(ID_OVERWORLD),
                     instance_num: None,
                 },
-                dat.is_mob,
             ) {
                 Ok(follower) => follower,
                 Err(e) => {
@@ -1720,7 +1717,6 @@ fn load_npcs() -> Result<Vec<NPCSpawnData>, String> {
 
     fn load_npc_table(
         table: &Map<std::string::String, Value>,
-        is_mob: bool,
         is_group: bool,
     ) -> Result<Vec<NPCSpawnData>, String> {
         #[derive(Deserialize)]
@@ -1749,7 +1745,6 @@ fn load_npcs() -> Result<Vec<NPCSpawnData>, String> {
             let npc_data_entry = NPCSpawnData {
                 group_id: if is_group { Some(key) } else { None },
                 npc_type: npc_data_entry.iNPCType,
-                is_mob,
                 pos: Position {
                     x: npc_data_entry.iX,
                     y: npc_data_entry.iY,
@@ -1779,13 +1774,13 @@ fn load_npcs() -> Result<Vec<NPCSpawnData>, String> {
 
     let npc_root = load_json("NPCs.json")?;
     let npc_table = get_object(&npc_root, NPC_TABLE_KEY)?;
-    npc_data.extend(load_npc_table(npc_table, false, false)?);
+    npc_data.extend(load_npc_table(npc_table, false)?);
 
     let mob_root = load_json("mobs.json")?;
     let mob_table = get_object(&mob_root, MOB_TABLE_KEY)?;
-    npc_data.extend(load_npc_table(mob_table, true, false)?);
+    npc_data.extend(load_npc_table(mob_table, false)?);
     let grouped_mob_table = get_object(&mob_root, MOB_GROUP_TABLE_KEY)?;
-    npc_data.extend(load_npc_table(grouped_mob_table, true, true)?);
+    npc_data.extend(load_npc_table(grouped_mob_table, true)?);
 
     Ok(npc_data)
 }

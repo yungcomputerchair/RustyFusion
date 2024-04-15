@@ -30,7 +30,6 @@ pub struct NPC {
     pub path: Option<Path>,
     pub loose_follow: Option<EntityID>,
     pub interacting_pcs: HashSet<i32>,
-    pub is_mob: bool,
 }
 impl NPC {
     pub fn new(
@@ -39,7 +38,6 @@ impl NPC {
         position: Position,
         angle: i32,
         instance_id: InstanceID,
-        is_mob: bool,
     ) -> FFResult<Self> {
         let stats = tdata_get().get_npc_stats(ty)?;
         Ok(Self {
@@ -54,7 +52,6 @@ impl NPC {
             path: None,
             loose_follow: None,
             interacting_pcs: HashSet::new(),
-            is_mob,
         })
     }
 

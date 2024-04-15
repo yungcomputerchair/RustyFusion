@@ -3,7 +3,7 @@ use std::cmp::max;
 use rusty_fusion::{
     chunk::InstanceID,
     defines::*,
-    entity::{Combatant, Entity, EntityID, PlayerSearchQuery},
+    entity::{Combatant, Entity, EntityID, PlayerSearchQuery, NPC},
     enums::*,
     error::*,
     item::Item,
@@ -13,6 +13,7 @@ use rusty_fusion::{
     },
     placeholder,
     state::ShardServerState,
+    tabledata::tdata_get,
     unused, util, Position,
 };
 
@@ -569,6 +570,39 @@ pub fn gm_pc_mission_complete(client: &mut FFClient, state: &mut ShardServerStat
         iMissionNum: mission_id,
     };
     client.send_packet(P_FE2CL_REP_PC_MISSION_COMPLETE_SUCC, &resp)
+}
+
+pub fn gm_npc_summon(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let client = clients.get_self();
+    let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__GM as i16)?;
+    let pkt: sP_CL2FE_REQ_NPC_SUMMON = *client.get_packet(P_CL2FE_REQ_NPC_SUMMON)?;
+    let player = state.get_player(pc_id)?;
+
+    let perms = player.get_perms();
+    if perms > CN_ACCOUNT_LEVEL__GM as i16 {
+        return Err(FFError::build(
+            Severity::Warning,
+            format!("{} tried to summon NPC without GM perms", player),
+        ));
+    }
+    let npc_type = pkt.iNPCType;
+    tdata_get().get_npc_stats(npc_type)?;
+
+    let spawn_pos = player.get_position();
+    let spawn_angle = player.get_rotation();
+    let spawn_instance_id = player.instance_id;
+
+    let entity_map = &mut state.entity_map;
+    let count = pkt.iNPCCnt as usize;
+    for _ in 0..count {
+        let npc_id = entity_map.gen_next_npc_id();
+        let npc = NPC::new(npc_id, npc_type, spawn_pos, spawn_angle, spawn_instance_id).unwrap();
+        let chunk_coords = npc.get_chunk_coords();
+        let eid = entity_map.track(Box::new(npc), true);
+        entity_map.update(eid, Some(chunk_coords), Some(clients));
+    }
+
+    Ok(())
 }
 
 mod helpers {

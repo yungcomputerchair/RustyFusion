@@ -7,7 +7,7 @@ use crate::{
     config::config_get,
     defines::{ID_OVERWORLD, MAX_NUM_CHANNELS},
     entity::{Entity, EntityID, Player, Slider, NPC},
-    enums::ItemType,
+    enums::{ItemType, NPCTeam},
     error::{log, log_if_failed, panic_log, FFError, FFResult, Severity},
     helpers,
     item::Item,
@@ -48,11 +48,17 @@ impl Default for ShardServerState {
         }
         for channel_num in 1..=num_channels {
             for mut npc in tdata_get().make_all_npcs(&mut state.entity_map, channel_num) {
-                let mut needs_tick = npc.is_mob;
+                let mut needs_tick = false;
+
+                if tdata_get().get_npc_stats(npc.ty).unwrap().team == NPCTeam::Mob {
+                    needs_tick = true;
+                }
+
                 if let Some(path) = tdata_get().get_npc_path(npc.ty) {
                     npc.set_path(path);
                     needs_tick = true;
                 }
+
                 let chunk_pos = npc.get_chunk_coords();
                 let entity_map = &mut state.entity_map;
                 let id = entity_map.track(Box::new(npc), needs_tick);
