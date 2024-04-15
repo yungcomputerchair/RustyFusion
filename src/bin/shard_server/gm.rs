@@ -3,7 +3,7 @@ use std::{cmp::max, collections::HashSet};
 use rusty_fusion::{
     chunk::{EntityMap, InstanceID},
     defines::*,
-    entity::{Combatant, Entity, EntityID, PlayerSearchQuery, NPC},
+    entity::{Combatant, Egg, Entity, EntityID, PlayerSearchQuery, NPC},
     enums::*,
     error::*,
     item::Item,
@@ -570,6 +570,30 @@ pub fn gm_pc_mission_complete(client: &mut FFClient, state: &mut ShardServerStat
         iMissionNum: mission_id,
     };
     client.send_packet(P_FE2CL_REP_PC_MISSION_COMPLETE_SUCC, &resp)
+}
+
+pub fn gm_shiny_summon(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let client = clients.get_self();
+    let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__GM as i16)?;
+    let pkt: sP_CL2FE_REQ_SHINY_SUMMON = *client.get_packet(P_CL2FE_REQ_SHINY_SUMMON)?;
+    let player = state.get_player(pc_id)?;
+
+    let egg_type = pkt.iShinyType;
+    tdata_get().get_egg_stats(egg_type)?;
+    let egg_pos = Position {
+        x: pkt.iX,
+        y: pkt.iY,
+        z: pkt.iZ,
+    };
+    let egg_instance_id = player.instance_id;
+
+    let entity_map = &mut state.entity_map;
+    let egg_id = entity_map.gen_next_egg_id();
+    let egg = Egg::new(egg_id, egg_type, egg_pos, egg_instance_id, true);
+    let chunk_coords = egg.get_chunk_coords();
+    let eid = entity_map.track(Box::new(egg), true);
+    entity_map.update(eid, Some(chunk_coords), Some(clients));
+    Ok(())
 }
 
 pub fn gm_npc_summon(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {

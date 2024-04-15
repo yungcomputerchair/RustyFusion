@@ -243,6 +243,7 @@ fn handle_packet(
         P_CL2FE_REQ_NPC_SUMMON => gm::gm_npc_summon(&mut clients, state),
         P_CL2FE_REQ_NPC_GROUP_SUMMON => gm::gm_npc_group_summon(&mut clients, state),
         P_CL2FE_REQ_NPC_UNSUMMON => gm::gm_npc_unsummon(&mut clients, state),
+        P_CL2FE_REQ_SHINY_SUMMON => gm::gm_shiny_summon(&mut clients, state),
         //
         P_CL2FE_REQ_NPC_INTERACTION => npc::npc_interaction(clients.get_self(), state),
         P_CL2FE_REQ_BARKER => npc::npc_bark(clients.get_self(), state),
