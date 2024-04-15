@@ -101,6 +101,7 @@ pub struct EntityMap {
     next_pc_id: u32,
     next_npc_id: u32,
     next_slider_id: u32,
+    next_egg_id: u32,
 }
 
 impl EntityMap {
@@ -329,6 +330,15 @@ impl EntityMap {
             panic_log("Ran out of slider IDs");
         }
         self.next_slider_id += 1;
+        id as i32
+    }
+
+    pub fn gen_next_egg_id(&mut self) -> i32 {
+        let id = self.next_egg_id;
+        if id == u32::MAX {
+            panic_log("Ran out of egg IDs");
+        }
+        self.next_egg_id += 1;
         id as i32
     }
 
@@ -680,6 +690,7 @@ impl Default for EntityMap {
             next_pc_id: 1,
             next_npc_id: 1,
             next_slider_id: 1,
+            next_egg_id: 1,
         }
     }
 }

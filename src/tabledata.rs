@@ -14,7 +14,7 @@ use crate::{
     chunk::{EntityMap, InstanceID},
     config::config_get,
     defines::*,
-    entity::NPC,
+    entity::{Egg, NPC},
     enums::*,
     error::{log, log_error, log_if_failed, panic_log, FFError, FFResult, Severity},
     item::{CrocPotData, Item, ItemStats, Reward, VendorData, VendorItem},
@@ -70,6 +70,13 @@ struct NPCSpawnData {
     angle: i32,
     map_num: Option<u32>,
     followers: Vec<FollowerData>,
+}
+
+#[derive(Debug)]
+struct EggSpawnData {
+    egg_type: i32,
+    pos: Position,
+    map_num: Option<u32>,
 }
 
 #[derive(Debug)]
@@ -165,6 +172,13 @@ pub struct NPCStats {
     pub bark_type: Option<usize>,
 }
 
+pub struct EggStats {
+    pub crate_id: Option<i16>,
+    pub effect_id: Option<i32>,
+    pub effect_duration: Duration,
+    pub respawn_time: Duration,
+}
+
 #[derive(Debug, Deserialize)]
 struct CrateDropChance {
     DropChance: i32,
@@ -238,6 +252,11 @@ struct ItemReference {
     Type: i32,
 }
 
+struct EggData {
+    egg_stats: HashMap<i32, EggStats>,
+    eggs: Vec<EggSpawnData>,
+}
+
 struct DropData {
     crate_drop_chances: HashMap<i32, CrateDropChance>,
     crate_drop_types: HashMap<i32, CrateDropType>,
@@ -262,6 +281,7 @@ pub struct TableData {
     npcs: Vec<NPCSpawnData>,
     drop_data: DropData,
     path_data: PathData,
+    egg_data: EggData,
 }
 impl TableData {
     fn new() -> Self {
@@ -276,6 +296,7 @@ impl TableData {
             npcs: load_npcs().map_err(|e| format!("Error loading NPC data: {}", e))?,
             drop_data: load_drop_data().map_err(|e| format!("Error loading drop data: {}", e))?,
             path_data: load_path_data().map_err(|e| format!("Error loading path data: {}", e))?,
+            egg_data: load_egg_data().map_err(|e| format!("Error loading egg data: {}", e))?,
         })
     }
 
@@ -290,6 +311,13 @@ impl TableData {
                     item_id, item_type
                 ),
             ))
+    }
+
+    pub fn get_egg_stats(&self, egg_type: i32) -> FFResult<&EggStats> {
+        self.egg_data.egg_stats.get(&egg_type).ok_or(FFError::build(
+            Severity::Warning,
+            format!("Stats for egg type {} don't exist", egg_type),
+        ))
     }
 
     pub fn get_vendor_data(&self, vendor_id: i32) -> FFResult<&VendorData> {
@@ -488,6 +516,29 @@ impl TableData {
             }
         }
         npcs
+    }
+
+    pub fn make_eggs(&self, entity_map: &mut EntityMap, channel_num: usize) -> Vec<Egg> {
+        let mut eggs = Vec::new();
+        for dat in &self.egg_data.eggs {
+            let egg = Egg::new(
+                entity_map.gen_next_egg_id(),
+                dat.egg_type,
+                Position {
+                    x: dat.pos.x,
+                    y: dat.pos.y,
+                    z: dat.pos.z,
+                },
+                InstanceID {
+                    channel_num,
+                    map_num: dat.map_num.unwrap_or(ID_OVERWORLD),
+                    instance_num: None,
+                },
+                false,
+            );
+            eggs.push(egg);
+        }
+        eggs
     }
 
     pub fn get_item_from_crate(&self, crate_id: i16, gender: i32) -> FFResult<Item> {
@@ -1856,6 +1907,83 @@ fn load_drop_data() -> Result<DropData, String> {
         rarity_weights: load_drop_table(rarity_weights_table, RARITY_WEIGHTS_ID_KEY)?,
         item_sets: load_drop_table(item_sets_table, ITEM_SETS_ID_KEY)?,
         item_refs: load_drop_table(item_references_table, ITEM_REFERENCES_ID_KEY)?,
+    })
+}
+
+fn load_egg_data() -> Result<EggData, String> {
+    const EGG_TYPES_TABLE_KEY: &str = "EggTypes";
+    const EGG_TABLE_KEY: &str = "Eggs";
+
+    fn load_egg_stats(
+        table: &Map<std::string::String, Value>,
+    ) -> Result<HashMap<i32, EggStats>, String> {
+        #[derive(Deserialize)]
+        struct EggStatsEntry {
+            Id: i32,
+            DropCrateId: i16,
+            EffectId: i32,
+            Duration: usize,
+            Regen: usize,
+        }
+
+        let mut egg_stats = HashMap::new();
+        for (_, v) in table {
+            let egg_stats_entry: EggStatsEntry = serde_json::from_value(v.clone())
+                .map_err(|e| format!("Malformed egg stats entry: {} {}", e, v))?;
+            let key = egg_stats_entry.Id;
+            let egg_stats_entry = EggStats {
+                crate_id: match egg_stats_entry.DropCrateId {
+                    0 => None,
+                    x => Some(x),
+                },
+                effect_id: match egg_stats_entry.EffectId {
+                    0 => None,
+                    x => Some(x),
+                },
+                effect_duration: Duration::from_secs(egg_stats_entry.Duration as u64),
+                respawn_time: Duration::from_secs(egg_stats_entry.Regen as u64),
+            };
+            egg_stats.insert(key, egg_stats_entry);
+        }
+        Ok(egg_stats)
+    }
+
+    fn load_eggs(table: &Map<std::string::String, Value>) -> Result<Vec<EggSpawnData>, String> {
+        #[derive(Deserialize)]
+        struct EggSpawnDataEntry {
+            iType: i32,
+            iX: i32,
+            iY: i32,
+            iZ: i32,
+            iMapNum: Option<u32>,
+        }
+
+        let mut eggs = Vec::new();
+        for (_, v) in table {
+            let egg_data_entry: EggSpawnDataEntry = serde_json::from_value(v.clone())
+                .map_err(|e| format!("Malformed egg data entry: {} {}", e, v))?;
+            let egg_data_entry = EggSpawnData {
+                egg_type: egg_data_entry.iType,
+                pos: Position {
+                    x: egg_data_entry.iX,
+                    y: egg_data_entry.iY,
+                    z: egg_data_entry.iZ,
+                },
+                map_num: egg_data_entry.iMapNum,
+            };
+            eggs.push(egg_data_entry);
+        }
+        Ok(eggs)
+    }
+
+    let egg_root = load_json("eggs.json")?;
+
+    let egg_types_table = get_object(&egg_root, EGG_TYPES_TABLE_KEY)?;
+    let eggs_table = get_object(&egg_root, EGG_TABLE_KEY)?;
+
+    Ok(EggData {
+        egg_stats: load_egg_stats(egg_types_table)?,
+        eggs: load_eggs(eggs_table)?,
     })
 }
 

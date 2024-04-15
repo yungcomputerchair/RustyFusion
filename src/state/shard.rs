@@ -65,6 +65,13 @@ impl Default for ShardServerState {
                 entity_map.update(id, Some(chunk_pos), None);
             }
 
+            for egg in tdata_get().make_eggs(&mut state.entity_map, channel_num) {
+                let chunk_pos = egg.get_chunk_coords();
+                let entity_map = &mut state.entity_map;
+                let id = entity_map.track(Box::new(egg), true);
+                entity_map.update(id, Some(chunk_pos), None);
+            }
+
             // spawn sliders uniformly across the circuit
             let mut slider_circuit = tdata_get().get_slider_path();
             let num_sliders = config_get().shard.num_sliders.get();
