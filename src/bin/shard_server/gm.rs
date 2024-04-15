@@ -1,4 +1,4 @@
-use std::cmp::max;
+use std::{cmp::max, collections::HashSet};
 
 use rusty_fusion::{
     chunk::{EntityMap, InstanceID},
@@ -619,6 +619,33 @@ pub fn gm_npc_group_summon(clients: &mut ClientMap, state: &mut ShardServerState
     Ok(())
 }
 
+pub fn gm_npc_unsummon(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let client = clients.get_self();
+    helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__GM as i16)?;
+    let pkt: sP_CL2FE_REQ_NPC_UNSUMMON = *client.get_packet(P_CL2FE_REQ_NPC_UNSUMMON)?;
+
+    // find all NPC IDs attached to the requested one
+    let npc_id = pkt.iNPC_ID;
+    let mut visited_ids = HashSet::new();
+    let mut ids_to_visit = vec![npc_id];
+    while let Some(npc_id) = ids_to_visit.pop() {
+        if let Ok(npc) = state.get_npc(npc_id) {
+            if !npc.summoned || !visited_ids.insert(npc_id) {
+                continue;
+            }
+            if let Some(leader_id) = npc.leader_id {
+                ids_to_visit.push(leader_id);
+            }
+            ids_to_visit.extend(npc.follower_ids.iter().copied());
+        }
+    }
+
+    for npc_id in visited_ids {
+        helpers::remove_temp_npc(clients, &mut state.entity_map, npc_id);
+    }
+    Ok(())
+}
+
 mod helpers {
     use super::*;
 
@@ -653,9 +680,16 @@ mod helpers {
         FFError::build(Severity::Warning, err_msg)
     }
 
-    pub fn spawn_temp_npc(clients: &mut ClientMap, entity_map: &mut EntityMap, npc: NPC) {
+    pub fn spawn_temp_npc(clients: &mut ClientMap, entity_map: &mut EntityMap, mut npc: NPC) {
+        npc.summoned = true;
         let chunk_coords = npc.get_chunk_coords();
         let eid = entity_map.track(Box::new(npc), true);
         entity_map.update(eid, Some(chunk_coords), Some(clients));
+    }
+
+    pub fn remove_temp_npc(clients: &mut ClientMap, entity_map: &mut EntityMap, npc_id: i32) {
+        let eid = EntityID::NPC(npc_id);
+        entity_map.update(eid, None, Some(clients));
+        entity_map.untrack(eid);
     }
 }

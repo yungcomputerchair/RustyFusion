@@ -30,6 +30,7 @@ pub struct NPC {
     pub path: Option<Path>,
     pub loose_follow: Option<EntityID>,
     pub interacting_pcs: HashSet<i32>,
+    pub summoned: bool,
 }
 impl NPC {
     pub fn new(
@@ -52,6 +53,7 @@ impl NPC {
             path: None,
             loose_follow: None,
             interacting_pcs: HashSet::new(),
+            summoned: false,
         })
     }
 
