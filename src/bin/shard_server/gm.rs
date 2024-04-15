@@ -1,7 +1,7 @@
 use std::cmp::max;
 
 use rusty_fusion::{
-    chunk::InstanceID,
+    chunk::{EntityMap, InstanceID},
     defines::*,
     entity::{Combatant, Entity, EntityID, PlayerSearchQuery, NPC},
     enums::*,
@@ -578,13 +578,6 @@ pub fn gm_npc_summon(clients: &mut ClientMap, state: &mut ShardServerState) -> F
     let pkt: sP_CL2FE_REQ_NPC_SUMMON = *client.get_packet(P_CL2FE_REQ_NPC_SUMMON)?;
     let player = state.get_player(pc_id)?;
 
-    let perms = player.get_perms();
-    if perms > CN_ACCOUNT_LEVEL__GM as i16 {
-        return Err(FFError::build(
-            Severity::Warning,
-            format!("{} tried to summon NPC without GM perms", player),
-        ));
-    }
     let npc_type = pkt.iNPCType;
     tdata_get().get_npc_stats(npc_type)?;
 
@@ -597,9 +590,30 @@ pub fn gm_npc_summon(clients: &mut ClientMap, state: &mut ShardServerState) -> F
     for _ in 0..count {
         let npc_id = entity_map.gen_next_npc_id();
         let npc = NPC::new(npc_id, npc_type, spawn_pos, spawn_angle, spawn_instance_id).unwrap();
-        let chunk_coords = npc.get_chunk_coords();
-        let eid = entity_map.track(Box::new(npc), true);
-        entity_map.update(eid, Some(chunk_coords), Some(clients));
+        helpers::spawn_temp_npc(clients, entity_map, npc);
+    }
+
+    Ok(())
+}
+
+pub fn gm_npc_group_summon(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let client = clients.get_self();
+    let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__GM as i16)?;
+    let pkt: sP_CL2FE_REQ_NPC_GROUP_SUMMON = *client.get_packet(P_CL2FE_REQ_NPC_GROUP_SUMMON)?;
+    let player = state.get_player(pc_id)?;
+
+    let spawn_pos = player.get_position();
+    let spawn_angle = player.get_rotation();
+    let spawn_instance_id = player.instance_id;
+
+    let group_id = pkt.iNPCGroupType;
+    let entity_map = &mut state.entity_map;
+    let npcs = tdata_get().make_group_npcs(entity_map, unused!(), group_id);
+    for mut npc in npcs {
+        npc.set_position(spawn_pos);
+        npc.set_rotation(spawn_angle);
+        npc.instance_id = spawn_instance_id;
+        helpers::spawn_temp_npc(clients, entity_map, npc);
     }
 
     Ok(())
@@ -637,5 +651,11 @@ mod helpers {
         };
         log_if_failed(client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt));
         FFError::build(Severity::Warning, err_msg)
+    }
+
+    pub fn spawn_temp_npc(clients: &mut ClientMap, entity_map: &mut EntityMap, npc: NPC) {
+        let chunk_coords = npc.get_chunk_coords();
+        let eid = entity_map.track(Box::new(npc), true);
+        entity_map.update(eid, Some(chunk_coords), Some(clients));
     }
 }
