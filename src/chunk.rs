@@ -8,7 +8,7 @@ use std::{
 use crate::{
     config::config_get,
     defines::{ID_OVERWORLD, MAX_NUM_CHANNELS},
-    entity::{Entity, EntityID, Player, Slider, NPC},
+    entity::{Egg, Entity, EntityID, Player, Slider, NPC},
     enums::ShardChannelStatus,
     error::{log, log_if_failed, panic_log, FFError, FFResult, Severity},
     net::{ClientMap, FFClient},
@@ -237,6 +237,24 @@ impl EntityMap {
             let entity_ref = entry.entity.as_mut().as_any_mut();
             let slider_ref = entity_ref.downcast_mut();
             slider_ref
+        })
+    }
+
+    pub fn get_egg(&self, egg_id: i32) -> Option<&Egg> {
+        let id = EntityID::Egg(egg_id);
+        self.registry.get(&id).and_then(|entry| {
+            let entity_ref = entry.entity.as_ref().as_any();
+            let egg_ref = entity_ref.downcast_ref();
+            egg_ref
+        })
+    }
+
+    pub fn get_egg_mut(&mut self, egg_id: i32) -> Option<&mut Egg> {
+        let id = EntityID::Egg(egg_id);
+        self.registry.get_mut(&id).and_then(|entry| {
+            let entity_ref = entry.entity.as_mut().as_any_mut();
+            let egg_ref = entity_ref.downcast_mut();
+            egg_ref
         })
     }
 

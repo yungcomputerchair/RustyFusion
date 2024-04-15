@@ -8,6 +8,9 @@ use crate::{
     Position,
 };
 
+mod egg;
+pub use egg::*;
+
 mod npc;
 pub use npc::*;
 
@@ -22,6 +25,7 @@ pub enum EntityID {
     Player(i32),
     NPC(i32),
     Slider(i32),
+    Egg(i32),
 }
 
 pub trait Entity {

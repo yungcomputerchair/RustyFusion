@@ -230,6 +230,11 @@ impl ShardServerState {
                     slider.tick(time, clients, self);
                     *self.entity_map.get_slider_mut(slider_id).unwrap() = slider;
                 }
+                EntityID::Egg(egg_id) => {
+                    let mut egg = self.entity_map.get_egg_mut(egg_id).unwrap().clone();
+                    egg.tick(time, clients, self);
+                    *self.entity_map.get_egg_mut(egg_id).unwrap() = egg;
+                }
             }
         }
     }
