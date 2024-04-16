@@ -1,5 +1,6 @@
 #![allow(non_upper_case_globals)]
 
+pub const LIB_VERSION: Option<&str> = option_env!("CARGO_PKG_VERSION");
 pub const PROTOCOL_VERSION: i32 = 104;
 pub const DB_VERSION: i32 = 5;
 
