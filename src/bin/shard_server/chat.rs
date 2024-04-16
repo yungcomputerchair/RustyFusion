@@ -1,6 +1,6 @@
 use rusty_fusion::{
     defines::*,
-    entity::EntityID,
+    entity::{Entity, EntityID},
     error::*,
     net::{
         packet::{PacketID::*, *},
@@ -154,6 +154,14 @@ mod commands {
         );
 
         command_map.insert(
+            "refresh",
+            Command {
+                description: "Reinsert the player into the current chunk",
+                handler: cmd_refresh,
+            },
+        );
+
+        command_map.insert(
             "help",
             Command {
                 description: "Show this help message",
@@ -210,6 +218,23 @@ mod commands {
                 DB_VERSION,
             ),
         )
+    }
+
+    fn cmd_refresh(
+        _tokens: Vec<&str>,
+        clients: &mut ClientMap,
+        state: &mut ShardServerState,
+    ) -> FFResult<()> {
+        let pc_id = clients.get_self().get_player_id()?;
+        let player = state.get_player(pc_id)?;
+        let chunk_coords = player.get_chunk_coords();
+        state
+            .entity_map
+            .update(EntityID::Player(pc_id), None, Some(clients));
+        state
+            .entity_map
+            .update(EntityID::Player(pc_id), Some(chunk_coords), Some(clients));
+        Ok(())
     }
 
     fn cmd_help(
