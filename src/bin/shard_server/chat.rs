@@ -37,6 +37,10 @@ pub fn send_freechat_message(
                 ));
             }
 
+            // TODO filtering
+
+            log(Severity::Info, &format!("{}: \"{}\"", player, msg));
+
             let resp = sP_FE2CL_REP_SEND_FREECHAT_MESSAGE_SUCC {
                 iPC_ID: pc_id,
                 szFreeChat: util::encode_utf16(&msg),
@@ -73,8 +77,12 @@ pub fn send_menuchat_message(
         (|| {
             let client = clients.get_self();
             let pc_id = client.get_player_id()?;
+            let player = state.get_player(pc_id)?;
 
+            let msg = util::parse_utf16(&pkt.szFreeChat)?;
             // TODO validate contents
+
+            log(Severity::Info, &format!("{}: '{}'", player, msg));
 
             let resp = sP_FE2CL_REP_SEND_MENUCHAT_MESSAGE_SUCC {
                 iPC_ID: pc_id,

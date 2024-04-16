@@ -1530,7 +1530,9 @@ impl Display for Player {
             title,
             self.first_name,
             self.last_name,
-            self.get_uid()
+            self.id
+                .map(|id| id.to_string())
+                .unwrap_or("???".to_string()),
         )
     }
 }
