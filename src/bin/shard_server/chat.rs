@@ -143,33 +143,25 @@ mod commands {
     type CommandHandler = fn(Vec<&str>, &mut ClientMap, &mut ShardServerState) -> FFResult<()>;
 
     fn init_commands() -> HashMap<&'static str, Command> {
-        let mut command_map = HashMap::new();
+        #[rustfmt::skip]
+        let commands: [(&'static str, &'static str, CommandHandler); 3] = [
+            ("about", "Show information about the server", cmd_about),
+            ("refresh", "Reinsert the player into the current chunk", cmd_refresh),
+            ("help", "Show this help message", cmd_help),
+        ];
 
-        command_map.insert(
-            "about",
-            Command {
-                description: "Show information about the server",
-                handler: cmd_about,
-            },
-        );
-
-        command_map.insert(
-            "refresh",
-            Command {
-                description: "Reinsert the player into the current chunk",
-                handler: cmd_refresh,
-            },
-        );
-
-        command_map.insert(
-            "help",
-            Command {
-                description: "Show this help message",
-                handler: cmd_help,
-            },
-        );
-
-        command_map
+        commands
+            .into_iter()
+            .map(|(name, description, handler)| {
+                (
+                    name,
+                    Command {
+                        description,
+                        handler,
+                    },
+                )
+            })
+            .collect()
     }
 
     fn send_system_message(client: &mut FFClient, msg: &str) -> FFResult<()> {
