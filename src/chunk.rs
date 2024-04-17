@@ -1,6 +1,7 @@
 #![allow(clippy::needless_range_loop)]
 
 use std::{
+    alloc::{self, Layout},
     collections::{HashMap, HashSet},
     fmt::{Display, Formatter},
 };
@@ -82,7 +83,7 @@ struct RegistryEntry {
 
 struct ChunkMap {
     player_count: usize,
-    chunks: [[Chunk; NCHUNKS]; NCHUNKS],
+    chunks: Box<[[Chunk; NCHUNKS]; NCHUNKS]>,
 }
 impl ChunkMap {
     fn get_ids(&self) -> Vec<EntityID> {
@@ -578,9 +579,23 @@ impl EntityMap {
     fn init_instance(&mut self, instance_id: InstanceID) -> &mut ChunkMap {
         let new = !self.chunk_maps.contains_key(&instance_id);
         self.chunk_maps.entry(instance_id).or_insert_with(|| {
+            let chunks = unsafe {
+                let ptr = alloc::alloc(Layout::new::<[[Chunk; NCHUNKS]; NCHUNKS]>())
+                    as *mut [[Chunk; NCHUNKS]; NCHUNKS];
+                if ptr.is_null() {
+                    panic_log("Failed to allocate memory for chunk map");
+                }
+                for x in 0..NCHUNKS {
+                    for y in 0..NCHUNKS {
+                        let chunk_ptr = &mut (*ptr)[x][y] as *mut Chunk;
+                        chunk_ptr.write(Chunk::default());
+                    }
+                }
+                Box::from_raw(ptr)
+            };
             let chunk_map = ChunkMap {
                 player_count: 0,
-                chunks: std::array::from_fn(|_| std::array::from_fn(|_| Chunk::default())),
+                chunks,
             };
             log(
                 Severity::Debug,
