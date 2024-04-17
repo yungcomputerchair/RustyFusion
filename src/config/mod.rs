@@ -34,7 +34,7 @@ impl Config {
             if let std::io::ErrorKind::NotFound = e.kind() {
                 log(
                     Severity::Warning,
-                    "Config file {} missing, using default config",
+                    &format!("Config file {} missing, using default config", path),
                 );
                 return None;
             } else {
