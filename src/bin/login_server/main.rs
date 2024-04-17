@@ -150,6 +150,7 @@ fn handle_packet(
     let state = state.as_login();
     let client = clients.get_mut(&key).unwrap();
     match pkt_id {
+        P_FE2LS_REQ_AUTH_CHALLENGE => shard::auth_challenge(client),
         P_FE2LS_REQ_CONNECT => shard::connect(client, state, time),
         P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC => shard::update_login_info_succ(key, clients),
         P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL => shard::update_login_info_fail(key, clients),

@@ -18,10 +18,21 @@ use rusty_fusion::{
 };
 
 pub fn login_connect_req(server: &mut FFClient) {
-    let pkt = sP_FE2LS_REQ_CONNECT {
-        iTempValue: unused!(), // TODO auth
+    let pkt = sP_FE2LS_REQ_AUTH_CHALLENGE {
+        iTempValue: unused!(),
     };
-    log_if_failed(server.send_packet(P_FE2LS_REQ_CONNECT, &pkt));
+    log_if_failed(server.send_packet(P_FE2LS_REQ_AUTH_CHALLENGE, &pkt));
+}
+
+pub fn login_connect_challenge(server: &mut FFClient) -> FFResult<()> {
+    let pkt: &sP_LS2FE_REP_AUTH_CHALLENGE = server.get_packet(P_LS2FE_REP_AUTH_CHALLENGE)?;
+    let key = config_get().general.server_key.get().clone();
+    let mut challenge = pkt.aChallenge;
+    crypto::decrypt_payload(&mut challenge[..], key.as_bytes());
+    let pkt = sP_FE2LS_REQ_CONNECT {
+        aChallengeSolved: challenge,
+    };
+    server.send_packet(P_FE2LS_REQ_CONNECT, &pkt)
 }
 
 pub fn login_connect_succ(server: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {

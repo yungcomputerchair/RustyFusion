@@ -189,6 +189,7 @@ fn handle_packet(
     let state = state.as_shard();
     let mut clients = ClientMap::new(key, clients);
     match pkt_id {
+        P_LS2FE_REP_AUTH_CHALLENGE => login::login_connect_challenge(clients.get_self()),
         P_LS2FE_REP_CONNECT_SUCC => login::login_connect_succ(clients.get_self(), state),
         P_LS2FE_REP_CONNECT_FAIL => login::login_connect_fail(clients.get_self()),
         P_LS2FE_REQ_UPDATE_LOGIN_INFO => login::login_update_info(clients.get_self(), state),

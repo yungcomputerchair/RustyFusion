@@ -12,6 +12,8 @@ log_write_interval = 60 # how long (seconds) between log file writes
 live_check_time = 60 # how much network silence (seconds) before sending a live check.
                      # if this amount of time passes *again* after sending a live check,
                      # the client will be disconnected
+server_key = "myserverkey" # CHANGE ME; what password the login server and shard servers
+                           # will use to connect to each other. this must match between servers!!
 db_username = "admin" # what username to connect to database with
 db_password = "mypassword" # CHANGE ME; what password to connect to database with
 db_host = "localhost" # hostname/address of database server to connect to

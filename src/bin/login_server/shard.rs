@@ -17,12 +17,47 @@ use rusty_fusion::{
     unused, util,
 };
 
+pub fn auth_challenge(server: &mut FFClient) -> FFResult<()> {
+    let key = config_get().general.server_key.get().clone();
+    let mut challenge = crypto::gen_auth_challenge();
+    server.client_type = ClientType::UnauthedShardServer(Box::new(challenge));
+
+    crypto::encrypt_payload(&mut challenge, key.as_bytes());
+    let resp = sP_LS2FE_REP_AUTH_CHALLENGE {
+        aChallenge: challenge,
+    };
+    server.send_packet(P_LS2FE_REP_AUTH_CHALLENGE, &resp)
+}
+
 pub fn connect(
     server: &mut FFClient,
     state: &mut LoginServerState,
     time: SystemTime,
 ) -> FFResult<()> {
-    // TODO auth
+    let pkt: &sP_FE2LS_REQ_CONNECT = server.get_packet(P_FE2LS_REQ_CONNECT)?;
+    let challenge_solved = pkt.aChallengeSolved;
+    let ClientType::UnauthedShardServer(challenge) = &server.client_type else {
+        return Err(FFError::build(
+            Severity::Warning,
+            format!(
+                "Shard server tried to connect a second time: {:?}",
+                server.client_type
+            ),
+        ));
+    };
+
+    if challenge_solved != *challenge.clone() {
+        let resp = sP_LS2FE_REP_CONNECT_FAIL { iErrorCode: 1 };
+        log_if_failed(server.send_packet(P_LS2FE_REP_CONNECT_FAIL, &resp));
+        return Err(FFError::build(
+            Severity::Warning,
+            format!(
+                "Shard server {} tried to connect with wrong password",
+                server.get_addr()
+            ),
+        ));
+    }
+
     let shard_id = match state.register_shard() {
         Some(id) => id,
         None => {

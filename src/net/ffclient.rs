@@ -12,7 +12,10 @@ use crate::{
 
 use super::{
     bytes_to_struct,
-    crypto::{decrypt_payload, encrypt_payload, EncryptionMode, CRYPTO_KEY_SIZE, DEFAULT_KEY},
+    crypto::{
+        decrypt_payload, encrypt_payload, AuthChallenge, EncryptionMode, CRYPTO_KEY_SIZE,
+        DEFAULT_KEY,
+    },
     packet::{
         FFPacket, PacketID, PACKET_MASK_CL2FE, PACKET_MASK_CL2LS, PACKET_MASK_FE2LS,
         PACKET_MASK_LS2FE,
@@ -33,6 +36,7 @@ pub enum ClientType {
         pc_id: Option<i32>, // iPC_ID
     },
     LoginServer,
+    UnauthedShardServer(Box<AuthChallenge>),
     ShardServer(i32),
 }
 
@@ -144,6 +148,7 @@ impl FFClient {
                 PACKET_MASK_CL2FE & pkt_id_raw != 0 || PACKET_MASK_CL2LS & pkt_id_raw != 0
             }
             ClientType::LoginServer => PACKET_MASK_LS2FE & pkt_id_raw != 0,
+            ClientType::UnauthedShardServer(_) => pkt_id == PacketID::P_FE2LS_REQ_CONNECT,
             ClientType::ShardServer(_) => PACKET_MASK_FE2LS & pkt_id_raw != 0,
         }
     }

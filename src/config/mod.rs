@@ -102,7 +102,9 @@ mod tests {
     use super::*;
 
     #[test]
-    /* Validate that every setting is defined in config.toml.default */
+    // Validate that every setting is defined in config.toml.default
+    // The FIRST thing you should do when adding a config setting is
+    // to add an assertion for it here and in config.toml.default
     fn test_default_config() {
         let config = Config::load("config.toml.default").unwrap();
 
@@ -112,6 +114,7 @@ mod tests {
         assert!(general.logging_level_file.is_set());
         assert!(general.log_write_interval.is_set());
         assert!(general.live_check_time.is_set());
+        assert!(general.server_key.is_set());
         assert!(general.db_username.is_set());
         assert!(general.db_password.is_set());
         assert!(general.db_host.is_set());
