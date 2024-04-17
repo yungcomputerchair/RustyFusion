@@ -13,7 +13,11 @@ use crate::{
 use super::{
     bytes_to_struct,
     crypto::{decrypt_payload, encrypt_payload, EncryptionMode, CRYPTO_KEY_SIZE, DEFAULT_KEY},
-    packet::{FFPacket, PacketID},
+    packet::{
+        FFPacket, PacketID, PACKET_MASK_CL2FE, PACKET_MASK_CL2LS, PACKET_MASK_FE2LS,
+        PACKET_MASK_LS2FE,
+    },
+    UNKNOWN_CT_ALLOWED_PACKETS,
 };
 
 #[derive(Debug, Clone)]
@@ -132,6 +136,18 @@ impl FFClient {
         Ok(pc_id)
     }
 
+    pub fn can_send_packet(&self, pkt_id: PacketID) -> bool {
+        let pkt_id_raw = pkt_id as u32;
+        match self.client_type {
+            ClientType::Unknown => UNKNOWN_CT_ALLOWED_PACKETS.contains(&pkt_id),
+            ClientType::UnauthedClient { .. } | ClientType::GameClient { .. } => {
+                PACKET_MASK_CL2FE & pkt_id_raw != 0 || PACKET_MASK_CL2LS & pkt_id_raw != 0
+            }
+            ClientType::LoginServer => PACKET_MASK_LS2FE & pkt_id_raw != 0,
+            ClientType::ShardServer(_) => PACKET_MASK_FE2LS & pkt_id_raw != 0,
+        }
+    }
+
     pub fn set_ignore_packets(&mut self, ignore: bool) -> FFResult<()> {
         if self.ignore_packets == ignore {
             return Err(FFError::build(
@@ -238,14 +254,15 @@ impl FFClient {
 
         let id = self.peek_packet_id()?;
 
-        // discard packet if we're ignoring them for this client.
+        // discard packet if we're ignoring them for this client,
+        // or if the packet ID is not allowed for this client type.
         // we need to set the data length to 0 to "empty" the buffer.
         // we also need to return an error so the caller doesn't fire the packet handler.
-        if self.ignore_packets {
+        if self.ignore_packets || !self.can_send_packet(id) {
             self.in_data_len = 0;
             return Err(FFError::build(
                 Severity::Warning,
-                format!("Ignoring {:?} from {}", id, self.get_addr()),
+                format!("Ignoring {:?} from {:?}", id, self.client_type),
             ));
         }
 

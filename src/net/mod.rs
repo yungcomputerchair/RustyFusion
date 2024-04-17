@@ -10,6 +10,8 @@ use crate::{
 };
 
 const PACKET_BUFFER_SIZE: usize = 4096;
+const UNKNOWN_CT_ALLOWED_PACKETS: [PacketID; 3] =
+    [P_FE2LS_REQ_CONNECT, P_CL2LS_REQ_LOGIN, P_CL2FE_REQ_PC_ENTER];
 const SILENCED_PACKETS: [PacketID; 5] = [
     P_LS2FE_REP_CONNECT_SUCC,
     //

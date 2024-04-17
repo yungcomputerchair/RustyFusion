@@ -4,7 +4,14 @@
 
 use num_enum::TryFromPrimitive;
 
-use crate::{defines::MAX_NUM_CHANNELS, error::FFError};
+use crate::{defines::*, error::FFError};
+
+pub const PACKET_MASK_CL2LS: u32 = 0x12000000;
+pub const PACKET_MASK_LS2CL: u32 = 0x21000000;
+pub const PACKET_MASK_CL2FE: u32 = 0x13000000;
+pub const PACKET_MASK_FE2CL: u32 = 0x31000000;
+pub const PACKET_MASK_LS2FE: u32 = 0x23000000;
+pub const PACKET_MASK_FE2LS: u32 = 0x32000000;
 
 #[repr(u32)]
 #[derive(Debug, TryFromPrimitive, Clone, Copy, PartialEq)]

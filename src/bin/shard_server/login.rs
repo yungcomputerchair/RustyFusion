@@ -19,7 +19,7 @@ use rusty_fusion::{
 
 pub fn login_connect_req(server: &mut FFClient) {
     let pkt = sP_FE2LS_REQ_CONNECT {
-        iTempValue: unused!(),
+        iTempValue: unused!(), // TODO auth
     };
     log_if_failed(server.send_packet(P_FE2LS_REQ_CONNECT, &pkt));
 }

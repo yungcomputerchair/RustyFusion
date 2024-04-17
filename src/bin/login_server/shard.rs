@@ -22,6 +22,7 @@ pub fn connect(
     state: &mut LoginServerState,
     time: SystemTime,
 ) -> FFResult<()> {
+    // TODO auth
     let shard_id = match state.register_shard() {
         Some(id) => id,
         None => {
@@ -126,43 +127,37 @@ pub fn update_login_info_fail(
 
 pub fn update_pc_shard(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
     let pkt: sP_FE2LS_UPDATE_PC_SHARD = *client.get_packet(P_FE2LS_UPDATE_PC_SHARD)?;
-    if let ClientType::ShardServer(shard_id) = client.client_type {
-        let pc_uid = pkt.iPC_UID;
-        let status: PlayerShardStatus = pkt.ePSS.try_into()?;
-        log(
-            Severity::Info,
-            &format!("Player {} moved (shard {}, {:?})", pc_uid, shard_id, status),
-        );
+    let shard_id = client.get_shard_id().expect("Packet filter failed");
+    let pc_uid = pkt.iPC_UID;
+    let status: PlayerShardStatus = pkt.ePSS.try_into()?;
+    log(
+        Severity::Info,
+        &format!("Player {} moved (shard {}, {:?})", pc_uid, shard_id, status),
+    );
 
-        match status {
-            PlayerShardStatus::Entered => {
-                let old = state.set_player_shard(pc_uid, shard_id);
-                if let Some(old_shard_id) = old {
-                    log(
-                        Severity::Warning,
-                        &format!(
-                            "Player {} was already tracked in shard {}",
-                            pc_uid, old_shard_id
-                        ),
-                    );
-                }
+    match status {
+        PlayerShardStatus::Entered => {
+            let old = state.set_player_shard(pc_uid, shard_id);
+            if let Some(old_shard_id) = old {
+                log(
+                    Severity::Warning,
+                    &format!(
+                        "Player {} was already tracked in shard {}",
+                        pc_uid, old_shard_id
+                    ),
+                );
             }
-            PlayerShardStatus::Exited => {
-                if state.unset_player_shard(pc_uid).is_none() {
-                    log(
-                        Severity::Warning,
-                        &format!("Player {} was untracked in shard {}", pc_uid, shard_id),
-                    );
-                }
+        }
+        PlayerShardStatus::Exited => {
+            if state.unset_player_shard(pc_uid).is_none() {
+                log(
+                    Severity::Warning,
+                    &format!("Player {} was untracked in shard {}", pc_uid, shard_id),
+                );
             }
-        };
-        Ok(())
-    } else {
-        Err(FFError::build(
-            Severity::Warning,
-            "P_FE2LS_UPDATE_PC_SHARD: Client is not a shard server".to_string(),
-        ))
-    }
+        }
+    };
+    Ok(())
 }
 
 pub fn update_channel_statuses(
@@ -171,20 +166,14 @@ pub fn update_channel_statuses(
 ) -> FFResult<()> {
     let pkt: sP_FE2LS_UPDATE_CHANNEL_STATUSES =
         *client.get_packet(P_FE2LS_UPDATE_CHANNEL_STATUSES)?;
-    if let ClientType::ShardServer(shard_id) = client.client_type {
-        let mut statuses = [ShardChannelStatus::Closed; MAX_NUM_CHANNELS];
-        for (channel_num, status_raw) in pkt.aChannelStatus.iter().enumerate() {
-            let status: ShardChannelStatus = (*status_raw).try_into()?;
-            statuses[channel_num] = status;
-        }
-        state.update_shard_channel_statuses(shard_id, statuses);
-        Ok(())
-    } else {
-        Err(FFError::build(
-            Severity::Warning,
-            "P_FE2LS_UPDATE_CHANNEL_STATUSES: Client is not a shard server".to_string(),
-        ))
+    let shard_id = client.get_shard_id().expect("Packet filter failed");
+    let mut statuses = [ShardChannelStatus::Closed; MAX_NUM_CHANNELS];
+    for (channel_num, status_raw) in pkt.aChannelStatus.iter().enumerate() {
+        let status: ShardChannelStatus = (*status_raw).try_into()?;
+        statuses[channel_num] = status;
     }
+    state.update_shard_channel_statuses(shard_id, statuses);
+    Ok(())
 }
 
 pub fn motd(client: &mut FFClient) -> FFResult<()> {
