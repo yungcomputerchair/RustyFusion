@@ -43,6 +43,7 @@ pub enum ClientType {
 pub struct FFClient {
     pub sock: TcpStream,
     addr: SocketAddr,
+    waiting_data_len: Option<usize>,
     in_buf: [u8; PACKET_BUFFER_SIZE],
     in_buf_ptr: usize,
     in_data_len: usize,
@@ -64,6 +65,7 @@ impl FFClient {
         Self {
             sock: conn_data.0,
             addr: conn_data.1,
+            waiting_data_len: None,
             in_buf: [0; PACKET_BUFFER_SIZE],
             in_buf_ptr: 0,
             in_data_len: 0,
@@ -231,14 +233,19 @@ impl FFClient {
         self.last_heartbeat = SystemTime::now();
         self.live_check_time = None;
 
-        // read the size
-        let mut sz_buf: [u8; 4] = [0; 4];
-        self.sock
-            .read_exact(&mut sz_buf)
-            .map_err(FFError::from_io_err)?;
-        let sz: usize = u32::from_le_bytes(sz_buf) as usize;
+        if self.waiting_data_len.is_none() {
+            // read the size
+            let mut sz_buf: [u8; 4] = [0; 4];
+            self.sock
+                .read_exact(&mut sz_buf)
+                .map_err(FFError::from_io_err)?;
+            let sz: usize = u32::from_le_bytes(sz_buf) as usize;
+            self.waiting_data_len = Some(sz);
+        }
 
+        let sz = self.waiting_data_len.unwrap();
         if sz > PACKET_BUFFER_SIZE {
+            self.waiting_data_len = None;
             return Err(FFError::build_dc(
                 Severity::Warning,
                 format!(
@@ -251,6 +258,7 @@ impl FFClient {
         // read the packet
         let buf: &mut [u8] = &mut self.in_buf[..sz];
         self.sock.read_exact(buf).map_err(FFError::from_io_err)?;
+        self.waiting_data_len = None;
         self.in_buf_ptr = 0;
         self.in_data_len = sz;
 

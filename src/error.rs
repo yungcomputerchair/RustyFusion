@@ -2,7 +2,7 @@ use std::{
     cmp::min,
     fmt::Display,
     fs::File,
-    io::{BufWriter, Write},
+    io::{BufWriter, ErrorKind, Write},
     sync::{Mutex, OnceLock},
     time::SystemTime,
 };
@@ -98,12 +98,15 @@ impl FFError {
     pub fn from_io_err(error: std::io::Error) -> Self {
         Self {
             severity: match error.kind() {
-                std::io::ErrorKind::UnexpectedEof => Severity::Debug,
-                std::io::ErrorKind::BrokenPipe => Severity::Debug,
+                ErrorKind::UnexpectedEof => Severity::Debug,
+                ErrorKind::BrokenPipe => Severity::Debug,
+                ErrorKind::ConnectionReset => Severity::Debug,
+                ErrorKind::ConnectionAborted => Severity::Debug,
+                ErrorKind::WouldBlock => Severity::Debug,
                 _ => Severity::Warning,
             },
             msg: format!("I/O error ({:?})", error.kind()),
-            should_dc: true,
+            should_dc: error.kind() != ErrorKind::WouldBlock && error.kind() != ErrorKind::TimedOut,
             parent: None,
         }
     }
