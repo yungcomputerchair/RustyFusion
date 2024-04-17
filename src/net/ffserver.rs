@@ -131,7 +131,7 @@ impl FFServer {
                 let client = match self.clients.get_mut(&ev.key) {
                     Some(client) => client,
                     None => {
-                        continue;
+                        continue; // client was disconnected
                     }
                 };
                 let addr = client.get_addr();

@@ -245,11 +245,10 @@ impl FFClient {
 
         let sz = self.waiting_data_len.unwrap();
         if sz > PACKET_BUFFER_SIZE {
-            self.waiting_data_len = None;
             return Err(FFError::build_dc(
                 Severity::Warning,
                 format!(
-                    "Payload bigger than input buffer ({} > {})",
+                    "Payload bigger than input buffer ({} > {}); disconnecting client",
                     sz, PACKET_BUFFER_SIZE
                 ),
             ));
