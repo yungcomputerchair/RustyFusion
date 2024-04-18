@@ -7,7 +7,8 @@ use crate::{
     error::FFResult,
     net::{
         packet::{
-            sNPCAppearanceData, sP_FE2CL_NPC_ENTER, sP_FE2CL_NPC_EXIT, sP_FE2CL_NPC_MOVE, PacketID,
+            sNPCAppearanceData, sNPCGroupMemberInfo, sP_FE2CL_NPC_ENTER, sP_FE2CL_NPC_EXIT,
+            sP_FE2CL_NPC_MOVE, PacketID,
         },
         ClientMap, FFClient,
     },
@@ -63,6 +64,19 @@ impl NPC {
 
     pub fn set_follow(&mut self, entity_id: EntityID) {
         self.loose_follow = Some(entity_id);
+    }
+
+    pub fn get_group_member_info(&self) -> sNPCGroupMemberInfo {
+        sNPCGroupMemberInfo {
+            iNPC_ID: self.id,
+            iNPC_Type: self.ty,
+            iHP: self.hp,
+            iMapType: unused!(),
+            iMapNum: self.instance_id.map_num as i32,
+            iX: self.position.x,
+            iY: self.position.y,
+            iZ: self.position.z,
+        }
     }
 
     fn get_appearance_data(&self) -> sNPCAppearanceData {

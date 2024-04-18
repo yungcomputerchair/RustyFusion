@@ -58,6 +58,7 @@ pub trait Combatant {
 const GROUP_MAX_PLAYER_COUNT: usize = 4;
 const GROUP_MAX_NPC_COUNT: usize = 1;
 
+#[derive(Debug, Clone)]
 pub struct Group {
     members: Vec<EntityID>,
 }
@@ -78,7 +79,7 @@ impl Group {
 
         match id {
             EntityID::Player(_) => {
-                if self.get_player_ids().len() >= GROUP_MAX_PLAYER_COUNT {
+                if self.get_num_players() >= GROUP_MAX_PLAYER_COUNT {
                     return Err(FFError::build(
                         Severity::Warning,
                         "Group is full of players".to_string(),
@@ -86,7 +87,7 @@ impl Group {
                 }
             }
             EntityID::NPC(_) => {
-                if self.get_npc_ids().len() >= GROUP_MAX_NPC_COUNT {
+                if self.get_num_npcs() >= GROUP_MAX_NPC_COUNT {
                     return Err(FFError::build(
                         Severity::Warning,
                         "Group is full of NPCs".to_string(),
@@ -130,20 +131,18 @@ impl Group {
         &self.members
     }
 
-    pub fn get_player_ids(&self) -> Vec<EntityID> {
+    pub fn get_num_players(&self) -> usize {
         self.members
             .iter()
             .filter(|&id| matches!(id, EntityID::Player(_)))
-            .copied()
-            .collect()
+            .count()
     }
 
-    pub fn get_npc_ids(&self) -> Vec<EntityID> {
+    pub fn get_num_npcs(&self) -> usize {
         self.members
             .iter()
             .filter(|&id| matches!(id, EntityID::NPC(_)))
-            .copied()
-            .collect()
+            .count()
     }
 
     pub fn get_leader_id(&self) -> EntityID {

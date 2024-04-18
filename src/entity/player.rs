@@ -360,6 +360,8 @@ pub struct Player {
     transport_data: TransportData,
     pub trade_id: Option<Uuid>,
     pub trade_offered_to: Option<i32>,
+    pub group_id: Option<Uuid>,
+    pub group_offered_to: Option<i32>,
     pub vehicle_speed: Option<i32>,
     pre_warp_data: PreWarpData,
 }
@@ -586,6 +588,30 @@ impl Player {
             iFirstUseFlag1: self.flags.tip_flags as i64,
             iFirstUseFlag2: (self.flags.tip_flags >> 64) as i64,
             aiPCSkill: [unused!(); 33],
+        }
+    }
+
+    pub fn get_group_member_info(&self) -> sPCGroupMemberInfo {
+        sPCGroupMemberInfo {
+            iPC_ID: self.get_player_id(),
+            iPCUID: self.uid as u64,
+            iNameCheck: if self.flags.name_check_flag { 1 } else { 0 },
+            szFirstName: util::encode_utf16(&self.first_name),
+            szLastName: util::encode_utf16(&self.last_name),
+            iSpecialState: self.get_special_state_bit_flag(),
+            iLv: self.level,
+            iHP: self.hp,
+            iMaxHP: self.get_max_hp(),
+            iMapType: unused!(),
+            iMapNum: self.instance_id.map_num as i32,
+            iX: self.position.x,
+            iY: self.position.y,
+            iZ: self.position.z,
+            bNano: match self.nano_data.active_slot {
+                Some(_) => 1,
+                None => 0,
+            },
+            Nano: self.get_active_nano().cloned().into(),
         }
     }
 

@@ -176,6 +176,7 @@ fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>, state: 
 mod chat;
 mod combat;
 mod gm;
+mod group;
 mod item;
 mod login;
 mod mission;
@@ -305,6 +306,10 @@ fn handle_packet(
         P_CL2FE_REQ_PC_SET_CURRENT_MISSION_ID => {
             mission::set_current_mission_id(clients.get_self(), state)
         }
+        //
+        P_CL2FE_REQ_PC_GROUP_INVITE => group::pc_group_invite(&mut clients, state),
+        P_CL2FE_REQ_PC_GROUP_INVITE_REFUSE => group::pc_group_invite_refuse(&mut clients, state),
+        P_CL2FE_REQ_PC_GROUP_JOIN => group::pc_group_join(&mut clients, state),
         //
         P_CL2FE_REP_LIVE_CHECK => Ok(()),
         //
