@@ -538,10 +538,10 @@ impl Player {
 
     pub fn get_load_data(&self) -> sPCLoadData2CL {
         sPCLoadData2CL {
-            iUserLevel: self.perms,
+            iUserLevel: 0, // allow anyone to send GM commands; we'll validate perms
             PCStyle: self.get_style(),
             PCStyle2: self.get_style_2(),
-            iLevel: 0, // allow anyone to send GM commands; we'll validate perms
+            iLevel: self.level,
             iMentor: self.guide_data.current_guide as i16,
             iMentorCount: self.guide_data.total_guides as i16,
             iHP: self.hp,
