@@ -144,8 +144,9 @@ mod commands {
 
     fn init_commands() -> HashMap<&'static str, Command> {
         #[rustfmt::skip]
-        let commands: [(&'static str, &'static str, CommandHandler); 3] = [
+        let commands: [(&'static str, &'static str, CommandHandler); 4] = [
             ("about", "Show information about the server", cmd_about),
+            ("perms", "View or temporarily change a player's permissions level", cmd_perms),
             ("refresh", "Reinsert the player into the current chunk", cmd_refresh),
             ("help", "Show this help message", cmd_help),
         ];
@@ -172,14 +173,21 @@ mod commands {
         client.send_packet(P_FE2CL_PC_MOTD_LOGIN, &resp)
     }
 
+    fn parse_pc_id(token: &str) -> Result<Option<i32>, ()> {
+        if token == "." {
+            return Ok(None);
+        }
+        token.parse::<i32>().map_err(|_| ()).map(Some)
+    }
+
     pub fn handle_custom_command(
-        mut tokens: Vec<&str>,
+        tokens: Vec<&str>,
         clients: &mut ClientMap,
         state: &mut ShardServerState,
     ) -> FFResult<()> {
         let cmds = AVAILABLE_COMMANDS.get_or_init(init_commands);
 
-        let cmd_name = tokens.remove(0);
+        let cmd_name = tokens[0];
         if let Some(cmd) = cmds.get(cmd_name) {
             (cmd.handler)(tokens, clients, state)
         } else {
@@ -208,6 +216,80 @@ mod commands {
                 LIB_VERSION.unwrap_or("unknown"),
                 PROTOCOL_VERSION,
                 DB_VERSION,
+            ),
+        )
+    }
+
+    fn cmd_perms(
+        tokens: Vec<&str>,
+        clients: &mut ClientMap,
+        state: &mut ShardServerState,
+    ) -> FFResult<()> {
+        let client = clients.get_self();
+        if tokens.len() < 2 {
+            return send_system_message(
+                client,
+                "Usage: /perms <pc_id> [new_permissions_level]\n\
+                Use . for pc_id to select yourself\n\
+                Leave new_permissions_level empty to view the current level",
+            );
+        }
+
+        let pc_id = client.get_player_id()?;
+        let player = state.get_player(pc_id)?;
+        let own_perms = player.perms;
+
+        let target_pc_id = match parse_pc_id(tokens[1]) {
+            Ok(Some(pc_id)) => pc_id,
+            Ok(None) => pc_id,
+            Err(_) => return send_system_message(client, "Invalid player ID"),
+        };
+
+        let Ok(target_player) = state.get_player_mut(target_pc_id) else {
+            return send_system_message(client, &format!("Player {} not found", target_pc_id));
+        };
+        let target_perms = target_player.perms;
+
+        if tokens.len() < 3 {
+            return send_system_message(
+                client,
+                &format!("{} has permissions level {}", target_player, target_perms),
+            );
+        }
+
+        let Ok(new_perms) = tokens[2].parse::<i16>() else {
+            return send_system_message(client, "Invalid permissions level");
+        };
+
+        if !(1..=99).contains(&new_perms) {
+            return send_system_message(client, "Permissions level out of range [1, 99]");
+        }
+
+        if new_perms <= own_perms {
+            return send_system_message(
+                client,
+                &format!(
+                    "Can only grant weaker permissions than your own (> {})",
+                    own_perms
+                ),
+            );
+        }
+
+        if target_perms <= own_perms {
+            return send_system_message(
+                client, &format!(
+                    "Can only change the permissions of a player with weaker ones than your own (> {})",
+                    own_perms
+                ),
+            );
+        }
+
+        target_player.perms = new_perms;
+        send_system_message(
+            client,
+            &format!(
+                "Permissions level changed to {} for {}",
+                new_perms, target_player
             ),
         )
     }
