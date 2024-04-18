@@ -6,7 +6,7 @@ use super::PACKET_BUFFER_SIZE;
 
 pub const DEFAULT_KEY: &[u8] = b"m@rQn~W#";
 pub const CRYPTO_KEY_SIZE: usize = DEFAULT_KEY.len();
-pub const AUTH_CHALLENGE_SIZE: usize = PACKET_BUFFER_SIZE - 4;
+pub const AUTH_CHALLENGE_SIZE: usize = PACKET_BUFFER_SIZE / 2;
 
 pub type CryptoKey = [u8; CRYPTO_KEY_SIZE];
 pub type AuthChallenge = [u8; AUTH_CHALLENGE_SIZE];
