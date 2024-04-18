@@ -2,6 +2,7 @@ use std::{any::Any, cmp::Ordering, time::SystemTime};
 
 use crate::{
     chunk::ChunkCoords,
+    defines::*,
     error::{FFError, FFResult, Severity},
     net::{ClientMap, FFClient},
     state::ShardServerState,
@@ -54,9 +55,6 @@ pub trait Combatant {
     fn get_max_hp(&self) -> i32;
     fn is_dead(&self) -> bool;
 }
-
-const GROUP_MAX_PLAYER_COUNT: usize = 4;
-const GROUP_MAX_NPC_COUNT: usize = 1;
 
 #[derive(Debug, Clone)]
 pub struct Group {

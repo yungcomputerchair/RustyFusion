@@ -1,4 +1,5 @@
 use rusty_fusion::{
+    defines::*,
     entity::{Entity, EntityID, Group},
     error::*,
     net::{
@@ -102,8 +103,8 @@ pub fn pc_group_join(clients: &mut ClientMap, state: &mut ShardServerState) -> F
                 iMemberPCCnt: group.get_num_players() as i32,
                 iMemberNPCCnt: group.get_num_npcs() as i32,
             };
-            let mut pc_group_data = Vec::new();
-            let mut npc_group_data = Vec::new();
+            let mut pc_group_data = Vec::with_capacity(GROUP_MAX_PLAYER_COUNT);
+            let mut npc_group_data = Vec::with_capacity(GROUP_MAX_NPC_COUNT);
             for eid in group.get_member_ids() {
                 match eid {
                     EntityID::Player(pc_id) => {

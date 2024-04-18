@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::{
     chunk::{EntityMap, InstanceID},
     config::config_get,
-    defines::{ID_OVERWORLD, MAX_NUM_CHANNELS},
+    defines::*,
     entity::{Entity, EntityID, Group, Player, Slider, NPC},
     enums::{ItemType, NPCTeam},
     error::{log, log_if_failed, panic_log, FFError, FFResult, Severity},
@@ -215,6 +215,45 @@ impl ShardServerState {
         for pc_id in pc_ids_dismounted {
             let player = self.entity_map.get_player(pc_id).unwrap();
             helpers::broadcast_state(pc_id, player.get_state_bit_flag(), clients, self);
+        }
+    }
+
+    pub fn tick_groups(&mut self, clients: &mut ClientMap) {
+        for group in self.groups.values() {
+            let pkt = sP_FE2CL_PC_GROUP_MEMBER_INFO {
+                iID: unused!(),
+                iMemberPCCnt: group.get_num_players() as i32,
+                iMemberNPCCnt: group.get_num_npcs() as i32,
+            };
+            let mut pc_group_data = Vec::with_capacity(GROUP_MAX_PLAYER_COUNT);
+            let mut npc_group_data = Vec::with_capacity(GROUP_MAX_NPC_COUNT);
+            for eid in group.get_member_ids() {
+                match eid {
+                    EntityID::Player(pc_id) => {
+                        let player = self.get_player(*pc_id).unwrap();
+                        pc_group_data.push(player.get_group_member_info());
+                    }
+                    EntityID::NPC(npc_id) => {
+                        let npc = self.get_npc(*npc_id).unwrap();
+                        npc_group_data.push(npc.get_group_member_info());
+                    }
+                    _ => unreachable!(),
+                }
+            }
+
+            for eid in group.get_member_ids() {
+                let entity = self.entity_map.get_from_id(*eid).unwrap();
+                if let Some(client) = entity.get_client(clients) {
+                    client.queue_packet(P_FE2CL_PC_GROUP_JOIN_SUCC, &pkt);
+                    for pc_data in &pc_group_data {
+                        client.queue_struct(pc_data);
+                    }
+                    for npc_data in &npc_group_data {
+                        client.queue_struct(npc_data);
+                    }
+                    log_if_failed(client.flush());
+                }
+            }
         }
     }
 

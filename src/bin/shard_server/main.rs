@@ -56,6 +56,8 @@ fn main() -> Result<()> {
     let mut state = ServerState::new_shard(shard_id);
 
     let mut timers = TimerMap::default();
+
+    // Special timers
     timers.register_timer(
         logger_flush_scheduled,
         Duration::from_secs(config.general.log_write_interval.get()),
@@ -67,6 +69,13 @@ fn main() -> Result<()> {
         true,
     );
     timers.register_timer(
+        |t, _, st| do_autosave(t, st.as_shard()),
+        Duration::from_secs(config.shard.autosave_interval.get() * 60),
+        false,
+    );
+
+    // Per-minute timer
+    timers.register_timer(
         |t, srv, st| {
             st.as_shard()
                 .check_for_expired_vehicles(t, &mut srv.get_client_map());
@@ -75,6 +84,8 @@ fn main() -> Result<()> {
         Duration::from_secs(60),
         false,
     );
+
+    // Per-tick "fast" timer
     timers.register_timer(
         |t, srv, st| {
             st.as_shard().tick_entities(t, &mut srv.get_client_map());
@@ -83,14 +94,13 @@ fn main() -> Result<()> {
         Duration::from_millis(1000 / SHARD_TICKS_PER_SECOND as u64),
         false,
     );
+
+    // Per-second "slow" timer
     timers.register_timer(
-        |t, _, st| do_autosave(t, st.as_shard()),
-        Duration::from_secs(config.shard.autosave_interval.get() * 60),
-        false,
-    );
-    timers.register_timer(
-        |_, _, st| {
-            st.as_shard().check_receivers();
+        |_, srv, st| {
+            let state = st.as_shard();
+            state.tick_groups(&mut srv.get_client_map());
+            state.check_receivers();
             Ok(())
         },
         Duration::from_secs(1),
