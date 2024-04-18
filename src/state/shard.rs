@@ -22,8 +22,8 @@ use crate::{
 use super::FFReceiver;
 
 pub struct ShardServerState {
+    pub shard_id: i32,
     pub login_server_conn_id: Option<Uuid>,
-    pub shard_id: Option<i32>,
     pub login_data: HashMap<i64, LoginData>,
     pub autosave_rx: Option<FFReceiver<()>>,
     pub entity_map: EntityMap,
@@ -32,11 +32,11 @@ pub struct ShardServerState {
     pub groups: HashMap<Uuid, Group>,
 }
 
-impl Default for ShardServerState {
-    fn default() -> Self {
+impl ShardServerState {
+    pub fn new(shard_id: i32) -> Self {
         let mut state = Self {
             login_server_conn_id: None,
-            shard_id: None,
+            shard_id,
             login_data: HashMap::new(),
             autosave_rx: None,
             entity_map: EntityMap::default(),

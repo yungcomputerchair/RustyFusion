@@ -34,6 +34,7 @@ motd_path = "motd.txt" # path to the MOTD file. the MOTD is sent to each shard
 
 [shard]
 log_path = "shard.log" # path to log file, or blank for console logging only
+shard_id = 1 # shard identifier between 1 and 9 (inclusive)
 listen_addr = "127.0.0.1:23001" # address to bind to
 external_addr = "127.0.0.1:23001" # address for clients to connect to
 login_server_addr = "127.0.0.1:23000" # address of login server

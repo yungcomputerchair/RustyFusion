@@ -1,6 +1,7 @@
 use super::*;
 
 define_setting!(LogPathSetting, String, "shard.log");
+define_setting!(ShardIDSetting, i32, 1_i32);
 define_setting!(ListenAddrSetting, String, "127.0.0.1:23001");
 define_setting!(ExternalAddrSetting, String, "127.0.0.1:23001");
 define_setting!(LoginServerAddrSetting, String, "127.0.0.1:23000");
@@ -15,6 +16,7 @@ define_setting!(VehicleDurationSetting, u64, 10_080_u64);
 #[derive(Deserialize, Default)]
 pub struct ShardConfig {
     pub log_path: LogPathSetting,
+    pub shard_id: ShardIDSetting,
     pub listen_addr: ListenAddrSetting,
     pub external_addr: ExternalAddrSetting,
     pub login_server_addr: LoginServerAddrSetting,

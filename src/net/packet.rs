@@ -6536,7 +6536,6 @@ impl FFPacket for sP_LS2CL_REP_SHARD_LIST_INFO_SUCC {}
 pub struct sP_LS2FE_REP_CONNECT_SUCC {
     pub uiSvrTime: u64,
     pub aLS_UID: [u8; 16],
-    pub iFE_ID: i32,
 }
 impl FFPacket for sP_LS2FE_REP_CONNECT_SUCC {}
 
@@ -6644,6 +6643,7 @@ impl FFPacket for sP_LS2FE_REP_AUTH_CHALLENGE {}
 #[derive(Debug, Copy, Clone)]
 pub struct sP_FE2LS_REQ_CONNECT {
     pub aChallengeSolved: [u8; AUTH_CHALLENGE_SIZE],
+    pub iShardID: i32,
 }
 impl FFPacket for sP_FE2LS_REQ_CONNECT {}
 

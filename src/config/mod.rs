@@ -132,6 +132,7 @@ mod tests {
         // Shard server settings
         let shard = config.shard;
         assert!(shard.log_path.is_set());
+        assert!(shard.shard_id.is_set());
         assert!(shard.listen_addr.is_set());
         assert!(shard.external_addr.is_set());
         assert!(shard.login_server_addr.is_set());

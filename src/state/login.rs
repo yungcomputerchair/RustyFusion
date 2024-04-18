@@ -49,7 +49,6 @@ pub struct PlayerSearchRequest {
 pub struct LoginServerState {
     pub server_id: Uuid,
     sessions: HashMap<i64, LoginSession>,
-    shard_id_pool: Vec<i32>,
     shards: HashMap<i32, ShardServerInfo>,
     pub player_search_reqeust: Option<PlayerSearchRequest>,
 }
@@ -58,7 +57,6 @@ impl Default for LoginServerState {
         Self {
             server_id: Uuid::new_v4(),
             sessions: HashMap::new(),
-            shard_id_pool: (1..=MAX_NUM_SHARDS as i32).collect(),
             shards: HashMap::new(),
             player_search_reqeust: None,
         }
@@ -136,19 +134,27 @@ impl LoginServerState {
             .map(|(shard_id, _)| *shard_id)
     }
 
-    pub fn register_shard(&mut self) -> Option<i32> {
-        if self.shard_id_pool.is_empty() {
-            None
-        } else {
-            let shard_id = self.shard_id_pool.remove(0);
-            self.shards.insert(shard_id, ShardServerInfo::default());
-            Some(shard_id)
+    pub fn register_shard(&mut self, shard_id: i32) -> FFResult<()> {
+        if self.shards.contains_key(&shard_id) {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Shard {} already registered", shard_id),
+            ));
         }
+
+        if !(1..=MAX_NUM_SHARDS as i32).contains(&shard_id) {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Shard ID {} out of range", shard_id),
+            ));
+        }
+
+        self.shards.insert(shard_id, ShardServerInfo::default());
+        Ok(())
     }
 
     pub fn unregister_shard(&mut self, shard_id: i32) {
         self.shards.remove(&shard_id);
-        self.shard_id_pool.push(shard_id);
     }
 
     pub fn get_shard_ids(&self) -> Vec<i32> {

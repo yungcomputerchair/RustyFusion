@@ -34,7 +34,12 @@ fn main() -> Result<()> {
     let _cleanup = Cleanup {};
 
     let config = config_init();
+    let shard_id = config.shard.shard_id.get();
     logger_init(config.shard.log_path.get());
+    log(
+        Severity::Info,
+        &format!("Shard server #{} starting up...", shard_id),
+    );
     drop(db_init());
     tdata_init();
 
@@ -48,7 +53,7 @@ fn main() -> Result<()> {
         Some(polling_interval),
     )?;
 
-    let mut state = ServerState::new_shard();
+    let mut state = ServerState::new_shard(shard_id);
 
     let mut timers = TimerMap::default();
     timers.register_timer(
@@ -189,7 +194,7 @@ fn handle_packet(
     let state = state.as_shard();
     let mut clients = ClientMap::new(key, clients);
     match pkt_id {
-        P_LS2FE_REP_AUTH_CHALLENGE => login::login_connect_challenge(clients.get_self()),
+        P_LS2FE_REP_AUTH_CHALLENGE => login::login_connect_challenge(clients.get_self(), state),
         P_LS2FE_REP_CONNECT_SUCC => login::login_connect_succ(clients.get_self(), state),
         P_LS2FE_REP_CONNECT_FAIL => login::login_connect_fail(clients.get_self()),
         P_LS2FE_REQ_UPDATE_LOGIN_INFO => login::login_update_info(clients.get_self(), state),

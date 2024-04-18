@@ -35,6 +35,7 @@ pub fn connect(
     time: SystemTime,
 ) -> FFResult<()> {
     let pkt: &sP_FE2LS_REQ_CONNECT = server.get_packet(P_FE2LS_REQ_CONNECT)?;
+    let shard_id = pkt.iShardID;
     let challenge_solved = pkt.aChallengeSolved;
     let ClientType::UnauthedShardServer(challenge) = &server.client_type else {
         return Err(FFError::build(
@@ -58,25 +59,15 @@ pub fn connect(
         ));
     }
 
-    let shard_id = match state.register_shard() {
-        Some(id) => id,
-        None => {
-            let resp = sP_LS2FE_REP_CONNECT_FAIL { iErrorCode: 0 };
-            log_if_failed(server.send_packet(P_LS2FE_REP_CONNECT_FAIL, &resp));
-            return Err(FFError::build(
-                Severity::Warning,
-                format!(
-                    "Shard server {} tried to connect, but no shard IDs are available",
-                    server.get_addr()
-                ),
-            ));
-        }
+    if let Err(e) = state.register_shard(shard_id) {
+        let resp = sP_LS2FE_REP_CONNECT_FAIL { iErrorCode: 2 };
+        log_if_failed(server.send_packet(P_LS2FE_REP_CONNECT_FAIL, &resp));
+        return Err(e);
     };
     server.client_type = ClientType::ShardServer(shard_id);
     let resp = sP_LS2FE_REP_CONNECT_SUCC {
         uiSvrTime: util::get_timestamp_ms(time),
         aLS_UID: state.server_id.to_bytes_le(),
-        iFE_ID: shard_id,
     };
     server.send_packet(P_LS2FE_REP_CONNECT_SUCC, &resp)?;
 

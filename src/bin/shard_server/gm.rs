@@ -307,7 +307,7 @@ pub fn gm_pc_location(clients: &mut ClientMap, state: &mut ShardServerState) -> 
         let resp = sP_FE2CL_GM_REP_PC_LOCATION {
             iTargetPC_UID: player.get_uid(),
             iTargetPC_ID: pc_id,
-            iShardID: state.shard_id.unwrap(),
+            iShardID: state.shard_id,
             iMapType: if player.instance_id.instance_num.is_some() {
                 1 // instance
             } else {
