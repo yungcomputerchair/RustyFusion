@@ -46,9 +46,9 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
   - [x] C.R.A.T.E. opening
 - [ ] Social features
   - [x] Basic chat
-  - [ ] Friends
+  - [ ] Friends & blocking
   - [ ] ***Groups***
-  - [ ] Email system
+  - [ ] Emails
 - [x] Nanos*
   - [x] Swapping equipped nanos
   - [x] Summoning nanos
@@ -76,7 +76,10 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
         - [x] Billy (Carnival Collection)
         - [x] Grim (Don't Fear the Reaper (Part 4 of 4))
 - [x] Entity pathing
-- [ ] Infected Zone races
+- [ ] Infected Zones
+  - [ ] Movement elements
+  - [ ] Races
+    - [ ] Rank endpoint
 - [x] Guide changing
 - [ ] Admin features
   - [x] Built-in cheat commands +
