@@ -276,7 +276,7 @@ pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> FF
         ));
     }
 
-    let mut player = Player::new(pc_uid, slot_num, unused!());
+    let mut player = Player::new(pc_uid, slot_num);
     let first_name = util::parse_utf16(&pkt.szFirstName)?;
     let last_name = util::parse_utf16(&pkt.szLastName)?;
     player.first_name = first_name;

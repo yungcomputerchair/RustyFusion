@@ -333,7 +333,7 @@ pub struct Player {
     pub first_name: String,
     pub last_name: String,
     client_id: Option<usize>,
-    perms: i16,
+    pub perms: i16,
     pub show_gm_marker: bool,
     pub invisible: bool,
     pub invulnerable: bool,
@@ -364,7 +364,7 @@ pub struct Player {
     pre_warp_data: PreWarpData,
 }
 impl Player {
-    pub fn new(uid: i64, slot_num: usize, perms: i16) -> Self {
+    pub fn new(uid: i64, slot_num: usize) -> Self {
         let start_level = 1;
         let stats = tdata_get().get_player_stats(start_level).unwrap();
         Self {
@@ -372,7 +372,7 @@ impl Player {
             slot_num,
             level: start_level,
             hp: stats.max_hp as i32,
-            perms,
+            perms: CN_ACCOUNT_LEVEL__USER as i16,
             ..Default::default()
         }
     }
@@ -383,10 +383,6 @@ impl Player {
 
     pub fn get_slot_num(&self) -> usize {
         self.slot_num
-    }
-
-    pub fn get_perms(&self) -> i16 {
-        self.perms
     }
 
     pub fn get_player_id(&self) -> i32 {
@@ -545,7 +541,7 @@ impl Player {
             iUserLevel: self.perms,
             PCStyle: self.get_style(),
             PCStyle2: self.get_style_2(),
-            iLevel: self.level,
+            iLevel: 0, // allow anyone to send GM commands; we'll validate perms
             iMentor: self.guide_data.current_guide as i16,
             iMentorCount: self.guide_data.total_guides as i16,
             iHP: self.hp,
@@ -1001,7 +997,7 @@ impl Player {
     }
 
     pub fn set_hp(&mut self, hp: i32) -> i32 {
-        let hp_max = if self.get_perms() <= CN_ACCOUNT_LEVEL__DEVELOPER as i16 {
+        let hp_max = if self.perms <= CN_ACCOUNT_LEVEL__DEVELOPER as i16 {
             i32::MAX // allow overflow for high perms
         } else {
             self.get_max_hp()
@@ -1025,7 +1021,7 @@ impl Player {
         clients: Option<&mut ClientMap>,
     ) -> u32 {
         let player_stats = tdata_get().get_player_stats(self.level).unwrap();
-        let fm_max = if self.get_perms() <= CN_ACCOUNT_LEVEL__DEVELOPER as i16 {
+        let fm_max = if self.perms <= CN_ACCOUNT_LEVEL__DEVELOPER as i16 {
             PC_FUSIONMATTER_MAX
         } else {
             player_stats.fm_limit

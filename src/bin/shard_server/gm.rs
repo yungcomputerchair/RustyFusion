@@ -680,13 +680,12 @@ mod helpers {
     ) -> FFResult<i32> {
         let user_pc_id = client.get_player_id()?;
         let player = state.get_player(user_pc_id)?;
-        let perms = player.get_perms();
-        if perms > req_perms {
+        if player.perms > req_perms {
             return Err(FFError::build(
                 Severity::Warning,
                 format!(
                     "{} tried to use cheats without sufficient perms: {}",
-                    player, perms
+                    player, player.perms
                 ),
             ));
         }

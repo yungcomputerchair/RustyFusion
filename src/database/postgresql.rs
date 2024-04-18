@@ -268,8 +268,7 @@ impl PostgresDatabase {
     fn load_player_internal(client: &mut impl GenericClient, row: &Row) -> FFResult<Player> {
         let pc_uid = row.get("PlayerId");
         let slot_num: Int = row.get("Slot");
-        let perms: Int = row.get("AccountLevel");
-        let mut player = Player::new(pc_uid, slot_num as usize, perms as i16);
+        let mut player = Player::new(pc_uid, slot_num as usize);
         let appearance_flag: Int = row.get("AppearanceFlag");
         player.style = if appearance_flag != 0 {
             Some(PlayerStyle {
@@ -405,6 +404,9 @@ impl PostgresDatabase {
             let count: Int = quest_item.get("Opt");
             player.set_quest_item_count(item_id as i16, count as usize)?;
         }
+
+        let perms: Int = row.get("AccountLevel");
+        player.perms = perms as i16;
 
         Ok(player)
     }

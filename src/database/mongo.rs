@@ -301,12 +301,11 @@ impl From<(BigInt, &Player, Int)> for DbPlayer {
         }
     }
 }
-impl TryFrom<(DbPlayer, i16)> for Player {
+impl TryFrom<DbPlayer> for Player {
     type Error = FFError;
 
-    fn try_from(values: (DbPlayer, i16)) -> FFResult<Self> {
-        let (db_player, perms) = values;
-        let mut player = Player::new(db_player.uid, db_player.slot_number as usize, perms);
+    fn try_from(db_player: DbPlayer) -> FFResult<Self> {
+        let mut player = Player::new(db_player.uid, db_player.slot_number as usize);
         player.style = if let Some(style) = db_player.style {
             Some(style.try_into()?)
         } else {
@@ -685,7 +684,9 @@ impl Database for MongoDatabase {
             ));
         }
 
-        (db_player, db_acc.account_level as i16).try_into()
+        let mut player: Player = db_player.try_into()?;
+        player.perms = db_acc.account_level as i16;
+        Ok(player)
     }
 
     fn load_players(&mut self, acc_id: BigInt) -> FFResult<Vec<Player>> {
@@ -716,7 +717,7 @@ impl Database for MongoDatabase {
                     Severity::Warning,
                     format!("Player with UID {} not found in database", pc_uid),
                 ))?;
-            let player: FFResult<Player> = (player, db_acc.account_level as i16).try_into();
+            let player: FFResult<Player> = player.try_into();
             if let Err(e) = player {
                 log_error(&e);
                 continue;
