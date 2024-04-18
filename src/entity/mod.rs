@@ -2,7 +2,6 @@ use std::{any::Any, cmp::Ordering, time::SystemTime};
 
 use crate::{
     chunk::ChunkCoords,
-    defines::CN_MAX_COUNT_GROUP_MEMBER,
     error::{FFError, FFResult, Severity},
     net::{ClientMap, FFClient},
     state::ShardServerState,
@@ -56,12 +55,15 @@ pub trait Combatant {
     fn is_dead(&self) -> bool;
 }
 
+const GROUP_MAX_PLAYER_COUNT: usize = 4;
+const GROUP_MAX_NPC_COUNT: usize = 1;
+
 pub struct Group {
     members: Vec<EntityID>,
 }
 impl Group {
     pub fn new(leader_id: EntityID) -> Self {
-        let mut members = Vec::with_capacity(CN_MAX_COUNT_GROUP_MEMBER as usize);
+        let mut members = Vec::with_capacity(GROUP_MAX_PLAYER_COUNT + GROUP_MAX_NPC_COUNT);
         members.push(leader_id);
         Self { members }
     }
@@ -74,12 +76,31 @@ impl Group {
             ));
         }
 
-        if self.members.len() >= CN_MAX_COUNT_GROUP_MEMBER as usize {
-            return Err(FFError::build(
-                Severity::Warning,
-                "Group is full".to_string(),
-            ));
+        match id {
+            EntityID::Player(_) => {
+                if self.get_player_ids().len() >= GROUP_MAX_PLAYER_COUNT {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        "Group is full of players".to_string(),
+                    ));
+                }
+            }
+            EntityID::NPC(_) => {
+                if self.get_npc_ids().len() >= GROUP_MAX_NPC_COUNT {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        "Group is full of NPCs".to_string(),
+                    ));
+                }
+            }
+            other => {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!("{:?} cannot join group; must be a player or NPC", other),
+                ));
+            }
         }
+
         self.members.push(id);
         self.members.sort_by(|a, b| {
             if matches!(a, EntityID::Player(_)) && !matches!(b, EntityID::Player(_)) {
@@ -107,6 +128,22 @@ impl Group {
 
     pub fn get_member_ids(&self) -> &Vec<EntityID> {
         &self.members
+    }
+
+    pub fn get_player_ids(&self) -> Vec<EntityID> {
+        self.members
+            .iter()
+            .filter(|&id| matches!(id, EntityID::Player(_)))
+            .copied()
+            .collect()
+    }
+
+    pub fn get_npc_ids(&self) -> Vec<EntityID> {
+        self.members
+            .iter()
+            .filter(|&id| matches!(id, EntityID::NPC(_)))
+            .copied()
+            .collect()
     }
 
     pub fn get_leader_id(&self) -> EntityID {
@@ -156,16 +193,14 @@ mod tests {
         assert_eq!(group.get_leader_id(), npc1);
         assert!(group.should_disband());
 
-        // adding, no players
+        // adding second NPC (past limit)
         let npc2 = EntityID::NPC(2);
-        group.add_member(npc2).unwrap();
-        assert_eq!(group.get_member_ids(), &vec![npc1, npc2]);
-        assert!(group.should_disband());
+        assert!(group.add_member(npc2).is_err());
 
         // adding only player
         let player3 = EntityID::Player(3);
         group.add_member(player3).unwrap();
-        assert_eq!(group.get_member_ids(), &vec![player3, npc1, npc2]);
+        assert_eq!(group.get_member_ids(), &vec![player3, npc1]);
         assert_eq!(group.get_leader_id(), player3);
         assert!(!group.should_disband());
 
@@ -175,20 +210,28 @@ mod tests {
 
         // adding player in mixed group
         group.add_member(player1).unwrap();
-        assert_eq!(group.get_member_ids(), &vec![player3, player1, npc1, npc2]);
+        assert_eq!(group.get_member_ids(), &vec![player3, player1, npc1]);
+        assert_eq!(group.get_leader_id(), player3);
 
         // removing non-member
         let player4 = EntityID::Player(4);
         assert!(group.remove_member(player4).is_err());
 
-        // adding to full group
+        // adding up to full group
+        group.add_member(player4).unwrap();
         let player5 = EntityID::Player(5);
         group.add_member(player5).unwrap();
         assert_eq!(
             group.get_member_ids(),
-            &vec![player3, player1, player5, npc1, npc2]
+            &vec![player3, player1, player4, player5, npc1]
         );
+
+        // adding over full group
         let player6 = EntityID::Player(6);
+        assert!(group.add_member(player6).is_err());
+
+        // adding fifth player (past limit) to non-full group
+        group.remove_member(npc1).unwrap();
         assert!(group.add_member(player6).is_err());
     }
 }
