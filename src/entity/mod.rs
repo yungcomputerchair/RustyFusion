@@ -1,8 +1,9 @@
-use std::{any::Any, time::SystemTime};
+use std::{any::Any, cmp::Ordering, time::SystemTime};
 
 use crate::{
     chunk::ChunkCoords,
-    error::FFResult,
+    defines::CN_MAX_COUNT_GROUP_MEMBER,
+    error::{FFError, FFResult, Severity},
     net::{ClientMap, FFClient},
     state::ShardServerState,
     Position,
@@ -53,4 +54,141 @@ pub trait Combatant {
     fn get_hp(&self) -> i32;
     fn get_max_hp(&self) -> i32;
     fn is_dead(&self) -> bool;
+}
+
+pub struct Group {
+    members: Vec<EntityID>,
+}
+impl Group {
+    pub fn new(leader_id: EntityID) -> Self {
+        let mut members = Vec::with_capacity(CN_MAX_COUNT_GROUP_MEMBER as usize);
+        members.push(leader_id);
+        Self { members }
+    }
+
+    pub fn add_member(&mut self, id: EntityID) -> FFResult<()> {
+        if self.members.contains(&id) {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("{:?} is already in the group", id),
+            ));
+        }
+
+        if self.members.len() >= CN_MAX_COUNT_GROUP_MEMBER as usize {
+            return Err(FFError::build(
+                Severity::Warning,
+                "Group is full".to_string(),
+            ));
+        }
+        self.members.push(id);
+        self.members.sort_by(|a, b| {
+            if matches!(a, EntityID::Player(_)) && !matches!(b, EntityID::Player(_)) {
+                Ordering::Less
+            } else if !matches!(a, EntityID::Player(_)) && matches!(b, EntityID::Player(_)) {
+                Ordering::Greater
+            } else {
+                Ordering::Equal
+            }
+        });
+        Ok(())
+    }
+
+    pub fn remove_member(&mut self, id: EntityID) -> FFResult<()> {
+        if let Some(index) = self.members.iter().position(|&x| x == id) {
+            self.members.remove(index);
+            Ok(())
+        } else {
+            Err(FFError::build(
+                Severity::Warning,
+                format!("{:?} is not in the group", id),
+            ))
+        }
+    }
+
+    pub fn get_member_ids(&self) -> &Vec<EntityID> {
+        &self.members
+    }
+
+    pub fn get_leader_id(&self) -> EntityID {
+        self.members[0]
+    }
+
+    pub fn should_disband(&self) -> bool {
+        self.members.len() <= 1 || matches!(self.get_leader_id(), EntityID::NPC(_))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_group() {
+        // test setup
+        let player1 = EntityID::Player(1);
+        let mut group = Group::new(player1);
+        assert_eq!(group.get_member_ids(), &vec![player1]);
+        assert_eq!(group.get_leader_id(), player1);
+        assert!(group.should_disband());
+
+        // adding same type
+        let player2 = EntityID::Player(2);
+        group.add_member(player2).unwrap();
+        assert_eq!(group.get_member_ids(), &vec![player1, player2]);
+        assert_eq!(group.get_leader_id(), player1);
+        assert!(!group.should_disband());
+
+        // removing leader
+        group.remove_member(player1).unwrap();
+        assert_eq!(group.get_member_ids(), &vec![player2]);
+        assert_eq!(group.get_leader_id(), player2);
+        assert!(group.should_disband());
+
+        // adding new type
+        let npc1 = EntityID::NPC(1);
+        group.add_member(npc1).unwrap();
+        assert_eq!(group.get_member_ids(), &vec![player2, npc1]);
+        assert!(!group.should_disband());
+
+        // removing last player
+        group.remove_member(player2).unwrap();
+        assert_eq!(group.get_member_ids(), &vec![npc1]);
+        assert_eq!(group.get_leader_id(), npc1);
+        assert!(group.should_disband());
+
+        // adding, no players
+        let npc2 = EntityID::NPC(2);
+        group.add_member(npc2).unwrap();
+        assert_eq!(group.get_member_ids(), &vec![npc1, npc2]);
+        assert!(group.should_disband());
+
+        // adding only player
+        let player3 = EntityID::Player(3);
+        group.add_member(player3).unwrap();
+        assert_eq!(group.get_member_ids(), &vec![player3, npc1, npc2]);
+        assert_eq!(group.get_leader_id(), player3);
+        assert!(!group.should_disband());
+
+        // adding existing
+        assert!(group.add_member(player3).is_err());
+        assert!(group.add_member(npc1).is_err());
+
+        // adding player in mixed group
+        group.add_member(player1).unwrap();
+        assert_eq!(group.get_member_ids(), &vec![player3, player1, npc1, npc2]);
+
+        // removing non-member
+        let player4 = EntityID::Player(4);
+        assert!(group.remove_member(player4).is_err());
+
+        // adding to full group
+        let player5 = EntityID::Player(5);
+        group.add_member(player5).unwrap();
+        assert_eq!(
+            group.get_member_ids(),
+            &vec![player3, player1, player5, npc1, npc2]
+        );
+        let player6 = EntityID::Player(6);
+        assert!(group.add_member(player6).is_err());
+    }
 }

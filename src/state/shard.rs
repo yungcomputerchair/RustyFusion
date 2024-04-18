@@ -6,7 +6,7 @@ use crate::{
     chunk::{EntityMap, InstanceID},
     config::config_get,
     defines::{ID_OVERWORLD, MAX_NUM_CHANNELS},
-    entity::{Entity, EntityID, Player, Slider, NPC},
+    entity::{Entity, EntityID, Group, Player, Slider, NPC},
     enums::{ItemType, NPCTeam},
     error::{log, log_if_failed, panic_log, FFError, FFResult, Severity},
     helpers,
@@ -29,6 +29,7 @@ pub struct ShardServerState {
     pub entity_map: EntityMap,
     pub buyback_lists: HashMap<i32, Vec<Item>>,
     pub ongoing_trades: HashMap<Uuid, TradeContext>,
+    pub groups: HashMap<Uuid, Group>,
 }
 
 impl Default for ShardServerState {
@@ -41,6 +42,7 @@ impl Default for ShardServerState {
             entity_map: EntityMap::default(),
             buyback_lists: HashMap::new(),
             ongoing_trades: HashMap::new(),
+            groups: HashMap::new(),
         };
         let num_channels = config_get().shard.num_channels.get();
         if num_channels == 0 || num_channels > MAX_NUM_CHANNELS {
