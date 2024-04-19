@@ -1513,6 +1513,11 @@ impl Entity for Player {
                 client_other.send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL, &pkt_cancel),
             );
         }
+
+        // cleanup group
+        if let Some(group_id) = self.group_id {
+            crate::helpers::remove_group_member(pc_id, group_id, state, clients);
+        }
     }
 
     fn tick(&mut self, time: SystemTime, clients: &mut ClientMap, state: &mut ShardServerState) {

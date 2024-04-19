@@ -134,3 +134,36 @@ pub fn pc_group_join(clients: &mut ClientMap, state: &mut ShardServerState) -> F
         },
     )
 }
+
+pub fn pc_group_leave(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    catch_fail(
+        (|| {
+            let client = clients.get_self();
+            let leaver_pc_id = client.get_player_id()?;
+            let player = state.get_player_mut(leaver_pc_id)?;
+            let group_id = player.group_id.take().ok_or_else(|| {
+                FFError::build(
+                    Severity::Warning,
+                    format!("{} tried to leave a group while not in one", player),
+                )
+            })?;
+
+            rusty_fusion::helpers::remove_group_member(leaver_pc_id, group_id, state, clients);
+
+            // leaver needs the leave success packet too, thx client
+            let resp = sP_FE2CL_PC_GROUP_LEAVE_SUCC { UNUSED: unused!() };
+            clients
+                .get_self()
+                .send_packet(P_FE2CL_PC_GROUP_LEAVE_SUCC, &resp)
+        })(),
+        || {
+            let pkt = sP_FE2CL_PC_GROUP_LEAVE_FAIL {
+                iID: unused!(),
+                iErrorCode: unused!(),
+            };
+            clients
+                .get_self()
+                .send_packet(P_FE2CL_PC_GROUP_LEAVE_FAIL, &pkt)
+        },
+    )
+}

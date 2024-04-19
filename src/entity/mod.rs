@@ -4,7 +4,10 @@ use crate::{
     chunk::ChunkCoords,
     defines::*,
     error::{FFError, FFResult, Severity},
-    net::{packet::{sNPCGroupMemberInfo, sPCGroupMemberInfo}, ClientMap, FFClient},
+    net::{
+        packet::{sNPCGroupMemberInfo, sPCGroupMemberInfo},
+        ClientMap, FFClient,
+    },
     state::ShardServerState,
     Position,
 };
@@ -147,7 +150,10 @@ impl Group {
         self.members.len() <= 1 || matches!(self.members[0], EntityID::NPC(_))
     }
 
-    pub fn get_member_data(&self, state: &ShardServerState) -> (Vec<sPCGroupMemberInfo>, Vec<sNPCGroupMemberInfo>) {
+    pub fn get_member_data(
+        &self,
+        state: &ShardServerState,
+    ) -> (Vec<sPCGroupMemberInfo>, Vec<sNPCGroupMemberInfo>) {
         let mut pc_group_data = Vec::with_capacity(GROUP_MAX_PLAYER_COUNT);
         let mut npc_group_data = Vec::with_capacity(GROUP_MAX_NPC_COUNT);
         for eid in &self.members {
