@@ -49,7 +49,8 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
   - [ ] Friends & blocking
   - [ ] Groups
     - [x] Framework
-    - [ ] Shared drops
+    - [ ] Group chat
+    - [ ] Shared rewards
     - [ ] Group warping
   - [ ] Emails
 - [x] Nanos*
@@ -102,7 +103,7 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
   - [ ] Code redemption
 
 ### Known Issues
-- Escort missions with groups likely don't work
+None currently
 
 Items that are ***highlighted*** are in planning or WIP. Items marked with `+` are either new and not present in OpenFusion or enhanced from OpenFusion (bug fixes not included). Some items have dependencies in other categories, so the list won't get completed in order.
 

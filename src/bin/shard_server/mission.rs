@@ -203,7 +203,10 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
                 if let Some(ref mut path) = escort_npc.path {
                     path.start();
                 } else {
-                    escort_npc.loose_follow = Some(EntityID::Player(pc_id));
+                    // Don't override loose follow (for groups)
+                    if escort_npc.loose_follow.is_none() {
+                        escort_npc.loose_follow = Some(EntityID::Player(pc_id));
+                    }
                     state
                         .entity_map
                         .set_tick(EntityID::NPC(escort_npc_id), true)
