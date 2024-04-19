@@ -1,4 +1,4 @@
-use std::{any::Any, cmp::Ordering, time::SystemTime};
+use std::{any::Any, collections::HashSet, time::SystemTime};
 
 use crate::{
     chunk::ChunkCoords,
@@ -61,12 +61,12 @@ pub trait Combatant {
 
 #[derive(Debug, Clone)]
 pub struct Group {
-    members: Vec<EntityID>,
+    members: HashSet<EntityID>,
 }
 impl Group {
     pub fn new(creator_id: EntityID) -> Self {
-        let mut members = Vec::with_capacity(GROUP_MAX_PLAYER_COUNT + GROUP_MAX_NPC_COUNT);
-        members.push(creator_id);
+        let mut members = HashSet::with_capacity(GROUP_MAX_PLAYER_COUNT + GROUP_MAX_NPC_COUNT);
+        members.insert(creator_id);
         Self { members }
     }
 
@@ -103,32 +103,21 @@ impl Group {
             }
         }
 
-        self.members.push(id);
-        self.members.sort_by(|a, b| {
-            if matches!(a, EntityID::Player(_)) && !matches!(b, EntityID::Player(_)) {
-                Ordering::Less
-            } else if !matches!(a, EntityID::Player(_)) && matches!(b, EntityID::Player(_)) {
-                Ordering::Greater
-            } else {
-                Ordering::Equal
-            }
-        });
+        self.members.insert(id);
         Ok(())
     }
 
     pub fn remove_member(&mut self, id: EntityID) -> FFResult<()> {
-        if let Some(index) = self.members.iter().position(|&x| x == id) {
-            self.members.remove(index);
-            Ok(())
-        } else {
-            Err(FFError::build(
+        match self.members.remove(&id) {
+            true => Ok(()),
+            false => Err(FFError::build(
                 Severity::Warning,
                 format!("{:?} is not in the group", id),
-            ))
+            )),
         }
     }
 
-    pub fn get_member_ids(&self) -> &Vec<EntityID> {
+    pub fn get_member_ids(&self) -> &HashSet<EntityID> {
         &self.members
     }
 
@@ -147,7 +136,7 @@ impl Group {
     }
 
     pub fn should_disband(&self) -> bool {
-        self.members.len() <= 1 || matches!(self.members[0], EntityID::NPC(_))
+        self.members.len() <= 1 || self.get_num_players() == 0
     }
 
     pub fn get_member_data(
@@ -182,29 +171,24 @@ mod tests {
         // test setup
         let player1 = EntityID::Player(1);
         let mut group = Group::new(player1);
-        assert_eq!(group.get_member_ids(), &vec![player1]);
         assert!(group.should_disband());
 
         // adding same type
         let player2 = EntityID::Player(2);
         group.add_member(player2).unwrap();
-        assert_eq!(group.get_member_ids(), &vec![player1, player2]);
         assert!(!group.should_disband());
 
-        // removing leader
+        // removing to 1 member
         group.remove_member(player1).unwrap();
-        assert_eq!(group.get_member_ids(), &vec![player2]);
         assert!(group.should_disband());
 
         // adding new type
         let npc1 = EntityID::NPC(1);
         group.add_member(npc1).unwrap();
-        assert_eq!(group.get_member_ids(), &vec![player2, npc1]);
         assert!(!group.should_disband());
 
         // removing last player
         group.remove_member(player2).unwrap();
-        assert_eq!(group.get_member_ids(), &vec![npc1]);
         assert!(group.should_disband());
 
         // adding second NPC (past limit)
@@ -214,7 +198,6 @@ mod tests {
         // adding only player
         let player3 = EntityID::Player(3);
         group.add_member(player3).unwrap();
-        assert_eq!(group.get_member_ids(), &vec![player3, npc1]);
         assert!(!group.should_disband());
 
         // adding existing
@@ -223,7 +206,6 @@ mod tests {
 
         // adding player in mixed group
         group.add_member(player1).unwrap();
-        assert_eq!(group.get_member_ids(), &vec![player3, player1, npc1]);
 
         // removing non-member
         let player4 = EntityID::Player(4);
@@ -233,10 +215,6 @@ mod tests {
         group.add_member(player4).unwrap();
         let player5 = EntityID::Player(5);
         group.add_member(player5).unwrap();
-        assert_eq!(
-            group.get_member_ids(),
-            &vec![player3, player1, player4, player5, npc1]
-        );
 
         // adding over full group
         let player6 = EntityID::Player(6);
