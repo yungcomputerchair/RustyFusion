@@ -371,9 +371,7 @@ mod helpers {
             }
         }
 
-        let player = state.get_player_mut(pc_id)?;
-
-        // TODO group proximity check
+        let player = state.get_player(pc_id)?;
 
         if player.get_taros() < warp_data.cost {
             return Err(FFError::build(
@@ -413,6 +411,35 @@ mod helpers {
             }
         }
 
+        // group proximity check
+        let position = player.get_position();
+        if warp_data.is_group_warp {
+            if let Some(group_id) = player.group_id {
+                let group = state.groups.get(&group_id).unwrap();
+                for member_id in group.get_member_ids() {
+                    if let EntityID::Player(member_pc_id) = *member_id {
+                        if member_pc_id == pc_id {
+                            continue;
+                        }
+
+                        let member = state.get_player(member_pc_id).unwrap();
+                        if member.get_position().distance_to(&position) > RANGE_GROUP_WARP {
+                            return Err(FFError::build(
+                                Severity::Warning,
+                                format!(
+                                    "Player {} tried to group warp with a group member too far away",
+                                    pc_id
+                                ),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
+        // good to warp
+        let player = state.get_player_mut(pc_id)?;
+
         let mut item_consumed = None;
         if let Some((item_type, item_id)) = warp_data.req_item_consumed {
             let item = player.get_item_mut(
@@ -435,53 +462,92 @@ mod helpers {
             Item::split_items(item, 1); // consume item
             item_consumed = *item;
         }
+        player.set_taros(player.get_taros() - warp_data.cost);
 
-        if to_past {
-            player.set_future_done();
-
-            // remove all active tasks
-            for task_id in player.mission_journal.get_current_task_ids() {
-                let task = player.mission_journal.remove_task(task_id).unwrap();
-                for item_id in &task.get_task_def().delete_qitems {
-                    let qitem_slot = player.set_quest_item_count(*item_id, 0).unwrap();
-                    // client doesn't automatically delete qitems clientside
-                    let pkt = sP_FE2CL_REP_PC_ITEM_DELETE_SUCC {
-                        eIL: ItemLocation::QInven as i32,
-                        iSlotNum: qitem_slot as i32,
-                    };
-                    log_if_failed(client.send_packet(P_FE2CL_REP_PC_ITEM_DELETE_SUCC, &pkt));
+        let mut pc_ids_to_warp = vec![pc_id];
+        if warp_data.is_group_warp {
+            if let Some(group_id) = player.group_id {
+                let group = state.groups.get(&group_id).unwrap();
+                for member_id in group.get_member_ids() {
+                    if let EntityID::Player(member_pc_id) = *member_id {
+                        if member_pc_id == pc_id {
+                            continue;
+                        }
+                        pc_ids_to_warp.push(member_pc_id);
+                    }
                 }
-
-                let resp = sP_FE2CL_REP_PC_TASK_STOP_SUCC { iTaskNum: task_id };
-                log_if_failed(client.send_packet(P_FE2CL_REP_PC_TASK_STOP_SUCC, &resp));
             }
         }
 
-        player.set_taros(player.get_taros() - warp_data.cost);
-        player.set_pre_warp();
-        player.set_position(warp_data.pos);
-        let instance_id = InstanceID {
-            channel_num: player.instance_id.channel_num,
-            map_num: warp_data.map_num,
-            instance_num: if warp_data.is_instance {
-                // basically impossible to get 0, but we'll make sure anyway
-                // since an instance ID of 0 represents no instance
-                Some(util::rand_range_inclusive(1, u32::MAX))
-            } else {
-                None
-            },
+        let instance_num = if warp_data.is_instance {
+            Some(util::rand_range_inclusive(1, u32::MAX))
+        } else {
+            None
         };
-        player.instance_id = instance_id;
+        for warping_pc_id in pc_ids_to_warp {
+            let player = state.get_player_mut(warping_pc_id)?;
+            let client = player.get_client(clients).unwrap();
+            player.set_pre_warp();
+            player.set_position(warp_data.pos);
+            let instance_id = InstanceID {
+                channel_num: player.instance_id.channel_num,
+                map_num: warp_data.map_num,
+                instance_num,
+            };
+            player.instance_id = instance_id;
 
-        // force vehicle dismount
-        player.vehicle_speed = None;
-        rusty_fusion::helpers::broadcast_state(pc_id, player.get_state_bit_flag(), clients, state);
+            // force vehicle dismount
+            player.vehicle_speed = None;
 
-        // we remove the player from the chunk here and wait for PC_LOADING_COMPLETE to put them back.
-        // it needs to be done this way or the client will miss the PC/NPC_ENTER packets.
-        state
-            .entity_map
-            .update(EntityID::Player(pc_id), None, Some(clients));
+            if to_past {
+                player.set_future_done();
+
+                // remove all active tasks
+                for task_id in player.mission_journal.get_current_task_ids() {
+                    let task = player.mission_journal.remove_task(task_id).unwrap();
+                    for item_id in &task.get_task_def().delete_qitems {
+                        let qitem_slot = player.set_quest_item_count(*item_id, 0).unwrap();
+                        // client doesn't automatically delete qitems clientside
+                        let pkt = sP_FE2CL_REP_PC_ITEM_DELETE_SUCC {
+                            eIL: ItemLocation::QInven as i32,
+                            iSlotNum: qitem_slot as i32,
+                        };
+                        log_if_failed(client.send_packet(P_FE2CL_REP_PC_ITEM_DELETE_SUCC, &pkt));
+                    }
+
+                    let resp = sP_FE2CL_REP_PC_TASK_STOP_SUCC { iTaskNum: task_id };
+                    log_if_failed(client.send_packet(P_FE2CL_REP_PC_TASK_STOP_SUCC, &resp));
+                }
+            }
+
+            // generic NPC warp packet for players that are warping along.
+            // caller should reply with the correct packet for the initiator
+            if warping_pc_id != pc_id {
+                let resp = sP_FE2CL_REP_PC_WARP_USE_NPC_SUCC {
+                    iX: player.get_position().x,
+                    iY: player.get_position().y,
+                    iZ: player.get_position().z,
+                    eIL: ItemLocation::end(),
+                    iItemSlotNum: unused!(),
+                    Item: None.into(),
+                    iCandy: player.get_taros() as i32,
+                };
+                log_if_failed(client.send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp));
+            }
+
+            rusty_fusion::helpers::broadcast_state(
+                pc_id,
+                player.get_state_bit_flag(),
+                clients,
+                state,
+            );
+
+            // we remove the player from the chunk here and wait for PC_LOADING_COMPLETE to put them back.
+            // it needs to be done this way or the client will miss the PC/NPC_ENTER packets.
+            state
+                .entity_map
+                .update(EntityID::Player(pc_id), None, Some(clients));
+        }
 
         Ok(item_consumed)
     }

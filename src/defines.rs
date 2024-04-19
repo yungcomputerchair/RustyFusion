@@ -27,6 +27,7 @@ pub const ID_GUMBALL: i16 = 119;
 pub const TYPE_TIME_MACHINE: i32 = 1425;
 pub const TYPE_SLIDER: i32 = 1;
 
+pub const RANGE_GROUP_WARP: u32 = 500;
 pub const RANGE_INTERACT: u32 = 800;
 pub const RANGE_TRIGGER: u32 = 1600;
 
