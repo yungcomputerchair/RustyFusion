@@ -1,5 +1,7 @@
 use std::{collections::HashSet, time::SystemTime};
 
+use uuid::Uuid;
+
 use crate::{
     chunk::{ChunkCoords, InstanceID},
     defines::RANGE_INTERACT,
@@ -29,6 +31,7 @@ pub struct NPC {
     pub follower_ids: HashSet<i32>,
     pub leader_id: Option<i32>,
     pub path: Option<Path>,
+    pub group_id: Option<Uuid>,
     pub loose_follow: Option<EntityID>,
     pub interacting_pcs: HashSet<i32>,
     pub summoned: bool,
@@ -52,6 +55,7 @@ impl NPC {
             follower_ids: HashSet::new(),
             leader_id: None,
             path: None,
+            group_id: None,
             loose_follow: None,
             interacting_pcs: HashSet::new(),
             summoned: false,
@@ -217,7 +221,12 @@ impl Entity for NPC {
         }
     }
 
-    fn cleanup(&mut self, _clients: &mut ClientMap, _state: &mut ShardServerState) {}
+    fn cleanup(&mut self, clients: &mut ClientMap, state: &mut ShardServerState) {
+        // cleanup group
+        if let Some(group_id) = self.group_id {
+            crate::helpers::remove_group_member(self.get_id(), group_id, state, clients).unwrap();
+        }
+    }
 
     fn as_any(&self) -> &dyn std::any::Any {
         self

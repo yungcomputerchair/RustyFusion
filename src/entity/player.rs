@@ -1516,7 +1516,8 @@ impl Entity for Player {
 
         // cleanup group
         if let Some(group_id) = self.group_id {
-            crate::helpers::remove_group_member(pc_id, group_id, state, clients);
+            crate::helpers::remove_group_member(EntityID::Player(pc_id), group_id, state, clients)
+                .unwrap();
         }
     }
 

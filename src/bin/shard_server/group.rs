@@ -17,8 +17,16 @@ pub fn pc_group_invite(clients: &mut ClientMap, state: &mut ShardServerState) ->
         (|| {
             let client = clients.get_self();
             let pc_id = client.get_player_id()?;
+            let player = state.get_player_mut(pc_id)?;
+            if player.group_offered_to.is_some() {
+                return Err(FFError::build(
+                    Severity::Debug,
+                    format!("{} is already offering a group invite", player),
+                ));
+            }
 
             let target_pc_id = pkt.iID_To;
+            player.group_offered_to = Some(target_pc_id);
             let target_player = state.get_player(target_pc_id)?;
             if target_player.group_id.is_some() {
                 return Err(FFError::build(
@@ -30,9 +38,6 @@ pub fn pc_group_invite(clients: &mut ClientMap, state: &mut ShardServerState) ->
             let target_client = target_player.get_client(clients).unwrap();
             let pkt = sP_FE2CL_PC_GROUP_INVITE { iHostID: pc_id };
             log_if_failed(target_client.send_packet(P_FE2CL_PC_GROUP_INVITE, &pkt));
-
-            let player = state.get_player_mut(pc_id)?;
-            player.group_offered_to = Some(target_pc_id);
             Ok(())
         })(),
         || {
@@ -78,6 +83,13 @@ pub fn pc_group_join(clients: &mut ClientMap, state: &mut ShardServerState) -> F
         (|| {
             let client = clients.get_self();
             let pc_id = client.get_player_id()?;
+            let player = state.get_player(pc_id)?;
+            if player.group_id.is_some() {
+                return Err(FFError::build(
+                    Severity::Debug,
+                    format!("{} tried to join a group while already in one", player),
+                ));
+            }
 
             let host_pc_id = pkt.iID_From;
             let host_player = state.get_player_mut(host_pc_id)?;
@@ -148,7 +160,12 @@ pub fn pc_group_leave(clients: &mut ClientMap, state: &mut ShardServerState) -> 
                 )
             })?;
 
-            rusty_fusion::helpers::remove_group_member(leaver_pc_id, group_id, state, clients);
+            rusty_fusion::helpers::remove_group_member(
+                EntityID::Player(leaver_pc_id),
+                group_id,
+                state,
+                clients,
+            )?;
 
             // leaver needs the leave success packet too, thx client
             let resp = sP_FE2CL_PC_GROUP_LEAVE_SUCC { UNUSED: unused!() };
@@ -166,4 +183,73 @@ pub fn pc_group_leave(clients: &mut ClientMap, state: &mut ShardServerState) -> 
                 .send_packet(P_FE2CL_PC_GROUP_LEAVE_FAIL, &pkt)
         },
     )
+}
+
+pub fn npc_group_invite(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let client = clients.get_self();
+    let pc_id = client.get_player_id()?;
+    let pkt: &sP_CL2FE_REQ_NPC_GROUP_INVITE = client.get_packet(P_CL2FE_REQ_NPC_GROUP_INVITE)?;
+    let player = state.get_player_mut(pc_id)?;
+
+    let group_id = player.group_id.unwrap_or(Uuid::new_v4());
+    let mut group = if player.group_id.is_some() {
+        state.groups.get(&group_id).unwrap().clone()
+    } else {
+        log(Severity::Debug, &format!("Creating group {}", group_id));
+        Group::new(EntityID::Player(pc_id))
+    };
+
+    let target_npc_id = pkt.iNPC_ID;
+    let target_npc = state.get_npc_mut(target_npc_id)?;
+    if target_npc.group_id.is_some() {
+        return Err(FFError::build(
+            Severity::Warning,
+            format!("NPC {} is already in a group", target_npc_id),
+        ));
+    }
+    group.add_member(EntityID::NPC(target_npc_id))?;
+
+    let (pc_group_data, npc_group_data) = group.get_member_data(state);
+    let pkt = sP_FE2CL_REP_NPC_GROUP_INVITE_SUCC {
+        iPC_ID: unused!(),
+        iNPC_ID: target_npc_id,
+        iMemberPCCnt: pc_group_data.len() as i32,
+        iMemberNPCCnt: npc_group_data.len() as i32,
+    };
+    for eid in group.get_member_ids() {
+        let entity = state.entity_map.get_from_id(*eid).unwrap();
+        if let Some(client) = entity.get_client(clients) {
+            client.queue_packet(P_FE2CL_REP_NPC_GROUP_INVITE_SUCC, &pkt);
+            for pc_data in &pc_group_data {
+                client.queue_struct(pc_data);
+            }
+            for npc_data in &npc_group_data {
+                client.queue_struct(npc_data);
+            }
+            log_if_failed(client.flush());
+        }
+    }
+
+    state.groups.insert(group_id, group);
+    state.get_player_mut(pc_id).unwrap().group_id = Some(group_id);
+    state.get_npc_mut(target_npc_id).unwrap().group_id = Some(group_id);
+    Ok(())
+}
+
+pub fn npc_group_kick(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let client = clients.get_self();
+    let pc_id = client.get_player_id()?;
+    let pkt: &sP_CL2FE_REQ_NPC_GROUP_KICK = client.get_packet(P_CL2FE_REQ_NPC_GROUP_KICK)?;
+    let player = state.get_player(pc_id)?;
+
+    let group_id = player.group_id.ok_or_else(|| {
+        FFError::build(
+            Severity::Warning,
+            format!("{} tried to kick an NPC while not in a group", player),
+        )
+    })?;
+
+    let target_npc_id = pkt.iNPC_ID;
+    let target_npc = state.get_npc_mut(target_npc_id)?;
+    rusty_fusion::helpers::remove_group_member(target_npc.get_id(), group_id, state, clients)
 }

@@ -3,7 +3,7 @@ use uuid::Uuid;
 use crate::{
     entity::{Combatant, Entity, EntityID},
     enums::RideType,
-    error::{log, log_if_failed, Severity},
+    error::{log, log_if_failed, FFResult, Severity},
     net::{
         packet::{PacketID::*, *},
         ClientMap,
@@ -66,16 +66,16 @@ pub fn broadcast_monkey(
 }
 
 pub fn remove_group_member(
-    leaver_pc_id: i32,
+    leaver_id: EntityID,
     group_id: Uuid,
     state: &mut ShardServerState,
     clients: &mut ClientMap,
-) {
+) -> FFResult<()> {
     let mut group = state.groups.get(&group_id).unwrap().clone();
-    group.remove_member(EntityID::Player(leaver_pc_id)).unwrap();
+    group.remove_member(leaver_id)?;
 
     if group.should_disband() {
-        // we can just tell everyone that they've left the group
+        // we can just tell all players that they've left the group
         // (except the leaver; that is the caller's job)
         let leaver_pkt = sP_FE2CL_PC_GROUP_LEAVE_SUCC { UNUSED: unused!() };
         for eid in group.get_member_ids() {
@@ -83,37 +83,70 @@ pub fn remove_group_member(
             if let Some(client) = entity.get_client(clients) {
                 log_if_failed(client.send_packet(P_FE2CL_PC_GROUP_LEAVE_SUCC, &leaver_pkt));
             }
-            if let EntityID::Player(pc_id) = eid {
-                state.get_player_mut(*pc_id).unwrap().group_id = None;
+            match eid {
+                EntityID::Player(pc_id) => {
+                    state.get_player_mut(*pc_id).unwrap().group_id = None;
+                }
+                EntityID::NPC(npc_id) => {
+                    state.get_npc_mut(*npc_id).unwrap().group_id = None;
+                }
+                _ => unreachable!(),
             }
         }
 
         log(Severity::Debug, &format!("Disbanded group {}", group_id));
         state.groups.remove(&group_id);
-        return;
+        return Ok(());
     }
 
     // notify clients of the group member removal
     let (pc_group_data, npc_group_data) = group.get_member_data(state);
-    let update_pkt = sP_FE2CL_PC_GROUP_LEAVE {
-        iID_LeaveMember: leaver_pc_id,
-        iMemberPCCnt: pc_group_data.len() as i32,
-        iMemberNPCCnt: npc_group_data.len() as i32,
-    };
-    for eid in group.get_member_ids() {
-        let entity = state.entity_map.get_from_id(*eid).unwrap();
-        if let Some(client) = entity.get_client(clients) {
-            client.queue_packet(P_FE2CL_PC_GROUP_LEAVE, &update_pkt);
-            for pc_data in &pc_group_data {
-                client.queue_struct(pc_data);
+    match leaver_id {
+        EntityID::Player(leaver_pc_id) => {
+            let update_pkt = sP_FE2CL_PC_GROUP_LEAVE {
+                iID_LeaveMember: leaver_pc_id,
+                iMemberPCCnt: pc_group_data.len() as i32,
+                iMemberNPCCnt: npc_group_data.len() as i32,
+            };
+            for eid in group.get_member_ids() {
+                let entity = state.entity_map.get_from_id(*eid).unwrap();
+                if let Some(client) = entity.get_client(clients) {
+                    client.queue_packet(P_FE2CL_PC_GROUP_LEAVE, &update_pkt);
+                    for pc_data in &pc_group_data {
+                        client.queue_struct(pc_data);
+                    }
+                    for npc_data in &npc_group_data {
+                        client.queue_struct(npc_data);
+                    }
+                    log_if_failed(client.flush());
+                }
             }
-            for npc_data in &npc_group_data {
-                client.queue_struct(npc_data);
-            }
-            log_if_failed(client.flush());
         }
+        EntityID::NPC(leaver_npc_id) => {
+            let update_pkt = sP_FE2CL_REP_NPC_GROUP_KICK_SUCC {
+                iPC_ID: unused!(),
+                iNPC_ID: leaver_npc_id,
+                iMemberPCCnt: pc_group_data.len() as i32,
+                iMemberNPCCnt: npc_group_data.len() as i32,
+            };
+            for eid in group.get_member_ids() {
+                let entity = state.entity_map.get_from_id(*eid).unwrap();
+                if let Some(client) = entity.get_client(clients) {
+                    client.queue_packet(P_FE2CL_REP_NPC_GROUP_KICK_SUCC, &update_pkt);
+                    for pc_data in &pc_group_data {
+                        client.queue_struct(pc_data);
+                    }
+                    for npc_data in &npc_group_data {
+                        client.queue_struct(npc_data);
+                    }
+                    log_if_failed(client.flush());
+                }
+            }
+        }
+        _ => unreachable!(),
     }
 
     // save group state
     state.groups.insert(group_id, group);
+    Ok(())
 }

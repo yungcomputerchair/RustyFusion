@@ -178,7 +178,7 @@ pub fn update_pc_shard(client: &mut FFClient, state: &mut LoginServerState) -> F
             if state.unset_player_shard(pc_uid).is_none() {
                 log(
                     Severity::Warning,
-                    &format!("Player {} was untracked in shard {}", pc_uid, shard_id),
+                    &format!("Player {} was not tracked in shard {}", pc_uid, shard_id),
                 );
             }
         }

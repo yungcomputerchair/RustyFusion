@@ -321,6 +321,8 @@ fn handle_packet(
         P_CL2FE_REQ_PC_GROUP_INVITE_REFUSE => group::pc_group_invite_refuse(&mut clients, state),
         P_CL2FE_REQ_PC_GROUP_JOIN => group::pc_group_join(&mut clients, state),
         P_CL2FE_REQ_PC_GROUP_LEAVE => group::pc_group_leave(&mut clients, state),
+        P_CL2FE_REQ_NPC_GROUP_INVITE => group::npc_group_invite(&mut clients, state),
+        P_CL2FE_REQ_NPC_GROUP_KICK => group::npc_group_kick(&mut clients, state),
         //
         P_CL2FE_REP_LIVE_CHECK => Ok(()),
         //
