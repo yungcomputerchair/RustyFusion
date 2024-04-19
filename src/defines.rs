@@ -30,6 +30,7 @@ pub const TYPE_SLIDER: i32 = 1;
 pub const RANGE_GROUP_WARP: u32 = 500;
 pub const RANGE_INTERACT: u32 = 800;
 pub const RANGE_TRIGGER: u32 = 1600;
+pub const RANGE_GROUP_PARTICIPATE: u32 = 5000;
 
 pub const FLAG_PC_STATE_VEHICLE: i8 = 8;
 
