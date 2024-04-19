@@ -99,6 +99,7 @@ fn main() -> Result<()> {
     timers.register_timer(
         |_, srv, st| {
             let state = st.as_shard();
+            state.tick_instance_gc(&mut srv.get_client_map());
             state.tick_groups(&mut srv.get_client_map());
             state.check_receivers();
             Ok(())

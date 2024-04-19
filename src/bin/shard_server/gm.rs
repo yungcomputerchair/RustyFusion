@@ -665,7 +665,7 @@ pub fn gm_npc_unsummon(clients: &mut ClientMap, state: &mut ShardServerState) ->
     }
 
     for npc_id in visited_ids {
-        helpers::remove_temp_npc(clients, &mut state.entity_map, npc_id);
+        helpers::remove_temp_npc(clients, state, npc_id);
     }
     Ok(())
 }
@@ -710,9 +710,11 @@ mod helpers {
         entity_map.update(eid, Some(chunk_coords), Some(clients));
     }
 
-    pub fn remove_temp_npc(clients: &mut ClientMap, entity_map: &mut EntityMap, npc_id: i32) {
+    pub fn remove_temp_npc(clients: &mut ClientMap, state: &mut ShardServerState, npc_id: i32) {
+        let entity_map = &mut state.entity_map;
         let eid = EntityID::NPC(npc_id);
         entity_map.update(eid, None, Some(clients));
-        entity_map.untrack(eid);
+        let mut npc = entity_map.untrack(eid);
+        npc.cleanup(clients, state)
     }
 }

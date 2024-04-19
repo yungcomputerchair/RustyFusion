@@ -218,6 +218,13 @@ impl ShardServerState {
         }
     }
 
+    pub fn tick_instance_gc(&mut self, clients: &mut ClientMap) {
+        let removed_entities = self.entity_map.garbage_collect_instances();
+        for mut entity in removed_entities {
+            entity.cleanup(clients, self);
+        }
+    }
+
     pub fn tick_groups(&mut self, clients: &mut ClientMap) {
         for group in self.groups.values() {
             let (pc_group_data, npc_group_data) = group.get_member_data(self);

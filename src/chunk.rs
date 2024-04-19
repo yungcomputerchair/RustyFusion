@@ -99,6 +99,7 @@ impl ChunkMap {
 pub struct EntityMap {
     registry: HashMap<EntityID, RegistryEntry>,
     chunk_maps: HashMap<InstanceID, ChunkMap>,
+    instances_to_cleanup: HashSet<InstanceID>,
     next_pc_id: u32,
     next_npc_id: u32,
     next_slider_id: u32,
@@ -383,8 +384,8 @@ impl EntityMap {
         let around_from = self.remove_from_chunk(id);
         let around_to = self.insert_into_chunk(id, to_chunk);
         if let Some(coords) = from_chunk {
-            if to_chunk.is_none() {
-                self.check_instance_for_cleanup(coords.i);
+            if to_chunk.is_none() && self.should_cleanup_instance(coords.i) {
+                self.instances_to_cleanup.insert(coords.i);
             }
         }
 
@@ -679,22 +680,37 @@ impl EntityMap {
         chunk_map.player_count -= 1;
     }
 
-    fn check_instance_for_cleanup(&mut self, instance_id: InstanceID) {
+    pub fn garbage_collect_instances(&mut self) -> Vec<Box<dyn Entity>> {
+        let mut entities = Vec::new();
+        let instances_to_cleanup = self.instances_to_cleanup.clone();
+        for instance_id in instances_to_cleanup {
+            entities.extend(self.cleanup_instance(instance_id));
+        }
+        self.instances_to_cleanup.clear();
+        entities
+    }
+
+    fn cleanup_instance(&mut self, instance_id: InstanceID) -> Vec<Box<dyn Entity>> {
+        let mut entities = Vec::new();
+        let chunk_map = self.chunk_maps.get(&instance_id).unwrap();
+        for id in chunk_map.get_ids() {
+            entities.push(self.untrack(id));
+        }
+        self.chunk_maps.remove(&instance_id);
+        log(
+            Severity::Debug,
+            &format!("Cleaned up instance {}", instance_id),
+        );
+        entities
+    }
+
+    fn should_cleanup_instance(&mut self, instance_id: InstanceID) -> bool {
         if instance_id.instance_num.is_none() {
-            return; // don't clean up the main instance
+            return false; // don't clean up the main instance
         }
 
         let chunk_map = self.chunk_maps.get(&instance_id).unwrap();
-        if chunk_map.player_count == 0 {
-            for id in chunk_map.get_ids() {
-                self.untrack(id);
-            }
-            self.chunk_maps.remove(&instance_id);
-            log(
-                Severity::Debug,
-                &format!("Cleaned up instance {}", instance_id),
-            );
-        }
+        chunk_map.player_count == 0
     }
 }
 impl Default for EntityMap {
@@ -702,6 +718,7 @@ impl Default for EntityMap {
         Self {
             registry: HashMap::new(),
             chunk_maps: HashMap::new(),
+            instances_to_cleanup: HashSet::new(),
             next_pc_id: 1,
             next_npc_id: 1,
             next_slider_id: 1,
