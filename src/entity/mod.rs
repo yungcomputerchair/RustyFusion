@@ -61,9 +61,9 @@ pub struct Group {
     members: Vec<EntityID>,
 }
 impl Group {
-    pub fn new(leader_id: EntityID) -> Self {
+    pub fn new(creator_id: EntityID) -> Self {
         let mut members = Vec::with_capacity(GROUP_MAX_PLAYER_COUNT + GROUP_MAX_NPC_COUNT);
-        members.push(leader_id);
+        members.push(creator_id);
         Self { members }
     }
 
@@ -143,12 +143,8 @@ impl Group {
             .count()
     }
 
-    pub fn get_leader_id(&self) -> EntityID {
-        self.members[0]
-    }
-
     pub fn should_disband(&self) -> bool {
-        self.members.len() <= 1 || matches!(self.get_leader_id(), EntityID::NPC(_))
+        self.members.len() <= 1 || matches!(self.members[0], EntityID::NPC(_))
     }
 }
 
@@ -162,20 +158,17 @@ mod tests {
         let player1 = EntityID::Player(1);
         let mut group = Group::new(player1);
         assert_eq!(group.get_member_ids(), &vec![player1]);
-        assert_eq!(group.get_leader_id(), player1);
         assert!(group.should_disband());
 
         // adding same type
         let player2 = EntityID::Player(2);
         group.add_member(player2).unwrap();
         assert_eq!(group.get_member_ids(), &vec![player1, player2]);
-        assert_eq!(group.get_leader_id(), player1);
         assert!(!group.should_disband());
 
         // removing leader
         group.remove_member(player1).unwrap();
         assert_eq!(group.get_member_ids(), &vec![player2]);
-        assert_eq!(group.get_leader_id(), player2);
         assert!(group.should_disband());
 
         // adding new type
@@ -187,7 +180,6 @@ mod tests {
         // removing last player
         group.remove_member(player2).unwrap();
         assert_eq!(group.get_member_ids(), &vec![npc1]);
-        assert_eq!(group.get_leader_id(), npc1);
         assert!(group.should_disband());
 
         // adding second NPC (past limit)
@@ -198,7 +190,6 @@ mod tests {
         let player3 = EntityID::Player(3);
         group.add_member(player3).unwrap();
         assert_eq!(group.get_member_ids(), &vec![player3, npc1]);
-        assert_eq!(group.get_leader_id(), player3);
         assert!(!group.should_disband());
 
         // adding existing
@@ -208,7 +199,6 @@ mod tests {
         // adding player in mixed group
         group.add_member(player1).unwrap();
         assert_eq!(group.get_member_ids(), &vec![player3, player1, npc1]);
-        assert_eq!(group.get_leader_id(), player3);
 
         // removing non-member
         let player4 = EntityID::Player(4);
