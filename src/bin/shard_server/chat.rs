@@ -37,7 +37,10 @@ pub fn send_freechat_message(
                 ));
             }
 
-            // TODO filtering
+            let msg = helpers::process_freechat_message(msg);
+            if msg.trim().is_empty() {
+                return Ok(());
+            }
 
             log(Severity::Info, &format!("{}: \"{}\"", player, msg));
 
@@ -80,7 +83,12 @@ pub fn send_menuchat_message(
             let player = state.get_player(pc_id)?;
 
             let msg = util::parse_utf16(&pkt.szFreeChat)?;
-            // TODO validate contents
+            if !helpers::validate_menuchat_message(&msg) {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!("Invalid menuchat message\n\t{}: '{}'", player, msg),
+                ));
+            }
 
             log(Severity::Info, &format!("{}: '{}'", player, msg));
 
@@ -108,6 +116,94 @@ pub fn send_menuchat_message(
     )
 }
 
+pub fn send_group_freechat_message(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let client = clients.get_self();
+    let pkt: sP_CL2FE_REQ_SEND_ALL_GROUP_FREECHAT_MESSAGE =
+        *client.get_packet(P_CL2FE_REQ_SEND_ALL_GROUP_FREECHAT_MESSAGE)?;
+    let pc_id = client.get_player_id()?;
+    let player = state.get_player(pc_id)?;
+
+    let msg = util::parse_utf16(&pkt.szFreeChat)?;
+    if player.freechat_muted {
+        return Err(FFError::build_dc(
+            Severity::Warning,
+            "Muted player sent freechat packet".to_string(),
+        ));
+    }
+
+    let msg = helpers::process_freechat_message(msg);
+    if msg.trim().is_empty() {
+        return Ok(());
+    }
+
+    log(
+        Severity::Info,
+        &format!("{} (to group): \"{}\"", player, msg),
+    );
+
+    let pkt = sP_FE2CL_REP_SEND_ALL_GROUP_FREECHAT_MESSAGE_SUCC {
+        iSendPCID: pc_id,
+        szFreeChat: util::encode_utf16(&msg),
+        iEmoteCode: pkt.iEmoteCode,
+    };
+    if let Some(group_id) = player.group_id {
+        let group = state.groups.get(&group_id).unwrap();
+        for eid in group.get_member_ids() {
+            let entity = state.entity_map.get_from_id(*eid).unwrap();
+            if let Some(client) = entity.get_client(clients) {
+                log_if_failed(
+                    client.send_packet(P_FE2CL_REP_SEND_ALL_GROUP_FREECHAT_MESSAGE_SUCC, &pkt),
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub fn send_group_menuchat_message(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let client = clients.get_self();
+    let pkt: sP_CL2FE_REQ_SEND_ALL_GROUP_MENUCHAT_MESSAGE =
+        *client.get_packet(P_CL2FE_REQ_SEND_ALL_GROUP_MENUCHAT_MESSAGE)?;
+    let pc_id = client.get_player_id()?;
+    let player = state.get_player(pc_id)?;
+
+    let msg = util::parse_utf16(&pkt.szFreeChat)?;
+    if !helpers::validate_menuchat_message(&msg) {
+        return Err(FFError::build(
+            Severity::Warning,
+            format!("Invalid menuchat message\n\t{}: '{}'", player, msg),
+        ));
+    }
+
+    log(Severity::Info, &format!("{} (to group): '{}'", player, msg));
+
+    let pkt = sP_FE2CL_REP_SEND_ALL_GROUP_MENUCHAT_MESSAGE_SUCC {
+        iSendPCID: pc_id,
+        szFreeChat: pkt.szFreeChat,
+        iEmoteCode: pkt.iEmoteCode,
+    };
+    if let Some(group_id) = player.group_id {
+        let group = state.groups.get(&group_id).unwrap();
+        for eid in group.get_member_ids() {
+            let entity = state.entity_map.get_from_id(*eid).unwrap();
+            if let Some(client) = entity.get_client(clients) {
+                log_if_failed(
+                    client.send_packet(P_FE2CL_REP_SEND_ALL_GROUP_MENUCHAT_MESSAGE_SUCC, &pkt),
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
 pub fn pc_avatar_emotes_chat(
     clients: &mut ClientMap,
     state: &mut ShardServerState,
@@ -127,6 +223,18 @@ pub fn pc_avatar_emotes_chat(
             client.send_packet(P_FE2CL_REP_PC_AVATAR_EMOTES_CHAT, &resp)
         });
     Ok(())
+}
+
+mod helpers {
+    pub fn validate_menuchat_message(_msg: &str) -> bool {
+        // TODO validate
+        true
+    }
+
+    pub fn process_freechat_message(msg: String) -> String {
+        // TODO process
+        msg
+    }
 }
 
 mod commands {

@@ -46,10 +46,12 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
   - [x] C.R.A.T.E. opening
 - [ ] Social features
   - [x] Basic chat
-  - [ ] Friends & blocking
-  - [ ] Groups
-    - [x] Framework
-    - [ ] Group chat
+  - [ ] Buddies
+    - [ ] Buddy chat
+  - [ ] Blocking
+  - [ ] ***Groups***
+    - [x] Framework +
+    - [x] Group chat
     - [ ] Shared rewards
     - [x] Group warping
   - [ ] Emails

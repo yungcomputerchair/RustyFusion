@@ -268,6 +268,12 @@ fn handle_packet(
         //
         P_CL2FE_REQ_SEND_FREECHAT_MESSAGE => chat::send_freechat_message(&mut clients, state),
         P_CL2FE_REQ_SEND_MENUCHAT_MESSAGE => chat::send_menuchat_message(&mut clients, state),
+        P_CL2FE_REQ_SEND_ALL_GROUP_FREECHAT_MESSAGE => {
+            chat::send_group_freechat_message(&mut clients, state)
+        }
+        P_CL2FE_REQ_SEND_ALL_GROUP_MENUCHAT_MESSAGE => {
+            chat::send_group_menuchat_message(&mut clients, state)
+        }
         P_CL2FE_REQ_PC_AVATAR_EMOTES_CHAT => chat::pc_avatar_emotes_chat(&mut clients, state),
         //
         P_CL2FE_REQ_PC_ATTACK_NPCs => combat::pc_attack_npcs(&mut clients, state),
