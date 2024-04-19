@@ -1,5 +1,4 @@
 use rusty_fusion::{
-    defines::*,
     entity::{Entity, EntityID, Group},
     error::*,
     net::{
@@ -94,31 +93,17 @@ pub fn pc_group_join(clients: &mut ClientMap, state: &mut ShardServerState) -> F
             let mut group = if host_player.group_id.is_some() {
                 state.groups.get(&group_id).unwrap().clone()
             } else {
+                log(Severity::Debug, &format!("Creating group {}", group_id));
                 Group::new(EntityID::Player(host_pc_id))
             };
             group.add_member(EntityID::Player(pc_id))?;
 
+            let (pc_group_data, npc_group_data) = group.get_member_data(state);
             let pkt = sP_FE2CL_PC_GROUP_JOIN_SUCC {
                 iID_NewMember: pc_id,
-                iMemberPCCnt: group.get_num_players() as i32,
-                iMemberNPCCnt: group.get_num_npcs() as i32,
+                iMemberPCCnt: pc_group_data.len() as i32,
+                iMemberNPCCnt: npc_group_data.len() as i32,
             };
-            let mut pc_group_data = Vec::with_capacity(GROUP_MAX_PLAYER_COUNT);
-            let mut npc_group_data = Vec::with_capacity(GROUP_MAX_NPC_COUNT);
-            for eid in group.get_member_ids() {
-                match eid {
-                    EntityID::Player(pc_id) => {
-                        let player = state.get_player(*pc_id).unwrap();
-                        pc_group_data.push(player.get_group_member_info());
-                    }
-                    EntityID::NPC(npc_id) => {
-                        let npc = state.get_npc(*npc_id).unwrap();
-                        npc_group_data.push(npc.get_group_member_info());
-                    }
-                    _ => unreachable!(),
-                }
-            }
-
             for eid in group.get_member_ids() {
                 let entity = state.entity_map.get_from_id(*eid).unwrap();
                 if let Some(client) = entity.get_client(clients) {

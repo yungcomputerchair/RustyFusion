@@ -4,7 +4,7 @@ use crate::{
     chunk::ChunkCoords,
     defines::*,
     error::{FFError, FFResult, Severity},
-    net::{ClientMap, FFClient},
+    net::{packet::{sNPCGroupMemberInfo, sPCGroupMemberInfo}, ClientMap, FFClient},
     state::ShardServerState,
     Position,
 };
@@ -129,14 +129,14 @@ impl Group {
         &self.members
     }
 
-    pub fn get_num_players(&self) -> usize {
+    fn get_num_players(&self) -> usize {
         self.members
             .iter()
             .filter(|&id| matches!(id, EntityID::Player(_)))
             .count()
     }
 
-    pub fn get_num_npcs(&self) -> usize {
+    fn get_num_npcs(&self) -> usize {
         self.members
             .iter()
             .filter(|&id| matches!(id, EntityID::NPC(_)))
@@ -145,6 +145,25 @@ impl Group {
 
     pub fn should_disband(&self) -> bool {
         self.members.len() <= 1 || matches!(self.members[0], EntityID::NPC(_))
+    }
+
+    pub fn get_member_data(&self, state: &ShardServerState) -> (Vec<sPCGroupMemberInfo>, Vec<sNPCGroupMemberInfo>) {
+        let mut pc_group_data = Vec::with_capacity(GROUP_MAX_PLAYER_COUNT);
+        let mut npc_group_data = Vec::with_capacity(GROUP_MAX_NPC_COUNT);
+        for eid in &self.members {
+            match eid {
+                EntityID::Player(pc_id) => {
+                    let player = state.get_player(*pc_id).unwrap();
+                    pc_group_data.push(player.get_group_member_info());
+                }
+                EntityID::NPC(npc_id) => {
+                    let npc = state.get_npc(*npc_id).unwrap();
+                    npc_group_data.push(npc.get_group_member_info());
+                }
+                _ => unreachable!(),
+            }
+        }
+        (pc_group_data, npc_group_data)
     }
 }
 

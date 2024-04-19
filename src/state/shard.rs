@@ -220,27 +220,12 @@ impl ShardServerState {
 
     pub fn tick_groups(&mut self, clients: &mut ClientMap) {
         for group in self.groups.values() {
+            let (pc_group_data, npc_group_data) = group.get_member_data(self);
             let pkt = sP_FE2CL_PC_GROUP_MEMBER_INFO {
                 iID: unused!(),
-                iMemberPCCnt: group.get_num_players() as i32,
-                iMemberNPCCnt: group.get_num_npcs() as i32,
+                iMemberPCCnt: pc_group_data.len() as i32,
+                iMemberNPCCnt: npc_group_data.len() as i32,
             };
-            let mut pc_group_data = Vec::with_capacity(GROUP_MAX_PLAYER_COUNT);
-            let mut npc_group_data = Vec::with_capacity(GROUP_MAX_NPC_COUNT);
-            for eid in group.get_member_ids() {
-                match eid {
-                    EntityID::Player(pc_id) => {
-                        let player = self.get_player(*pc_id).unwrap();
-                        pc_group_data.push(player.get_group_member_info());
-                    }
-                    EntityID::NPC(npc_id) => {
-                        let npc = self.get_npc(*npc_id).unwrap();
-                        npc_group_data.push(npc.get_group_member_info());
-                    }
-                    _ => unreachable!(),
-                }
-            }
-
             for eid in group.get_member_ids() {
                 let entity = self.entity_map.get_from_id(*eid).unwrap();
                 if let Some(client) = entity.get_client(clients) {
