@@ -588,7 +588,8 @@ impl Database for MongoDatabase {
     }
 
     fn change_account_level(&mut self, acc_id: BigInt, new_level: Int) -> FFResult<()> {
-        self.db
+        let update = self
+            .db
             .collection::<DbAccount>("accounts")
             .update_one(
                 doc! { "_id": acc_id },
@@ -596,6 +597,72 @@ impl Database for MongoDatabase {
                 None,
             )
             .map_err(FFError::from_db_error)?;
+
+        if update.matched_count == 0 {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Account with ID {} not found in database", acc_id),
+            ));
+        }
+        Ok(())
+    }
+
+    fn ban_account(
+        &mut self,
+        acc_id: BigInt,
+        banned_until: SystemTime,
+        ban_reason: Text,
+    ) -> FFResult<()> {
+        let banned_until_time = util::get_timestamp_sec(banned_until) as Int;
+        let banned_since_time = util::get_timestamp_sec(SystemTime::now()) as Int;
+        let update = self
+            .db
+            .collection::<DbAccount>("accounts")
+            .update_one(
+                doc! { "_id": acc_id },
+                doc! {
+                    "$set": {
+                        "banned_until_time": banned_until_time,
+                        "banned_since_time": banned_since_time,
+                        "ban_reason": ban_reason,
+                    }
+                },
+                None,
+            )
+            .map_err(FFError::from_db_error)?;
+
+        if update.matched_count == 0 {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Account with ID {} not found in database", acc_id),
+            ));
+        }
+        Ok(())
+    }
+
+    fn unban_account(&mut self, acc_id: BigInt) -> FFResult<()> {
+        let update = self
+            .db
+            .collection::<DbAccount>("accounts")
+            .update_one(
+                doc! { "_id": acc_id },
+                doc! {
+                    "$set": {
+                        "banned_until_time": 0,
+                        "banned_since_time": 0,
+                        "ban_reason": "",
+                    }
+                },
+                None,
+            )
+            .map_err(FFError::from_db_error)?;
+
+        if update.matched_count == 0 {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Account with ID {} not found in database", acc_id),
+            ));
+        }
         Ok(())
     }
 
