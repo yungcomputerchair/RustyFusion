@@ -45,7 +45,7 @@ pub fn login(
             .to_owned();
 
             let mut db = db_get();
-            let account = match db.find_account(&username)? {
+            let account = match db.find_account_from_username(&username)? {
                 Some(account) => account,
                 None => {
                     if config_get().login.auto_create_accounts.get() {

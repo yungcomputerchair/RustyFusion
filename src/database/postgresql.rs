@@ -466,7 +466,7 @@ impl Database for PostgresDatabase {
         Ok(())
     }
 
-    fn find_account(&mut self, username: &Text) -> FFResult<Option<Account>> {
+    fn find_account_from_username(&mut self, username: &Text) -> FFResult<Option<Account>> {
         let client = &mut self.client;
         let rows = Self::query(client, "find_account", &[username])?;
         assert!(rows.len() <= 1);
@@ -479,6 +479,27 @@ impl Database for PostgresDatabase {
             banned_until: util::get_systime_from_sec(row.get::<_, Int>("BannedUntil") as u64),
             ban_reason: row.get("BanReason"),
         }))
+    }
+
+    fn find_account_from_player(&mut self, pc_uid: BigInt) -> FFResult<Account> {
+        let client = &mut self.client;
+        let rows = Self::query(client, "find_account_from_player", &[&pc_uid])?;
+        if rows.is_empty() {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Account not found for player with UID {}", pc_uid),
+            ));
+        }
+        let row = &rows[0];
+        Ok(Account {
+            id: row.get("AccountId"),
+            username: row.get("Login"),
+            password_hashed: row.get("Password"),
+            selected_slot: row.get::<_, Int>("Selected") as u8,
+            account_level: row.get::<_, Int>("AccountLevel") as i16,
+            banned_until: util::get_systime_from_sec(row.get::<_, Int>("BannedUntil") as u64),
+            ban_reason: row.get("BanReason"),
+        })
     }
 
     fn create_account(&mut self, username: &Text, password_hashed: &Text) -> FFResult<Account> {
@@ -497,7 +518,7 @@ impl Database for PostgresDatabase {
             &[username, password_hashed, &acc_level],
         )?;
         assert_eq!(updated, 1);
-        let new_acc = self.find_account(username)?.unwrap();
+        let new_acc = self.find_account_from_username(username)?.unwrap();
         Ok(new_acc)
     }
 

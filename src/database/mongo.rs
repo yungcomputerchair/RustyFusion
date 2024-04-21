@@ -520,7 +520,7 @@ impl MongoDatabase {
     }
 }
 impl Database for MongoDatabase {
-    fn find_account(&mut self, username: &Text) -> FFResult<Option<Account>> {
+    fn find_account_from_username(&mut self, username: &Text) -> FFResult<Option<Account>> {
         let result = self
             .db
             .collection::<DbAccount>("accounts")
@@ -528,6 +528,29 @@ impl Database for MongoDatabase {
             .map_err(FFError::from_db_error)?
             .map(|acc| acc.into());
         Ok(result)
+    }
+
+    fn find_account_from_player(&mut self, pc_uid: BigInt) -> FFResult<Account> {
+        let db_player = self
+            .db
+            .collection::<DbPlayer>("players")
+            .find_one(doc! { "_id": pc_uid }, None)
+            .map_err(FFError::from_db_error)?
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Player with UID {} not found in database", pc_uid),
+            ))?;
+        let acc_id = db_player.account_id;
+        let db_acc = self
+            .db
+            .collection::<DbAccount>("accounts")
+            .find_one(doc! { "_id": acc_id }, None)
+            .map_err(FFError::from_db_error)?
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Account with ID {} not found in database", acc_id),
+            ))?;
+        Ok(db_acc.into())
     }
 
     fn create_account(&mut self, username: &Text, password_hashed: &Text) -> FFResult<Account> {
@@ -560,7 +583,7 @@ impl Database for MongoDatabase {
         accounts
             .insert_one(account, None)
             .map_err(FFError::from_db_error)?;
-        let new_acc = self.find_account(username)?.unwrap();
+        let new_acc = self.find_account_from_username(username)?.unwrap();
         Ok(new_acc)
     }
 
