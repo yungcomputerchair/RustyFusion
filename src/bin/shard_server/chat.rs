@@ -238,7 +238,7 @@ mod helpers {
 }
 
 mod commands {
-    use std::{collections::HashMap, sync::OnceLock};
+    use std::{collections::HashMap, sync::OnceLock, time::SystemTime};
 
     use rusty_fusion::database::db_get;
 
@@ -254,8 +254,11 @@ mod commands {
 
     fn init_commands() -> HashMap<&'static str, Command> {
         #[rustfmt::skip]
-        let commands: [(&'static str, &'static str, CommandHandler); 4] = [
+        let commands: [(&'static str, &'static str, CommandHandler); 7] = [
             ("about", "Show information about the server", cmd_about),
+            ("ban_a", "Ban an account", cmd_ban),
+            ("ban_i", "Ban a player and their account", cmd_ban),
+            ("unban", "Unban an account", cmd_unban),
             ("perms", "View or change a player's permissions level", cmd_perms),
             ("refresh", "Reinsert the player into the current chunk", cmd_refresh),
             ("help", "Show this help message", cmd_help),
@@ -328,6 +331,139 @@ mod commands {
                 DB_VERSION,
             ),
         )
+    }
+
+    fn cmd_ban(
+        tokens: Vec<&str>,
+        clients: &mut ClientMap,
+        state: &mut ShardServerState,
+    ) -> FFResult<()> {
+        let client = clients.get_self();
+        let is_ban_i = tokens[0] == "ban_i";
+        if tokens.len() < 3 {
+            return send_system_message(
+                client,
+                if is_ban_i {
+                    "Usage: /ban_i <pc_id> <duration> [reason]\n\
+                    Duration example: 1d3h5m42s (no spaces!)"
+                } else {
+                    "Usage: /ban_a <account_id> <duration> [reason]\n\
+                    Duration example: 1d3h5m42s (no spaces!)"
+                },
+            );
+        }
+
+        let own_pc_id = client.get_player_id()?;
+        let player = state.get_player(own_pc_id)?;
+        if player.perms > CN_ACCOUNT_LEVEL__GM as i16 {
+            return send_system_message(client, "You do not have permission to ban players");
+        }
+
+        let pc_id = match parse_pc_id(tokens[1]) {
+            Ok(Some(pc_id)) => pc_id,
+            Ok(None) => own_pc_id,
+            Err(_) => return send_system_message(client, "Invalid player ID"),
+        };
+        if own_pc_id == pc_id {
+            return send_system_message(client, "You cannot ban yourself");
+        }
+
+        let mut db = db_get();
+        let acc_id = if is_ban_i {
+            let Ok(player) = state.get_player(pc_id) else {
+                return send_system_message(client, &format!("Player {} not found", pc_id));
+            };
+            db.find_account_from_player(player.get_uid()).unwrap().id
+        } else {
+            let Ok(acc_id) = tokens[1].parse::<i64>() else {
+                return send_system_message(client, "Invalid account ID");
+            };
+            acc_id
+        };
+
+        let Ok(duration) = util::get_duration_from_shorthand(tokens[2]) else {
+            return send_system_message(client, "Invalid duration");
+        };
+        if duration.is_zero() {
+            return send_system_message(client, "Duration must be non-zero");
+        }
+        let banned_until = SystemTime::now() + duration;
+        let ban_reason = if tokens.len() > 3 {
+            tokens[3..].join(" ")
+        } else {
+            "No reason given".to_string()
+        };
+
+        match db.ban_account(acc_id, banned_until, ban_reason.clone()) {
+            Ok(()) => {
+                let ban_msg = format!(
+                    "Account {} banned for {}\n\
+                    Reason: {}",
+                    acc_id,
+                    util::format_duration(duration),
+                    ban_reason,
+                );
+                log_if_failed(send_system_message(client, &ban_msg));
+                log(
+                    Severity::Info,
+                    &format!("{}\nBanned by: {}", ban_msg, player),
+                );
+            }
+            Err(e) => {
+                return send_system_message(client, &format!("Failed to ban: {}", e.get_msg()));
+            }
+        }
+
+        if is_ban_i {
+            let banned_player = state.get_player(pc_id)?;
+            let banned_client = banned_player.get_client(clients).unwrap();
+            let pkt = sP_FE2CL_REP_PC_EXIT_SUCC {
+                iID: pc_id,
+                iExitCode: EXIT_CODE_REQ_BY_GM as i32,
+            };
+            log_if_failed(banned_client.send_packet(P_FE2CL_REP_PC_EXIT_SUCC, &pkt));
+            banned_client.disconnect();
+
+            let client = clients.get_self();
+            log_if_failed(send_system_message(
+                client,
+                &format!("{} kicked", banned_player),
+            ));
+        }
+
+        Ok(())
+    }
+
+    fn cmd_unban(
+        tokens: Vec<&str>,
+        clients: &mut ClientMap,
+        state: &mut ShardServerState,
+    ) -> FFResult<()> {
+        let client = clients.get_self();
+        if tokens.len() < 2 {
+            return send_system_message(client, "Usage: /unban <account_id>");
+        }
+
+        let player = state.get_player(client.get_player_id()?)?;
+        if player.perms > CN_ACCOUNT_LEVEL__GM as i16 {
+            return send_system_message(client, "You do not have permission to unban players");
+        }
+
+        let Ok(acc_id) = tokens[1].parse::<i64>() else {
+            return send_system_message(client, "Invalid account ID");
+        };
+        let mut db = db_get();
+        match db.unban_account(acc_id) {
+            Ok(()) => {
+                let unban_msg = format!("Account {} unbanned", acc_id);
+                log(
+                    Severity::Info,
+                    &format!("{}\nUnbanned by: {}", unban_msg, player),
+                );
+                send_system_message(client, &unban_msg)
+            }
+            Err(e) => send_system_message(client, &format!("Failed to unban: {}", e.get_msg())),
+        }
     }
 
     fn cmd_perms(

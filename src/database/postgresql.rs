@@ -525,13 +525,48 @@ impl Database for PostgresDatabase {
     fn change_account_level(&mut self, acc_id: BigInt, new_level: Int) -> FFResult<()> {
         let client = &mut self.client;
         let updated = Self::exec(client, "change_account_level", &[&acc_id, &new_level])?;
-        if updated != 1 {
+        if updated == 0 {
             return Err(FFError::build(
                 Severity::Warning,
                 format!(
                     "Failed to change account level for account with ID {}",
                     acc_id
                 ),
+            ));
+        }
+        Ok(())
+    }
+
+    fn ban_account(
+        &mut self,
+        acc_id: BigInt,
+        banned_until: SystemTime,
+        ban_reason: Text,
+    ) -> FFResult<()> {
+        let client = &mut self.client;
+        let banned_since = util::get_timestamp_sec(SystemTime::now()) as Int;
+        let banned_until = util::get_timestamp_sec(banned_until) as Int;
+        let updated = Self::exec(
+            client,
+            "ban_account",
+            &[&acc_id, &banned_since, &banned_until, &ban_reason],
+        )?;
+        if updated == 0 {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Failed to ban account with ID {}", acc_id),
+            ));
+        }
+        Ok(())
+    }
+
+    fn unban_account(&mut self, acc_id: BigInt) -> FFResult<()> {
+        let client = &mut self.client;
+        let updated = Self::exec(client, "unban_account", &[&acc_id])?;
+        if updated == 0 {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Failed to unban account with ID {}", acc_id),
             ));
         }
         Ok(())

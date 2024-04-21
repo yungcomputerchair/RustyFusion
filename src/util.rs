@@ -95,16 +95,50 @@ pub fn check_password(password: &str, hash: &str) -> FFResult<bool> {
     bcrypt::verify(password, hash).map_err(FFError::from_bcrypt_err)
 }
 
+pub fn make_duration(days: u64, hours: u64, mins: u64, secs: u64) -> Duration {
+    let mut duration = Duration::from_secs(secs);
+    duration += Duration::from_secs(mins * 60);
+    duration += Duration::from_secs(hours * 60 * 60);
+    duration += Duration::from_secs(days * 24 * 60 * 60);
+    duration
+}
+
+pub fn get_duration_from_shorthand(shorthand: &str) -> FFResult<Duration> {
+    let mut duration = Duration::from_secs(0);
+    let mut num = 0;
+    for c in shorthand.chars() {
+        if c.is_ascii_digit() {
+            num = num * 10 + c.to_digit(10).unwrap();
+        } else {
+            match c {
+                'd' => duration += Duration::from_secs(num as u64 * 24 * 60 * 60),
+                'h' => duration += Duration::from_secs(num as u64 * 60 * 60),
+                'm' => duration += Duration::from_secs(num as u64 * 60),
+                's' => duration += Duration::from_secs(num as u64),
+                _ => {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!("Invalid shorthand character: {}", c),
+                    ))
+                }
+            }
+            num = 0;
+        }
+    }
+    Ok(duration)
+}
+
 pub fn format_duration(duration: Duration) -> String {
     let secs = duration.as_secs();
     let mins = secs / 60;
     let hours = mins / 60;
     let days = hours / 24;
     format!(
-        "{} day(s), {} hour(s), {} minute(s)",
+        "{} day(s), {} hour(s), {} minute(s), {} second(s)",
         days,
         hours % 24,
-        mins % 60
+        mins % 60,
+        secs % 60
     )
 }
 
@@ -167,4 +201,81 @@ pub fn get_random_gumball() -> Item {
     ];
     let choice = rand_range_exclusive(0, gumballs.len());
     gumballs[choice]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_duration_parsing() {
+        assert_eq!(
+            get_duration_from_shorthand("").unwrap(),
+            make_duration(0, 0, 0, 0)
+        );
+        assert_eq!(
+            get_duration_from_shorthand("1d").unwrap(),
+            make_duration(1, 0, 0, 0)
+        );
+        assert_eq!(
+            get_duration_from_shorthand("1h").unwrap(),
+            make_duration(0, 1, 0, 0)
+        );
+        assert_eq!(
+            get_duration_from_shorthand("1m").unwrap(),
+            make_duration(0, 0, 1, 0)
+        );
+        assert_eq!(
+            get_duration_from_shorthand("1s").unwrap(),
+            make_duration(0, 0, 0, 1)
+        );
+        assert_eq!(
+            get_duration_from_shorthand("1d1h1m1s").unwrap(),
+            make_duration(1, 1, 1, 1)
+        );
+        assert_eq!(
+            get_duration_from_shorthand("1d1h1m").unwrap(),
+            make_duration(1, 1, 1, 0)
+        );
+        assert_eq!(
+            get_duration_from_shorthand("1d1h").unwrap(),
+            make_duration(1, 1, 0, 0)
+        );
+        assert_eq!(
+            get_duration_from_shorthand("1d1m").unwrap(),
+            make_duration(1, 0, 1, 0)
+        );
+        assert_eq!(
+            get_duration_from_shorthand("1d1s").unwrap(),
+            make_duration(1, 0, 0, 1)
+        );
+        assert_eq!(
+            get_duration_from_shorthand("1h1m1s").unwrap(),
+            make_duration(0, 1, 1, 1)
+        );
+        assert_eq!(
+            get_duration_from_shorthand("1h1m").unwrap(),
+            make_duration(0, 1, 1, 0)
+        );
+        assert_eq!(
+            get_duration_from_shorthand("1h1s").unwrap(),
+            make_duration(0, 1, 0, 1)
+        );
+        assert_eq!(
+            get_duration_from_shorthand("1m1s").unwrap(),
+            make_duration(0, 0, 1, 1)
+        );
+        assert_eq!(
+            get_duration_from_shorthand("8h24m").unwrap(),
+            make_duration(0, 8, 24, 0)
+        );
+        assert_eq!(
+            get_duration_from_shorthand("1h1h").unwrap(),
+            make_duration(0, 2, 0, 0)
+        );
+        assert_eq!(
+            get_duration_from_shorthand("1h1d1h").unwrap(),
+            make_duration(1, 2, 0, 0)
+        );
+    }
 }
