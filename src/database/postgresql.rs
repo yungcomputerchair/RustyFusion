@@ -522,6 +522,21 @@ impl Database for PostgresDatabase {
         Ok(new_acc)
     }
 
+    fn change_account_level(&mut self, acc_id: BigInt, new_level: Int) -> FFResult<()> {
+        let client = &mut self.client;
+        let updated = Self::exec(client, "change_account_level", &[&acc_id, &new_level])?;
+        if updated != 1 {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Failed to change account level for account with ID {}",
+                    acc_id
+                ),
+            ));
+        }
+        Ok(())
+    }
+
     fn update_selected_player(&mut self, acc_id: BigInt, slot_num: Int) -> FFResult<()> {
         let client = &mut self.client;
         let timestamp_now = util::get_timestamp_sec(SystemTime::now()) as Int;

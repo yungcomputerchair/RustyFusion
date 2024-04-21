@@ -240,6 +240,8 @@ mod helpers {
 mod commands {
     use std::{collections::HashMap, sync::OnceLock};
 
+    use rusty_fusion::database::db_get;
+
     use super::*;
 
     struct Command {
@@ -254,7 +256,7 @@ mod commands {
         #[rustfmt::skip]
         let commands: [(&'static str, &'static str, CommandHandler); 4] = [
             ("about", "Show information about the server", cmd_about),
-            ("perms", "View or temporarily change a player's permissions level", cmd_perms),
+            ("perms", "View or change a player's permissions level", cmd_perms),
             ("refresh", "Reinsert the player into the current chunk", cmd_refresh),
             ("help", "Show this help message", cmd_help),
         ];
@@ -337,9 +339,10 @@ mod commands {
         if tokens.len() < 2 {
             return send_system_message(
                 client,
-                "Usage: /perms <pc_id> [new_permissions_level]\n\
+                "Usage: /perms <pc_id> [new_level] [\"save\"]\n\
                 Use . for pc_id to select yourself\n\
-                Leave new_permissions_level empty to view the current level",
+                Leave new_level empty to view the current level\n\
+                Add \"save\" to save the new level to the account",
             );
         }
 
@@ -383,7 +386,7 @@ mod commands {
             );
         }
 
-        if target_perms <= own_perms {
+        if pc_id != target_pc_id && target_perms <= own_perms {
             return send_system_message(
                 client, &format!(
                     "Can only change the permissions of a player with weaker ones than your own (> {})",
@@ -393,13 +396,31 @@ mod commands {
         }
 
         target_player.perms = new_perms;
-        send_system_message(
+        log_if_failed(send_system_message(
             client,
             &format!(
                 "Permissions level changed to {} for {}",
                 new_perms, target_player
             ),
-        )
+        ));
+
+        if tokens.get(3).is_some_and(|arg| *arg == "save") {
+            let mut db = db_get();
+            let acc = db
+                .find_account_from_player(target_player.get_uid())
+                .unwrap();
+            match db.change_account_level(acc.id, new_perms as i32) {
+                Ok(()) => log_if_failed(send_system_message(
+                    client,
+                    "Permissions level saved to account!",
+                )),
+                Err(e) => log_if_failed(send_system_message(
+                    client,
+                    &format!("Failed to save permissions level: {}", e.get_msg()),
+                )),
+            }
+        }
+        Ok(())
     }
 
     fn cmd_refresh(

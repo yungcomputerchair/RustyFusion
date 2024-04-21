@@ -587,6 +587,18 @@ impl Database for MongoDatabase {
         Ok(new_acc)
     }
 
+    fn change_account_level(&mut self, acc_id: BigInt, new_level: Int) -> FFResult<()> {
+        self.db
+            .collection::<DbAccount>("accounts")
+            .update_one(
+                doc! { "_id": acc_id },
+                doc! { "$set": { "account_level": new_level } },
+                None,
+            )
+            .map_err(FFError::from_db_error)?;
+        Ok(())
+    }
+
     fn init_player(&mut self, acc_id: BigInt, player: &Player) -> FFResult<()> {
         let state_timestamp = util::get_timestamp_sec(SystemTime::now()) as Int;
         let mut tsct = self

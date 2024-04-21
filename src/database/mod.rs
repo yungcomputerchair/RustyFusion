@@ -24,6 +24,7 @@ pub trait Database: Send + std::fmt::Debug {
     fn find_account_from_username(&mut self, username: &Text) -> FFResult<Option<Account>>;
     fn find_account_from_player(&mut self, pc_uid: BigInt) -> FFResult<Account>;
     fn create_account(&mut self, username: &Text, password_hashed: &Text) -> FFResult<Account>;
+    fn change_account_level(&mut self, acc_id: BigInt, new_level: Int) -> FFResult<()>;
     fn init_player(&mut self, acc_id: BigInt, player: &Player) -> FFResult<()>;
     fn update_player_appearance(&mut self, player: &Player) -> FFResult<()>;
     fn update_selected_player(&mut self, acc_id: BigInt, slot_num: Int) -> FFResult<()>;
