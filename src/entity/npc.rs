@@ -166,12 +166,19 @@ impl NPC {
         }
     }
 
-    pub fn add_base_behavior(&mut self, behavior: Behavior) {
+    pub fn add_base_behavior_group(&mut self, behaviors: Vec<Behavior>) {
         if let Some(ref mut ai) = self.ai {
-            ai.add_base_behavior(behavior);
+            ai.add_base_node_with_behaviors(behaviors);
         } else {
-            self.ai = Some(AI::new(behavior));
+            let mut new_ai = AI::default();
+            new_ai.add_base_node_with_behaviors(behaviors);
+            self.ai = Some(new_ai);
         }
+    }
+
+    pub fn add_base_behavior(&mut self, behavior: Behavior) {
+        let behaviors = vec![behavior];
+        self.add_base_behavior_group(behaviors);
     }
 }
 impl Entity for NPC {
@@ -237,6 +244,7 @@ impl Entity for NPC {
             }
         }
         if self.interacting_pcs.is_empty() {
+            // we take the AI object out during tick to satisfy the borrow checker
             if let Some(ai) = self.ai.take() {
                 self.ai = Some(ai.tick(self, state, clients, &time));
             }

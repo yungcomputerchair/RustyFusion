@@ -12,20 +12,11 @@ use crate::{
     Position,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct AI {
-    head: AINode,
+    root: AINode,
 }
 impl AI {
-    pub fn new(behavior: Behavior) -> AI {
-        AI {
-            head: AINode {
-                behaviors: vec![behavior],
-                parent: None,
-            },
-        }
-    }
-
     pub fn tick(
         mut self,
         npc: &mut NPC,
@@ -33,16 +24,30 @@ impl AI {
         clients: &mut ClientMap,
         time: &SystemTime,
     ) -> Self {
-        self.head = self.head.tick(npc, state, clients, time);
+        self.root = self
+            .root
+            .tick(npc, state, clients, time)
+            .unwrap_or_else(|| {
+                log(
+                    Severity::Warning,
+                    &format!("AI root node deleted ({:?})", npc.get_id()),
+                );
+                AINode::default()
+            });
         self
     }
 
-    pub fn add_base_behavior(&mut self, behavior: Behavior) {
-        let mut node = &mut self.head;
-        while let Some(parent) = &mut node.parent {
-            node = parent;
-        }
-        node.behaviors.push(behavior);
+    pub fn add_base_node_with_behaviors(&mut self, behaviors: Vec<Behavior>) {
+        // "base nodes" are nodes that are children of the root.
+        // base behaviors or behavior groups are added to these nodes.
+        // we do NOT add any behaviors to the root node.
+        //
+        // if multiple behaviors are passed in, they are grouped together.
+        // group behaviors are ticked, popped, and replaced together
+        // since they are bundled in the same node.
+        let mut node = AINode::default();
+        node.behaviors.extend(behaviors);
+        self.root.children.push(node);
     }
 }
 
@@ -51,10 +56,10 @@ pub enum Behavior {
     RandomRoamAround(RandomRoamAroundCtx),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 struct AINode {
     behaviors: Vec<Behavior>,
-    parent: Option<Box<AINode>>,
+    children: Vec<AINode>,
 }
 
 #[allow(dead_code)]
@@ -72,33 +77,48 @@ impl AINode {
         state: &mut ShardServerState,
         clients: &mut ClientMap,
         time: &SystemTime,
-    ) -> Self {
+    ) -> Option<Self> {
+        if self.children.is_empty() {
+            // no children means we are active
+            return self.tick_behaviors(npc, state, clients, time);
+        }
+
+        let mut new_children = Vec::with_capacity(self.children.len());
+        for child in self.children.drain(..) {
+            if let Some(new_child) = child.tick(npc, state, clients, time) {
+                new_children.push(new_child);
+            }
+        }
+        self.children = new_children;
+        Some(self)
+    }
+
+    fn tick_behaviors(
+        mut self,
+        npc: &mut NPC,
+        state: &mut ShardServerState,
+        clients: &mut ClientMap,
+        time: &SystemTime,
+    ) -> Option<Self> {
         for behavior in self.behaviors.iter_mut() {
             let op = match behavior {
                 Behavior::RandomRoamAround(ctx) => ctx.tick(npc, state, clients, time),
             };
             match op {
                 NodeOperation::Nop => (),
-                NodeOperation::Push(mut node) => {
-                    node.parent = Some(Box::new(self));
-                    return node;
+                NodeOperation::Push(node) => {
+                    self.children.push(node);
+                    break;
                 }
                 NodeOperation::Pop => {
-                    if let Some(parent) = self.parent {
-                        return *parent;
-                    } else {
-                        log(
-                            Severity::Warning,
-                            &format!("AI attempted to pop root node ({:?})", npc.get_id()),
-                        );
-                    }
+                    return None;
                 }
                 NodeOperation::Replace(node) => {
-                    return node;
+                    return Some(node);
                 }
             }
         }
-        self
+        Some(self)
     }
 }
 
