@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::{
     ai::{Behavior, RandomRoamAroundCtx},
-    chunk::{EntityMap, InstanceID},
+    chunk::{EntityMap, InstanceID, TickMode},
     config::config_get,
     defines::*,
     entity::{Entity, EntityID, Group, Player, Slider, NPC},
@@ -51,7 +51,7 @@ impl ShardServerState {
         }
         for channel_num in 1..=num_channels {
             for mut npc in tdata_get().make_all_npcs(&mut state.entity_map, channel_num) {
-                let mut needs_tick = false;
+                let mut tick_mode = TickMode::Never;
 
                 if tdata_get().get_npc_stats(npc.ty).unwrap().team == NPCTeam::Mob {
                     let base_roam_delay_ms = placeholder!(5000);
@@ -61,24 +61,24 @@ impl ShardServerState {
                         (base_roam_delay_ms / 2, base_roam_delay_ms * 3 / 2),
                     );
                     npc.add_base_behavior(Behavior::RandomRoamAround(roam_behavior_ctx));
-                    needs_tick = true;
+                    tick_mode = TickMode::WhenLoaded;
                 }
 
                 if let Some(path) = tdata_get().get_npc_path(npc.ty) {
                     npc.set_path(path);
-                    needs_tick = true;
+                    tick_mode = TickMode::Always;
                 }
 
                 let chunk_pos = npc.get_chunk_coords();
                 let entity_map = &mut state.entity_map;
-                let id = entity_map.track(Box::new(npc), needs_tick);
+                let id = entity_map.track(Box::new(npc), tick_mode);
                 entity_map.update(id, Some(chunk_pos), None);
             }
 
             for egg in tdata_get().make_eggs(&mut state.entity_map, channel_num) {
                 let chunk_pos = egg.get_chunk_coords();
                 let entity_map = &mut state.entity_map;
-                let id = entity_map.track(Box::new(egg), true);
+                let id = entity_map.track(Box::new(egg), TickMode::Always);
                 entity_map.update(id, Some(chunk_pos), None);
             }
 
@@ -125,7 +125,7 @@ impl ShardServerState {
                 );
                 sliders_spawned += 1;
                 let chunk_pos = slider.get_chunk_coords();
-                let id = entity_map.track(Box::new(slider), true);
+                let id = entity_map.track(Box::new(slider), TickMode::Always);
                 entity_map.update(id, Some(chunk_pos), None);
                 dist_to_next = slider_gap_size;
                 if sliders_spawned as usize == num_sliders {

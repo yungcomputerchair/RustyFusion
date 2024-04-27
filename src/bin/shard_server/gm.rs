@@ -1,7 +1,7 @@
 use std::{cmp::max, collections::HashSet};
 
 use rusty_fusion::{
-    chunk::{EntityMap, InstanceID},
+    chunk::{EntityMap, InstanceID, TickMode},
     defines::*,
     entity::{Combatant, Egg, Entity, EntityID, PlayerSearchQuery, NPC},
     enums::*,
@@ -591,7 +591,7 @@ pub fn gm_shiny_summon(clients: &mut ClientMap, state: &mut ShardServerState) ->
     let egg_id = entity_map.gen_next_egg_id();
     let egg = Egg::new(egg_id, egg_type, egg_pos, egg_instance_id, true);
     let chunk_coords = egg.get_chunk_coords();
-    let eid = entity_map.track(Box::new(egg), true);
+    let eid = entity_map.track(Box::new(egg), TickMode::Always);
     entity_map.update(eid, Some(chunk_coords), Some(clients));
     Ok(())
 }
@@ -706,7 +706,7 @@ mod helpers {
     pub fn spawn_temp_npc(clients: &mut ClientMap, entity_map: &mut EntityMap, mut npc: NPC) {
         npc.summoned = true;
         let chunk_coords = npc.get_chunk_coords();
-        let eid = entity_map.track(Box::new(npc), true);
+        let eid = entity_map.track(Box::new(npc), TickMode::WhenLoaded);
         entity_map.update(eid, Some(chunk_coords), Some(clients));
     }
 

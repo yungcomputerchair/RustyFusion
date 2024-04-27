@@ -1,7 +1,7 @@
 use std::time::SystemTime;
 
 use rusty_fusion::{
-    chunk::MAP_SQUARE_SIZE,
+    chunk::{TickMode, MAP_SQUARE_SIZE},
     config::config_get,
     database::db_get,
     defines::*,
@@ -110,7 +110,7 @@ pub fn pc_enter(
             player, player.instance_id.channel_num
         ),
     );
-    state.entity_map.track(Box::new(player), true);
+    state.entity_map.track(Box::new(player), TickMode::Always);
 
     clients
         .get_self()

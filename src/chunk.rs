@@ -75,14 +75,20 @@ fn get_visibility_range() -> usize {
     config_get().shard.visibility_range.get()
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum TickMode {
+    Always,
+    WhenLoaded,
+    Never,
+}
+
 struct RegistryEntry {
     entity: Box<dyn Entity>,
     chunk: Option<ChunkCoords>,
-    tick: bool,
+    tick_mode: TickMode,
 }
 
 struct ChunkMap {
-    player_count: usize,
     chunks: Box<[[Chunk; NCHUNKS]; NCHUNKS]>,
 }
 impl ChunkMap {
@@ -93,6 +99,14 @@ impl ChunkMap {
             .flat_map(|chunk| chunk.get_all())
             .cloned()
             .collect()
+    }
+
+    fn get_player_count(&self) -> usize {
+        self.chunks
+            .iter()
+            .flatten()
+            .map(|chunk| chunk.get_player_count())
+            .sum()
     }
 }
 
@@ -126,15 +140,32 @@ impl EntityMap {
     pub fn get_tickable_ids(&self) -> impl Iterator<Item = EntityID> + '_ {
         self.registry
             .iter()
-            .filter_map(|(id, entry)| if entry.tick { Some(*id) } else { None })
+            .filter_map(|(id, entry)| match entry.tick_mode {
+                TickMode::Always => Some(*id),
+                TickMode::Never => None,
+                TickMode::WhenLoaded => {
+                    if let Some(coords) = entry.chunk {
+                        if let Some(chunk) = self.get_chunk(coords) {
+                            if chunk.is_loaded() {
+                                return Some(*id);
+                            }
+                        }
+                    }
+                    None
+                }
+            })
     }
 
     pub fn get_around_entity(&mut self, id: EntityID) -> HashSet<EntityID> {
+        let mut entities = HashSet::new();
         if let Some(coords) = self.registry.get(&id).and_then(|entry| entry.chunk) {
-            self.get_around(coords, get_visibility_range())
-        } else {
-            HashSet::new()
+            for coords in Self::get_coords_around(coords, get_visibility_range()) {
+                if let Some(chunk) = self.get_chunk(coords) {
+                    entities.extend(chunk.get_all());
+                }
+            }
         }
+        entities
     }
 
     pub fn get_player(&self, pc_id: i32) -> Option<&Player> {
@@ -344,7 +375,7 @@ impl EntityMap {
         id as i32
     }
 
-    pub fn track(&mut self, entity: Box<dyn Entity>, tick: bool) -> EntityID {
+    pub fn track(&mut self, entity: Box<dyn Entity>, tick_mode: TickMode) -> EntityID {
         let id = entity.get_id();
         if self.registry.contains_key(&id) {
             panic_log(&format!("Already tracking entity with id {:?}", id));
@@ -352,7 +383,7 @@ impl EntityMap {
         let entry = RegistryEntry {
             entity,
             chunk: None,
-            tick,
+            tick_mode,
         };
         self.registry.insert(id, entry);
         id
@@ -444,12 +475,12 @@ impl EntityMap {
         // }
     }
 
-    pub fn set_tick(&mut self, id: EntityID, tick: bool) -> FFResult<()> {
+    pub fn set_tick(&mut self, id: EntityID, tick_mode: TickMode) -> FFResult<()> {
         let entry = self.registry.get_mut(&id).ok_or(FFError::build(
             Severity::Warning,
             format!("Entity with ID {:?} doesn't exist", id),
         ))?;
-        entry.tick = tick;
+        entry.tick_mode = tick_mode;
         Ok(())
     }
 
@@ -471,7 +502,7 @@ impl EntityMap {
         self.chunk_maps
             .iter()
             .filter(|(instance_id, _)| instance_id.channel_num == channel_num)
-            .map(|(_, chunk_map)| chunk_map.player_count)
+            .map(|(_, chunk_map)| chunk_map.get_player_count())
             .sum()
     }
 
@@ -513,17 +544,22 @@ impl EntityMap {
         let entry = self.registry.get_mut(&id).unwrap();
         if let Some(coords) = entry.chunk {
             entry.chunk = None;
-            let chunk = self.get_chunk(coords).unwrap();
+            let chunk = self.get_chunk_mut(coords).unwrap();
             if !chunk.remove(id) {
                 panic_log(&format!(
                     "Chunk {:?} did not contain entity with ID {:?}",
                     coords, id
                 ));
             }
-            if let EntityID::Player(_) = id {
-                self.instance_player_exit(coords.i);
+            let coords_around = Self::get_coords_around(coords, get_visibility_range());
+            for coords in coords_around {
+                if let Some(chunk) = self.get_chunk_mut(coords) {
+                    affected.extend(chunk.get_all());
+                    if matches!(id, EntityID::Player(_)) {
+                        chunk.load_count -= 1;
+                    }
+                }
             }
-            affected.extend(self.get_around(coords, get_visibility_range()));
         }
         affected
     }
@@ -535,26 +571,40 @@ impl EntityMap {
     ) -> HashSet<EntityID> {
         let mut affected = HashSet::new();
         if let Some(coords) = to_chunk {
-            if let Some(chunk) = self.get_chunk(coords) {
+            if let Some(chunk) = self.get_chunk_mut(coords) {
                 if !chunk.insert(id) {
                     panic_log(&format!(
                         "Chunk {:?} already contained entity with ID {:?}",
                         coords, id
                     ));
                 }
-                if let EntityID::Player(_) = id {
-                    self.instance_player_enter(coords.i);
-                }
                 let entry = self.registry.get_mut(&id).unwrap();
                 entry.chunk = to_chunk;
-                affected.extend(self.get_around(coords, get_visibility_range()));
+                let coords_around = Self::get_coords_around(coords, get_visibility_range());
+                for coords in coords_around {
+                    if let Some(chunk) = self.get_chunk_mut(coords) {
+                        affected.extend(chunk.get_all());
+                        if matches!(id, EntityID::Player(_)) {
+                            chunk.load_count += 1;
+                        }
+                    }
+                }
                 affected.remove(&id); // we don't want ourself in this
             }
         }
         affected
     }
 
-    fn get_chunk(&mut self, coords: ChunkCoords) -> Option<&mut Chunk> {
+    fn get_chunk(&self, coords: ChunkCoords) -> Option<&Chunk> {
+        if (0..NCHUNKS as i32).contains(&coords.x) && (0..NCHUNKS as i32).contains(&coords.y) {
+            let chunk_map = self.chunk_maps.get(&coords.i)?;
+            let chunk = &chunk_map.chunks[coords.x as usize][coords.y as usize];
+            return Some(chunk);
+        }
+        None
+    }
+
+    fn get_chunk_mut(&mut self, coords: ChunkCoords) -> Option<&mut Chunk> {
         if (0..NCHUNKS as i32).contains(&coords.x) && (0..NCHUNKS as i32).contains(&coords.y) {
             let chunk_map = self.init_instance(coords.i);
             let chunk = &mut chunk_map.chunks[coords.x as usize][coords.y as usize];
@@ -563,18 +613,16 @@ impl EntityMap {
         None
     }
 
-    fn get_around(&mut self, coords: ChunkCoords, range: usize) -> HashSet<EntityID> {
+    fn get_coords_around(coords: ChunkCoords, range: usize) -> Vec<ChunkCoords> {
+        let num_around = (range * 2 + 1) * (range * 2 + 1);
+        let mut coords_around = Vec::with_capacity(num_around);
         let range = range as i32;
-        let mut entities = HashSet::new();
         for x in (coords.x - range)..=(coords.x + range) {
             for y in (coords.y - range)..=(coords.y + range) {
-                let coords = ChunkCoords { x, y, i: coords.i };
-                if let Some(chunk) = self.get_chunk(coords) {
-                    entities.extend(chunk.get_all());
-                }
+                coords_around.push(ChunkCoords { x, y, i: coords.i });
             }
         }
-        entities
+        coords_around
     }
 
     fn init_instance(&mut self, instance_id: InstanceID) -> &mut ChunkMap {
@@ -594,10 +642,7 @@ impl EntityMap {
                 }
                 Box::from_raw(ptr)
             };
-            let chunk_map = ChunkMap {
-                player_count: 0,
-                chunks,
-            };
+            let chunk_map = ChunkMap { chunks };
             log(
                 Severity::Debug,
                 &format!("Initialized instance {}", instance_id),
@@ -618,7 +663,7 @@ impl EntityMap {
             for x in 0..NCHUNKS {
                 for y in 0..NCHUNKS {
                     for id in template_chunks[x][y].get_all() {
-                        let tick = self.registry[&id].tick;
+                        let tick_mode = self.registry[&id].tick_mode;
                         if let EntityID::NPC(npc_id) = *id {
                             let mut npc = self.get_npc(npc_id).unwrap().clone();
                             npc.instance_id = instance_id;
@@ -638,7 +683,7 @@ impl EntityMap {
                             npc.leader_id = None;
 
                             let chunk_pos = npc.get_chunk_coords();
-                            let new_npc_id = self.track(Box::new(npc), tick);
+                            let new_npc_id = self.track(Box::new(npc), tick_mode);
                             self.update(new_npc_id, Some(chunk_pos), None);
                             npc_count += 1;
                         }
@@ -668,16 +713,6 @@ impl EntityMap {
             );
         }
         self.chunk_maps.get_mut(&instance_id).unwrap()
-    }
-
-    fn instance_player_enter(&mut self, instance_id: InstanceID) {
-        let chunk_map = self.init_instance(instance_id);
-        chunk_map.player_count += 1;
-    }
-
-    fn instance_player_exit(&mut self, instance_id: InstanceID) {
-        let chunk_map = self.init_instance(instance_id);
-        chunk_map.player_count -= 1;
     }
 
     pub fn garbage_collect_instances(&mut self) -> Vec<Box<dyn Entity>> {
@@ -710,7 +745,7 @@ impl EntityMap {
         }
 
         let chunk_map = self.chunk_maps.get(&instance_id).unwrap();
-        chunk_map.player_count == 0
+        chunk_map.get_player_count() == 0
     }
 }
 impl Default for EntityMap {
@@ -729,12 +764,24 @@ impl Default for EntityMap {
 
 #[derive(Default, Clone)]
 pub struct Chunk {
+    load_count: usize,
     tracked: HashSet<EntityID>,
 }
 
 impl Chunk {
+    fn is_loaded(&self) -> bool {
+        self.load_count > 0
+    }
+
     fn get_all(&self) -> &HashSet<EntityID> {
         &self.tracked
+    }
+
+    fn get_player_count(&self) -> usize {
+        self.tracked
+            .iter()
+            .filter(|id| matches!(id, EntityID::Player(_)))
+            .count()
     }
 
     fn insert(&mut self, id: EntityID) -> bool {

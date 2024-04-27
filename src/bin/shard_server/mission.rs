@@ -1,4 +1,5 @@
 use rusty_fusion::{
+    chunk::TickMode,
     defines::{RANGE_INTERACT, RANGE_TRIGGER},
     entity::{Combatant, EntityID},
     enums::{ItemLocation, ItemType, MissionType, TaskType},
@@ -209,7 +210,7 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
                     }
                     state
                         .entity_map
-                        .set_tick(EntityID::NPC(escort_npc_id), true)
+                        .set_tick(EntityID::NPC(escort_npc_id), TickMode::Always)
                         .unwrap();
                 }
                 task.escort_npc_id = Some(escort_npc_id);
