@@ -31,6 +31,7 @@ pub mod config;
 pub mod database;
 pub mod tabledata;
 
+pub mod ai;
 pub mod chunk;
 pub mod entity;
 pub mod item;

@@ -3,6 +3,7 @@ use std::{collections::HashSet, time::SystemTime};
 use uuid::Uuid;
 
 use crate::{
+    ai::AI,
     chunk::{ChunkCoords, InstanceID},
     defines::RANGE_INTERACT,
     entity::{Combatant, Entity, EntityID},
@@ -35,6 +36,7 @@ pub struct NPC {
     pub loose_follow: Option<EntityID>,
     pub interacting_pcs: HashSet<i32>,
     pub summoned: bool,
+    ai: Option<AI>,
 }
 impl NPC {
     pub fn new(
@@ -59,6 +61,7 @@ impl NPC {
             loose_follow: None,
             interacting_pcs: HashSet::new(),
             summoned: false,
+            ai: None,
         })
     }
 
@@ -204,7 +207,7 @@ impl Entity for NPC {
         client.send_packet(PacketID::P_FE2CL_NPC_EXIT, &pkt)
     }
 
-    fn tick(&mut self, _time: SystemTime, clients: &mut ClientMap, state: &mut ShardServerState) {
+    fn tick(&mut self, time: SystemTime, clients: &mut ClientMap, state: &mut ShardServerState) {
         let pc_ids: Vec<i32> = self.interacting_pcs.iter().copied().collect();
         for pc_id in pc_ids {
             let pc_eid = EntityID::Player(pc_id);
@@ -217,6 +220,9 @@ impl Entity for NPC {
             }
         }
         if self.interacting_pcs.is_empty() {
+            if let Some(ai) = self.ai.take() {
+                self.ai = Some(ai.tick(self, state, clients, &time));
+            }
             self.tick_movement(clients, state);
         }
     }
