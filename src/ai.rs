@@ -57,6 +57,7 @@ struct AINode {
     parent: Option<Box<AINode>>,
 }
 
+#[allow(dead_code)]
 enum NodeOperation {
     Nop,
     Push(AINode),
