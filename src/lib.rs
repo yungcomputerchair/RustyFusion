@@ -69,14 +69,20 @@ impl Position {
         }
     }
 
+    pub fn get_random_around(&self, x_range: i32, y_range: i32, z_range: i32) -> Position {
+        Position {
+            x: self.x + util::rand_range_inclusive(-x_range, x_range),
+            y: self.y + util::rand_range_inclusive(-y_range, y_range),
+            z: self.z + util::rand_range_inclusive(-z_range, z_range),
+        }
+    }
+
     pub fn get_unstuck(&self) -> Position {
         const UNSTICK_XY_RANGE: i32 = 200;
         const UNSTICK_Z_BUMP: i32 = 80;
-        Position {
-            x: self.x + util::rand_range_inclusive(-UNSTICK_XY_RANGE, UNSTICK_XY_RANGE),
-            y: self.y + util::rand_range_inclusive(-UNSTICK_XY_RANGE, UNSTICK_XY_RANGE),
-            z: self.z + UNSTICK_Z_BUMP,
-        }
+        let mut nudged = self.get_random_around(UNSTICK_XY_RANGE, UNSTICK_XY_RANGE, 0);
+        nudged.z += UNSTICK_Z_BUMP;
+        nudged
     }
 }
 impl From<Vector3<f32>> for Position {

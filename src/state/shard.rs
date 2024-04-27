@@ -3,6 +3,7 @@ use std::{collections::HashMap, sync::mpsc::TryRecvError, time::SystemTime};
 use uuid::Uuid;
 
 use crate::{
+    ai::{Behavior, RandomRoamAroundCtx},
     chunk::{EntityMap, InstanceID},
     config::config_get,
     defines::*,
@@ -53,6 +54,13 @@ impl ShardServerState {
                 let mut needs_tick = false;
 
                 if tdata_get().get_npc_stats(npc.ty).unwrap().team == NPCTeam::Mob {
+                    let base_roam_delay_ms = placeholder!(5000);
+                    let roam_behavior_ctx = RandomRoamAroundCtx::new(
+                        npc.get_position(),
+                        placeholder!(1000),
+                        (base_roam_delay_ms / 2, base_roam_delay_ms * 3 / 2),
+                    );
+                    npc.add_base_behavior(Behavior::RandomRoamAround(roam_behavior_ctx));
                     needs_tick = true;
                 }
 

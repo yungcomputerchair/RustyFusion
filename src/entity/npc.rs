@@ -3,7 +3,7 @@ use std::{collections::HashSet, time::SystemTime};
 use uuid::Uuid;
 
 use crate::{
-    ai::AI,
+    ai::{Behavior, AI},
     chunk::{ChunkCoords, InstanceID},
     defines::RANGE_INTERACT,
     entity::{Combatant, Entity, EntityID},
@@ -100,6 +100,36 @@ impl NPC {
         }
     }
 
+    pub fn tick_movement_along_path(
+        &mut self,
+        path: &mut Path,
+        clients: &mut ClientMap,
+        state: &mut ShardServerState,
+    ) {
+        let speed = path.get_speed();
+        if path.tick(&mut self.position) {
+            let chunk_pos = self.get_chunk_coords();
+            state
+                .entity_map
+                .update(self.get_id(), Some(chunk_pos), Some(clients));
+
+            let run_speed = tdata_get().get_npc_stats(self.ty).unwrap().run_speed;
+            let pkt = sP_FE2CL_NPC_MOVE {
+                iNPC_ID: self.id,
+                iToX: self.position.x,
+                iToY: self.position.y,
+                iToZ: self.position.z,
+                iSpeed: speed,
+                iMoveStyle: if speed > run_speed { 1 } else { 0 },
+            };
+            state
+                .entity_map
+                .for_each_around(self.get_id(), clients, |c| {
+                    c.send_packet(PacketID::P_FE2CL_NPC_MOVE, &pkt)
+                });
+        }
+    }
+
     fn tick_movement(&mut self, clients: &mut ClientMap, state: &mut ShardServerState) {
         const FOLLOWING_DISTANCE: i32 = 200;
 
@@ -128,32 +158,19 @@ impl NPC {
         let ticked_path = if let Some(path) = &mut follow_path {
             Some(path)
         } else {
-            self.path.as_mut()
+            None // TODO
         };
 
         if let Some(path) = ticked_path {
-            let speed = path.get_speed();
-            if path.tick(&mut self.position) {
-                let chunk_pos = self.get_chunk_coords();
-                state
-                    .entity_map
-                    .update(self.get_id(), Some(chunk_pos), Some(clients));
+            self.tick_movement_along_path(path, clients, state);
+        }
+    }
 
-                let run_speed = tdata_get().get_npc_stats(self.ty).unwrap().run_speed;
-                let pkt = sP_FE2CL_NPC_MOVE {
-                    iNPC_ID: self.id,
-                    iToX: self.position.x,
-                    iToY: self.position.y,
-                    iToZ: self.position.z,
-                    iSpeed: speed,
-                    iMoveStyle: if speed > run_speed { 1 } else { 0 },
-                };
-                state
-                    .entity_map
-                    .for_each_around(self.get_id(), clients, |c| {
-                        c.send_packet(PacketID::P_FE2CL_NPC_MOVE, &pkt)
-                    });
-            }
+    pub fn add_base_behavior(&mut self, behavior: Behavior) {
+        if let Some(ref mut ai) = self.ai {
+            ai.add_base_behavior(behavior);
+        } else {
+            self.ai = Some(AI::new(behavior));
         }
     }
 }
