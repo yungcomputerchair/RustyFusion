@@ -132,19 +132,19 @@ enum RoamState {
 #[derive(Debug, Clone)]
 pub struct RandomRoamAroundCtx {
     home: Position,
-    roam_radius: i32,
+    roam_radius_range: (i32, i32),
     roam_delay_range_ms: (u64, u64),
     roam_state: RoamState,
 }
 impl RandomRoamAroundCtx {
     pub fn new(
         home: Position,
-        roam_radius: i32,
+        roam_radius_range: (i32, i32),
         roam_delay_range_ms: (u64, u64),
     ) -> RandomRoamAroundCtx {
         RandomRoamAroundCtx {
             home,
-            roam_radius,
+            roam_radius_range,
             roam_delay_range_ms,
             roam_state: RoamState::Idle,
         }
@@ -166,9 +166,9 @@ impl RandomRoamAroundCtx {
             }
             RoamState::Waiting(wait_time) => {
                 if *time > wait_time {
-                    let target_pos =
-                        self.home
-                            .get_random_around(self.roam_radius, self.roam_radius, 0);
+                    let (min_radius, max_radius) = self.roam_radius_range;
+                    let roam_radius = thread_rng().gen_range(min_radius..max_radius);
+                    let target_pos = self.home.get_random_around(roam_radius, roam_radius, 0);
                     let speed = tdata_get().get_npc_stats(npc.ty).unwrap().walk_speed;
                     let mut path = Path::new_single(target_pos, speed);
                     path.start();
