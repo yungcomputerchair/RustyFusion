@@ -54,6 +54,7 @@ impl AI {
 #[derive(Debug, Clone)]
 pub enum Behavior {
     RandomRoamAround(RandomRoamAroundCtx),
+    FollowPath(FollowPathCtx),
 }
 
 #[derive(Debug, Clone, Default)]
@@ -103,6 +104,7 @@ impl AINode {
         for behavior in self.behaviors.iter_mut() {
             let op = match behavior {
                 Behavior::RandomRoamAround(ctx) => ctx.tick(npc, state, clients, time),
+                Behavior::FollowPath(ctx) => ctx.tick(npc, state, clients),
             };
             match op {
                 NodeOperation::Nop => (),
@@ -119,6 +121,34 @@ impl AINode {
             }
         }
         Some(self)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FollowPathCtx {
+    path: Path,
+    remove_when_done: bool,
+}
+impl FollowPathCtx {
+    pub fn new(path: Path, remove_when_done: bool) -> FollowPathCtx {
+        FollowPathCtx {
+            path,
+            remove_when_done,
+        }
+    }
+
+    fn tick(
+        &mut self,
+        npc: &mut NPC,
+        state: &mut ShardServerState,
+        clients: &mut ClientMap,
+    ) -> NodeOperation {
+        npc.tick_movement_along_path(&mut self.path, clients, state);
+        if self.remove_when_done && self.path.is_done() {
+            NodeOperation::Pop
+        } else {
+            NodeOperation::Nop
+        }
     }
 }
 
