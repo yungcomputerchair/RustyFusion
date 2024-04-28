@@ -3,7 +3,9 @@ use std::time::{Duration, SystemTime};
 use rand::{thread_rng, Rng};
 
 use crate::{
+    chunk::TickMode,
     entity::{Entity, NPC},
+    enums::NPCTeam,
     error::{log, Severity},
     net::ClientMap,
     path::Path,
@@ -17,6 +19,53 @@ pub struct AI {
     root: AINode,
 }
 impl AI {
+    pub fn make_for_npc(npc: &NPC) -> (Option<Self>, TickMode) {
+        let stats = tdata_get().get_npc_stats(npc.ty).unwrap();
+        if stats.ai_type == 0 {
+            return (None, TickMode::Never);
+        }
+
+        let mut ai = AI::default();
+        let mut tick_mode = TickMode::WhenLoaded;
+
+        // movement
+        let movement_behavior = (|| {
+            if let Some(path) = tdata_get().get_npc_path(npc.ty) {
+                if path.is_started() {
+                    tick_mode = TickMode::Always;
+                    return Some(Behavior::FollowPath(FollowPathCtx::new(
+                        path.clone(),
+                        false,
+                    )));
+                }
+            }
+
+            if stats.team == NPCTeam::Mob {
+                let home = npc.get_position();
+                let max_roam_radius = stats.idle_range / 2;
+                let roam_radius_range = (max_roam_radius / 2, max_roam_radius);
+                let max_delay_time_ms = stats.delay_time * 1000;
+                let roam_delay_range_ms = (max_delay_time_ms / 2, max_delay_time_ms);
+                return Some(Behavior::RandomRoamAround(RandomRoamAroundCtx::new(
+                    home,
+                    roam_radius_range,
+                    roam_delay_range_ms,
+                )));
+            }
+
+            None
+        })();
+
+        let combat_behavior = None; // TODO
+
+        let base_behaviors = vec![movement_behavior, combat_behavior]
+            .into_iter()
+            .flatten()
+            .collect();
+        ai.add_base_node_with_behaviors(base_behaviors);
+        (Some(ai), tick_mode)
+    }
+
     pub fn tick(
         mut self,
         npc: &mut NPC,

@@ -36,7 +36,7 @@ pub struct NPC {
     pub loose_follow: Option<EntityID>,
     pub interacting_pcs: HashSet<i32>,
     pub summoned: bool,
-    ai: Option<AI>,
+    pub ai: Option<AI>,
 }
 impl NPC {
     pub fn new(

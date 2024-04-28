@@ -3,12 +3,12 @@ use std::{collections::HashMap, sync::mpsc::TryRecvError, time::SystemTime};
 use uuid::Uuid;
 
 use crate::{
-    ai::{Behavior, RandomRoamAroundCtx},
+    ai::AI,
     chunk::{EntityMap, InstanceID, TickMode},
     config::config_get,
     defines::*,
     entity::{Entity, EntityID, Group, Player, Slider, NPC},
-    enums::{ItemType, NPCTeam},
+    enums::ItemType,
     error::{log, log_if_failed, panic_log, FFError, FFResult, Severity},
     helpers,
     item::Item,
@@ -51,23 +51,8 @@ impl ShardServerState {
         }
         for channel_num in 1..=num_channels {
             for mut npc in tdata_get().make_all_npcs(&mut state.entity_map, channel_num) {
-                let mut tick_mode = TickMode::Never;
-
-                if tdata_get().get_npc_stats(npc.ty).unwrap().team == NPCTeam::Mob {
-                    let base_roam_delay_ms = placeholder!(5000);
-                    let roam_behavior_ctx = RandomRoamAroundCtx::new(
-                        npc.get_position(),
-                        placeholder!(1000),
-                        (base_roam_delay_ms / 2, base_roam_delay_ms * 3 / 2),
-                    );
-                    npc.add_base_behavior(Behavior::RandomRoamAround(roam_behavior_ctx));
-                    tick_mode = TickMode::WhenLoaded;
-                }
-
-                if let Some(path) = tdata_get().get_npc_path(npc.ty) {
-                    npc.set_path(path);
-                    tick_mode = TickMode::Always;
-                }
+                let (ai, tick_mode) = AI::make_for_npc(&npc);
+                npc.ai = ai;
 
                 let chunk_pos = npc.get_chunk_coords();
                 let entity_map = &mut state.entity_map;

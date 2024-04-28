@@ -82,6 +82,10 @@ impl Path {
         }
     }
 
+    pub fn is_started(&self) -> bool {
+        !matches!(self.state, PathState::Pending)
+    }
+
     pub fn is_done(&self) -> bool {
         matches!(self.state, PathState::Done)
     }
