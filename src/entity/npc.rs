@@ -3,7 +3,7 @@ use std::{collections::HashSet, time::SystemTime};
 use uuid::Uuid;
 
 use crate::{
-    ai::{Behavior, AI},
+    ai::AI,
     chunk::{ChunkCoords, InstanceID},
     defines::RANGE_INTERACT,
     entity::{Combatant, Entity, EntityID},
@@ -129,57 +129,6 @@ impl NPC {
                 });
         }
     }
-
-    fn tick_movement(&mut self, clients: &mut ClientMap, state: &mut ShardServerState) {
-        const FOLLOWING_DISTANCE: i32 = 200;
-
-        let mut follow_path = if let Some(entity_id) = self.loose_follow {
-            if let Some(entity) = state.entity_map.get_from_id(entity_id) {
-                let target_pos = entity.get_position();
-                let (target_pos, too_close) =
-                    target_pos.interpolate(&self.position, FOLLOWING_DISTANCE as f32);
-                // exceed target speed by 10% to not fall behind
-                let target_speed = entity.get_speed() as f32 * 1.1;
-                let mut path = Path::new_single(target_pos, target_speed as i32);
-                if !too_close {
-                    path.start();
-                }
-                Some(path)
-            } else {
-                // target entity is gone
-                self.loose_follow = None;
-                None
-            }
-        } else {
-            None
-        };
-
-        // If we are following an entity, that takes priority over our own path
-        let ticked_path = if let Some(path) = &mut follow_path {
-            Some(path)
-        } else {
-            None // TODO
-        };
-
-        if let Some(path) = ticked_path {
-            self.tick_movement_along_path(path, clients, state);
-        }
-    }
-
-    pub fn add_base_behavior_group(&mut self, behaviors: Vec<Behavior>) {
-        if let Some(ref mut ai) = self.ai {
-            ai.add_base_node_with_behaviors(behaviors);
-        } else {
-            let mut new_ai = AI::default();
-            new_ai.add_base_node_with_behaviors(behaviors);
-            self.ai = Some(new_ai);
-        }
-    }
-
-    pub fn add_base_behavior(&mut self, behavior: Behavior) {
-        let behaviors = vec![behavior];
-        self.add_base_behavior_group(behaviors);
-    }
 }
 impl Entity for NPC {
     fn get_id(&self) -> EntityID {
@@ -245,10 +194,10 @@ impl Entity for NPC {
         }
         if self.interacting_pcs.is_empty() {
             // we take the AI object out during tick to satisfy the borrow checker
-            if let Some(ai) = self.ai.take() {
-                self.ai = Some(ai.tick(self, state, clients, &time));
+            if let Some(mut ai) = self.ai.take() {
+                ai.tick(self, state, clients, &time);
+                self.ai = Some(ai);
             }
-            self.tick_movement(clients, state);
         }
     }
 

@@ -51,6 +51,10 @@ impl ShardServerState {
         }
         for channel_num in 1..=num_channels {
             for mut npc in tdata_get().make_all_npcs(&mut state.entity_map, channel_num) {
+                if let Some(path) = tdata_get().get_npc_path(npc.ty) {
+                    npc.path = Some(path);
+                }
+
                 let (ai, tick_mode) = AI::make_for_npc(&npc);
                 npc.ai = ai;
 

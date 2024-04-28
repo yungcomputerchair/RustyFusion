@@ -6,7 +6,6 @@ use crate::{
     chunk::TickMode,
     entity::{Entity, NPC},
     enums::NPCTeam,
-    error::{log, Severity},
     net::ClientMap,
     path::Path,
     state::ShardServerState,
@@ -14,7 +13,7 @@ use crate::{
     Position,
 };
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct AI {
     root: AINode,
 }
@@ -25,165 +24,80 @@ impl AI {
             return (None, TickMode::Never);
         }
 
-        let mut ai = AI::default();
-        let mut tick_mode = TickMode::WhenLoaded;
+        #[allow(clippy::box_default)]
+        let mut movement_behaviors = vec![
+            AINode::Behavior(Box::new(FollowAssignedPathState::default())),
+            AINode::Behavior(Box::new(FollowAssignedEntityState::new(200))),
+        ];
 
-        // movement
-        let movement_behavior = (|| {
-            if let Some(path) = tdata_get().get_npc_path(npc.ty) {
-                if path.is_started() {
-                    tick_mode = TickMode::Always;
-                    return Some(Behavior::FollowPath(FollowPathCtx::new(
-                        path.clone(),
-                        false,
-                    )));
-                }
-            }
+        if stats.team == NPCTeam::Mob {
+            // stats.ai_type == ???
+            let roam_radius_max = stats.idle_range / 2;
+            let roam_radius_range = (roam_radius_max / 2, roam_radius_max);
+            let roam_delay_max_ms = stats.delay_time * 1000;
+            let roam_delay_range_ms = (roam_delay_max_ms / 2, roam_delay_max_ms);
+            movement_behaviors.push(AINode::Behavior(Box::new(RandomRoamAroundState::new(
+                npc.get_position(),
+                roam_radius_range,
+                roam_delay_range_ms,
+            ))));
+        }
 
-            if stats.team == NPCTeam::Mob {
-                let home = npc.get_position();
-                let max_roam_radius = stats.idle_range / 2;
-                let roam_radius_range = (max_roam_radius / 2, max_roam_radius);
-                let max_delay_time_ms = stats.delay_time * 1000;
-                let roam_delay_range_ms = (max_delay_time_ms / 2, max_delay_time_ms);
-                return Some(Behavior::RandomRoamAround(RandomRoamAroundCtx::new(
-                    home,
-                    roam_radius_range,
-                    roam_delay_range_ms,
-                )));
-            }
+        let movement_selector = AINode::Selector(movement_behaviors);
+        let root = AINode::Sequence(vec![movement_selector]);
+        let tick_mode = if npc.path.is_some() {
+            TickMode::Always
+        } else {
+            TickMode::WhenLoaded
+        };
 
-            None
-        })();
-
-        let combat_behavior = None; // TODO
-
-        let base_behaviors = vec![movement_behavior, combat_behavior]
-            .into_iter()
-            .flatten()
-            .collect();
-        ai.add_base_node_with_behaviors(base_behaviors);
-        (Some(ai), tick_mode)
+        (Some(AI { root }), tick_mode)
     }
 
     pub fn tick(
-        mut self,
+        &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
         clients: &mut ClientMap,
         time: &SystemTime,
-    ) -> Self {
-        self.root = self
-            .root
-            .tick(npc, state, clients, time)
-            .unwrap_or_else(|| {
-                log(
-                    Severity::Warning,
-                    &format!("AI root node deleted ({:?})", npc.get_id()),
-                );
-                AINode::default()
-            });
-        self
+    ) {
+        self.root.tick(npc, state, clients, time);
     }
-
-    pub fn add_base_node_with_behaviors(&mut self, behaviors: Vec<Behavior>) {
-        // "base nodes" are nodes that are children of the root.
-        // base behaviors or behavior groups are added to these nodes.
-        // we do NOT add any behaviors to the root node.
-        //
-        // if multiple behaviors are passed in, they are grouped together.
-        // group behaviors are ticked, popped, and replaced together
-        // since they are bundled in the same node.
-        let mut node = AINode::default();
-        node.behaviors.extend(behaviors);
-        self.root.children.push(node);
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum Behavior {
-    RandomRoamAround(RandomRoamAroundCtx),
-    FollowPath(FollowPathCtx),
-}
-
-#[derive(Debug, Clone, Default)]
-struct AINode {
-    behaviors: Vec<Behavior>,
-    children: Vec<AINode>,
 }
 
 #[allow(dead_code)]
-enum NodeOperation {
-    Nop,
-    Push(AINode),
-    Pop,
-    Replace(AINode),
+#[derive(Debug)]
+enum NodeStatus {
+    Success,
+    Failure,
+    Running,
 }
 
-impl AINode {
+trait AIState: std::fmt::Debug {
+    fn box_clone(&self) -> Box<dyn AIState>;
     fn tick(
-        mut self,
+        &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
         clients: &mut ClientMap,
         time: &SystemTime,
-    ) -> Option<Self> {
-        if self.children.is_empty() {
-            // no children means we are active
-            return self.tick_behaviors(npc, state, clients, time);
-        }
-
-        let mut new_children = Vec::with_capacity(self.children.len());
-        for child in self.children.drain(..) {
-            if let Some(new_child) = child.tick(npc, state, clients, time) {
-                new_children.push(new_child);
-            }
-        }
-        self.children = new_children;
-        Some(self)
-    }
-
-    fn tick_behaviors(
-        mut self,
-        npc: &mut NPC,
-        state: &mut ShardServerState,
-        clients: &mut ClientMap,
-        time: &SystemTime,
-    ) -> Option<Self> {
-        for behavior in self.behaviors.iter_mut() {
-            let op = match behavior {
-                Behavior::RandomRoamAround(ctx) => ctx.tick(npc, state, clients, time),
-                Behavior::FollowPath(ctx) => ctx.tick(npc, state, clients),
-            };
-            match op {
-                NodeOperation::Nop => (),
-                NodeOperation::Push(node) => {
-                    self.children.push(node);
-                    break;
-                }
-                NodeOperation::Pop => {
-                    return None;
-                }
-                NodeOperation::Replace(node) => {
-                    return Some(node);
-                }
-            }
-        }
-        Some(self)
+    ) -> NodeStatus;
+}
+impl Clone for Box<dyn AIState> {
+    fn clone(&self) -> Box<dyn AIState> {
+        self.box_clone()
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct FollowPathCtx {
-    path: Path,
-    remove_when_done: bool,
+enum AINode {
+    Sequence(Vec<AINode>),
+    Selector(Vec<AINode>),
+    Behavior(Box<dyn AIState>),
 }
-impl FollowPathCtx {
-    pub fn new(path: Path, remove_when_done: bool) -> FollowPathCtx {
-        FollowPathCtx {
-            path,
-            remove_when_done,
-        }
+impl AIState for AINode {
+    fn box_clone(&self) -> Box<dyn AIState> {
+        Box::new(self.clone())
     }
 
     fn tick(
@@ -191,12 +105,104 @@ impl FollowPathCtx {
         npc: &mut NPC,
         state: &mut ShardServerState,
         clients: &mut ClientMap,
-    ) -> NodeOperation {
-        npc.tick_movement_along_path(&mut self.path, clients, state);
-        if self.remove_when_done && self.path.is_done() {
-            NodeOperation::Pop
-        } else {
-            NodeOperation::Nop
+        time: &SystemTime,
+    ) -> NodeStatus {
+        match self {
+            AINode::Sequence(children) => {
+                for child in children {
+                    match child.tick(npc, state, clients, time) {
+                        NodeStatus::Success => continue,
+                        NodeStatus::Failure => return NodeStatus::Failure,
+                        NodeStatus::Running => return NodeStatus::Running,
+                    }
+                }
+                NodeStatus::Success
+            }
+            AINode::Selector(children) => {
+                for child in children {
+                    match child.tick(npc, state, clients, time) {
+                        NodeStatus::Success => return NodeStatus::Success,
+                        NodeStatus::Failure => continue,
+                        NodeStatus::Running => return NodeStatus::Running,
+                    }
+                }
+                NodeStatus::Failure
+            }
+            AINode::Behavior(behavior) => behavior.tick(npc, state, clients, time),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct FollowAssignedPathState {}
+impl AIState for FollowAssignedPathState {
+    fn box_clone(&self) -> Box<dyn AIState> {
+        Box::new(self.clone())
+    }
+
+    fn tick(
+        &mut self,
+        npc: &mut NPC,
+        state: &mut ShardServerState,
+        clients: &mut ClientMap,
+        _time: &SystemTime,
+    ) -> NodeStatus {
+        let path = npc.path.take();
+        match path {
+            Some(mut path) => {
+                npc.tick_movement_along_path(&mut path, clients, state);
+                npc.path = Some(path);
+                NodeStatus::Success
+            }
+            None => NodeStatus::Failure,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FollowAssignedEntityState {
+    following_distance: i32,
+}
+impl FollowAssignedEntityState {
+    pub fn new(following_distance: i32) -> Self {
+        Self { following_distance }
+    }
+}
+impl AIState for FollowAssignedEntityState {
+    fn box_clone(&self) -> Box<dyn AIState> {
+        Box::new(self.clone())
+    }
+
+    fn tick(
+        &mut self,
+        npc: &mut NPC,
+        state: &mut ShardServerState,
+        clients: &mut ClientMap,
+        _time: &SystemTime,
+    ) -> NodeStatus {
+        match npc.loose_follow {
+            Some(eid) => {
+                let entity = match state.entity_map.get_from_id(eid) {
+                    Some(entity) => entity,
+                    None => return NodeStatus::Failure,
+                };
+
+                let target_pos = entity.get_position();
+                let following_distance = self.following_distance; // TODO account for sizes
+                let (target_pos, too_close) =
+                    target_pos.interpolate(&npc.get_position(), following_distance as f32);
+                if too_close {
+                    return NodeStatus::Success;
+                }
+
+                // exceed target speed by 10% to not fall behind
+                let target_speed = entity.get_speed() as f32 * 1.1;
+                let mut path = Path::new_single(target_pos, target_speed as i32);
+                path.start();
+                npc.tick_movement_along_path(&mut path, clients, state);
+                NodeStatus::Success
+            }
+            None => NodeStatus::Failure,
         }
     }
 }
@@ -209,24 +215,29 @@ enum RoamState {
 }
 
 #[derive(Debug, Clone)]
-pub struct RandomRoamAroundCtx {
+pub struct RandomRoamAroundState {
     home: Position,
     roam_radius_range: (i32, i32),
     roam_delay_range_ms: (u64, u64),
     roam_state: RoamState,
 }
-impl RandomRoamAroundCtx {
+impl RandomRoamAroundState {
     pub fn new(
         home: Position,
         roam_radius_range: (i32, i32),
         roam_delay_range_ms: (u64, u64),
-    ) -> RandomRoamAroundCtx {
-        RandomRoamAroundCtx {
+    ) -> Self {
+        Self {
             home,
             roam_radius_range,
             roam_delay_range_ms,
             roam_state: RoamState::Idle,
         }
+    }
+}
+impl AIState for RandomRoamAroundState {
+    fn box_clone(&self) -> Box<dyn AIState> {
+        Box::new(self.clone())
     }
 
     fn tick(
@@ -235,7 +246,7 @@ impl RandomRoamAroundCtx {
         state: &mut ShardServerState,
         clients: &mut ClientMap,
         time: &SystemTime,
-    ) -> NodeOperation {
+    ) -> NodeStatus {
         match self.roam_state {
             RoamState::Idle => {
                 let (delay_min, delay_max) = self.roam_delay_range_ms;
@@ -261,6 +272,6 @@ impl RandomRoamAroundCtx {
                 }
             }
         }
-        NodeOperation::Nop
+        NodeStatus::Success
     }
 }
