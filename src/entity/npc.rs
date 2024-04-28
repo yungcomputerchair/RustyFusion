@@ -208,6 +208,14 @@ impl Entity for NPC {
         }
     }
 
+    fn as_combatant(&self) -> Option<&dyn Combatant> {
+        Some(self)
+    }
+
+    fn as_combatant_mut(&mut self) -> Option<&mut dyn Combatant> {
+        Some(self)
+    }
+
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }

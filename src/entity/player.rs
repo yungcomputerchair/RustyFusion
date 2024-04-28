@@ -1526,6 +1526,14 @@ impl Entity for Player {
         self.tick_missions(time, clients, state);
     }
 
+    fn as_combatant(&self) -> Option<&dyn Combatant> {
+        Some(self)
+    }
+
+    fn as_combatant_mut(&mut self) -> Option<&mut dyn Combatant> {
+        Some(self)
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }

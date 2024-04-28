@@ -12,6 +12,8 @@ use crate::{
     Position,
 };
 
+use super::Combatant;
+
 #[derive(Debug, Clone)]
 pub struct Egg {
     id: i32,
@@ -111,6 +113,14 @@ impl Entity for Egg {
     }
 
     fn cleanup(&mut self, _: &mut ClientMap, _: &mut ShardServerState) {}
+
+    fn as_combatant(&self) -> Option<&dyn Combatant> {
+        None
+    }
+
+    fn as_combatant_mut(&mut self) -> Option<&mut dyn Combatant> {
+        None
+    }
 
     fn as_any(&self) -> &dyn Any {
         self

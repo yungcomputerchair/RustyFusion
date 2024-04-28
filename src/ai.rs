@@ -187,6 +187,10 @@ impl AIState for FollowAssignedEntityState {
                     None => return NodeStatus::Failure,
                 };
 
+                if entity.as_combatant().is_some_and(|cb| cb.is_dead()) {
+                    return NodeStatus::Failure;
+                }
+
                 let target_pos = entity.get_position();
                 let following_distance = self.following_distance; // TODO account for sizes
                 let (target_pos, too_close) =

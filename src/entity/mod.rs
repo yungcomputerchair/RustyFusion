@@ -47,11 +47,14 @@ pub trait Entity {
     fn tick(&mut self, time: SystemTime, clients: &mut ClientMap, state: &mut ShardServerState);
     fn cleanup(&mut self, clients: &mut ClientMap, state: &mut ShardServerState);
 
+    fn as_combatant(&self) -> Option<&dyn Combatant>;
+    fn as_combatant_mut(&mut self) -> Option<&mut dyn Combatant>;
+
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
-pub trait Combatant {
+pub trait Combatant: Entity {
     fn get_condition_bit_flag(&self) -> i32;
     fn get_level(&self) -> i16;
     fn get_hp(&self) -> i32;
