@@ -144,14 +144,20 @@ impl EntityMap {
                 TickMode::Always => Some(*id),
                 TickMode::Never => None,
                 TickMode::WhenLoaded => {
-                    if let Some(coords) = entry.chunk {
-                        if let Some(chunk) = self.get_chunk(coords) {
-                            if chunk.is_loaded() {
-                                return Some(*id);
+                    match entry.chunk {
+                        Some(coords) => {
+                            if let Some(chunk) = self.get_chunk(coords) {
+                                if chunk.is_loaded() {
+                                    return Some(*id);
+                                }
                             }
+                            None
                         }
+                        // need to tick transient entities!
+                        // e.g. when a mob is dead it is off-screen, but
+                        // needs to tick or else it will never respawn
+                        None => Some(*id),
                     }
-                    None
                 }
             })
     }

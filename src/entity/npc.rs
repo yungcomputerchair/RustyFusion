@@ -18,6 +18,7 @@ use crate::{
     path::Path,
     state::ShardServerState,
     tabledata::tdata_get,
+    util::clamp_min,
     Position,
 };
 
@@ -245,5 +246,14 @@ impl Combatant for NPC {
 
     fn is_dead(&self) -> bool {
         self.get_hp() <= 0
+    }
+
+    fn take_damage(&mut self, damage: i32) -> i32 {
+        self.hp = clamp_min(self.hp - damage, 0);
+        self.hp
+    }
+
+    fn reset(&mut self) {
+        self.hp = self.get_max_hp();
     }
 }

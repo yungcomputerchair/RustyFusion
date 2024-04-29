@@ -28,7 +28,7 @@ use crate::{
     path::Path,
     state::ShardServerState,
     tabledata::{tdata_get, TripData},
-    util::{self, clamp, clamp_max},
+    util::{self, clamp, clamp_max, clamp_min},
     Position,
 };
 
@@ -1435,6 +1435,18 @@ impl Combatant for Player {
 
     fn is_dead(&self) -> bool {
         self.hp <= 0
+    }
+
+    fn take_damage(&mut self, damage: i32) -> i32 {
+        self.hp = clamp_min(self.hp - damage, 0);
+        self.hp
+    }
+
+    fn reset(&mut self) {
+        self.hp = self.get_max_hp() / 2;
+        for nano_id in self.nano_data.equipped_ids.into_iter().flatten() {
+            self.get_nano_mut(nano_id).unwrap().stamina = NANO_STAMINA_MAX / 2;
+        }
     }
 }
 impl Entity for Player {

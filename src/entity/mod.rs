@@ -60,6 +60,9 @@ pub trait Combatant: Entity {
     fn get_hp(&self) -> i32;
     fn get_max_hp(&self) -> i32;
     fn is_dead(&self) -> bool;
+
+    fn take_damage(&mut self, damage: i32) -> i32;
+    fn reset(&mut self);
 }
 
 #[derive(Debug, Clone)]

@@ -57,12 +57,14 @@ pub fn pc_attack_npcs(clients: &mut ClientMap, state: &mut ShardServerState) -> 
             continue;
         };
         // TODO proper implementation. This is stubbed to just kill the NPC for mission testing
+        let damage = placeholder!(target.get_hp());
+        let remaining_hp = target.take_damage(damage);
         let result = sAttackResult {
             eCT: placeholder!(4),
             iID: target_id,
             bProtected: placeholder!(0),
-            iDamage: placeholder!(target.get_hp()),
-            iHP: placeholder!(0),
+            iDamage: damage,
+            iHP: remaining_hp,
             iHitFlag: placeholder!(1),
         };
         attack_results.push(result);

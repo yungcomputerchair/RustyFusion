@@ -170,6 +170,7 @@ pub struct NPCStats {
     pub run_speed: i32,
     pub sight_range: i32,
     pub idle_range: i32,
+    pub regen_time: u64,
     pub delay_time: u64, // generic value for various delays
     pub ai_type: u8,     // TODO investigate further
     pub bark_type: Option<usize>,
@@ -1730,6 +1731,7 @@ fn load_npc_data(root: &Map<std::string::String, Value>) -> Result<HashMap<i32, 
         m_iRunSpeed: i32,
         m_iSightRange: i32,
         m_iIdleRange: i32,
+        m_iRegenTime: u64,
         m_iDelayTime: u64,
         m_iAiType: u8,
         m_iBarkerType: usize,
@@ -1757,6 +1759,7 @@ fn load_npc_data(root: &Map<std::string::String, Value>) -> Result<HashMap<i32, 
                 .try_into()
                 .map_err(|e: FFError| e.get_msg().to_string())?,
             idle_range: entry.m_iIdleRange,
+            regen_time: entry.m_iRegenTime,
             delay_time: entry.m_iDelayTime,
             ai_type: entry.m_iAiType,
             bark_type: match entry.m_iBarkerType {
