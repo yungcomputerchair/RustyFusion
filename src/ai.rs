@@ -13,9 +13,25 @@ use crate::{
     Position,
 };
 
+trait AINode: std::fmt::Debug {
+    fn box_clone(&self) -> Box<dyn AINode>;
+    fn tick(
+        &mut self,
+        npc: &mut NPC,
+        state: &mut ShardServerState,
+        clients: &mut ClientMap,
+        time: &SystemTime,
+    ) -> NodeStatus;
+}
+impl Clone for Box<dyn AINode> {
+    fn clone(&self) -> Box<dyn AINode> {
+        self.box_clone()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct AI {
-    root: AINode,
+    root: Box<dyn AINode>,
 }
 impl AI {
     pub fn make_for_npc(npc: &NPC) -> (Option<Self>, TickMode) {
@@ -24,10 +40,9 @@ impl AI {
             return (None, TickMode::Never);
         }
 
-        #[allow(clippy::box_default)]
         let mut movement_behaviors = vec![
-            AINode::Behavior(Box::new(FollowAssignedPathState::default())),
-            AINode::Behavior(Box::new(FollowAssignedEntityState::new(200))),
+            FollowAssignedPath::new_node(),
+            FollowAssignedEntity::new_node(200),
         ];
 
         if stats.team == NPCTeam::Mob {
@@ -36,15 +51,15 @@ impl AI {
             let roam_radius_range = (roam_radius_max / 2, roam_radius_max);
             let roam_delay_max_ms = stats.delay_time * 1000;
             let roam_delay_range_ms = (roam_delay_max_ms / 2, roam_delay_max_ms);
-            movement_behaviors.push(AINode::Behavior(Box::new(RandomRoamAroundState::new(
+            movement_behaviors.push(RandomRoamAround::new_node(
                 npc.get_position(),
                 roam_radius_range,
                 roam_delay_range_ms,
-            ))));
+            ));
         }
 
-        let movement_selector = AINode::Selector(movement_behaviors);
-        let root = AINode::Sequence(vec![movement_selector]);
+        let movement_selector = SelectorNode::new_node(movement_behaviors);
+        let root = SequenceNode::new_node(vec![movement_selector]);
         let tick_mode = if npc.path.is_some() {
             TickMode::Always
         } else {
@@ -73,30 +88,21 @@ enum NodeStatus {
     Running,
 }
 
-trait AIState: std::fmt::Debug {
-    fn box_clone(&self) -> Box<dyn AIState>;
-    fn tick(
-        &mut self,
-        npc: &mut NPC,
-        state: &mut ShardServerState,
-        clients: &mut ClientMap,
-        time: &SystemTime,
-    ) -> NodeStatus;
+#[derive(Debug, Clone)]
+struct SequenceNode {
+    children: Vec<Box<dyn AINode>>,
+    cursor: usize,
 }
-impl Clone for Box<dyn AIState> {
-    fn clone(&self) -> Box<dyn AIState> {
-        self.box_clone()
+impl SequenceNode {
+    fn new_node(children: Vec<Box<dyn AINode>>) -> Box<dyn AINode> {
+        Box::new(Self {
+            children,
+            cursor: 0,
+        })
     }
 }
-
-#[derive(Debug, Clone)]
-enum AINode {
-    Sequence(Vec<AINode>),
-    Selector(Vec<AINode>),
-    Behavior(Box<dyn AIState>),
-}
-impl AIState for AINode {
-    fn box_clone(&self) -> Box<dyn AIState> {
+impl AINode for SequenceNode {
+    fn box_clone(&self) -> Box<dyn AINode> {
         Box::new(self.clone())
     }
 
@@ -107,36 +113,80 @@ impl AIState for AINode {
         clients: &mut ClientMap,
         time: &SystemTime,
     ) -> NodeStatus {
-        match self {
-            AINode::Sequence(children) => {
-                for child in children {
-                    match child.tick(npc, state, clients, time) {
-                        NodeStatus::Success => continue,
-                        NodeStatus::Failure => return NodeStatus::Failure,
-                        NodeStatus::Running => return NodeStatus::Running,
-                    }
+        while self.cursor < self.children.len() {
+            let status = self.children[self.cursor].tick(npc, state, clients, time);
+            match status {
+                NodeStatus::Success => {
+                    self.cursor += 1;
                 }
-                NodeStatus::Success
-            }
-            AINode::Selector(children) => {
-                for child in children {
-                    match child.tick(npc, state, clients, time) {
-                        NodeStatus::Success => return NodeStatus::Success,
-                        NodeStatus::Failure => continue,
-                        NodeStatus::Running => return NodeStatus::Running,
-                    }
+                NodeStatus::Failure => {
+                    self.cursor = 0;
+                    return NodeStatus::Failure;
                 }
-                NodeStatus::Failure
+                NodeStatus::Running => {
+                    return NodeStatus::Running;
+                }
             }
-            AINode::Behavior(behavior) => behavior.tick(npc, state, clients, time),
         }
+        self.cursor = 0;
+        NodeStatus::Success
     }
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct FollowAssignedPathState {}
-impl AIState for FollowAssignedPathState {
-    fn box_clone(&self) -> Box<dyn AIState> {
+#[derive(Debug, Clone)]
+struct SelectorNode {
+    children: Vec<Box<dyn AINode>>,
+    cursor: usize,
+}
+impl SelectorNode {
+    fn new_node(children: Vec<Box<dyn AINode>>) -> Box<dyn AINode> {
+        Box::new(Self {
+            children,
+            cursor: 0,
+        })
+    }
+}
+impl AINode for SelectorNode {
+    fn box_clone(&self) -> Box<dyn AINode> {
+        Box::new(self.clone())
+    }
+
+    fn tick(
+        &mut self,
+        npc: &mut NPC,
+        state: &mut ShardServerState,
+        clients: &mut ClientMap,
+        time: &SystemTime,
+    ) -> NodeStatus {
+        while self.cursor < self.children.len() {
+            let status = self.children[self.cursor].tick(npc, state, clients, time);
+            match status {
+                NodeStatus::Success => {
+                    self.cursor = 0;
+                    return NodeStatus::Success;
+                }
+                NodeStatus::Failure => {
+                    self.cursor += 1;
+                }
+                NodeStatus::Running => {
+                    return NodeStatus::Running;
+                }
+            }
+        }
+        self.cursor = 0;
+        NodeStatus::Failure
+    }
+}
+
+#[derive(Debug, Clone)]
+struct FollowAssignedPath {}
+impl FollowAssignedPath {
+    fn new_node() -> Box<dyn AINode> {
+        Box::new(Self {})
+    }
+}
+impl AINode for FollowAssignedPath {
+    fn box_clone(&self) -> Box<dyn AINode> {
         Box::new(self.clone())
     }
 
@@ -160,16 +210,16 @@ impl AIState for FollowAssignedPathState {
 }
 
 #[derive(Debug, Clone)]
-pub struct FollowAssignedEntityState {
+struct FollowAssignedEntity {
     following_distance: i32,
 }
-impl FollowAssignedEntityState {
-    pub fn new(following_distance: i32) -> Self {
-        Self { following_distance }
+impl FollowAssignedEntity {
+    fn new_node(following_distance: i32) -> Box<dyn AINode> {
+        Box::new(Self { following_distance })
     }
 }
-impl AIState for FollowAssignedEntityState {
-    fn box_clone(&self) -> Box<dyn AIState> {
+impl AINode for FollowAssignedEntity {
+    fn box_clone(&self) -> Box<dyn AINode> {
         Box::new(self.clone())
     }
 
@@ -219,28 +269,28 @@ enum RoamState {
 }
 
 #[derive(Debug, Clone)]
-pub struct RandomRoamAroundState {
+struct RandomRoamAround {
     home: Position,
     roam_radius_range: (i32, i32),
     roam_delay_range_ms: (u64, u64),
     roam_state: RoamState,
 }
-impl RandomRoamAroundState {
-    pub fn new(
+impl RandomRoamAround {
+    fn new_node(
         home: Position,
         roam_radius_range: (i32, i32),
         roam_delay_range_ms: (u64, u64),
-    ) -> Self {
-        Self {
+    ) -> Box<dyn AINode> {
+        Box::new(Self {
             home,
             roam_radius_range,
             roam_delay_range_ms,
             roam_state: RoamState::Idle,
-        }
+        })
     }
 }
-impl AIState for RandomRoamAroundState {
-    fn box_clone(&self) -> Box<dyn AIState> {
+impl AINode for RandomRoamAround {
+    fn box_clone(&self) -> Box<dyn AINode> {
         Box::new(self.clone())
     }
 
