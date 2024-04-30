@@ -55,11 +55,23 @@ impl AI {
 
         let mut movement_behaviors = vec![
             FollowAssignedPath::new_node(),
-            FollowAssignedEntity::new_node(200),
+            FollowEntity::new_node(FollowTarget::AssignedEntity, 300, 200, stats.walk_speed),
         ];
 
         if stats.team == NPCTeam::Mob {
             // stats.ai_type == ???
+
+            // Follow combat target
+            let stay_within_range = stats.attack_range + stats.radius;
+            let following_distance = stats.radius;
+            movement_behaviors.push(FollowEntity::new_node(
+                FollowTarget::CombatTarget,
+                stay_within_range,
+                following_distance,
+                stats.run_speed,
+            ));
+
+            // Roam around spawn
             let roam_radius_max = stats.idle_range / 2;
             let roam_radius_range = (roam_radius_max / 2, roam_radius_max);
             let roam_delay_max_ms = stats.delay_time * 1000;
@@ -223,15 +235,34 @@ impl AINode for FollowAssignedPath {
 }
 
 #[derive(Debug, Clone)]
-struct FollowAssignedEntity {
-    following_distance: i32,
+enum FollowTarget {
+    AssignedEntity,
+    CombatTarget,
 }
-impl FollowAssignedEntity {
-    fn new_node(following_distance: i32) -> Box<dyn AINode> {
-        Box::new(Self { following_distance })
+
+#[derive(Debug, Clone)]
+struct FollowEntity {
+    target: FollowTarget,
+    stay_within: u32,
+    following_distance: u32,
+    speed: i32,
+}
+impl FollowEntity {
+    fn new_node(
+        target: FollowTarget,
+        stay_within: u32,
+        following_distance: u32,
+        speed: i32,
+    ) -> Box<dyn AINode> {
+        Box::new(Self {
+            target,
+            stay_within,
+            following_distance,
+            speed,
+        })
     }
 }
-impl AINode for FollowAssignedEntity {
+impl AINode for FollowEntity {
     fn clone_node(&self) -> Box<dyn AINode> {
         Box::new(self.clone())
     }
@@ -243,7 +274,12 @@ impl AINode for FollowAssignedEntity {
         clients: &mut ClientMap,
         _time: &SystemTime,
     ) -> NodeStatus {
-        match npc.loose_follow {
+        let target_id = match self.target {
+            FollowTarget::AssignedEntity => npc.loose_follow,
+            FollowTarget::CombatTarget => npc.target_id,
+        };
+
+        match target_id {
             Some(eid) => {
                 let entity = match state.entity_map.get_from_id(eid) {
                     Some(entity) => entity,
@@ -254,17 +290,19 @@ impl AINode for FollowAssignedEntity {
                     return NodeStatus::Failure;
                 }
 
+                let self_pos = npc.get_position();
                 let target_pos = entity.get_position();
-                let following_distance = self.following_distance; // TODO account for sizes
+                if target_pos.distance_to(&self_pos) < self.stay_within {
+                    return NodeStatus::Success;
+                }
+
                 let (target_pos, too_close) =
-                    target_pos.interpolate(&npc.get_position(), following_distance as f32);
+                    target_pos.interpolate(&npc.get_position(), self.following_distance as f32);
                 if too_close {
                     return NodeStatus::Success;
                 }
 
-                // exceed target speed by 10% to not fall behind
-                let target_speed = entity.get_speed() as f32 * 1.1;
-                let mut path = Path::new_single(target_pos, target_speed as i32);
+                let mut path = Path::new_single(target_pos, self.speed);
                 path.start();
                 npc.tick_movement_along_path(&mut path, clients, state);
                 NodeStatus::Success
@@ -284,14 +322,14 @@ enum RoamState {
 #[derive(Debug, Clone)]
 struct RandomRoamAround {
     home: Position,
-    roam_radius_range: (i32, i32),
+    roam_radius_range: (u32, u32),
     roam_delay_range_ms: (u64, u64),
     roam_state: RoamState,
 }
 impl RandomRoamAround {
     fn new_node(
         home: Position,
-        roam_radius_range: (i32, i32),
+        roam_radius_range: (u32, u32),
         roam_delay_range_ms: (u64, u64),
     ) -> Box<dyn AINode> {
         Box::new(Self {

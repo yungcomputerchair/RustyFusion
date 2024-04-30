@@ -29,6 +29,7 @@ pub struct NPC {
     position: Position,
     rotation: i32,
     hp: i32,
+    pub target_id: Option<EntityID>,
     pub invulnerable: bool,
     pub instance_id: InstanceID,
     pub follower_ids: HashSet<i32>,
@@ -55,6 +56,7 @@ impl NPC {
             position,
             rotation: angle % 360,
             hp: stats.max_hp as i32,
+            target_id: None,
             invulnerable: false,
             instance_id,
             follower_ids: HashSet::new(),
@@ -250,9 +252,13 @@ impl Combatant for NPC {
         self.get_hp() <= 0
     }
 
-    fn take_damage(&mut self, damage: i32) -> i32 {
+    fn take_damage(&mut self, damage: i32, source: EntityID) -> i32 {
         if self.invulnerable {
             return 0;
+        }
+
+        if self.target_id.is_none() {
+            self.target_id = Some(source);
         }
 
         let init_hp = self.hp;
@@ -261,6 +267,7 @@ impl Combatant for NPC {
     }
 
     fn reset(&mut self) {
+        self.target_id = None;
         self.hp = self.get_max_hp();
     }
 }

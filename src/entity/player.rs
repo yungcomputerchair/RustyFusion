@@ -1437,7 +1437,7 @@ impl Combatant for Player {
         self.hp <= 0
     }
 
-    fn take_damage(&mut self, damage: i32) -> i32 {
+    fn take_damage(&mut self, damage: i32, _source: EntityID) -> i32 {
         if self.invulnerable {
             return 0;
         }

@@ -69,16 +69,19 @@ impl Position {
         }
     }
 
-    pub fn get_random_around(&self, x_range: i32, y_range: i32, z_range: i32) -> Position {
+    pub fn get_random_around(&self, x_radius: u32, y_radius: u32, z_radius: u32) -> Position {
+        let x_radius = x_radius as i32;
+        let y_radius = y_radius as i32;
+        let z_radius = z_radius as i32;
         Position {
-            x: self.x + util::rand_range_inclusive(-x_range, x_range),
-            y: self.y + util::rand_range_inclusive(-y_range, y_range),
-            z: self.z + util::rand_range_inclusive(-z_range, z_range),
+            x: self.x + util::rand_range_inclusive(-x_radius, x_radius),
+            y: self.y + util::rand_range_inclusive(-y_radius, y_radius),
+            z: self.z + util::rand_range_inclusive(-z_radius, z_radius),
         }
     }
 
     pub fn get_unstuck(&self) -> Position {
-        const UNSTICK_XY_RANGE: i32 = 200;
+        const UNSTICK_XY_RANGE: u32 = 200;
         const UNSTICK_Z_BUMP: i32 = 80;
         let mut nudged = self.get_random_around(UNSTICK_XY_RANGE, UNSTICK_XY_RANGE, 0);
         nudged.z += UNSTICK_Z_BUMP;
