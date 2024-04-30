@@ -1438,8 +1438,13 @@ impl Combatant for Player {
     }
 
     fn take_damage(&mut self, damage: i32) -> i32 {
+        if self.invulnerable {
+            return 0;
+        }
+
+        let init_hp = self.hp;
         self.hp = clamp_min(self.hp - damage, 0);
-        self.hp
+        init_hp - self.hp
     }
 
     fn reset(&mut self) {
