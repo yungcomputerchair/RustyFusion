@@ -114,6 +114,7 @@ pub struct EntityMap {
     registry: HashMap<EntityID, RegistryEntry>,
     chunk_maps: HashMap<InstanceID, ChunkMap>,
     instances_to_cleanup: HashSet<InstanceID>,
+    entities_to_cleanup: HashSet<EntityID>,
     next_pc_id: u32,
     next_npc_id: u32,
     next_slider_id: u32,
@@ -402,6 +403,10 @@ impl EntityMap {
                 panic_log(&format!("Entity with id {:?} already untracked", id));
             })
             .entity
+    }
+
+    pub fn mark_for_cleanup(&mut self, id: EntityID) {
+        self.entities_to_cleanup.insert(id);
     }
 
     pub fn update(
@@ -731,6 +736,16 @@ impl EntityMap {
         entities
     }
 
+    pub fn garbage_collect_entities(&mut self) -> Vec<Box<dyn Entity>> {
+        let mut entities = Vec::new();
+        let entities_to_cleanup = self.entities_to_cleanup.clone();
+        for id in entities_to_cleanup {
+            entities.push(self.untrack(id));
+        }
+        self.entities_to_cleanup.clear();
+        entities
+    }
+
     fn cleanup_instance(&mut self, instance_id: InstanceID) -> Vec<Box<dyn Entity>> {
         let mut entities = Vec::new();
         let chunk_map = self.chunk_maps.get(&instance_id).unwrap();
@@ -760,6 +775,7 @@ impl Default for EntityMap {
             registry: HashMap::new(),
             chunk_maps: HashMap::new(),
             instances_to_cleanup: HashSet::new(),
+            entities_to_cleanup: HashSet::new(),
             next_pc_id: 1,
             next_npc_id: 1,
             next_slider_id: 1,

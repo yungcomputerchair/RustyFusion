@@ -413,6 +413,7 @@ enum DeadState {
     Init,
     Dying(SystemTime),
     Dead(SystemTime),
+    PermaDead,
     Done,
 }
 
@@ -457,8 +458,13 @@ impl AINode for Dead {
             DeadState::Dying(dechunk_time) => {
                 if *time > dechunk_time {
                     state.entity_map.update(npc.get_id(), None, Some(clients));
-                    let respawn_time = *time + self.respawn_after - self.dechunk_after;
-                    self.dead_state = DeadState::Dead(respawn_time);
+                    if npc.summoned {
+                        state.entity_map.mark_for_cleanup(npc.get_id());
+                        self.dead_state = DeadState::PermaDead;
+                    } else {
+                        let respawn_time = *time + self.respawn_after - self.dechunk_after;
+                        self.dead_state = DeadState::Dead(respawn_time);
+                    }
                 }
             }
             DeadState::Dead(respawn_time) => {
@@ -468,6 +474,7 @@ impl AINode for Dead {
                     self.dead_state = DeadState::Done;
                 }
             }
+            DeadState::PermaDead => {}
             DeadState::Done => {
                 // N.B. can't do this in the previous state
                 // because the NPC state doesn't get saved until

@@ -215,10 +215,18 @@ impl ShardServerState {
         }
     }
 
-    pub fn tick_instance_gc(&mut self, clients: &mut ClientMap) {
-        let removed_entities = self.entity_map.garbage_collect_instances();
-        for mut entity in removed_entities {
+    pub fn tick_garbage_collection(&mut self, clients: &mut ClientMap) {
+        let mut removed_entities = self.entity_map.garbage_collect_instances();
+        removed_entities.extend(self.entity_map.garbage_collect_entities());
+        for entity in removed_entities.iter_mut() {
             entity.cleanup(clients, self);
+        }
+
+        if !removed_entities.is_empty() {
+            log(
+                Severity::Debug,
+                &format!("Garbage collected {} entities", removed_entities.len()),
+            );
         }
     }
 
