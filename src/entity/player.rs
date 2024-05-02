@@ -11,8 +11,8 @@ use crate::{
     defines::*,
     entity::{Combatant, Entity, EntityID},
     enums::{
-        ItemLocation, ItemType, PlayerGuide, PlayerShardStatus, RewardCategory, RewardType,
-        RideType, TaskType,
+        CombatantTeam, ItemLocation, ItemType, PlayerGuide, PlayerShardStatus, RewardCategory,
+        RewardType, RideType, TaskType,
     },
     error::{codes, log, log_if_failed, panic_log, FFError, FFResult, Severity},
     item::Item,
@@ -1431,6 +1431,19 @@ impl Combatant for Player {
 
     fn get_max_hp(&self) -> i32 {
         tdata_get().get_player_stats(self.level).unwrap().max_hp as i32
+    }
+
+    fn get_team(&self) -> CombatantTeam {
+        CombatantTeam::Friendly
+    }
+
+    fn get_aggro_factor(&self) -> f32 {
+        if self.invisible || self.invulnerable {
+            0.0
+        } else {
+            // TODO check for sneak or active IZ race
+            1.0
+        }
     }
 
     fn is_dead(&self) -> bool {

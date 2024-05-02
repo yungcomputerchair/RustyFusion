@@ -3,6 +3,7 @@ use std::{any::Any, collections::HashSet, time::SystemTime};
 use crate::{
     chunk::ChunkCoords,
     defines::*,
+    enums::CombatantTeam,
     error::{FFError, FFResult, Severity},
     net::{
         packet::{sNPCGroupMemberInfo, sPCGroupMemberInfo},
@@ -59,6 +60,8 @@ pub trait Combatant: Entity {
     fn get_level(&self) -> i16;
     fn get_hp(&self) -> i32;
     fn get_max_hp(&self) -> i32;
+    fn get_team(&self) -> CombatantTeam;
+    fn get_aggro_factor(&self) -> f32;
     fn is_dead(&self) -> bool;
 
     fn take_damage(&mut self, damage: i32, source: EntityID) -> i32;

@@ -162,7 +162,7 @@ pub struct PlayerStats {
 }
 
 pub struct NPCStats {
-    pub team: NPCTeam,
+    pub team: CombatantTeam,
     pub style: CombatStyle,
     pub level: i16,
     pub max_hp: u32,

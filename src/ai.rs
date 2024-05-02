@@ -1,11 +1,15 @@
-use std::time::{Duration, SystemTime};
+use std::{
+    collections::HashMap,
+    time::{Duration, SystemTime},
+};
 
 use rand::{thread_rng, Rng};
 
 use crate::{
     chunk::TickMode,
-    entity::{Combatant, Entity, NPC},
-    enums::NPCTeam,
+    defines::SHARD_TICKS_PER_SECOND,
+    entity::{Combatant, Entity, EntityID, NPC},
+    enums::CombatantTeam,
     net::ClientMap,
     path::Path,
     state::ShardServerState,
@@ -42,6 +46,7 @@ impl AI {
             return (None, TickMode::Never);
         }
 
+        // Defeat beahviors
         let respawn_time_ms = stats.regen_time * 100;
         let defeat_behaviors = vec![
             CheckAlive::new_node(),
@@ -53,12 +58,12 @@ impl AI {
         ];
         let defeat_selector = SelectorNode::new_node(defeat_behaviors);
 
+        // Movement behaviors
         let mut movement_behaviors = vec![
             FollowAssignedPath::new_node(),
             FollowEntity::new_node(FollowTarget::AssignedEntity, 300, 200, stats.walk_speed),
         ];
-
-        if stats.team == NPCTeam::Mob {
+        if stats.team == CombatantTeam::Mob {
             // stats.ai_type == ???
 
             // Follow combat target
@@ -84,7 +89,30 @@ impl AI {
         }
         let movement_selector = SelectorNode::new_node(movement_behaviors);
 
-        let root = SequenceNode::new_node(vec![defeat_selector, movement_selector]);
+        // Combat behaviors
+        let mut combat_behaviors = vec![];
+        if stats.team == CombatantTeam::Mob {
+            let scan_radius = stats.sight_range;
+            let distance_factor = 0.1;
+            let level_factor = 0.1;
+            let aggro_rates = (
+                1.0 / SHARD_TICKS_PER_SECOND as f32,
+                -0.5 / SHARD_TICKS_PER_SECOND as f32,
+            );
+            let aggro_threshold = 100.0;
+            combat_behaviors.push(ScanForTargets::new_node(
+                Some(CombatantTeam::Friendly),
+                scan_radius,
+                distance_factor,
+                level_factor,
+                aggro_rates,
+                aggro_threshold,
+            ));
+        }
+        let combat_sequence = SequenceNode::new_node(combat_behaviors);
+
+        let root =
+            SequenceNode::new_node(vec![defeat_selector, movement_selector, combat_sequence]);
         let tick_mode = if npc.path.is_some() {
             TickMode::Always
         } else {
@@ -488,5 +516,104 @@ impl AINode for Dead {
             }
         }
         NodeStatus::Running
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ScanForTargets {
+    target_team: Option<CombatantTeam>,
+    scan_radius: u32,
+    distance_factor: f32,
+    level_factor: f32,
+    aggro_rates: (f32, f32),
+    aggro_threshold: f32,
+    aggros: HashMap<EntityID, f32>,
+}
+impl ScanForTargets {
+    fn new_node(
+        target_team: Option<CombatantTeam>,
+        scan_radius: u32,
+        distance_factor: f32,
+        level_factor: f32,
+        aggro_rates: (f32, f32),
+        aggro_threshold: f32,
+    ) -> Box<dyn AINode> {
+        Box::new(Self {
+            target_team,
+            scan_radius,
+            distance_factor,
+            level_factor,
+            aggro_rates,
+            aggro_threshold,
+            aggros: HashMap::new(),
+        })
+    }
+}
+impl AINode for ScanForTargets {
+    fn clone_node(&self) -> Box<dyn AINode> {
+        Box::new(self.clone())
+    }
+
+    fn tick(
+        &mut self,
+        npc: &mut NPC,
+        state: &mut ShardServerState,
+        _clients: &mut ClientMap,
+        _time: &SystemTime,
+    ) -> NodeStatus {
+        if npc.target_id.is_some() {
+            return NodeStatus::Success;
+        }
+
+        // gain aggro
+        let aggro_up_rate = self.aggro_rates.0;
+        for eid in state.entity_map.get_around_entity(npc.get_id()) {
+            let entity = state.entity_map.get_from_id(eid).unwrap();
+            let cb = match entity.as_combatant() {
+                Some(cb) => cb,
+                None => continue,
+            };
+
+            let distance = cb.get_position().distance_to(&npc.get_position());
+            if distance > self.scan_radius {
+                continue;
+            }
+
+            let cb_team = cb.get_team();
+            let is_opponent = match self.target_team {
+                Some(team) => cb_team == team,
+                None => cb_team != npc.get_team(),
+            };
+            if !is_opponent {
+                continue;
+            }
+
+            // level difference
+            let level_diff = (npc.get_level() - cb.get_level()) as f32;
+            let level_diff_up = level_diff * self.level_factor;
+            // distance difference
+            let distance_diff = distance as f32;
+            let distance_diff_up = distance_diff * self.distance_factor;
+            // total
+            let scale = cb.get_aggro_factor();
+            let aggro_up = (aggro_up_rate + level_diff_up + distance_diff_up) * scale;
+
+            let aggro = self.aggros.entry(eid).or_insert(0.0);
+            *aggro += aggro_up;
+            if *aggro >= self.aggro_threshold {
+                npc.target_id = Some(eid);
+                self.aggros.clear();
+                return NodeStatus::Success;
+            }
+        }
+
+        // lose aggro
+        let aggro_down_rate = self.aggro_rates.1;
+        self.aggros.retain(|_, aggro| {
+            *aggro += aggro_down_rate;
+            *aggro >= 0.0
+        });
+
+        NodeStatus::Failure
     }
 }

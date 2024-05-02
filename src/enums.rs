@@ -68,7 +68,7 @@ ffenum!(TargetSearchBy, i32, {
     PlayerUID = 2,
 });
 
-ffenum!(NPCTeam, i32, {
+ffenum!(CombatantTeam, i32, {
     Unknown = 0,
     Friendly = 1,
     Mob = 2,

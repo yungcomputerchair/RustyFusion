@@ -7,6 +7,7 @@ use crate::{
     chunk::{ChunkCoords, InstanceID},
     defines::RANGE_INTERACT,
     entity::{Combatant, Entity, EntityID},
+    enums::CombatantTeam,
     error::FFResult,
     net::{
         packet::{
@@ -214,6 +215,14 @@ impl Entity for NPC {
     }
 
     fn as_combatant(&self) -> Option<&dyn Combatant> {
+        let stats = tdata_get().get_npc_stats(self.ty).unwrap();
+        if stats.ai_type == 0 {
+            // to reduce calculations in downstream code,
+            // we don't consider NPCs with no AI as combatants.
+            // we check the stats instead of self.ai since the
+            // AI object is taken out during tick.
+            return None;
+        }
         Some(self)
     }
 
@@ -246,6 +255,19 @@ impl Combatant for NPC {
     fn get_max_hp(&self) -> i32 {
         let stats = tdata_get().get_npc_stats(self.ty).unwrap();
         stats.max_hp as i32
+    }
+
+    fn get_team(&self) -> CombatantTeam {
+        let stats = tdata_get().get_npc_stats(self.ty).unwrap();
+        stats.team
+    }
+
+    fn get_aggro_factor(&self) -> f32 {
+        if self.invulnerable {
+            0.0
+        } else {
+            1.0
+        }
     }
 
     fn is_dead(&self) -> bool {
