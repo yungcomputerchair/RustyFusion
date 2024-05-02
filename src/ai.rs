@@ -77,15 +77,17 @@ impl AI {
             ));
 
             // Roam around spawn
-            let roam_radius_max = stats.idle_range / 2;
-            let roam_radius_range = (roam_radius_max / 2, roam_radius_max);
-            let roam_delay_max_ms = stats.delay_time * 1000;
-            let roam_delay_range_ms = (roam_delay_max_ms / 2, roam_delay_max_ms);
-            movement_behaviors.push(RandomRoamAround::new_node(
-                npc.get_position(),
-                roam_radius_range,
-                roam_delay_range_ms,
-            ));
+            if stats.idle_range > 0 {
+                let roam_radius_max = stats.idle_range / 2;
+                let roam_radius_range = (roam_radius_max / 2, roam_radius_max);
+                let roam_delay_max_ms = stats.delay_time * 1000;
+                let roam_delay_range_ms = (roam_delay_max_ms / 2, roam_delay_max_ms);
+                movement_behaviors.push(RandomRoamAround::new_node(
+                    npc.get_position(),
+                    roam_radius_range,
+                    roam_delay_range_ms,
+                ));
+            }
         }
         let movement_selector = SelectorNode::new_node(movement_behaviors);
 
