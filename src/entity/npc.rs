@@ -32,6 +32,7 @@ pub struct NPC {
     hp: i32,
     pub target_id: Option<EntityID>,
     pub invulnerable: bool,
+    pub retreating: bool,
     pub instance_id: InstanceID,
     pub follower_ids: HashSet<i32>,
     pub leader_id: Option<i32>,
@@ -59,6 +60,7 @@ impl NPC {
             hp: stats.max_hp as i32,
             target_id: None,
             invulnerable: false,
+            retreating: false,
             instance_id,
             follower_ids: HashSet::new(),
             leader_id: None,
@@ -275,7 +277,7 @@ impl Combatant for NPC {
     }
 
     fn take_damage(&mut self, damage: i32, source: EntityID) -> i32 {
-        if self.invulnerable {
+        if self.invulnerable || self.retreating {
             return 0;
         }
 

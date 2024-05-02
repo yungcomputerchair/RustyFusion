@@ -48,15 +48,11 @@ impl AI {
 
         // Defeat beahviors
         let respawn_time_ms = stats.regen_time * 100;
-        let defeat_behaviors = vec![
-            CheckAlive::new_node(),
-            Dead::new_node(
-                npc.get_position(),
-                Duration::from_millis(DECHUNK_DELAY_MS),
-                Duration::from_millis(respawn_time_ms),
-            ),
-        ];
-        let defeat_selector = SelectorNode::new_node(defeat_behaviors);
+        let defeat_check = CheckDead::new_node(
+            npc.get_position(),
+            Duration::from_millis(DECHUNK_DELAY_MS),
+            Duration::from_millis(respawn_time_ms),
+        );
 
         // Movement behaviors
         let mut movement_behaviors = vec![
@@ -113,8 +109,7 @@ impl AI {
         }
         let combat_sequence = SequenceNode::new_node(combat_behaviors);
 
-        let root =
-            SequenceNode::new_node(vec![defeat_selector, movement_selector, combat_sequence]);
+        let root = SequenceNode::new_node(vec![defeat_check, movement_selector, combat_sequence]);
         let tick_mode = if npc.path.is_some() {
             TickMode::Always
         } else {
@@ -412,35 +407,8 @@ impl AINode for RandomRoamAround {
 }
 
 #[derive(Debug, Clone)]
-struct CheckAlive {}
-impl CheckAlive {
-    fn new_node() -> Box<dyn AINode> {
-        Box::new(Self {})
-    }
-}
-impl AINode for CheckAlive {
-    fn clone_node(&self) -> Box<dyn AINode> {
-        Box::new(self.clone())
-    }
-
-    fn tick(
-        &mut self,
-        npc: &mut NPC,
-        _state: &mut ShardServerState,
-        _clients: &mut ClientMap,
-        _time: &SystemTime,
-    ) -> NodeStatus {
-        if npc.as_combatant().is_some_and(|cb| cb.is_dead()) {
-            NodeStatus::Failure
-        } else {
-            NodeStatus::Success
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
 enum DeadState {
-    Init,
+    Alive,
     Dying(SystemTime),
     Dead(SystemTime),
     PermaDead,
@@ -448,13 +416,13 @@ enum DeadState {
 }
 
 #[derive(Debug, Clone)]
-struct Dead {
+struct CheckDead {
     spawn_pos: Position,
     dechunk_after: Duration,
     respawn_after: Duration,
     dead_state: DeadState,
 }
-impl Dead {
+impl CheckDead {
     fn new_node(
         spawn_pos: Position,
         dechunk_after: Duration,
@@ -464,11 +432,11 @@ impl Dead {
             spawn_pos,
             dechunk_after,
             respawn_after,
-            dead_state: DeadState::Init,
+            dead_state: DeadState::Alive,
         })
     }
 }
-impl AINode for Dead {
+impl AINode for CheckDead {
     fn clone_node(&self) -> Box<dyn AINode> {
         Box::new(self.clone())
     }
@@ -481,7 +449,10 @@ impl AINode for Dead {
         time: &SystemTime,
     ) -> NodeStatus {
         match self.dead_state {
-            DeadState::Init => {
+            DeadState::Alive => {
+                if !npc.is_dead() {
+                    return NodeStatus::Success;
+                }
                 let dechunk_time = *time + self.dechunk_after;
                 self.dead_state = DeadState::Dying(dechunk_time);
             }
@@ -506,14 +477,14 @@ impl AINode for Dead {
             }
             DeadState::PermaDead => {}
             DeadState::Done => {
-                // N.B. can't do this in the previous state
-                // because the NPC state doesn't get saved until
-                // after the tick
+                // N.B. can't do this in the Dead state
+                // because the NPC state doesn't get written
+                // to the entity map until after the tick
                 let chunk_pos = npc.get_chunk_coords();
                 state
                     .entity_map
                     .update(npc.get_id(), Some(chunk_pos), Some(clients));
-                self.dead_state = DeadState::Init;
+                self.dead_state = DeadState::Alive;
                 return NodeStatus::Success;
             }
         }
