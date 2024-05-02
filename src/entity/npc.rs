@@ -292,6 +292,7 @@ impl Combatant for NPC {
 
     fn reset(&mut self) {
         self.target_id = None;
+        self.retreating = false;
         self.hp = self.get_max_hp();
     }
 }

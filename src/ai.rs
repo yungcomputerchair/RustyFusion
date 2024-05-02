@@ -59,13 +59,19 @@ impl AI {
             FollowAssignedPath::new_node(),
             FollowEntity::new_node(FollowTarget::AssignedEntity, 300, 200, stats.walk_speed),
         ];
-        if stats.team == CombatantTeam::Mob {
+        if npc.as_combatant().is_some() && stats.team == CombatantTeam::Mob {
             // stats.ai_type == ???
+            let mut mob_movement_behaviors = Vec::new();
+
+            // Retreat if needed
+            let retreat_threshold = stats.combat_range;
+            let retreat_to = npc.get_position();
+            mob_movement_behaviors.push(CheckRetreat::new_node(retreat_to, retreat_threshold));
 
             // Follow combat target
             let stay_within_range = stats.attack_range + stats.radius;
             let following_distance = stats.radius;
-            movement_behaviors.push(FollowEntity::new_node(
+            mob_movement_behaviors.push(FollowEntity::new_node(
                 FollowTarget::CombatTarget,
                 stay_within_range,
                 following_distance,
@@ -78,12 +84,15 @@ impl AI {
                 let roam_radius_range = (roam_radius_max / 2, roam_radius_max);
                 let roam_delay_max_ms = stats.delay_time * 1000;
                 let roam_delay_range_ms = (roam_delay_max_ms / 2, roam_delay_max_ms);
-                movement_behaviors.push(RandomRoamAround::new_node(
+                mob_movement_behaviors.push(RandomRoamAround::new_node(
                     npc.get_position(),
                     roam_radius_range,
                     roam_delay_range_ms,
                 ));
             }
+
+            let mob_movement_selector = SelectorNode::new_node(mob_movement_behaviors);
+            movement_behaviors.push(mob_movement_selector);
         }
         let movement_selector = SelectorNode::new_node(movement_behaviors);
 
@@ -588,5 +597,85 @@ impl AINode for ScanForTargets {
         });
 
         NodeStatus::Failure
+    }
+}
+
+#[derive(Debug, Clone)]
+enum RetreatState {
+    Idle,
+    Retreating(Path),
+}
+
+#[derive(Debug, Clone)]
+struct CheckRetreat {
+    retreat_to: Position,
+    retreat_threshold: u32,
+    retreat_state: RetreatState,
+}
+impl CheckRetreat {
+    fn new_node(retreat_to: Position, retreat_threshold: u32) -> Box<dyn AINode> {
+        Box::new(Self {
+            retreat_to,
+            retreat_threshold,
+            retreat_state: RetreatState::Idle,
+        })
+    }
+}
+impl AINode for CheckRetreat {
+    fn clone_node(&self) -> Box<dyn AINode> {
+        Box::new(self.clone())
+    }
+
+    fn tick(
+        &mut self,
+        npc: &mut NPC,
+        state: &mut ShardServerState,
+        clients: &mut ClientMap,
+        _time: &SystemTime,
+    ) -> NodeStatus {
+        match &mut self.retreat_state {
+            RetreatState::Idle => {
+                let target_id = match npc.target_id {
+                    Some(target_id) => target_id,
+                    None => return NodeStatus::Success, // no target
+                };
+
+                let should_retreat = match state.entity_map.get_from_id(target_id) {
+                    Some(target) => {
+                        let cb = target.as_combatant().unwrap();
+                        cb.is_dead() // target dead
+                        // or not aggroable
+                        || cb.get_aggro_factor() <= 0.0
+                        // or we've gone too far
+                        || npc.get_position()
+                            .distance_to(&self.retreat_to) > self.retreat_threshold
+                    }
+                    None => true, // target gone
+                };
+
+                if should_retreat {
+                    let speed = tdata_get().get_npc_stats(npc.ty).unwrap().run_speed * 2;
+                    let mut path = Path::new_single(self.retreat_to, speed);
+                    path.start();
+                    self.retreat_state = RetreatState::Retreating(path);
+                    npc.retreating = true;
+                    NodeStatus::Running
+                } else {
+                    // actively in combat
+                    NodeStatus::Failure
+                }
+            }
+            RetreatState::Retreating(path) => {
+                npc.tick_movement_along_path(path, clients, state);
+                if path.is_done() {
+                    self.retreat_state = RetreatState::Idle;
+                    npc.reset();
+                    // TODO full heal effect
+                    NodeStatus::Success
+                } else {
+                    NodeStatus::Running
+                }
+            }
+        }
     }
 }
