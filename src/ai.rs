@@ -573,9 +573,9 @@ impl AINode for ScanForTargets {
             // level difference
             let level_diff = (npc.get_level() - cb.get_level()) as f32;
             let level_diff_up = level_diff * self.level_factor;
-            // distance difference
-            let distance_diff = distance as f32;
-            let distance_diff_up = distance_diff * self.distance_factor;
+            // distance difference (normalized; edge of radius = 0, center = 1)
+            let distance_diff_rel = distance as f32 / self.scan_radius as f32;
+            let distance_diff_up = (1.0 - distance_diff_rel) * self.distance_factor;
             // total
             let scale = cb.get_aggro_factor();
             let aggro_up = (aggro_up_rate + level_diff_up + distance_diff_up) * scale;
