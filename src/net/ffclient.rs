@@ -40,15 +40,126 @@ pub enum ClientType {
     ShardServer(i32),
 }
 
+#[derive(Clone)]
+pub struct PacketBuffer {
+    buf: [u8; PACKET_BUFFER_SIZE],
+    ptr: usize,
+    len: usize,
+}
+impl Default for PacketBuffer {
+    fn default() -> Self {
+        Self {
+            buf: [0; PACKET_BUFFER_SIZE],
+            ptr: 0,
+            len: 0,
+        }
+    }
+}
+impl PacketBuffer {
+    pub fn reset(&mut self) {
+        self.buf.fill(0);
+        self.ptr = 0;
+        self.len = 0;
+    }
+
+    // READ
+
+    pub fn peek_packet_id(&self) -> FFResult<PacketID> {
+        let from = self.ptr;
+        let to = from + 4;
+        if to > self.len {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Couldn't peek packet ID; not enough bytes came in: {} > {}",
+                    to, self.len
+                ),
+            ));
+        }
+
+        let id_ord = u32::from_le_bytes(self.buf[from..to].try_into().unwrap());
+        let id: FFResult<PacketID> = id_ord.try_into();
+        id.map_err(|_| FFError::build(Severity::Warning, format!("Bad packet ID: {}", id_ord)))
+    }
+
+    pub fn get_packet<T: FFPacket>(&mut self, pkt_id: PacketID) -> FFResult<&T> {
+        let buffered_pkt_id = self.peek_packet_id()?;
+        assert_eq!(
+            buffered_pkt_id, pkt_id,
+            "Tried to fetch packet {:?} != buffered {:?}",
+            pkt_id, buffered_pkt_id
+        );
+        self.ptr += 4;
+        let pkt = self.get_struct_internal(!SILENCED_PACKETS.contains(&pkt_id))?;
+        Ok(pkt)
+    }
+
+    pub fn get_struct<T: FFPacket>(&mut self) -> FFResult<&T> {
+        self.get_struct_internal(true)
+    }
+
+    fn get_struct_internal<T: FFPacket>(&mut self, log_struct: bool) -> FFResult<&T> {
+        let sz: usize = size_of::<T>();
+        let from = self.ptr;
+        let to = from + sz;
+        if to > self.len {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Bad struct read; not enough bytes came in: {} < {}",
+                    self.len, to
+                ),
+            ));
+        }
+
+        let buf: &[u8] = &self.buf[from..to];
+        let s = unsafe { bytes_to_struct(buf) };
+        self.ptr += sz;
+
+        if log_struct {
+            log(Severity::Debug, &format!("{:#?}", s));
+        }
+
+        Ok(s)
+    }
+
+    // WRITE
+
+    pub fn queue_packet<T: FFPacket>(&mut self, pkt_id: PacketID, pkt: &T) {
+        // add the packet ID and contents
+        let id_buf = (pkt_id as u32).to_le_bytes();
+        self.copy_to_buf(&id_buf);
+        self.queue_struct(pkt);
+    }
+
+    pub fn queue_struct<T: FFPacket>(&mut self, s: &T) {
+        let struct_buf = unsafe { struct_to_bytes(s) };
+        self.copy_to_buf(struct_buf);
+    }
+
+    fn copy_to_buf(&mut self, dat: &[u8]) {
+        let sz = dat.len();
+        let from = self.ptr;
+        let to = from + sz;
+        if to > self.buf.len() {
+            panic_log(&format!(
+                "Payload too big for output ({} > {})",
+                sz,
+                self.buf.len()
+            ));
+        }
+
+        self.buf[from..to].copy_from_slice(dat);
+        self.ptr = to;
+    }
+}
+
 pub struct FFClient {
     pub sock: TcpStream,
     addr: SocketAddr,
     waiting_data_len: Option<usize>,
-    in_buf: [u8; PACKET_BUFFER_SIZE],
-    in_buf_ptr: usize,
-    in_data_len: usize,
-    out_buf: [u8; PACKET_BUFFER_SIZE],
-    out_buf_ptr: usize,
+    in_buf: PacketBuffer,
+    out_buf: PacketBuffer,
     pub e_key: [u8; CRYPTO_KEY_SIZE],
     pub fe_key: [u8; CRYPTO_KEY_SIZE],
     pub enc_mode: EncryptionMode,
@@ -66,11 +177,8 @@ impl FFClient {
             sock: conn_data.0,
             addr: conn_data.1,
             waiting_data_len: None,
-            in_buf: [0; PACKET_BUFFER_SIZE],
-            in_buf_ptr: 0,
-            in_data_len: 0,
-            out_buf: [0; PACKET_BUFFER_SIZE],
-            out_buf_ptr: 0,
+            in_buf: PacketBuffer::default(),
+            out_buf: PacketBuffer::default(),
             e_key: default_key,
             fe_key: default_key,
             enc_mode: EncryptionMode::EKey,
@@ -171,62 +279,15 @@ impl FFClient {
     }
 
     pub fn peek_packet_id(&self) -> FFResult<PacketID> {
-        let from = self.in_buf_ptr;
-        let to = from + 4;
-        if to > self.in_data_len {
-            return Err(FFError::build(
-                Severity::Warning,
-                format!(
-                    "Couldn't peek packet ID; not enough bytes came in: {} > {}",
-                    to, self.in_data_len
-                ),
-            ));
-        }
-
-        let id_ord = u32::from_le_bytes(self.in_buf[from..to].try_into().unwrap());
-        let id: FFResult<PacketID> = id_ord.try_into();
-        id.map_err(|_| FFError::build(Severity::Warning, format!("Bad packet ID: {}", id_ord)))
+        self.in_buf.peek_packet_id()
     }
 
     pub fn get_packet<T: FFPacket>(&mut self, pkt_id: PacketID) -> FFResult<&T> {
-        let buffered_pkt_id = self.peek_packet_id()?;
-        assert_eq!(
-            buffered_pkt_id, pkt_id,
-            "Tried to fetch packet {:?} != buffered {:?}",
-            pkt_id, buffered_pkt_id
-        );
-        self.in_buf_ptr += 4;
-        let pkt = self.get_struct_internal(!SILENCED_PACKETS.contains(&pkt_id))?;
-        Ok(pkt)
+        self.in_buf.get_packet(pkt_id)
     }
 
     pub fn get_struct<T: FFPacket>(&mut self) -> FFResult<&T> {
-        self.get_struct_internal(true)
-    }
-
-    fn get_struct_internal<T: FFPacket>(&mut self, log_struct: bool) -> FFResult<&T> {
-        let sz: usize = size_of::<T>();
-        let from = self.in_buf_ptr;
-        let to = from + sz;
-        if to > self.in_data_len {
-            return Err(FFError::build(
-                Severity::Warning,
-                format!(
-                    "Bad struct read; not enough bytes came in: {} < {}",
-                    self.in_data_len, to
-                ),
-            ));
-        }
-
-        let buf: &[u8] = &self.in_buf[from..to];
-        let s = unsafe { bytes_to_struct(buf) };
-        self.in_buf_ptr += sz;
-
-        if log_struct {
-            log(Severity::Debug, &format!("{:#?}", s));
-        }
-
-        Ok(s)
+        self.in_buf.get_struct()
     }
 
     pub fn read_payload(&mut self) -> FFResult<()> {
@@ -255,11 +316,11 @@ impl FFClient {
         }
 
         // read the packet
-        let buf: &mut [u8] = &mut self.in_buf[..sz];
+        let buf: &mut [u8] = &mut self.in_buf.buf[..sz];
         self.sock.read_exact(buf).map_err(FFError::from_io_err)?;
         self.waiting_data_len = None;
-        self.in_buf_ptr = 0;
-        self.in_data_len = sz;
+        self.in_buf.ptr = 0;
+        self.in_buf.len = sz;
 
         // decrypt the packet (client always encrypts with E key)
         decrypt_payload(buf, &self.e_key);
@@ -271,7 +332,7 @@ impl FFClient {
         // we need to set the data length to 0 to "empty" the buffer.
         // we also need to return an error so the caller doesn't fire the packet handler.
         if self.ignore_packets || !self.can_send_packet(id) {
-            self.in_data_len = 0;
+            self.in_buf.len = 0;
             return Err(FFError::build(
                 Severity::Warning,
                 format!("Ignoring {:?} from {:?}", id, self.client_type),
@@ -288,7 +349,7 @@ impl FFClient {
     }
 
     pub fn flush(&mut self) -> FFResult<()> {
-        let sz: usize = self.out_buf_ptr; // everything buffered
+        let sz: usize = self.out_buf.ptr; // everything buffered
         self.flush_exact(sz)
     }
 
@@ -300,7 +361,7 @@ impl FFClient {
         let sz_buf: [u8; 4] = u32::to_le_bytes(sz as u32);
         self.sock.write_all(&sz_buf).map_err(FFError::from_io_err)?;
 
-        let send_buf = &mut self.out_buf[..sz];
+        let send_buf = &mut self.out_buf.buf[..sz];
 
         // encrypt the payload (client decrypts with either E or FE key)
         match self.enc_mode {
@@ -313,40 +374,25 @@ impl FFClient {
             .write_all(send_buf)
             .map_err(FFError::from_io_err)?;
 
-        self.out_buf.fill(0);
-        self.out_buf_ptr = 0;
+        self.out_buf.reset();
         Ok(())
     }
 
+    pub fn send_payload(&mut self, payload: PacketBuffer) -> FFResult<()> {
+        self.out_buf = payload;
+        self.flush()
+    }
+
     pub fn send_packet<T: FFPacket>(&mut self, pkt_id: PacketID, pkt: &T) -> FFResult<()> {
-        self.queue_packet(pkt_id, pkt);
+        self.out_buf.queue_packet(pkt_id, pkt);
         self.flush()
     }
 
     pub fn queue_packet<T: FFPacket>(&mut self, pkt_id: PacketID, pkt: &T) {
-        // add the packet ID and contents
-        let id_buf = (pkt_id as u32).to_le_bytes();
-        self.copy_to_buf(&id_buf);
-        self.queue_struct(pkt);
+        self.out_buf.queue_packet(pkt_id, pkt);
     }
 
     pub fn queue_struct<T: FFPacket>(&mut self, s: &T) {
-        let struct_buf = unsafe { struct_to_bytes(s) };
-        self.copy_to_buf(struct_buf);
-    }
-
-    fn copy_to_buf(&mut self, dat: &[u8]) {
-        let sz = dat.len();
-        let from = self.out_buf_ptr;
-        let to = from + sz;
-        if to > PACKET_BUFFER_SIZE {
-            panic_log(&format!(
-                "Payload too big for output ({} > {})",
-                sz, PACKET_BUFFER_SIZE
-            ));
-        }
-
-        self.out_buf[from..to].copy_from_slice(dat);
-        self.out_buf_ptr = to;
+        self.out_buf.queue_struct(s);
     }
 }
