@@ -57,11 +57,13 @@ impl AI {
         );
 
         // Movement behaviors
-        let mut movement_behaviors = vec![
+        let base_movement_behaviors = vec![
             FollowAssignedPath::new_node(),
             FollowEntity::new_node(FollowTarget::AssignedEntity, 300, 200, stats.walk_speed),
         ];
-        if npc.as_combatant().is_some() && stats.team == CombatantTeam::Mob {
+        let base_movement_selector = SelectorNode::new_node(base_movement_behaviors);
+        let movement_selector = if npc.as_combatant().is_some() && stats.team == CombatantTeam::Mob
+        {
             // stats.ai_type == ???
             let mut mob_movement_behaviors = Vec::new();
 
@@ -80,6 +82,9 @@ impl AI {
                 stats.run_speed,
             ));
 
+            // Base movement behaviors
+            mob_movement_behaviors.push(base_movement_selector);
+
             // Roam around spawn
             if stats.idle_range > 0 {
                 let roam_radius_max = stats.idle_range / 2;
@@ -93,10 +98,10 @@ impl AI {
                 ));
             }
 
-            let mob_movement_selector = SelectorNode::new_node(mob_movement_behaviors);
-            movement_behaviors.push(mob_movement_selector);
-        }
-        let movement_selector = SelectorNode::new_node(movement_behaviors);
+            SelectorNode::new_node(mob_movement_behaviors)
+        } else {
+            base_movement_selector
+        };
 
         // Combat behaviors
         let mut combat_behaviors = vec![];
