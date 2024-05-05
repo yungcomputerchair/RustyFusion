@@ -11,8 +11,8 @@ use crate::{
     defines::*,
     entity::{Combatant, Entity, EntityID},
     enums::{
-        CombatantTeam, ItemLocation, ItemType, PlayerGuide, PlayerShardStatus, RewardCategory,
-        RewardType, RideType, TaskType,
+        CharType, CombatantTeam, ItemLocation, ItemType, PlayerGuide, PlayerShardStatus,
+        RewardCategory, RewardType, RideType, TaskType,
     },
     error::{codes, log, log_if_failed, panic_log, FFError, FFResult, Severity},
     item::Item,
@@ -1435,6 +1435,10 @@ impl Combatant for Player {
 
     fn get_team(&self) -> CombatantTeam {
         CombatantTeam::Friendly
+    }
+
+    fn get_char_type(&self) -> CharType {
+        CharType::Player
     }
 
     fn get_aggro_factor(&self) -> f32 {

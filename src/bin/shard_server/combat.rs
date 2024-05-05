@@ -5,12 +5,12 @@ use rusty_fusion::{
     defines::RANGE_GROUP_PARTICIPATE,
     entity::{Combatant, Entity, EntityID, Player},
     enums::{ItemLocation, ItemType},
-    error::{log, log_error, log_if_failed, FFResult, Severity},
+    error::{log, log_error, log_if_failed, FFError, FFResult, Severity},
     net::{
         packet::{PacketID::*, *},
         ClientMap,
     },
-    placeholder,
+    placeholder, skills,
     state::ShardServerState,
     tabledata::tdata_get,
     unused,
@@ -27,67 +27,50 @@ struct sTargetNpcId {
 impl FFPacket for sTargetNpcId {}
 
 pub fn pc_attack_npcs(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    const MAX_TARGETS: usize = 4;
+
     let mut rng = thread_rng();
 
     let client = clients.get_self();
     let pc_id = client.get_player_id()?;
     let pkt: sP_CL2FE_REQ_PC_ATTACK_NPCs = *client.get_packet(P_CL2FE_REQ_PC_ATTACK_NPCs)?;
-    let attack_count = if pkt.iNPCCnt > 4 {
-        log(
+    let target_count = pkt.iNPCCnt as usize;
+    if target_count == 0 {
+        return Ok(());
+    }
+    if target_count > MAX_TARGETS {
+        return Err(FFError::build(
             Severity::Warning,
-            &format!(
-                "Player {} tried to attack {} NPCs at once",
-                pc_id, pkt.iNPCCnt
+            format!(
+                "Player {} tried to attack {} NPCs (max {})",
+                pc_id, pkt.iNPCCnt, MAX_TARGETS
             ),
-        );
-        4
-    } else {
-        pkt.iNPCCnt as usize
-    };
+        ));
+    }
 
-    let mut attack_results = Vec::with_capacity(attack_count);
     let mut defeated_types = HashMap::new();
-    for _ in 0..pkt.iNPCCnt {
-        let target_id = client.get_struct::<sTargetNpcId>()?.iNPC_ID;
-        let Ok(target) = state.get_npc_mut(target_id) else {
-            log(
-                Severity::Warning,
-                &format!("Attacked NPC {} not found", target_id),
-            );
-            continue;
-        };
-        // TODO proper implementation. This is stubbed to just kill the NPC for mission testing
-        let damage = placeholder!(target.get_max_hp() / 3);
-        let dealt = target.take_damage(damage, EntityID::Player(pc_id));
-        let result = sAttackResult {
-            eCT: placeholder!(4),
-            iID: target_id,
-            bProtected: unused!(),
-            iDamage: dealt,
-            iHP: target.get_hp(),
-            iHitFlag: placeholder!(1),
-        };
-        attack_results.push(result);
-        if target.is_dead() {
-            defeated_types
-                .entry(target.ty)
-                .and_modify(|count| *count += 1)
-                .or_insert(1_usize);
+    let mut target_ids = Vec::with_capacity(4);
+    for _ in 0..target_count {
+        let npc_id = client.get_struct::<sTargetNpcId>()?.iNPC_ID;
+        let target_id = EntityID::NPC(npc_id);
+        target_ids.push(target_id);
+    }
+    let attacker_id = EntityID::Player(pc_id);
+    let damage = placeholder!(50);
+    skills::do_basic_attack(attacker_id, &target_ids, damage, state, clients)?;
+
+    // kills
+    for target_id in &target_ids {
+        if let EntityID::NPC(npc_id) = target_id {
+            let npc = state.get_npc(*npc_id).unwrap();
+            if npc.is_dead() {
+                *defeated_types.entry(npc.ty).or_insert(0) += 1;
+            }
         }
     }
 
+    // rewards
     let player = state.get_player_mut(pc_id)?;
-    let resp = sP_FE2CL_PC_ATTACK_NPCs_SUCC {
-        iBatteryW: player.get_weapon_boosts() as i32,
-        iNPCCnt: attack_results.len() as i32,
-    };
-    client.queue_packet(P_FE2CL_PC_ATTACK_NPCs_SUCC, &resp);
-    for result in &attack_results {
-        client.queue_struct(result);
-    }
-    log_if_failed(client.flush());
-
-    // kills
     helpers::give_defeat_rewards(&defeated_types, player, clients, &mut rng);
     if let Some(group_id) = player.group_id {
         let position = player.get_position();
@@ -104,20 +87,6 @@ pub fn pc_attack_npcs(clients: &mut ClientMap, state: &mut ShardServerState) -> 
             }
         }
     }
-
-    let bcast = sP_FE2CL_PC_ATTACK_NPCs {
-        iPC_ID: pc_id,
-        iNPCCnt: attack_results.len() as i32,
-    };
-    state
-        .entity_map
-        .for_each_around(EntityID::Player(pc_id), clients, |c| {
-            c.queue_packet(P_FE2CL_PC_ATTACK_NPCs, &bcast);
-            for result in &attack_results {
-                c.queue_struct(result);
-            }
-            c.flush()
-        });
 
     Ok(())
 }

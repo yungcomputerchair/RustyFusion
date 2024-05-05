@@ -7,7 +7,7 @@ use crate::{
     chunk::{EntityMap, InstanceID, TickMode},
     config::config_get,
     defines::*,
-    entity::{Entity, EntityID, Group, Player, Slider, NPC},
+    entity::{Combatant, Entity, EntityID, Group, Player, Slider, NPC},
     enums::ItemType,
     error::{log, log_if_failed, panic_log, FFError, FFResult, Severity},
     helpers,
@@ -172,6 +172,30 @@ impl ShardServerState {
                 Severity::Warning,
                 format!("Slider with ID {} doesn't exist", slider_id),
             ))
+    }
+
+    pub fn get_combatant(&self, id: EntityID) -> FFResult<&dyn Combatant> {
+        let entity = self.entity_map.get_from_id(id).ok_or(FFError::build(
+            Severity::Warning,
+            format!("Entity with ID {:?} doesn't exist", id),
+        ))?;
+
+        entity.as_combatant().ok_or(FFError::build(
+            Severity::Warning,
+            format!("Entity with ID {:?} isn't a combatant", id),
+        ))
+    }
+
+    pub fn get_combatant_mut(&mut self, id: EntityID) -> FFResult<&mut dyn Combatant> {
+        let entity = self.entity_map.get_from_id_mut(id).ok_or(FFError::build(
+            Severity::Warning,
+            format!("Entity with ID {:?} doesn't exist", id),
+        ))?;
+
+        entity.as_combatant_mut().ok_or(FFError::build(
+            Severity::Warning,
+            format!("Entity with ID {:?} isn't a combatant", id),
+        ))
     }
 
     pub fn check_for_expired_vehicles(&mut self, time: SystemTime, clients: &mut ClientMap) {

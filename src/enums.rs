@@ -74,6 +74,14 @@ ffenum!(CombatantTeam, i32, {
     Mob = 2,
 });
 
+// eCharType.cs
+ffenum!(CharType, i32, 5, {
+    Unknown = 0,
+    Player = 1,
+    NPC = 2,
+    Mob = 3,
+});
+
 // eTaskTypeProperty.cs
 ffenum!(TaskType, i32, 7, {
     Unknown = 0,

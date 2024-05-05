@@ -38,6 +38,7 @@ pub mod item;
 pub mod mission;
 pub mod nano;
 pub mod path;
+pub mod skills;
 pub mod trade;
 
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]

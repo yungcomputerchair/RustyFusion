@@ -7,7 +7,7 @@ use crate::{
     chunk::{ChunkCoords, InstanceID},
     defines::RANGE_INTERACT,
     entity::{Combatant, Entity, EntityID},
-    enums::CombatantTeam,
+    enums::{CharType, CombatantTeam},
     error::FFResult,
     net::{
         packet::{
@@ -137,6 +137,16 @@ impl NPC {
                 });
         }
     }
+
+    fn can_fight(&self) -> bool {
+        // to reduce calculations in downstream code,
+        // we don't consider NPCs with certain AI types combatants.
+        // we check the stats instead of self.ai since the
+        // AI object is taken out during tick.
+        let stats = tdata_get().get_npc_stats(self.ty).unwrap();
+        stats.ai_type != 0 // no npcs without AI
+        && stats.ai_type != 11 // no cars or animals
+    }
 }
 impl Entity for NPC {
     fn get_id(&self) -> EntityID {
@@ -217,18 +227,16 @@ impl Entity for NPC {
     }
 
     fn as_combatant(&self) -> Option<&dyn Combatant> {
-        let stats = tdata_get().get_npc_stats(self.ty).unwrap();
-        if stats.ai_type == 0 {
-            // to reduce calculations in downstream code,
-            // we don't consider NPCs with no AI as combatants.
-            // we check the stats instead of self.ai since the
-            // AI object is taken out during tick.
+        if !self.can_fight() {
             return None;
         }
         Some(self)
     }
 
     fn as_combatant_mut(&mut self) -> Option<&mut dyn Combatant> {
+        if !self.can_fight() {
+            return None;
+        }
         Some(self)
     }
 
@@ -262,6 +270,14 @@ impl Combatant for NPC {
     fn get_team(&self) -> CombatantTeam {
         let stats = tdata_get().get_npc_stats(self.ty).unwrap();
         stats.team
+    }
+
+    fn get_char_type(&self) -> CharType {
+        match self.get_team() {
+            CombatantTeam::Friendly => CharType::NPC,
+            CombatantTeam::Mob => CharType::Mob,
+            _ => CharType::Unknown,
+        }
     }
 
     fn get_aggro_factor(&self) -> f32 {
