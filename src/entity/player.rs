@@ -200,6 +200,16 @@ impl Nanocom {
         }
         bank
     }
+
+    pub fn as_carried(&self) -> [sNano; SIZEOF_NANO_CARRY_SLOT as usize] {
+        let mut carried = [None.into(); SIZEOF_NANO_CARRY_SLOT as usize];
+        for (idx, nano_id) in self.equipped_ids.iter().enumerate() {
+            if let Some(nano_id) = nano_id {
+                carried[idx] = Some(self.nano_inventory.get(nano_id).unwrap().clone()).into();
+            }
+        }
+        carried
+    }
 }
 impl Default for Nanocom {
     fn default() -> Self {
@@ -357,6 +367,7 @@ pub struct Player {
     nano_potions: u32,
     weapon_boosts: u32,
     buddy_warp_time: i32,
+    last_heal_time: Option<SystemTime>,
     transport_data: TransportData,
     pub trade_id: Option<Uuid>,
     pub trade_offered_to: Option<i32>,
@@ -1415,6 +1426,31 @@ impl Player {
             }
         }
     }
+
+    fn tick_regen(&mut self, time: SystemTime) -> bool {
+        const REGEN_INTERVAL: Duration = Duration::from_secs(4);
+
+        if self.in_combat {
+            return false;
+        }
+
+        if self.hp >= self.get_max_hp() {
+            return false;
+        }
+
+        if self
+            .last_heal_time
+            .is_some_and(|t| time.duration_since(t).unwrap_or_default() < REGEN_INTERVAL)
+        {
+            return false;
+        }
+
+        let max_hp = self.get_max_hp();
+        let heal_amt = max_hp / 5;
+        self.hp = clamp_max(self.hp + heal_amt, max_hp);
+        self.last_heal_time = Some(time);
+        true
+    }
 }
 impl Combatant for Player {
     fn get_condition_bit_flag(&self) -> i32 {
@@ -1588,8 +1624,29 @@ impl Entity for Player {
     }
 
     fn tick(&mut self, time: SystemTime, clients: &mut ClientMap, state: &mut ShardServerState) {
+        if self.is_dead() {
+            return;
+        }
+
         self.tick_skyway_ride(time, clients, state);
         self.tick_missions(time, clients, state);
+
+        let transmit = self.tick_regen(time);
+        if !transmit {
+            return;
+        }
+
+        let pkt = sP_FE2CL_REP_PC_TICK {
+            iHP: self.hp,
+            aNano: self.nano_data.as_carried(),
+            iBatteryN: self.nano_potions as i32,
+            bResetMissionFlag: unused!(),
+        };
+        log_if_failed(
+            self.get_client(clients)
+                .unwrap()
+                .send_packet(P_FE2CL_REP_PC_TICK, &pkt),
+        );
     }
 
     fn as_combatant(&self) -> Option<&dyn Combatant> {

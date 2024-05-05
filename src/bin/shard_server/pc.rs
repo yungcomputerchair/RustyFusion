@@ -539,7 +539,7 @@ pub fn pc_combat_begin_end(
     let pc_id = client.get_player_id()?;
 
     let player = state.get_player_mut(pc_id)?;
-    player.in_combat = in_combat;
+    player.in_combat = in_combat; // TODO anticheat
 
     let special_state_flags = player.get_special_state_bit_flag();
 
