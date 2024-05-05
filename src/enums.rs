@@ -120,7 +120,7 @@ ffenum!(ItemLocation, i32, 4, {
     Inven = 1,  /*eIL_Inven*/
     QInven = 2, /*eIL_QInven*/
     Bank = 3,   /*eIL_Bank*/
-                /*eIL__End*/
+    /*eIL__End*/
 });
 
 // eItemType.cs
@@ -153,7 +153,7 @@ ffenum!(TransportationType, i32, {
     Warp = 1,   /*eTT_Warp*/
     Wyvern = 2, /*eTT_Wyvern*/
     Bus = 3,    /*eTT_Bus*/
-                /*eTT__End*/
+    /*eTT__End*/
 });
 
 // eCN_GM_TeleportType.cs
@@ -167,7 +167,19 @@ ffenum!(TeleportType, i32, {
 
 // eRideType.cs
 ffenum!(RideType, i32, 2, {
-    None = 0, /*eRT_None*/
+    None = 0,   /*eRT_None*/
     Wyvern = 1, /*eRT_Wyvern*/
-              /*eRT__End*/
+    /*eRT__End*/
+});
+
+// ePCRegenType.cs
+ffenum!(PCRegenType, i32, 7, {
+    None = 0,               /*ePCRegenType_None*/
+    Xcom = 1,               /*ePCRegenType_Xcom*/
+    Here = 2,               /*ePCRegenType_Here*/
+    HereByPhoenix = 3,      /*ePCRegenType_HereByPhoenix*/
+    HereByPhoenixGroup = 4, /*ePCRegenType_HereByPhoenixGroup*/
+    Unstick = 5,            /*ePCRegenType_Unstick*/
+    HereByPhoenixItem = 6,  /*ePCRegenType_HereByPhoenixItem*/
+    /* ePCRegenType__End */
 });

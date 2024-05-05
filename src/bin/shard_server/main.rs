@@ -236,6 +236,7 @@ fn handle_packet(
         P_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH => pc::pc_special_state_switch(&mut clients, state),
         P_CL2FE_REQ_PC_COMBAT_BEGIN => pc::pc_combat_begin_end(&mut clients, state, true),
         P_CL2FE_REQ_PC_COMBAT_END => pc::pc_combat_begin_end(&mut clients, state, false),
+        P_CL2FE_REQ_PC_REGEN => pc::pc_regen(&mut clients, state),
         P_CL2FE_REQ_PC_FIRST_USE_FLAG_SET => pc::pc_first_use_flag_set(clients.get_self(), state),
         P_CL2FE_REQ_PC_CHANGE_MENTOR => pc::pc_change_mentor(clients.get_self(), state),
         P_CL2FE_REQ_PC_EXIT => pc::pc_exit(&mut clients, state),

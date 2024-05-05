@@ -1,4 +1,4 @@
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use rusty_fusion::{
     chunk::{TickMode, MAP_SQUARE_SIZE},
@@ -552,6 +552,100 @@ pub fn pc_combat_begin_end(
         .entity_map
         .for_each_around(EntityID::Player(pc_id), clients, |c| {
             c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp)
+        });
+    Ok(())
+}
+
+fn get_respawn_point(pos: Position, map_num: u32) -> Position {
+    let respawn_pos = tdata_get().get_nearest_respawn_point(pos, map_num);
+    respawn_pos.unwrap_or_else(|| {
+        log(
+            Severity::Warning,
+            &format!("Couldn't find a respawn point in map {}", map_num),
+        );
+        pos
+    })
+}
+
+pub fn pc_regen(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    const WARP_AWAY_COOLDOWN: Duration = Duration::from_secs(60);
+
+    let client = clients.get_self();
+    let pc_id = client.get_player_id()?;
+    let pkt: &sP_CL2FE_REQ_PC_REGEN = client.get_packet(P_CL2FE_REQ_PC_REGEN)?;
+    let revive_type: PCRegenType = pkt.iRegenType.try_into()?;
+
+    let player = state.get_player_mut(pc_id)?;
+    let new_chunk_coords = match revive_type {
+        PCRegenType::Xcom => {
+            if !player.is_dead() {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!("{} tried to revive while not dead", player),
+                ));
+            }
+            player.set_position(get_respawn_point(
+                player.get_position(),
+                player.instance_id.map_num,
+            ));
+            Some(player.get_chunk_coords())
+        }
+        PCRegenType::HereByPhoenix => todo!(),
+        PCRegenType::HereByPhoenixGroup => todo!(),
+        PCRegenType::Unstick => {
+            // check warp away timer
+            if let Some(last_warp_away) = player.last_warp_away_time {
+                let time_now = SystemTime::now();
+                if time_now.duration_since(last_warp_away).unwrap_or_default() < WARP_AWAY_COOLDOWN
+                {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!("{} tried to warp away too soon", player),
+                    ));
+                } else {
+                    player.last_warp_away_time = Some(time_now);
+                }
+            }
+
+            player.set_position(get_respawn_point(
+                player.get_position(),
+                player.instance_id.map_num,
+            ));
+            Some(player.get_chunk_coords())
+        }
+        other => {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Unsupported regen type: {:?}", other),
+            ));
+        }
+    };
+    player.do_revive();
+
+    let (regen_data, regen_data_bcast) = player.get_regen_data();
+
+    let resp = sP_FE2CL_REP_PC_REGEN_SUCC {
+        PCRegenData: regen_data,
+        iFusionMatter: player.get_fusion_matter() as i32,
+        // we do NOT want the client to do GC. this is because we re-chunk the player serverside.
+        // we can't de-chunk and wait for the client to ask for re-chunking because the player
+        // might be in an instance that would get cleaned up prematurely.
+        bMoveLocation: 0,
+    };
+    log_if_failed(client.send_packet(P_FE2CL_REP_PC_REGEN_SUCC, &resp));
+    if let Some(new_chunk) = new_chunk_coords {
+        state
+            .entity_map
+            .update(EntityID::Player(pc_id), Some(new_chunk), Some(clients));
+    }
+
+    let bcast = sP_FE2CL_PC_REGEN {
+        PCRegenDataForOtherPC: regen_data_bcast,
+    };
+    state
+        .entity_map
+        .for_each_around(EntityID::Player(pc_id), clients, |c| {
+            c.send_packet(P_FE2CL_PC_REGEN, &bcast)
         });
     Ok(())
 }

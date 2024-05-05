@@ -368,6 +368,7 @@ pub struct Player {
     weapon_boosts: u32,
     buddy_warp_time: i32,
     last_heal_time: Option<SystemTime>,
+    pub last_warp_away_time: Option<SystemTime>,
     transport_data: TransportData,
     pub trade_id: Option<Uuid>,
     pub trade_offered_to: Option<i32>,
@@ -600,6 +601,34 @@ impl Player {
             iFirstUseFlag2: (self.flags.tip_flags >> 64) as i64,
             aiPCSkill: [unused!(); 33],
         }
+    }
+
+    pub fn get_regen_data(&self) -> (sPCRegenData, sPCRegenDataForOtherPC) {
+        let regen_data = sPCRegenData {
+            iHP: self.hp,
+            iMapNum: self.instance_id.map_num as i32,
+            iX: self.position.x,
+            iY: self.position.y,
+            iZ: self.position.z,
+            iActiveNanoSlotNum: match self.get_active_nano_slot() {
+                Some(slot) => slot as i16,
+                None => -1,
+            },
+            Nanos: self.nano_data.as_carried(),
+        };
+        let regen_data_other = sPCRegenDataForOtherPC {
+            iPC_ID: self.id.unwrap(),
+            iHP: self.hp,
+            iX: self.position.x,
+            iY: self.position.y,
+            iZ: self.position.z,
+            iAngle: 0,
+            iConditionBitFlag: self.get_condition_bit_flag(),
+            iPCState: self.get_state_bit_flag(),
+            iSpecialState: self.get_special_state_bit_flag(),
+            Nano: self.get_active_nano().cloned().into(),
+        };
+        (regen_data, regen_data_other)
     }
 
     pub fn get_group_member_info(&self) -> sPCGroupMemberInfo {
@@ -1157,6 +1186,14 @@ impl Player {
         });
     }
 
+    pub fn do_revive(&mut self) {
+        self.hp = self.get_max_hp() / 2;
+        self.last_heal_time = Some(SystemTime::now());
+        for nano_id in self.nano_data.equipped_ids.into_iter().flatten() {
+            self.get_nano_mut(nano_id).unwrap().stamina = NANO_STAMINA_MAX / 2;
+        }
+    }
+
     pub fn disconnect(pc_id: i32, state: &mut ShardServerState, clients: &mut ClientMap) {
         let player = state.get_player(pc_id).unwrap();
         let pc_uid = player.get_uid();
@@ -1533,10 +1570,7 @@ impl Combatant for Player {
     }
 
     fn reset(&mut self) {
-        self.hp = self.get_max_hp() / 2;
-        for nano_id in self.nano_data.equipped_ids.into_iter().flatten() {
-            self.get_nano_mut(nano_id).unwrap().stamina = NANO_STAMINA_MAX / 2;
-        }
+        // stubbed
     }
 }
 impl Entity for Player {
