@@ -34,6 +34,7 @@ struct XDTData {
     instance_data: InstanceData,
     nano_data: NanoData,
     mission_data: MissionData,
+    respawn_data: Vec<RespawnPoint>,
     player_data: HashMap<i16, PlayerStats>,
     npc_data: HashMap<i32, NPCStats>,
 }
@@ -55,6 +56,8 @@ impl XDTData {
                 .map_err(|e| format!("Error loading nano data: {}", e))?,
             mission_data: load_mission_data(&root)
                 .map_err(|e| format!("Error loading mission data: {}", e))?,
+            respawn_data: load_respawn_data(&root)
+                .map_err(|e| format!("Error loading respawn data: {}", e))?,
             player_data: load_player_data(&root)
                 .map_err(|e| format!("Error loading player data: {}", e))?,
             npc_data: load_npc_data(&root).map_err(|e| format!("Error loading NPC data: {}", e))?,
@@ -142,6 +145,11 @@ struct MissionData {
     mission_definitions: HashMap<i32, MissionDefinition>,
     task_definitions: HashMap<i32, TaskDefinition>,
     rewards: HashMap<i32, Reward>,
+}
+
+struct RespawnPoint {
+    pos: Position,
+    map_num: u32,
 }
 
 pub struct PlayerStats {
@@ -814,6 +822,24 @@ impl TableData {
                 Severity::Warning,
                 format!("Reward with id {} doesn't exist", reward_id),
             ))
+    }
+
+    pub fn get_nearest_respawn_point(&self, pos: Position, map_num: u32) -> Option<Position> {
+        self.xdt_data
+            .respawn_data
+            .iter()
+            .filter_map(|rd| {
+                if rd.map_num == map_num {
+                    Some(rd.pos)
+                } else {
+                    None
+                }
+            })
+            .min_by_key(|p| {
+                let dx = p.x - pos.x;
+                let dy = p.y - pos.y;
+                dx.abs() + dy.abs()
+            })
     }
 }
 
@@ -1666,6 +1692,37 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
         task_definitions: task_defs,
         rewards,
     })
+}
+
+fn load_respawn_data(root: &Map<std::string::String, Value>) -> Result<Vec<RespawnPoint>, String> {
+    const RESPAWN_TABLE_KEY: &str = "m_pXComTable";
+    const RESPAWN_TABLE_RESPAWN_DATA_KEY: &str = "m_pXComData";
+
+    #[derive(Debug, Deserialize)]
+    struct RespawnPointEntry {
+        m_iXpos: i32,
+        m_iYpos: i32,
+        m_iZpos: i32,
+        m_iZone: u32,
+    }
+
+    let table = get_object(root, RESPAWN_TABLE_KEY)?;
+    let respawn_data = get_array(table, RESPAWN_TABLE_RESPAWN_DATA_KEY)?;
+    let mut respawn_points = Vec::new();
+    for v in respawn_data {
+        let entry: RespawnPointEntry = serde_json::from_value(v.clone())
+            .map_err(|e| format!("Malformed respawn data entry: {} {}", e, v))?;
+        let respawn_point = RespawnPoint {
+            pos: Position {
+                x: entry.m_iXpos,
+                y: entry.m_iYpos,
+                z: entry.m_iZpos,
+            },
+            map_num: entry.m_iZone,
+        };
+        respawn_points.push(respawn_point);
+    }
+    Ok(respawn_points)
 }
 
 fn load_player_data(
