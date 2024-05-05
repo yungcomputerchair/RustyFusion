@@ -10,8 +10,10 @@ use crate::{
     defines::SHARD_TICKS_PER_SECOND,
     entity::{Combatant, Entity, EntityID, NPC},
     enums::CombatantTeam,
+    error::log_if_failed,
     net::ClientMap,
     path::Path,
+    skills,
     state::ShardServerState,
     tabledata::tdata_get,
     Position,
@@ -99,14 +101,12 @@ impl AI {
         // Combat behaviors
         let mut combat_behaviors = vec![];
         if stats.team == CombatantTeam::Mob {
+            // Scan for targets
             let scan_radius = stats.sight_range;
             let distance_factor = 0.1;
             let level_factor = 0.1;
-            let aggro_rates = (
-                1.0 / SHARD_TICKS_PER_SECOND as f32,
-                -0.5 / SHARD_TICKS_PER_SECOND as f32,
-            );
-            let aggro_threshold = 100.0;
+            let aggro_rates = (1.0, -0.5);
+            let aggro_threshold = 10.0;
             combat_behaviors.push(ScanForTargets::new_node(
                 Some(CombatantTeam::Friendly),
                 scan_radius,
@@ -115,6 +115,11 @@ impl AI {
                 aggro_rates,
                 aggro_threshold,
             ));
+
+            // Attack
+            let attack_range = stats.attack_range + stats.radius;
+            let attack_cooldown = Duration::from_millis(stats.delay_time * 100);
+            combat_behaviors.push(CheckAttack::new_node(attack_range, attack_cooldown));
         }
         let combat_sequence = SequenceNode::new_node(combat_behaviors);
 
@@ -520,12 +525,16 @@ impl ScanForTargets {
         aggro_rates: (f32, f32),
         aggro_threshold: f32,
     ) -> Box<dyn AINode> {
+        let aggro_rates_scaled = (
+            aggro_rates.0 / SHARD_TICKS_PER_SECOND as f32,
+            aggro_rates.1 / SHARD_TICKS_PER_SECOND as f32,
+        );
         Box::new(Self {
             target_team,
             scan_radius,
             distance_factor,
             level_factor,
-            aggro_rates,
+            aggro_rates: aggro_rates_scaled,
             aggro_threshold,
             aggros: HashMap::new(),
         })
@@ -671,6 +680,102 @@ impl AINode for CheckRetreat {
                     self.retreat_state = RetreatState::Idle;
                     npc.reset();
                     // TODO full heal effect
+                    NodeStatus::Success
+                } else {
+                    NodeStatus::Running
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum AttackState {
+    Attacking,
+    OnCooldown(SystemTime),
+    Casting(SystemTime),
+}
+
+#[derive(Debug, Clone)]
+struct CheckAttack {
+    attack_range: u32,
+    attack_cooldown: Duration,
+    attack_state: AttackState,
+}
+impl CheckAttack {
+    fn new_node(attack_range: u32, attack_cooldown: Duration) -> Box<dyn AINode> {
+        Box::new(Self {
+            attack_range,
+            attack_cooldown,
+            attack_state: AttackState::Attacking,
+        })
+    }
+}
+impl AINode for CheckAttack {
+    fn clone_node(&self) -> Box<dyn AINode> {
+        Box::new(self.clone())
+    }
+
+    fn tick(
+        &mut self,
+        npc: &mut NPC,
+        state: &mut ShardServerState,
+        clients: &mut ClientMap,
+        time: &SystemTime,
+    ) -> NodeStatus {
+        let target_id = match npc.target_id {
+            Some(target_id) => target_id,
+            None => return NodeStatus::Failure,
+        };
+
+        let target = match state.entity_map.get_from_id(target_id) {
+            Some(target) => target,
+            None => return NodeStatus::Failure,
+        };
+
+        if npc.get_position().distance_to(&target.get_position()) > self.attack_range {
+            return NodeStatus::Failure;
+        }
+
+        match self.attack_state {
+            AttackState::Attacking => {
+                let do_skill = placeholder!(false);
+                if do_skill {
+                    // TODO
+                    let cast_time = placeholder!(Duration::from_secs(3));
+                    self.attack_state = AttackState::Casting(*time + cast_time);
+                    NodeStatus::Running
+                } else {
+                    let base_damage = placeholder!(5);
+                    let target_ids = &[target_id];
+                    log_if_failed(skills::do_basic_attack(
+                        npc.get_id(),
+                        target_ids,
+                        base_damage,
+                        state,
+                        clients,
+                    ));
+
+                    let wait_time = *time + self.attack_cooldown;
+                    self.attack_state = AttackState::OnCooldown(wait_time);
+                    NodeStatus::Success
+                }
+            }
+            AttackState::OnCooldown(wait_time) => {
+                if *time > wait_time {
+                    self.attack_state = AttackState::Attacking;
+                }
+                NodeStatus::Failure
+            }
+            AttackState::Casting(wait_time) => {
+                if npc.is_dead() {
+                    self.attack_state = AttackState::Attacking;
+                    return NodeStatus::Failure;
+                }
+
+                if *time > wait_time {
+                    self.attack_state = AttackState::OnCooldown(*time + self.attack_cooldown);
+                    // TODO effect
                     NodeStatus::Success
                 } else {
                     NodeStatus::Running
