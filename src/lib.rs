@@ -57,6 +57,12 @@ impl Position {
         ((dx * dx + dy * dy + dz * dz).sqrt() * DIST_MATH_SCALE) as u32
     }
 
+    pub fn angle_to(&self, other: &Position) -> f32 {
+        let dx = (other.x - self.x) as f32;
+        let dy = (other.y - self.y) as f32;
+        dy.atan2(dx).to_degrees()
+    }
+
     pub fn interpolate(&self, target: &Position, distance: f32) -> (Position, bool) {
         let source = (*self).into();
         let target = (*target).into();
@@ -87,6 +93,17 @@ impl Position {
         let mut nudged = self.get_random_around(UNSTICK_XY_RANGE, UNSTICK_XY_RANGE, 0);
         nudged.z += UNSTICK_Z_BUMP;
         nudged
+    }
+
+    pub fn get_offset_by_polar_coords(&self, distance: u32, angle_deg: f32) -> Position {
+        let angle_rad = angle_deg.to_radians();
+        let x_offset = (angle_rad.cos() * distance as f32) as i32;
+        let y_offset = (angle_rad.sin() * distance as f32) as i32;
+        Position {
+            x: self.x + x_offset,
+            y: self.y + y_offset,
+            z: self.z,
+        }
     }
 }
 impl From<Vector3<f32>> for Position {

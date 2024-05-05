@@ -35,6 +35,14 @@ pub fn clamp_max<T: Ord>(val: T, max: T) -> T {
     }
 }
 
+pub fn rotation_to_angle(rotation_deg: i32) -> i32 {
+    (270 - rotation_deg).rem_euclid(360)
+}
+
+pub fn angle_to_rotation(angle_deg: i32) -> i32 {
+    (270 - angle_deg).rem_euclid(360)
+}
+
 pub fn parse_utf16(chars: &[u16]) -> FFResult<String> {
     let end_pos: usize = chars.iter().position(|&c| c == 0).unwrap_or(chars.len());
     String::from_utf16(&chars[..end_pos]).map_err(|_| {

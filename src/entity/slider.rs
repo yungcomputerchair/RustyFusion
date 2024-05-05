@@ -92,8 +92,8 @@ impl Entity for Slider {
         self.position = pos;
     }
 
-    fn set_rotation(&mut self, angle: i32) {
-        self.rotation = angle % 360;
+    fn set_rotation(&mut self, rotation: i32) {
+        self.rotation = rotation.rem_euclid(360);
     }
 
     fn send_enter(&self, client: &mut FFClient) -> FFResult<()> {

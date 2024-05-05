@@ -19,7 +19,7 @@ use crate::{
     path::Path,
     state::ShardServerState,
     tabledata::tdata_get,
-    util::clamp_min,
+    util::{self, clamp_min},
     Position,
 };
 
@@ -115,7 +115,10 @@ impl NPC {
         state: &mut ShardServerState,
     ) {
         let speed = path.get_speed();
+        let old_pos = self.position;
         if path.tick(&mut self.position) {
+            let new_angle = old_pos.angle_to(&self.position) as i32;
+            self.set_rotation(util::angle_to_rotation(new_angle));
             let chunk_pos = self.get_chunk_coords();
             state
                 .entity_map
@@ -128,7 +131,7 @@ impl NPC {
                 iToY: self.position.y,
                 iToZ: self.position.z,
                 iSpeed: speed,
-                iMoveStyle: if speed > run_speed { 1 } else { 0 },
+                iMoveStyle: if speed >= run_speed { 1 } else { 0 },
             };
             state
                 .entity_map
@@ -182,8 +185,8 @@ impl Entity for NPC {
         self.position = pos;
     }
 
-    fn set_rotation(&mut self, angle: i32) {
-        self.rotation = angle % 360;
+    fn set_rotation(&mut self, rotation: i32) {
+        self.rotation = rotation.rem_euclid(360);
     }
 
     fn send_enter(&self, client: &mut FFClient) -> FFResult<()> {

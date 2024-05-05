@@ -41,7 +41,7 @@ pub trait Entity {
     fn get_speed(&self) -> i32;
     fn get_chunk_coords(&self) -> ChunkCoords;
     fn set_position(&mut self, pos: Position);
-    fn set_rotation(&mut self, angle: i32);
+    fn set_rotation(&mut self, rotation: i32);
     fn send_enter(&self, client: &mut FFClient) -> FFResult<()>;
     fn send_exit(&self, client: &mut FFClient) -> FFResult<()>;
 
