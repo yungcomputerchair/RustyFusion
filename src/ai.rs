@@ -103,10 +103,10 @@ impl AI {
         if stats.team == CombatantTeam::Mob {
             // Scan for targets
             let scan_radius = stats.sight_range;
-            let distance_factor = 0.1;
+            let distance_factor = 0.5;
             let level_factor = 0.1;
             let aggro_rates = (1.0, -0.5);
-            let aggro_threshold = 10.0;
+            let aggro_threshold = 1.0;
             combat_behaviors.push(ScanForTargets::new_node(
                 Some(CombatantTeam::Friendly),
                 scan_radius,
@@ -525,17 +525,17 @@ impl ScanForTargets {
         aggro_rates: (f32, f32),
         aggro_threshold: f32,
     ) -> Box<dyn AINode> {
-        let aggro_rates_scaled = (
-            aggro_rates.0 / SHARD_TICKS_PER_SECOND as f32,
-            aggro_rates.1 / SHARD_TICKS_PER_SECOND as f32,
-        );
+        // need to scale the threshold up to account for the tickrate.
+        // higher tickrate = more ticks per second = more aggro per second.
+        // this scaling cancels that out
+        let aggro_threshold_scaled = aggro_threshold * SHARD_TICKS_PER_SECOND as f32;
         Box::new(Self {
             target_team,
             scan_radius,
             distance_factor,
             level_factor,
-            aggro_rates: aggro_rates_scaled,
-            aggro_threshold,
+            aggro_rates,
+            aggro_threshold: aggro_threshold_scaled,
             aggros: HashMap::new(),
         })
     }
@@ -556,8 +556,9 @@ impl AINode for ScanForTargets {
             return NodeStatus::Success;
         }
 
+        let (aggro_up_rate, aggro_down_rate) = self.aggro_rates;
+
         // gain aggro
-        let aggro_up_rate = self.aggro_rates.0;
         for eid in state.entity_map.get_around_entity(npc.get_id()) {
             let entity = state.entity_map.get_from_id(eid).unwrap();
             let cb = match entity.as_combatant() {
@@ -582,12 +583,17 @@ impl AINode for ScanForTargets {
             // level difference
             let level_diff = (npc.get_level() - cb.get_level()) as f32;
             let level_diff_up = level_diff * self.level_factor;
+
             // distance difference (normalized; edge of radius = 0, center = 1)
             let distance_diff_rel = distance as f32 / self.scan_radius as f32;
             let distance_diff_up = (1.0 - distance_diff_rel) * self.distance_factor;
+
             // total
             let scale = cb.get_aggro_factor();
             let aggro_up = (aggro_up_rate + level_diff_up + distance_diff_up) * scale;
+            if aggro_up <= 0.0 {
+                continue;
+            }
 
             let aggro = self.aggros.entry(eid).or_insert(0.0);
             *aggro += aggro_up;
@@ -596,10 +602,12 @@ impl AINode for ScanForTargets {
                 self.aggros.clear();
                 return NodeStatus::Success;
             }
+
+            // gained aggro this tick, so cancel out the upcoming decay
+            *aggro -= aggro_down_rate;
         }
 
         // lose aggro
-        let aggro_down_rate = self.aggro_rates.1;
         self.aggros.retain(|_, aggro| {
             *aggro += aggro_down_rate;
             *aggro >= 0.0
