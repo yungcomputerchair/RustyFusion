@@ -1,5 +1,9 @@
+use rand::Rng;
+
 use crate::{
+    defines::*,
     entity::{Combatant, EntityID},
+    enums::CombatStyle,
     error::*,
     net::{
         packet::{PacketID::*, *},
@@ -8,15 +12,36 @@ use crate::{
     state::ShardServerState,
 };
 
+struct BasicAttack {
+    power: i32,
+    crit_chance: Option<f32>,
+    attack_style: Option<CombatStyle>,
+    charged: bool,
+}
+
 pub fn do_basic_attack(
     attacker_id: EntityID,
     target_ids: &[EntityID],
-    damage: i32,
+    charged: bool,
     state: &mut ShardServerState,
     clients: &mut ClientMap,
 ) -> FFResult<()> {
-    let cb = state.get_combatant(attacker_id)?;
-    let mut attacker_client = cb.get_client(clients);
+    const CRIT_CHANCE: f32 = 0.05;
+
+    let attacker = state.get_combatant(attacker_id)?;
+    let mut attacker_client = attacker.get_client(clients);
+
+    let power = if target_ids.len() == 1 {
+        attacker.get_single_power()
+    } else {
+        attacker.get_multi_power()
+    };
+    let basic_attack = BasicAttack {
+        power,
+        crit_chance: Some(CRIT_CHANCE),
+        attack_style: attacker.get_style(),
+        charged,
+    };
 
     let mut pc_attack_results = Vec::new();
     let mut npc_attack_results = Vec::new();
@@ -38,7 +63,7 @@ pub fn do_basic_attack(
             );
             continue;
         }
-        let result = handle_basic_attack(attacker_id, target, damage);
+        let result = handle_basic_attack(attacker_id, target, &basic_attack);
         match target_id {
             EntityID::Player(_) => pc_attack_results.push(result),
             EntityID::NPC(_) => npc_attack_results.push(result),
@@ -159,8 +184,78 @@ pub fn do_basic_attack(
     Ok(())
 }
 
-fn handle_basic_attack(from: EntityID, to: &mut dyn Combatant, damage: i32) -> sAttackResult {
+fn calculate_damage(
+    attack: &BasicAttack,
+    defense: i32,
+    defense_style: Option<CombatStyle>,
+    defense_level: i16,
+) -> (i32, bool) {
+    // this formula is taken basically 1:1 from OpenFusion
+    let mut rng = rand::thread_rng();
+    let BasicAttack {
+        power: attack,
+        crit_chance,
+        attack_style,
+        charged,
+    } = attack;
+
+    // base damage + variability
+    if attack + defense == 0 {
+        // divide-by-0 check
+        return (0, false);
+    }
+    let mut damage = attack * attack / (attack + defense);
+    damage = std::cmp::max(
+        10 + attack / 10,
+        damage - (defense - attack / 6) * defense_level as i32 / 100,
+    );
+    damage = (damage as f32 * (rng.gen_range(0.8..1.2))) as i32;
+
+    // rock-paper-scissors
+    let rps = do_rps(attack_style, &defense_style);
+    match rps {
+        RpsResult::Win => {
+            damage = damage * 5 / 4;
+        }
+        RpsResult::Lose => {
+            damage = damage * 4 / 5;
+        }
+        RpsResult::Draw => {}
+    };
+
+    // boost
+    if *charged {
+        damage = damage * 5 / 4;
+    }
+
+    // crit
+    let crit = match crit_chance {
+        Some(crit_chance) => rng.gen::<f32>() < *crit_chance,
+        None => false,
+    };
+    if crit {
+        damage *= 2;
+    }
+
+    (damage, crit)
+}
+
+fn handle_basic_attack(
+    from: EntityID,
+    to: &mut dyn Combatant,
+    attack: &BasicAttack,
+) -> sAttackResult {
+    let defense = to.get_defense();
+    let defense_style = to.get_style();
+    let defense_level = to.get_level();
+    let (damage, crit) = calculate_damage(attack, defense, defense_style, defense_level);
     let dealt = to.take_damage(damage, from);
+
+    let mut hit_flag = HF_BIT_NORMAL as i8;
+    if crit {
+        hit_flag |= HF_BIT_CRITICAL as i8;
+    }
+
     sAttackResult {
         eCT: to.get_char_type() as i32,
         iID: match to.get_id() {
@@ -171,6 +266,39 @@ fn handle_basic_attack(from: EntityID, to: &mut dyn Combatant, damage: i32) -> s
         bProtected: unused!(),
         iDamage: dealt,
         iHP: to.get_hp(),
-        iHitFlag: placeholder!(1),
+        iHitFlag: hit_flag,
+    }
+}
+
+enum RpsResult {
+    Win,
+    Lose,
+    Draw,
+}
+fn do_rps(us: &Option<CombatStyle>, them: &Option<CombatStyle>) -> RpsResult {
+    if us.is_none() || them.is_none() {
+        return RpsResult::Draw;
+    }
+
+    let us = us.as_ref().unwrap();
+    let them = them.as_ref().unwrap();
+    match us {
+        CombatStyle::Adaptium => match them {
+            CombatStyle::Blastons => RpsResult::Win,
+            CombatStyle::Cosmix => RpsResult::Lose,
+            _ => RpsResult::Draw,
+        },
+
+        CombatStyle::Blastons => match them {
+            CombatStyle::Cosmix => RpsResult::Win,
+            CombatStyle::Adaptium => RpsResult::Lose,
+            _ => RpsResult::Draw,
+        },
+
+        CombatStyle::Cosmix => match them {
+            CombatStyle::Adaptium => RpsResult::Win,
+            CombatStyle::Blastons => RpsResult::Lose,
+            _ => RpsResult::Draw,
+        },
     }
 }

@@ -1,4 +1,4 @@
-use crate::{defines::*, enums::*, net::packet::*};
+use crate::{defines::*, enums::*, error::FFResult, net::packet::*, tabledata::tdata_get};
 
 #[derive(Debug, Clone)]
 pub struct Nano {
@@ -21,6 +21,10 @@ impl Nano {
 
     pub fn tune(&mut self, skill: Option<i16>) {
         self.selected_skill = skill;
+    }
+
+    pub fn get_stats(&self) -> FFResult<&NanoStats> {
+        tdata_get().get_nano_stats(self.id)
     }
 }
 impl From<sNano> for Option<Nano> {

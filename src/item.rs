@@ -158,6 +158,9 @@ pub struct ItemStats {
     pub required_level: i16,
     pub rarity: Option<i8>,
     pub gender: Option<i8>,
+    pub single_power: Option<i32>,
+    pub multi_power: Option<i32>,
+    pub defense: Option<i32>,
     pub speed: Option<i32>,
 }
 

@@ -11,8 +11,8 @@ use crate::{
     defines::*,
     entity::{Combatant, Entity, EntityID},
     enums::{
-        CharType, CombatantTeam, ItemLocation, ItemType, PlayerGuide, PlayerShardStatus,
-        RewardCategory, RewardType, RideType, TaskType,
+        CharType, CombatStyle, CombatantTeam, ItemLocation, ItemType, PlayerGuide,
+        PlayerShardStatus, RewardCategory, RewardType, RideType, TaskType,
     },
     error::{codes, log, log_if_failed, panic_log, FFError, FFResult, Severity},
     item::Item,
@@ -914,8 +914,8 @@ impl Player {
             .map(|(id, count)| (*id, *count))
     }
 
-    pub fn get_equipped(&self) -> [Option<Item>; 9] {
-        self.inventory.equipped
+    pub fn get_equipped(&self) -> &[Option<Item>; 9] {
+        &self.inventory.equipped
     }
 
     pub fn get_taros(&self) -> u32 {
@@ -1433,6 +1433,10 @@ impl Combatant for Player {
         tdata_get().get_player_stats(self.level).unwrap().max_hp as i32
     }
 
+    fn get_style(&self) -> Option<CombatStyle> {
+        self.get_active_nano().map(|n| n.get_stats().unwrap().style)
+    }
+
     fn get_team(&self) -> CombatantTeam {
         CombatantTeam::Friendly
     }
@@ -1452,6 +1456,34 @@ impl Combatant for Player {
 
     fn is_dead(&self) -> bool {
         self.hp <= 0
+    }
+
+    fn get_single_power(&self) -> i32 {
+        let weapon = self
+            .get_item(ItemLocation::Equip, EQUIP_SLOT_HAND as usize)
+            .unwrap();
+        match weapon {
+            Some(weapon) => weapon.get_stats().unwrap().single_power.unwrap_or(0),
+            None => 0,
+        }
+    }
+
+    fn get_multi_power(&self) -> i32 {
+        let weapon = self
+            .get_item(ItemLocation::Equip, EQUIP_SLOT_HAND as usize)
+            .unwrap();
+        match weapon {
+            Some(weapon) => weapon.get_stats().unwrap().multi_power.unwrap_or(0),
+            None => 0,
+        }
+    }
+
+    fn get_defense(&self) -> i32 {
+        let mut total = 0;
+        for item in self.get_equipped().iter().flatten() {
+            total += item.get_stats().unwrap().defense.unwrap_or(0);
+        }
+        total
     }
 
     fn take_damage(&mut self, damage: i32, _source: EntityID) -> i32 {

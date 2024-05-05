@@ -10,7 +10,7 @@ use rusty_fusion::{
         packet::{PacketID::*, *},
         ClientMap,
     },
-    placeholder, skills,
+    skills,
     state::ShardServerState,
     tabledata::tdata_get,
     unused,
@@ -27,7 +27,8 @@ struct sTargetNpcId {
 impl FFPacket for sTargetNpcId {}
 
 pub fn pc_attack_npcs(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
-    const MAX_TARGETS: usize = 4;
+    const MAX_TARGETS: usize = 3;
+    const BATTERY_BASE_COST: u32 = 6;
 
     let mut rng = thread_rng();
 
@@ -50,14 +51,33 @@ pub fn pc_attack_npcs(clients: &mut ClientMap, state: &mut ShardServerState) -> 
 
     let mut defeated_types = HashMap::new();
     let mut target_ids = Vec::with_capacity(4);
+    let mut weapon_boosts_needed = 0;
     for _ in 0..target_count {
         let npc_id = client.get_struct::<sTargetNpcId>()?.iNPC_ID;
-        let target_id = EntityID::NPC(npc_id);
-        target_ids.push(target_id);
+        let npc = match state.get_npc(npc_id) {
+            Ok(npc) => npc,
+            Err(e) => {
+                log_error(&e);
+                continue;
+            }
+        };
+        weapon_boosts_needed += BATTERY_BASE_COST + npc.get_level() as u32;
+        target_ids.push(npc.get_id());
     }
-    let attacker_id = EntityID::Player(pc_id);
-    let damage = placeholder!(50);
-    skills::do_basic_attack(attacker_id, &target_ids, damage, state, clients)?;
+
+    // consume weapon boosts
+    let player = state.get_player_mut(pc_id)?;
+    let weapon_boosts = player.get_weapon_boosts();
+    let charged = if weapon_boosts >= weapon_boosts_needed {
+        player.set_weapon_boosts(weapon_boosts - weapon_boosts_needed);
+        true
+    } else {
+        player.set_weapon_boosts(0);
+        false
+    };
+
+    // attack handler
+    skills::do_basic_attack(player.get_id(), &target_ids, charged, state, clients)?;
 
     // kills
     for target_id in &target_ids {

@@ -7,7 +7,7 @@ use crate::{
     chunk::{ChunkCoords, InstanceID},
     defines::RANGE_INTERACT,
     entity::{Combatant, Entity, EntityID},
-    enums::{CharType, CombatantTeam},
+    enums::{CharType, CombatStyle, CombatantTeam},
     error::FFResult,
     net::{
         packet::{
@@ -267,6 +267,11 @@ impl Combatant for NPC {
         stats.max_hp as i32
     }
 
+    fn get_style(&self) -> Option<CombatStyle> {
+        let stats = tdata_get().get_npc_stats(self.ty).unwrap();
+        Some(stats.style)
+    }
+
     fn get_team(&self) -> CombatantTeam {
         let stats = tdata_get().get_npc_stats(self.ty).unwrap();
         stats.team
@@ -290,6 +295,21 @@ impl Combatant for NPC {
 
     fn is_dead(&self) -> bool {
         self.get_hp() <= 0
+    }
+
+    fn get_single_power(&self) -> i32 {
+        const NPC_BASE_POWER: i32 = 450;
+        let stats = tdata_get().get_npc_stats(self.ty).unwrap();
+        NPC_BASE_POWER + stats.power
+    }
+
+    fn get_multi_power(&self) -> i32 {
+        self.get_single_power()
+    }
+
+    fn get_defense(&self) -> i32 {
+        let stats = tdata_get().get_npc_stats(self.ty).unwrap();
+        stats.defense
     }
 
     fn take_damage(&mut self, damage: i32, source: EntityID) -> i32 {

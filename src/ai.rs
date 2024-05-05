@@ -763,12 +763,11 @@ impl AINode for CheckAttack {
                     self.attack_state = AttackState::Casting(*time + cast_time);
                     NodeStatus::Running
                 } else {
-                    let base_damage = placeholder!(5);
                     let target_ids = &[target_id];
                     log_if_failed(skills::do_basic_attack(
                         npc.get_id(),
                         target_ids,
-                        base_damage,
+                        false,
                         state,
                         clients,
                     ));
