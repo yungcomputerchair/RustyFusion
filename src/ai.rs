@@ -622,9 +622,9 @@ struct CheckRetreat {
     retreat_state: RetreatState,
 }
 impl CheckRetreat {
-    fn new_node(retreat_to: Position, retreat_threshold: u32) -> Box<dyn AINode> {
+    fn new_node(retreat_to_initial: Position, retreat_threshold: u32) -> Box<dyn AINode> {
         Box::new(Self {
-            retreat_to,
+            retreat_to: retreat_to_initial,
             retreat_threshold,
             retreat_state: RetreatState::Idle,
         })
@@ -646,7 +646,11 @@ impl AINode for CheckRetreat {
             RetreatState::Idle => {
                 let target_id = match npc.target_id {
                     Some(target_id) => target_id,
-                    None => return NodeStatus::Success, // no target
+                    None => {
+                        // no target; update retreat position
+                        self.retreat_to = npc.get_position();
+                        return NodeStatus::Failure;
+                    }
                 };
 
                 let should_retreat = match state.entity_map.get_from_id(target_id) {
