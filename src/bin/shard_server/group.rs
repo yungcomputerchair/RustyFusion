@@ -251,5 +251,13 @@ pub fn npc_group_kick(clients: &mut ClientMap, state: &mut ShardServerState) -> 
 
     let target_npc_id = pkt.iNPC_ID;
     let target_npc = state.get_npc_mut(target_npc_id)?;
+    if target_npc.group_id != Some(group_id) {
+        return Err(FFError::build(
+            Severity::Warning,
+            format!("NPC {} is not in the group", target_npc_id),
+        ));
+    }
+
+    target_npc.group_id = None;
     rusty_fusion::helpers::remove_group_member(target_npc.get_id(), group_id, state, clients)
 }
