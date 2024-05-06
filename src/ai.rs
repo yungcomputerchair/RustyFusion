@@ -60,7 +60,7 @@ impl AI {
         // Movement behaviors
         let base_movement_behaviors = vec![
             FollowAssignedPath::new_node(),
-            FollowEntity::new_node(FollowTarget::AssignedEntity, 300, 200, stats.walk_speed),
+            FollowEntityLoose::new_node(FollowTarget::AssignedEntity, 300, 200, stats.walk_speed),
         ];
         let base_movement_selector = SelectorNode::new_node(base_movement_behaviors);
         let movement_selector = if npc.as_combatant().is_some() && stats.team == CombatantTeam::Mob
@@ -77,13 +77,13 @@ impl AI {
             if npc.tight_follow.is_some() {
                 let tolerance = stats.radius / 2;
                 let max_speed = stats.run_speed * 2;
-                mob_movement_behaviors.push(FollowPack::new_node(tolerance, max_speed));
+                mob_movement_behaviors.push(FollowEntityTight::new_node(tolerance, max_speed));
             }
 
             // Follow combat target
             let stay_within_range = stats.attack_range + stats.radius;
             let following_distance = stats.radius;
-            mob_movement_behaviors.push(FollowEntity::new_node(
+            mob_movement_behaviors.push(FollowEntityLoose::new_node(
                 FollowTarget::CombatTarget,
                 stay_within_range,
                 following_distance,
@@ -293,13 +293,13 @@ enum FollowTarget {
 }
 
 #[derive(Debug, Clone)]
-struct FollowEntity {
+struct FollowEntityLoose {
     target: FollowTarget,
     stay_within: u32,
     following_distance: u32,
     speed: i32,
 }
-impl FollowEntity {
+impl FollowEntityLoose {
     fn new_node(
         target: FollowTarget,
         stay_within: u32,
@@ -314,7 +314,7 @@ impl FollowEntity {
         })
     }
 }
-impl AINode for FollowEntity {
+impl AINode for FollowEntityLoose {
     fn clone_node(&self) -> Box<dyn AINode> {
         Box::new(self.clone())
     }
@@ -365,11 +365,11 @@ impl AINode for FollowEntity {
 }
 
 #[derive(Debug, Clone)]
-struct FollowPack {
+struct FollowEntityTight {
     tolerance: u32,
     max_speed: i32,
 }
-impl FollowPack {
+impl FollowEntityTight {
     fn new_node(tolerance: u32, max_speed: i32) -> Box<dyn AINode> {
         Box::new(Self {
             tolerance,
@@ -377,7 +377,7 @@ impl FollowPack {
         })
     }
 }
-impl AINode for FollowPack {
+impl AINode for FollowEntityTight {
     fn clone_node(&self) -> Box<dyn AINode> {
         Box::new(self.clone())
     }
