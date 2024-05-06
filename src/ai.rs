@@ -835,6 +835,9 @@ impl AINode for CheckRetreat {
                         cb.is_dead() // target dead
                         // or not aggroable
                         || cb.get_aggro_factor() <= 0.0
+                        // or they've gone too far
+                        || cb.get_position()
+                            .distance_to(&self.retreat_to) > self.retreat_threshold
                         // or we've gone too far
                         || npc.get_position()
                             .distance_to(&self.retreat_to) > self.retreat_threshold
