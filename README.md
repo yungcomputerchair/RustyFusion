@@ -64,8 +64,8 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
   - [x] Changing nano powers
 - [ ] Combat
   - [x] Mobs
-  - [ ] ***Core combat loop & mob AI***
-  - [x] Respawning
+  - [x] Core combat loop & mob AI
+  - [x] Player respawning
   - [ ] Abilities and (de)buffs
     - [ ] Passive skills (including nano)*
     - [ ] Active skills (including nano)*
@@ -97,9 +97,8 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
   - [ ] OpenFusion monitor protocol
   - [ ] Management application (bonus)
 - [x] Time machine
-- [ ] Event system
-  - [ ] Fuse boss fight
-  - [ ] Scripting API (bonus)
+- [ ] Fuse boss fight
+- [ ] Scripting API (bonus)
 - [ ] "Academy" (build 1013) support (currently, only build 104 is supported)
   - [ ] Struct support
   - [ ] Patching framework
