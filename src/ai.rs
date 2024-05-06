@@ -45,7 +45,7 @@ impl AI {
         const DECHUNK_DELAY_MS: u64 = 2000;
 
         let stats = tdata_get().get_npc_stats(npc.ty).unwrap();
-        if stats.ai_type == 0 {
+        if npc.path.is_none() && stats.ai_type == 0 {
             return (None, TickMode::Never);
         }
 

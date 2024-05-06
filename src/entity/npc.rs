@@ -144,6 +144,12 @@ impl NPC {
         // we don't consider NPCs with certain AI types combatants.
         // we check the stats instead of self.ai since the
         // AI object is taken out during tick.
+
+        if self.path.is_some() {
+            // exception: some NPCs have AI type 0, but are still combatants
+            return true;
+        }
+
         let stats = tdata_get().get_npc_stats(self.ty).unwrap();
         stats.ai_type != 0 // no npcs without AI
         && stats.ai_type != 11 // no cars or animals
