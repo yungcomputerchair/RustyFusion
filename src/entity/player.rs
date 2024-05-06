@@ -1519,7 +1519,7 @@ impl Combatant for Player {
     }
 
     fn get_aggro_factor(&self) -> f32 {
-        if self.invisible || self.invulnerable {
+        if self.invisible {
             0.0
         } else {
             // TODO check for sneak or active IZ race

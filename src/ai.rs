@@ -73,13 +73,6 @@ impl AI {
             let retreat_to = npc.get_position();
             mob_movement_behaviors.push(CheckRetreat::new_node(retreat_to, retreat_threshold));
 
-            // Follow pack
-            if npc.tight_follow.is_some() {
-                let tolerance = stats.radius / 2;
-                let max_speed = stats.run_speed * 2;
-                mob_movement_behaviors.push(FollowEntityTight::new_node(tolerance, max_speed));
-            }
-
             // Follow combat target
             let stay_within_range = stats.attack_range + stats.radius;
             let following_distance = stats.radius;
@@ -89,6 +82,13 @@ impl AI {
                 following_distance,
                 stats.run_speed,
             ));
+
+            // Follow pack (follower mobs only)
+            if npc.tight_follow.is_some() {
+                let tolerance = stats.radius / 2;
+                let max_speed = stats.run_speed * 2;
+                mob_movement_behaviors.push(FollowEntityTight::new_node(tolerance, max_speed));
+            }
 
             // Base movement behaviors
             mob_movement_behaviors.push(base_movement_selector);
@@ -114,6 +114,11 @@ impl AI {
         // Combat behaviors
         let mut combat_behaviors = vec![];
         if stats.team == CombatantTeam::Mob {
+            // Sync with leader (follower mobs only)
+            if npc.tight_follow.is_some() {
+                combat_behaviors.push(SyncWithLeader::new_node());
+            }
+
             // Scan for targets
             let scan_radius = stats.sight_range;
             let distance_factor = 0.5;
@@ -573,6 +578,95 @@ impl AINode for CheckDead {
 }
 
 #[derive(Debug, Clone)]
+enum SyncState {
+    Idle,
+    LeaderRetreating,
+}
+
+#[derive(Debug, Clone)]
+struct SyncWithLeader {
+    sync_state: SyncState,
+}
+impl SyncWithLeader {
+    fn new_node() -> Box<dyn AINode> {
+        Box::new(Self {
+            sync_state: SyncState::Idle,
+        })
+    }
+}
+impl AINode for SyncWithLeader {
+    fn clone_node(&self) -> Box<dyn AINode> {
+        Box::new(self.clone())
+    }
+
+    fn tick(
+        &mut self,
+        npc: &mut NPC,
+        state: &mut ShardServerState,
+        _clients: &mut ClientMap,
+        _time: &SystemTime,
+    ) -> NodeStatus {
+        let leader_npc_id = match npc.tight_follow {
+            Some((EntityID::NPC(leader_npc_id), _)) => leader_npc_id,
+            _ => return NodeStatus::Success,
+        };
+
+        let leader_npc = match state.get_npc_mut(leader_npc_id) {
+            Ok(leader_npc) => leader_npc,
+            Err(_) => return NodeStatus::Success,
+        };
+
+        if leader_npc.is_dead() {
+            return NodeStatus::Success;
+        }
+
+        // sync retreat
+        match self.sync_state {
+            SyncState::Idle => {
+                if leader_npc.retreating {
+                    npc.retreating = true;
+                    npc.target_id = None;
+                    self.sync_state = SyncState::LeaderRetreating;
+                }
+            }
+            SyncState::LeaderRetreating => {
+                if !leader_npc.retreating {
+                    npc.reset();
+                    // TODO full heal effect
+                    self.sync_state = SyncState::Idle;
+                    return NodeStatus::Failure;
+                }
+            }
+        }
+        if npc.retreating {
+            return NodeStatus::Success;
+        }
+
+        // sync target
+        match npc.target_id {
+            None => {
+                npc.target_id = leader_npc.target_id;
+                if npc.target_id.is_some() {
+                    println!(
+                        "{:?} sync aggro to {:?}",
+                        npc.get_id(),
+                        leader_npc.target_id
+                    );
+                }
+            }
+            Some(target_id) => {
+                if leader_npc.target_id.is_none() {
+                    leader_npc.target_id = Some(target_id);
+                    println!("{:?} sync aggro to {:?}", leader_npc.get_id(), target_id);
+                }
+            }
+        }
+
+        NodeStatus::Success
+    }
+}
+
+#[derive(Debug, Clone)]
 struct ScanForTargets {
     target_team: Option<CombatantTeam>,
     scan_radius: u32,
@@ -716,6 +810,14 @@ impl AINode for CheckRetreat {
         clients: &mut ClientMap,
         _time: &SystemTime,
     ) -> NodeStatus {
+        // if we have a tight follow, we let them drive retreats
+        // unless they are dead or gone
+        if let Some((leader_id, _)) = npc.tight_follow {
+            if state.get_combatant(leader_id).is_ok_and(|ld| !ld.is_dead()) {
+                return NodeStatus::Failure;
+            }
+        }
+
         match &mut self.retreat_state {
             RetreatState::Idle => {
                 let target_id = match npc.target_id {
