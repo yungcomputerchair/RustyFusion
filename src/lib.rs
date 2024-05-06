@@ -1,5 +1,7 @@
 #![allow(clippy::derivable_impls)]
 
+use std::ops::Add;
+
 use vecmath::{vec3_add, vec3_len, vec3_scale, vec3_sub, Vector3};
 
 #[macro_export]
@@ -118,5 +120,15 @@ impl From<Vector3<f32>> for Position {
 impl From<Position> for Vector3<f32> {
     fn from(value: Position) -> Self {
         [value.x as f32, value.y as f32, value.z as f32]
+    }
+}
+impl Add<Position> for Position {
+    type Output = Position;
+    fn add(self, other: Position) -> Position {
+        Position {
+            x: self.x + other.x,
+            y: self.y + other.y,
+            z: self.z + other.z,
+        }
     }
 }

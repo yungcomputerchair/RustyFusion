@@ -10,12 +10,13 @@ use crate::{
     defines::SHARD_TICKS_PER_SECOND,
     entity::{Combatant, Entity, EntityID, NPC},
     enums::CombatantTeam,
-    error::log_if_failed,
+    error::*,
     net::ClientMap,
     path::Path,
     skills,
     state::ShardServerState,
     tabledata::tdata_get,
+    util::*,
     Position,
 };
 
@@ -71,6 +72,13 @@ impl AI {
             let retreat_threshold = stats.combat_range;
             let retreat_to = npc.get_position();
             mob_movement_behaviors.push(CheckRetreat::new_node(retreat_to, retreat_threshold));
+
+            // Follow pack
+            if npc.tight_follow.is_some() {
+                let tolerance = stats.radius / 2;
+                let max_speed = stats.run_speed * 2;
+                mob_movement_behaviors.push(FollowPack::new_node(tolerance, max_speed));
+            }
 
             // Follow combat target
             let stay_within_range = stats.attack_range + stats.radius;
@@ -353,6 +361,59 @@ impl AINode for FollowEntity {
             }
             None => NodeStatus::Failure,
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct FollowPack {
+    tolerance: u32,
+    max_speed: i32,
+}
+impl FollowPack {
+    fn new_node(tolerance: u32, max_speed: i32) -> Box<dyn AINode> {
+        Box::new(Self {
+            tolerance,
+            max_speed,
+        })
+    }
+}
+impl AINode for FollowPack {
+    fn clone_node(&self) -> Box<dyn AINode> {
+        Box::new(self.clone())
+    }
+
+    fn tick(
+        &mut self,
+        npc: &mut NPC,
+        state: &mut ShardServerState,
+        clients: &mut ClientMap,
+        _time: &SystemTime,
+    ) -> NodeStatus {
+        let (leader_id, offset) = match npc.tight_follow {
+            Some(tight_follow) => tight_follow,
+            None => return NodeStatus::Failure,
+        };
+
+        let leader = match state.entity_map.get_from_id(leader_id) {
+            Some(leader) => leader,
+            None => return NodeStatus::Failure,
+        };
+
+        if leader.as_combatant().is_some_and(|cb| cb.is_dead()) {
+            return NodeStatus::Failure;
+        }
+
+        let pack_pos = leader.get_position() + offset;
+        let distance = npc.get_position().distance_to(&pack_pos);
+        if distance <= self.tolerance {
+            return NodeStatus::Success;
+        }
+
+        let speed = clamp_max(distance as i32, self.max_speed);
+        let mut path = Path::new_single(pack_pos, speed);
+        path.start();
+        npc.tick_movement_along_path(&mut path, clients, state);
+        NodeStatus::Success
     }
 }
 

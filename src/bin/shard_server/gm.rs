@@ -1,4 +1,4 @@
-use std::{cmp::max, collections::HashSet};
+use std::cmp::max;
 
 use rusty_fusion::{
     chunk::{EntityMap, InstanceID, TickMode},
@@ -647,26 +647,13 @@ pub fn gm_npc_unsummon(clients: &mut ClientMap, state: &mut ShardServerState) ->
     let client = clients.get_self();
     helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__GM as i16)?;
     let pkt: sP_CL2FE_REQ_NPC_UNSUMMON = *client.get_packet(P_CL2FE_REQ_NPC_UNSUMMON)?;
-
-    // find all NPC IDs attached to the requested one
     let npc_id = pkt.iNPC_ID;
-    let mut visited_ids = HashSet::new();
-    let mut ids_to_visit = vec![npc_id];
-    while let Some(npc_id) = ids_to_visit.pop() {
-        if let Ok(npc) = state.get_npc(npc_id) {
-            if !npc.summoned || !visited_ids.insert(npc_id) {
-                continue;
-            }
-            if let Some(leader_id) = npc.leader_id {
-                ids_to_visit.push(leader_id);
-            }
-            ids_to_visit.extend(npc.follower_ids.iter().copied());
-        }
+    let npc = state.get_npc(npc_id)?;
+    if !npc.summoned {
+        return Ok(());
     }
 
-    for npc_id in visited_ids {
-        helpers::remove_temp_npc(clients, state, npc_id);
-    }
+    helpers::remove_temp_npc(clients, state, npc_id);
     Ok(())
 }
 

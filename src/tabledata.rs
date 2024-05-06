@@ -14,7 +14,7 @@ use crate::{
     chunk::{EntityMap, InstanceID},
     config::config_get,
     defines::*,
-    entity::{Egg, NPC},
+    entity::{Egg, EntityID, NPC},
     enums::*,
     error::{log, log_error, log_if_failed, panic_log, FFError, FFResult, Severity},
     item::{CrocPotData, Item, ItemStats, Reward, VendorData, VendorItem},
@@ -85,8 +85,7 @@ struct EggSpawnData {
 #[derive(Debug)]
 struct FollowerData {
     npc_type: i32,
-    offset_x: i32,
-    offset_y: i32,
+    offset: Position,
 }
 
 #[derive(Debug)]
@@ -444,7 +443,7 @@ impl TableData {
     ) -> Vec<NPC> {
         let dat = spawn_data;
         let mut npcs = Vec::new();
-        let mut npc = match NPC::new(
+        let npc = match NPC::new(
             entity_map.gen_next_npc_id(),
             dat.npc_type,
             Position {
@@ -468,16 +467,12 @@ impl TableData {
                 return npcs;
             }
         };
-        for follower in &dat.followers {
+        for follower_data in &dat.followers {
             let id = entity_map.gen_next_npc_id();
             let mut follower = match NPC::new(
                 id,
-                follower.npc_type,
-                Position {
-                    x: dat.pos.x + follower.offset_x,
-                    y: dat.pos.y + follower.offset_y,
-                    z: dat.pos.z,
-                },
+                follower_data.npc_type,
+                dat.pos + follower_data.offset,
                 dat.angle,
                 InstanceID {
                     channel_num,
@@ -494,9 +489,8 @@ impl TableData {
                     continue;
                 }
             };
-            follower.leader_id = Some(npc.id);
+            follower.tight_follow = Some((EntityID::NPC(npc.id), follower_data.offset));
             npcs.push(follower);
-            npc.follower_ids.insert(id);
         }
         npcs.push(npc);
         npcs
@@ -1895,8 +1889,11 @@ fn load_npcs() -> Result<Vec<NPCSpawnData>, String> {
                         .into_iter()
                         .map(|f| FollowerData {
                             npc_type: f.iNPCType,
-                            offset_x: f.iOffsetX,
-                            offset_y: f.iOffsetY,
+                            offset: Position {
+                                x: f.iOffsetX,
+                                y: f.iOffsetY,
+                                z: 0,
+                            },
                         })
                         .collect()
                 } else {

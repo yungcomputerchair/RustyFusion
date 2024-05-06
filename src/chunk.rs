@@ -668,8 +668,7 @@ impl EntityMap {
             };
             let mut npc_count = 0;
             let mut id_mappings = HashMap::new();
-            let mut leader_mappings = HashMap::new();
-            let mut follower_mappings = HashMap::new();
+            let mut tight_follow_mappings = HashMap::new();
             let template_chunks = self.chunk_maps.get(&main_instance).unwrap().chunks.clone();
             for x in 0..NCHUNKS {
                 for y in 0..NCHUNKS {
@@ -679,19 +678,14 @@ impl EntityMap {
                             let mut npc = self.get_npc(npc_id).unwrap().clone();
                             npc.instance_id = instance_id;
                             let new_id = self.gen_next_npc_id();
-                            id_mappings.insert(npc.id, new_id);
+                            id_mappings.insert(*id, EntityID::NPC(new_id));
                             npc.id = new_id;
 
                             // since there's no guarantee on what order the NPCs will be iterated upon,
-                            // we update leader/follower ids after everyone is cloned
-                            if !npc.follower_ids.is_empty() {
-                                follower_mappings.insert(new_id, npc.follower_ids.clone());
+                            // we update follow ids after everyone is cloned
+                            if let Some(tight_follow) = npc.tight_follow {
+                                tight_follow_mappings.insert(new_id, tight_follow);
                             }
-                            npc.follower_ids.clear();
-                            if npc.leader_id.is_some() {
-                                leader_mappings.insert(new_id, npc.leader_id.unwrap());
-                            }
-                            npc.leader_id = None;
 
                             let chunk_pos = npc.get_chunk_coords();
                             let new_npc_id = self.track(Box::new(npc), tick_mode);
@@ -703,19 +697,10 @@ impl EntityMap {
             }
 
             // update leaders
-            for (follower_id, leader_id) in leader_mappings {
-                let npc = self.get_npc_mut(follower_id).unwrap();
-                let new_leader_id = id_mappings[&leader_id];
-                npc.leader_id = Some(new_leader_id);
-            }
-
-            // update followers
-            for (leader_id, follower_ids) in follower_mappings {
-                let npc = self.get_npc_mut(leader_id).unwrap();
-                for follower_id in follower_ids {
-                    let new_follower_id = id_mappings[&follower_id];
-                    npc.follower_ids.insert(new_follower_id);
-                }
+            for (new_npc_id, (old_leader_id, offset)) in tight_follow_mappings {
+                let npc = self.get_npc_mut(new_npc_id).unwrap();
+                let new_leader_id = id_mappings[&old_leader_id];
+                npc.tight_follow = Some((new_leader_id, offset));
             }
 
             log(
