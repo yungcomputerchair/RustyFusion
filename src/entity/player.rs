@@ -1532,31 +1532,36 @@ impl Combatant for Player {
     }
 
     fn get_single_power(&self) -> i32 {
+        let base_power = self.level as i32 * 2 + 8;
         let weapon = self
             .get_item(ItemLocation::Equip, EQUIP_SLOT_HAND as usize)
             .unwrap();
-        match weapon {
-            Some(weapon) => weapon.get_stats().unwrap().single_power.unwrap_or(0),
-            None => 0,
-        }
+        base_power
+            + match weapon {
+                Some(weapon) => weapon.get_stats().unwrap().single_power.unwrap_or(0),
+                None => 0,
+            }
     }
 
     fn get_multi_power(&self) -> i32 {
+        let base_power = self.level as i32 * 2 + 8;
         let weapon = self
             .get_item(ItemLocation::Equip, EQUIP_SLOT_HAND as usize)
             .unwrap();
-        match weapon {
-            Some(weapon) => weapon.get_stats().unwrap().multi_power.unwrap_or(0),
-            None => 0,
-        }
+        base_power
+            + match weapon {
+                Some(weapon) => weapon.get_stats().unwrap().multi_power.unwrap_or(0),
+                None => 0,
+            }
     }
 
     fn get_defense(&self) -> i32 {
-        let mut total = 0;
+        let base_defense = self.level as i32 * 2 + 16;
+        let mut total_from_armor = 0;
         for item in self.get_equipped().iter().flatten() {
-            total += item.get_stats().unwrap().defense.unwrap_or(0);
+            total_from_armor += item.get_stats().unwrap().defense.unwrap_or(0);
         }
-        total
+        base_defense + total_from_armor
     }
 
     fn take_damage(&mut self, damage: i32, _source: EntityID) -> i32 {

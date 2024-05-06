@@ -154,18 +154,11 @@ struct RespawnPoint {
 pub struct PlayerStats {
     pub hp_up: u32,
     pub max_hp: u32,
-    pub accuracy: u32,
-    pub dodge: u32,
-    pub power: u32,
-    pub protection: u32,
     pub req_fm_nano_create: u32,
     pub req_fm_nano_tune: u32,
     pub fm_limit: u32,
-    pub mob_fm: u32,
     pub nano_quest_task_id: Option<i32>,
     pub nano_id: i16,
-    pub bonus_fm: u32,
-    pub death_fm: u32,
 }
 
 pub struct NPCStats {
@@ -1754,21 +1747,14 @@ fn load_player_data(
         let player_stats = PlayerStats {
             hp_up: entry.m_iHpUp,
             max_hp: entry.m_iMaxHP,
-            accuracy: entry.m_iAccuracy,
-            dodge: entry.m_iDodge,
-            power: entry.m_iPower,
-            protection: entry.m_iProtection,
             req_fm_nano_create: entry.m_iReqBlob_NanoCreate,
             req_fm_nano_tune: entry.m_iReqBlob_NanoTune,
             fm_limit: entry.m_iFMLimit,
-            mob_fm: entry.m_iMobFM,
             nano_quest_task_id: match entry.m_iNanoQuestTaskID {
                 0 => None,
                 tid => Some(tid),
             },
             nano_id: entry.m_iNanoID,
-            bonus_fm: entry.m_iBonusFM,
-            death_fm: entry.m_iDeathFM,
         };
         player_stats_table.insert(key, player_stats);
     }
