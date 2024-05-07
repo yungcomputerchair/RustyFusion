@@ -2,13 +2,16 @@ use rusty_fusion::{
     defines::*,
     entity::{Entity, EntityID},
     error::*,
+    helpers::send_system_message,
     net::{
         packet::{PacketID::*, *},
-        ClientMap, FFClient,
+        ClientMap,
     },
     state::ShardServerState,
     unused, util,
 };
+
+const CUSTOM_COMMAND_PREFIX: char = '!';
 
 pub fn send_freechat_message(
     clients: &mut ClientMap,
@@ -20,7 +23,7 @@ pub fn send_freechat_message(
     catch_fail(
         (|| {
             let msg = util::parse_utf16(&pkt.szFreeChat)?;
-            if let Some(cmdstr) = msg.strip_prefix('/') {
+            if let Some(cmdstr) = msg.strip_prefix(CUSTOM_COMMAND_PREFIX) {
                 let tokens = cmdstr.split_whitespace().collect::<Vec<_>>();
                 if !tokens.is_empty() {
                     return commands::handle_custom_command(tokens, clients, state);
@@ -28,6 +31,17 @@ pub fn send_freechat_message(
             }
 
             let client = clients.get_self();
+            if msg.starts_with('/') {
+                return send_system_message(
+                    client,
+                    &format!(
+                        "You mistyped your built-in command!\n\
+                        Or if you meant to use a custom command, try {}help",
+                        CUSTOM_COMMAND_PREFIX
+                    ),
+                );
+            }
+
             let pc_id = client.get_player_id()?;
             let player = state.get_player(pc_id)?;
             if player.freechat_muted {
@@ -278,14 +292,6 @@ mod commands {
             .collect()
     }
 
-    fn send_system_message(client: &mut FFClient, msg: &str) -> FFResult<()> {
-        let resp = sP_FE2CL_PC_MOTD_LOGIN {
-            iType: unused!(),
-            szSystemMsg: util::encode_utf16(msg),
-        };
-        client.send_packet(P_FE2CL_PC_MOTD_LOGIN, &resp)
-    }
-
     fn parse_pc_id(token: &str) -> Result<Option<i32>, ()> {
         if token == "." {
             return Ok(None);
@@ -307,8 +313,8 @@ mod commands {
             send_system_message(
                 clients.get_self(),
                 &format!(
-                    "Unknown command /{}\nUse /help for a list of available commands",
-                    cmd_name
+                    "Unknown command {}{}\nUse {}help for a list of available commands",
+                    CUSTOM_COMMAND_PREFIX, cmd_name, CUSTOM_COMMAND_PREFIX
                 ),
             )
         }
@@ -343,12 +349,18 @@ mod commands {
         if tokens.len() < 3 {
             return send_system_message(
                 client,
-                if is_ban_i {
-                    "Usage: /ban_i <pc_id> <duration> [reason]\n\
-                    Duration example: 1d3h5m42s (no spaces!)"
+                &if is_ban_i {
+                    format!(
+                        "Usage: {}ban_i <pc_id> <duration> [reason]\n\
+                    Duration example: 1d3h5m42s (no spaces!)",
+                        CUSTOM_COMMAND_PREFIX
+                    )
                 } else {
-                    "Usage: /ban_a <account_id> <duration> [reason]\n\
-                    Duration example: 1d3h5m42s (no spaces!)"
+                    format!(
+                        "Usage: {}ban_a <account_id> <duration> [reason]\n\
+                    Duration example: 1d3h5m42s (no spaces!)",
+                        CUSTOM_COMMAND_PREFIX
+                    )
                 },
             );
         }
@@ -441,7 +453,10 @@ mod commands {
     ) -> FFResult<()> {
         let client = clients.get_self();
         if tokens.len() < 2 {
-            return send_system_message(client, "Usage: /unban <account_id>");
+            return send_system_message(
+                client,
+                &format!("Usage: {}unban <account_id>", CUSTOM_COMMAND_PREFIX),
+            );
         }
 
         let player = state.get_player(client.get_player_id()?)?;
@@ -475,10 +490,13 @@ mod commands {
         if tokens.len() < 2 {
             return send_system_message(
                 client,
-                "Usage: /perms <pc_id> [new_level] [\"save\"]\n\
+                &format!(
+                    "Usage: {}perms <pc_id> [new_level] [\"save\"]\n\
                 Use . for pc_id to select yourself\n\
                 Leave new_level empty to view the current level\n\
                 Add \"save\" to save the new level to the account",
+                    CUSTOM_COMMAND_PREFIX
+                ),
             );
         }
 
@@ -583,7 +601,10 @@ mod commands {
     ) -> FFResult<()> {
         let mut help_msg = "Available commands\n".to_string();
         for (cmd_name, cmd) in AVAILABLE_COMMANDS.get().unwrap() {
-            help_msg.push_str(&format!("/{}: {}\n", cmd_name, cmd.description));
+            help_msg.push_str(&format!(
+                "{}{}: {}\n",
+                CUSTOM_COMMAND_PREFIX, cmd_name, cmd.description
+            ));
         }
         help_msg.pop(); // remove trailing newline
         send_system_message(clients.get_self(), &help_msg)

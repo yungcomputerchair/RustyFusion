@@ -6,9 +6,10 @@ use crate::{
     error::{log, log_if_failed, FFResult, Severity},
     net::{
         packet::{PacketID::*, *},
-        ClientMap,
+        ClientMap, FFClient,
     },
     state::ShardServerState,
+    util,
 };
 
 pub fn broadcast_state(
@@ -149,4 +150,12 @@ pub fn remove_group_member(
     // save group state
     state.groups.insert(group_id, group);
     Ok(())
+}
+
+pub fn send_system_message(client: &mut FFClient, msg: &str) -> FFResult<()> {
+    let resp = sP_FE2CL_PC_MOTD_LOGIN {
+        iType: unused!(),
+        szSystemMsg: util::encode_utf16(msg),
+    };
+    client.send_packet(P_FE2CL_PC_MOTD_LOGIN, &resp)
 }
