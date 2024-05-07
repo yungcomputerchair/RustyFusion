@@ -39,20 +39,21 @@ pub fn pc_attack_npcs(clients: &mut ClientMap, state: &mut ShardServerState) -> 
     if target_count == 0 {
         return Ok(());
     }
-    if target_count > MAX_TARGETS {
-        return Err(FFError::build(
-            Severity::Warning,
-            format!(
-                "Player {} tried to attack {} NPCs (max {})",
-                pc_id, pkt.iNPCCnt, MAX_TARGETS
-            ),
-        ));
-    }
 
-    let mut defeated_types = HashMap::new();
-    let mut target_ids = Vec::with_capacity(4);
+    let mut target_ids = Vec::with_capacity(MAX_TARGETS);
     let mut weapon_boosts_needed = 0;
-    for _ in 0..target_count {
+    for i in 0..target_count {
+        // TODO stricter anti-cheat.
+        // validate target count, range, attack cooldown, etc against weapon stats
+        if i >= MAX_TARGETS {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Player {} tried to attack {} NPCs (max {})",
+                    pc_id, pkt.iNPCCnt, MAX_TARGETS
+                ),
+            ));
+        }
         let npc_id = client.get_struct::<sTargetNpcId>()?.iNPC_ID;
         let npc = match state.get_npc(npc_id) {
             Ok(npc) => npc,
@@ -79,7 +80,10 @@ pub fn pc_attack_npcs(clients: &mut ClientMap, state: &mut ShardServerState) -> 
     // attack handler
     skills::do_basic_attack(player.get_id(), &target_ids, charged, state, clients)?;
 
+    // TODO offload everything below to a separate function
+
     // kills
+    let mut defeated_types = HashMap::new();
     for target_id in &target_ids {
         if let EntityID::NPC(npc_id) = target_id {
             let npc = state.get_npc(*npc_id).unwrap();
