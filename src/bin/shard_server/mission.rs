@@ -313,7 +313,7 @@ pub fn task_stop(client: &mut FFClient, state: &mut ShardServerState) -> FFResul
 
 pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let pkt: sP_CL2FE_REQ_PC_TASK_END = *clients.get_self().get_packet(P_CL2FE_REQ_PC_TASK_END)?;
-    let mut error_code = None; // true failures are handled in player tick
+    let mut error_code = codes::TaskEndErr::NotComplete; // N.B. true failures are handled in player tick
     catch_fail(
         (|| {
             let pc_id = clients.get_self().get_player_id()?;
@@ -427,7 +427,7 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
                 let reward = tdata_get().get_mission_reward(reward_id)?;
                 let inv_space = player.get_free_slots(ItemLocation::Inven);
                 if reward.items.len() > inv_space {
-                    error_code = Some(codes::TaskEndErr::InventoryFull);
+                    error_code = codes::TaskEndErr::InventoryFull;
                     return Err(FFError::build(
                         Severity::Warning,
                         format!(
@@ -442,7 +442,7 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
 
             // check for free qitem slots for qitem rewards
             if player.get_free_slots(ItemLocation::QInven) < task_def.succ_qitems.len() {
-                error_code = Some(codes::TaskEndErr::InventoryFull);
+                error_code = codes::TaskEndErr::InventoryFull;
                 return Err(FFError::build(
                     Severity::Warning,
                     format!(
@@ -614,10 +614,7 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
         || {
             let resp = sP_FE2CL_REP_PC_TASK_END_FAIL {
                 iTaskNum: pkt.iTaskNum,
-                iErrorCode: error_code.unwrap_or_else(|| {
-                    log(Severity::Warning, "Task end failed with no error code");
-                    codes::TaskEndErr::Unknown
-                }) as i32,
+                iErrorCode: error_code as i32,
             };
             clients
                 .get_self()

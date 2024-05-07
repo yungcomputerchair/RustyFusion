@@ -273,7 +273,7 @@ pub mod codes {
     #[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
     #[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
     pub enum TaskEndErr {
-        Unknown = 0,
+        NotComplete = 0,
         TimeLimitExceeded = 1,
         EscortFailed = 11,
         InstanceLeft = 12,
