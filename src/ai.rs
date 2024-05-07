@@ -901,7 +901,7 @@ impl AINode for CheckRetreat {
                     Some(target) => {
                         let cb = target.as_combatant().unwrap();
                         cb.is_dead() // target dead
-                        // or not aggroable
+                        // or no longer aggroable
                         || cb.get_aggro_factor() <= 0.0
                         // or they've gone too far
                         || cb.get_position()
@@ -978,10 +978,18 @@ impl AINode for CheckAttack {
             None => return NodeStatus::Failure,
         };
 
-        let target = match state.entity_map.get_from_id(target_id) {
-            Some(target) => target,
-            None => return NodeStatus::Failure,
+        let target = match state.get_combatant(target_id) {
+            Ok(target) => target,
+            Err(_) => {
+                npc.target_id = None;
+                return NodeStatus::Failure;
+            }
         };
+
+        if target.is_dead() {
+            npc.target_id = None;
+            return NodeStatus::Failure;
+        }
 
         if npc.get_position().distance_to(&target.get_position()) > self.attack_range {
             return NodeStatus::Failure;
