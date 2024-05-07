@@ -4,8 +4,9 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
 ## RustyFusion vs. OpenFusion
 - **Compatibility:** RustyFusion is designed to work with general-purpose Fusionfall clients, as it speaks the original Fusionfall network protocol. This means that [OpenFusionClient](https://github.com/OpenFusionProject/OpenFusionClient) can connect to a RustyFusion server with no extra work. RustyFusion's SQL backends also use a superset of the OpenFusion database schema, and RustyFusion uses the same tabledata repository as OpenFusion for data sourcing. It will also later support the OpenFusion monitor protocol.
 - **Safety:** Because RustyFusion is written in Rust as opposed to OpenFusion's choice of C++, it is, in theory, **much less** prone to memory safety issues, security vulnerabilities, and undefined behavior than OpenFusion's implementation of the game with a near-zero decrease in performance.
-- **Scalability:** Unlike OpenFusion, RustyFusion's login server and shard server are **two separate binaries** that communicate to each other over the network, allowing for a more flexible server architecture with multiple shard servers. On top of that, RustyFusion shards properly support **channels**. There are built-in client commands to check and switch channels, like `/chinfo` and `/chwarp`.
+- **Scalability:** Unlike OpenFusion, RustyFusion's login server and shard server are **two separate binaries** that communicate to each other over the network, allowing for a more flexible server architecture with multiple shard servers.
 - **Reliability:** RustyFusion comes after years of writing, refactoring, and evaluating OpenFusion code. There were a handful of cut corners and bad design decisions made in the development of OF that this project aims to avoid. Some already implemented examples include the increased usage of high-level types, a proper logging system, strict error-handling, and stricter packet validation ("anti-cheat"). These changes should lead to a cleaner codebase with less bugs.
+- **Completeness:** OpenFusion is not technically complete in and of itself. There's a handful of features that remain unimplemented at the time of writing, such as channels, certain built-in commands, and NPC v. NPC combat. RustyFusion aims to close the gap on as many of these features as possible.
 
 ## What's Done and Left To Do (Roughly)
 - [x] Core login server functionality
@@ -64,13 +65,14 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
   - [x] Changing nano powers
 - [ ] Combat
   - [x] Mobs
-  - [x] Core combat loop & mob AI
+  - [x] Core combat loop & mob AI +
   - [x] Player respawning
   - [ ] Abilities and (de)buffs
     - [ ] Passive skills (including nano)*
     - [ ] Active skills (including nano)*
     - [ ] Gumballs & other usables
     - [ ] E.G.G.s (the ones on the ground that buff you)
+  - [ ] Rockets and grenades
   - [x] Mob drops
 - [x] Missions
   - [x] Starting tasks +
@@ -136,6 +138,12 @@ cargo clippy
 ```
 
 ## Other Notes
+### On Creative Liberties
+Although RustyFusion tries to match the front-end behavior of OpenFusion closely, there are some notable, intentional differences that exist between the two. I only diverged on these because I think they lead to an overall improved experience.
+- Mob aggro is dynamic and builds up/diminishes according to different factors. This new formula is being tweaked often.
+- Not all OpenFusion custom commands will be supported (particularly "gruntwork" commands) and brand new custom commands are added as good use cases come up.
+
+### Disclaimer
 RustyFusion is a **personal project that I work on in my free time**, so it is unlikely to progress at a constant pace.
 
 Feel free to email or DM me if you have any questions about the project or are interested in contributing.
