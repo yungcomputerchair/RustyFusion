@@ -49,106 +49,148 @@ impl AI {
             return (None, TickMode::Never);
         }
 
-        // Defeat beahviors
-        let respawn_time_ms = stats.regen_time * 100;
-        let defeat_check = CheckDead::new_node(
-            npc.get_position(),
-            Duration::from_millis(DECHUNK_DELAY_MS),
-            Duration::from_millis(respawn_time_ms),
-        );
+        let include_combatant_nodes = npc.as_combatant().is_some();
+        let include_mob_nodes = include_combatant_nodes && stats.team == CombatantTeam::Mob;
+        let include_pack_follower_nodes = include_mob_nodes && npc.tight_follow.is_some();
 
-        // Movement behaviors
-        let base_movement_behaviors = vec![
-            FollowAssignedPath::new_node(),
-            FollowEntityLoose::new_node(FollowTarget::AssignedEntity, 300, 200, stats.walk_speed),
-        ];
-        let base_movement_selector = SelectorNode::new_node(base_movement_behaviors);
-        let movement_selector = if npc.as_combatant().is_some() && stats.team == CombatantTeam::Mob
-        {
-            // stats.ai_type == ???
-            let mut mob_movement_behaviors = Vec::new();
+        let root_sequence = SequenceNode::new_node({
+            let mut root_behaviors = Vec::new();
 
-            // Retreat if needed
-            let retreat_threshold = stats.combat_range;
-            let retreat_to = npc.get_position();
-            mob_movement_behaviors.push(CheckRetreat::new_node(retreat_to, retreat_threshold));
-
-            // Follow combat target
-            let stay_within_range = stats.attack_range + stats.radius;
-            let following_distance = stats.radius;
-            mob_movement_behaviors.push(FollowEntityLoose::new_node(
-                FollowTarget::CombatTarget,
-                stay_within_range,
-                following_distance,
-                stats.run_speed,
-            ));
-
-            // Follow pack (follower mobs only)
-            if npc.tight_follow.is_some() {
-                let tolerance = stats.radius / 2;
-                let max_speed = stats.run_speed * 2;
-                mob_movement_behaviors.push(FollowEntityTight::new_node(tolerance, max_speed));
-            }
-
-            // Base movement behaviors
-            mob_movement_behaviors.push(base_movement_selector);
-
-            // Roam around spawn
-            if stats.idle_range > 0 {
-                let roam_radius_max = stats.idle_range / 2;
-                let roam_radius_range = (roam_radius_max / 2, roam_radius_max);
-                let roam_delay_max_ms = stats.delay_time * 1000;
-                let roam_delay_range_ms = (roam_delay_max_ms / 2, roam_delay_max_ms);
-                mob_movement_behaviors.push(RandomRoamAround::new_node(
+            // Combatants: check for defeat
+            if include_combatant_nodes {
+                let respawn_time_ms = stats.regen_time * 100;
+                root_behaviors.push(CheckDead::new_node(
                     npc.get_position(),
-                    roam_radius_range,
-                    roam_delay_range_ms,
+                    Duration::from_millis(DECHUNK_DELAY_MS),
+                    Duration::from_millis(respawn_time_ms),
                 ));
             }
 
-            SelectorNode::new_node(mob_movement_behaviors)
-        } else {
-            base_movement_selector
-        };
+            // Mobs: check for retreat
+            if include_mob_nodes {
+                let retreat_selector = SelectorNode::new_node({
+                    let mut retreat_behaviors = Vec::new();
 
-        // Combat behaviors
-        let mut combat_behaviors = vec![];
-        if stats.team == CombatantTeam::Mob {
-            // Sync with leader (follower mobs only)
-            if npc.tight_follow.is_some() {
-                combat_behaviors.push(SyncWithLeader::new_node());
+                    // Pack followers: check for leader retreat
+                    if include_pack_follower_nodes {
+                        retreat_behaviors.push(CheckLeaderRetreat::new_node());
+                    }
+
+                    // Retreat if needed
+                    let retreat_threshold = stats.combat_range;
+                    let retreat_to = npc.get_position();
+                    retreat_behaviors.push(CheckRetreat::new_node(retreat_to, retreat_threshold));
+
+                    retreat_behaviors
+                });
+                root_behaviors.push(retreat_selector);
             }
 
-            // Scan for targets
-            let scan_radius = stats.sight_range;
-            let distance_factor = 0.5;
-            let level_factor = 0.1;
-            let aggro_rates = (1.0, -0.5);
-            let aggro_threshold = 1.0;
-            combat_behaviors.push(ScanForTargets::new_node(
-                Some(CombatantTeam::Friendly),
-                scan_radius,
-                distance_factor,
-                level_factor,
-                aggro_rates,
-                aggro_threshold,
-            ));
+            // Pack followers: sync aggro with leader.
+            // This has to happen before movement to avoid yo-yoing
+            if include_pack_follower_nodes {
+                root_behaviors.push(SyncLeaderTarget::new_node());
+            }
 
-            // Attack
-            let attack_range = stats.attack_range + stats.radius;
-            let attack_cooldown = Duration::from_millis(stats.delay_time * 100);
-            combat_behaviors.push(CheckAttack::new_node(attack_range, attack_cooldown));
-        }
-        let combat_sequence = SequenceNode::new_node(combat_behaviors);
+            // Do movement
+            let movement_selector = SelectorNode::new_node({
+                let mut movement_behaviors = Vec::new();
 
-        let root = SequenceNode::new_node(vec![defeat_check, movement_selector, combat_sequence]);
+                // Combatants: follow target
+                if include_combatant_nodes {
+                    let stay_within_range = stats.attack_range + stats.radius;
+                    let following_distance = stats.radius;
+                    movement_behaviors.push(FollowEntityLoose::new_node(
+                        FollowTarget::CombatTarget,
+                        stay_within_range,
+                        following_distance,
+                        stats.run_speed,
+                    ));
+                }
+
+                // Pack followers: follow leader
+                if include_pack_follower_nodes {
+                    let tolerance = stats.radius / 2;
+                    let max_speed = stats.run_speed * 2;
+                    movement_behaviors.push(FollowEntityTight::new_node(tolerance, max_speed));
+                }
+
+                // Follow assigned entity
+                let stay_within_range = 300;
+                let following_distance = 200;
+                movement_behaviors.push(FollowEntityLoose::new_node(
+                    FollowTarget::AssignedEntity,
+                    stay_within_range,
+                    following_distance,
+                    stats.run_speed,
+                ));
+
+                // Follow assigned path
+                movement_behaviors.push(FollowAssignedPath::new_node());
+
+                // Mobs with non-zero idle range: roam around spawn
+                if include_mob_nodes && stats.idle_range > 0 {
+                    let roam_radius_max = stats.idle_range / 2;
+                    let roam_radius_range = (roam_radius_max / 2, roam_radius_max);
+                    let roam_delay_max_ms = stats.delay_time * 1000;
+                    let roam_delay_range_ms = (roam_delay_max_ms / 2, roam_delay_max_ms);
+                    movement_behaviors.push(PatrolPoint::new_node(
+                        npc.get_position(),
+                        roam_radius_range,
+                        roam_delay_range_ms,
+                    ));
+                }
+
+                movement_behaviors
+            });
+            root_behaviors.push(movement_selector);
+
+            // Combatants: find and attack targets
+            if include_combatant_nodes {
+                let combat_sequence = SequenceNode::new_node({
+                    let mut combat_behaviors = Vec::new();
+
+                    // Mobs: scan for non-mob targets
+                    if include_mob_nodes {
+                        let scan_radius = stats.sight_range;
+                        let distance_factor = 0.5;
+                        let level_factor = 0.1;
+                        let aggro_rates = (1.0, -0.5);
+                        let aggro_threshold = 1.0;
+                        combat_behaviors.push(ScanForTargets::new_node(
+                            Some(CombatantTeam::Friendly),
+                            scan_radius,
+                            distance_factor,
+                            level_factor,
+                            aggro_rates,
+                            aggro_threshold,
+                        ));
+                    }
+
+                    // Attack target
+                    let attack_range = stats.attack_range + stats.radius;
+                    let attack_cooldown = Duration::from_millis(stats.delay_time * 100);
+                    combat_behaviors.push(CheckAttack::new_node(attack_range, attack_cooldown));
+
+                    combat_behaviors
+                });
+                root_behaviors.push(combat_sequence);
+            }
+            root_behaviors
+        });
+
         let tick_mode = if npc.path.is_some() {
             TickMode::Always
         } else {
             TickMode::WhenLoaded
         };
 
-        (Some(AI { root }), tick_mode)
+        (
+            Some(AI {
+                root: root_sequence,
+            }),
+            tick_mode,
+        )
     }
 
     pub fn tick(
@@ -430,13 +472,13 @@ enum RoamState {
 }
 
 #[derive(Debug, Clone)]
-struct RandomRoamAround {
+struct PatrolPoint {
     home: Position,
     roam_radius_range: (u32, u32),
     roam_delay_range_ms: (u64, u64),
     roam_state: RoamState,
 }
-impl RandomRoamAround {
+impl PatrolPoint {
     fn new_node(
         home: Position,
         roam_radius_range: (u32, u32),
@@ -450,7 +492,7 @@ impl RandomRoamAround {
         })
     }
 }
-impl AINode for RandomRoamAround {
+impl AINode for PatrolPoint {
     fn clone_node(&self) -> Box<dyn AINode> {
         Box::new(self.clone())
     }
@@ -578,23 +620,75 @@ impl AINode for CheckDead {
 }
 
 #[derive(Debug, Clone)]
-enum SyncState {
+enum LeaderRetreatState {
     Idle,
     LeaderRetreating,
 }
 
 #[derive(Debug, Clone)]
-struct SyncWithLeader {
-    sync_state: SyncState,
+struct CheckLeaderRetreat {
+    leader_retreat_state: LeaderRetreatState,
 }
-impl SyncWithLeader {
+impl CheckLeaderRetreat {
     fn new_node() -> Box<dyn AINode> {
         Box::new(Self {
-            sync_state: SyncState::Idle,
+            leader_retreat_state: LeaderRetreatState::Idle,
         })
     }
 }
-impl AINode for SyncWithLeader {
+impl AINode for CheckLeaderRetreat {
+    fn clone_node(&self) -> Box<dyn AINode> {
+        Box::new(self.clone())
+    }
+
+    fn tick(
+        &mut self,
+        npc: &mut NPC,
+        state: &mut ShardServerState,
+        _clients: &mut ClientMap,
+        _time: &SystemTime,
+    ) -> NodeStatus {
+        let leader_npc_id = match npc.tight_follow {
+            Some((EntityID::NPC(leader_npc_id), _)) => leader_npc_id,
+            _ => return NodeStatus::Failure,
+        };
+
+        let leader_npc = match state.get_npc_mut(leader_npc_id) {
+            Ok(leader_npc) => leader_npc,
+            Err(_) => return NodeStatus::Failure,
+        };
+
+        if leader_npc.is_dead() {
+            return NodeStatus::Failure;
+        }
+
+        match self.leader_retreat_state {
+            LeaderRetreatState::Idle => {
+                if leader_npc.retreating {
+                    npc.retreating = true;
+                    self.leader_retreat_state = LeaderRetreatState::LeaderRetreating;
+                }
+            }
+            LeaderRetreatState::LeaderRetreating => {
+                if !leader_npc.retreating {
+                    npc.reset();
+                    // TODO full heal effect
+                    self.leader_retreat_state = LeaderRetreatState::Idle;
+                }
+            }
+        }
+        NodeStatus::Success
+    }
+}
+
+#[derive(Debug, Clone)]
+struct SyncLeaderTarget {}
+impl SyncLeaderTarget {
+    fn new_node() -> Box<dyn AINode> {
+        Box::new(Self {})
+    }
+}
+impl AINode for SyncLeaderTarget {
     fn clone_node(&self) -> Box<dyn AINode> {
         Box::new(self.clone())
     }
@@ -620,44 +714,26 @@ impl AINode for SyncWithLeader {
             return NodeStatus::Success;
         }
 
-        // sync retreat
-        match self.sync_state {
-            SyncState::Idle => {
-                if leader_npc.retreating {
-                    npc.retreating = true;
-                    npc.target_id = None;
-                    self.sync_state = SyncState::LeaderRetreating;
-                }
-            }
-            SyncState::LeaderRetreating => {
-                if !leader_npc.retreating {
-                    npc.reset();
-                    // TODO full heal effect
-                    self.sync_state = SyncState::Idle;
-                    return NodeStatus::Failure;
-                }
-            }
-        }
-        if npc.retreating {
+        if leader_npc.retreating {
+            npc.target_id = None;
             return NodeStatus::Success;
         }
 
-        // sync target
         match npc.target_id {
             None => {
                 npc.target_id = leader_npc.target_id;
-                if npc.target_id.is_some() {
-                    println!(
-                        "{:?} sync aggro to {:?}",
-                        npc.get_id(),
-                        leader_npc.target_id
-                    );
-                }
+                // if npc.target_id.is_some() {
+                //     println!(
+                //         "{:?} sync aggro to {:?}",
+                //         npc.get_id(),
+                //         leader_npc.target_id
+                //     );
+                // }
             }
             Some(target_id) => {
                 if leader_npc.target_id.is_none() {
                     leader_npc.target_id = Some(target_id);
-                    println!("{:?} sync aggro to {:?}", leader_npc.get_id(), target_id);
+                    //println!("{:?} sync aggro to {:?}", leader_npc.get_id(), target_id);
                 }
             }
         }
@@ -810,14 +886,6 @@ impl AINode for CheckRetreat {
         clients: &mut ClientMap,
         _time: &SystemTime,
     ) -> NodeStatus {
-        // if we have a tight follow, we let them drive retreats
-        // unless they are dead or gone
-        if let Some((leader_id, _)) = npc.tight_follow {
-            if state.get_combatant(leader_id).is_ok_and(|ld| !ld.is_dead()) {
-                return NodeStatus::Failure;
-            }
-        }
-
         match &mut self.retreat_state {
             RetreatState::Idle => {
                 let target_id = match npc.target_id {
@@ -825,7 +893,7 @@ impl AINode for CheckRetreat {
                     None => {
                         // no target; update retreat position
                         self.retreat_to = npc.get_position();
-                        return NodeStatus::Failure;
+                        return NodeStatus::Success;
                     }
                 };
 
@@ -853,8 +921,7 @@ impl AINode for CheckRetreat {
                     npc.retreating = true;
                     NodeStatus::Running
                 } else {
-                    // actively in combat
-                    NodeStatus::Failure
+                    NodeStatus::Success
                 }
             }
             RetreatState::Retreating(path) => {
