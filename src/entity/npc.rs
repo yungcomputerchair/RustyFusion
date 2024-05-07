@@ -315,8 +315,14 @@ impl Combatant for NPC {
     }
 
     fn get_defense(&self) -> i32 {
+        // OF's damage formula makes friendly NPCs wayyy too weak,
+        // so we buff them here
+        const FRIENDLY_DEFENSE_MULTIPLIER: f32 = 3.0;
         let stats = tdata_get().get_npc_stats(self.ty).unwrap();
-        stats.defense
+        match stats.team {
+            CombatantTeam::Friendly => (stats.defense as f32 * FRIENDLY_DEFENSE_MULTIPLIER) as i32,
+            _ => stats.defense,
+        }
     }
 
     fn take_damage(&mut self, damage: i32, source: EntityID) -> i32 {
