@@ -56,7 +56,7 @@ impl ShardServerState {
                     npc.path = Some(path);
                 }
 
-                let (ai, tick_mode) = AI::make_for_npc(&npc);
+                let (ai, tick_mode) = AI::make_for_npc(&npc, false);
                 npc.ai = ai;
 
                 let chunk_pos = npc.get_chunk_coords();

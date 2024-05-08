@@ -254,7 +254,7 @@ mod helpers {
 mod commands {
     use std::{collections::HashMap, sync::OnceLock, time::SystemTime};
 
-    use rusty_fusion::database::db_get;
+    use rusty_fusion::{ai::AI, database::db_get};
 
     use super::*;
 
@@ -513,8 +513,20 @@ mod commands {
 
         if let Some(npc_id) = closest_npc_id {
             let npc = state.get_npc_mut(npc_id).unwrap();
+            log_if_failed(send_system_message(
+                client,
+                &format!("{} is now following you", npc),
+            ));
             npc.set_follow(EntityID::Player(pc_id));
-            send_system_message(client, &format!("{} is now following you", npc))
+            if npc.ai.is_none() {
+                let (ai, new_tick_mode) = AI::make_for_npc(npc, true);
+                npc.ai = ai;
+                state
+                    .entity_map
+                    .set_tick(EntityID::NPC(npc_id), new_tick_mode)
+                    .unwrap();
+            }
+            Ok(())
         } else {
             send_system_message(client, "No NPCs nearby")
         }

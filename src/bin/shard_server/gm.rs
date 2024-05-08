@@ -694,7 +694,7 @@ mod helpers {
 
     pub fn spawn_temp_npc(clients: &mut ClientMap, entity_map: &mut EntityMap, mut npc: NPC) {
         npc.summoned = true;
-        let (ai, tick_mode) = AI::make_for_npc(&npc);
+        let (ai, tick_mode) = AI::make_for_npc(&npc, true);
         npc.ai = ai;
         let chunk_coords = npc.get_chunk_coords();
         let eid = entity_map.track(Box::new(npc), tick_mode);

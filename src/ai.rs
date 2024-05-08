@@ -43,11 +43,11 @@ pub struct AI {
     root: Box<dyn AINode>,
 }
 impl AI {
-    pub fn make_for_npc(npc: &NPC) -> (Option<Self>, TickMode) {
+    pub fn make_for_npc(npc: &NPC, force: bool) -> (Option<Self>, TickMode) {
         const DECHUNK_DELAY_MS: u64 = 2000;
 
         let stats = tdata_get().get_npc_stats(npc.ty).unwrap();
-        if npc.path.is_none() && stats.ai_type == 0 {
+        if !force && npc.path.is_none() && stats.ai_type == 0 {
             return (None, TickMode::Never);
         }
 
