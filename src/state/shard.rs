@@ -1,5 +1,6 @@
 use std::{collections::HashMap, sync::mpsc::TryRecvError, time::SystemTime};
 
+use rand::thread_rng;
 use uuid::Uuid;
 
 use crate::{
@@ -279,6 +280,7 @@ impl ShardServerState {
     }
 
     pub fn tick_entities(&mut self, time: SystemTime, clients: &mut ClientMap) {
+        let mut rng = thread_rng();
         let eids: Vec<EntityID> = self.entity_map.get_tickable_ids().collect();
         for eid in eids {
             match eid {
@@ -286,22 +288,22 @@ impl ShardServerState {
                 // we put it back when we're done.
                 EntityID::Player(pc_id) => {
                     let mut player = self.entity_map.get_player_mut(pc_id).unwrap().clone();
-                    player.tick(time, clients, self);
+                    player.tick(&time, clients, self, &mut rng);
                     *self.entity_map.get_player_mut(pc_id).unwrap() = player;
                 }
                 EntityID::NPC(npc_id) => {
                     let mut npc = self.entity_map.get_npc_mut(npc_id).unwrap().clone();
-                    npc.tick(time, clients, self);
+                    npc.tick(&time, clients, self, &mut rng);
                     *self.entity_map.get_npc_mut(npc_id).unwrap() = npc;
                 }
                 EntityID::Slider(slider_id) => {
                     let mut slider = self.entity_map.get_slider_mut(slider_id).unwrap().clone();
-                    slider.tick(time, clients, self);
+                    slider.tick(&time, clients, self, &mut rng);
                     *self.entity_map.get_slider_mut(slider_id).unwrap() = slider;
                 }
                 EntityID::Egg(egg_id) => {
                     let mut egg = self.entity_map.get_egg_mut(egg_id).unwrap().clone();
-                    egg.tick(time, clients, self);
+                    egg.tick(&time, clients, self, &mut rng);
                     *self.entity_map.get_egg_mut(egg_id).unwrap() = egg;
                 }
             }

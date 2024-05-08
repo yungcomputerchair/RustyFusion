@@ -3,14 +3,15 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use rand::{thread_rng, Rng};
+use rand::{rngs::ThreadRng, thread_rng, Rng};
 
 use crate::{
     chunk::TickMode,
-    defines::SHARD_TICKS_PER_SECOND,
+    defines::{RANGE_GROUP_PARTICIPATE, SHARD_TICKS_PER_SECOND},
     entity::{Combatant, Entity, EntityID, NPC},
     enums::CombatantTeam,
     error::*,
+    helpers,
     net::ClientMap,
     path::Path,
     skills,
@@ -28,6 +29,7 @@ trait AINode: std::fmt::Debug {
         state: &mut ShardServerState,
         clients: &mut ClientMap,
         time: &SystemTime,
+        rng: &mut ThreadRng,
     ) -> NodeStatus;
 }
 impl Clone for Box<dyn AINode> {
@@ -200,8 +202,9 @@ impl AI {
         state: &mut ShardServerState,
         clients: &mut ClientMap,
         time: &SystemTime,
+        rng: &mut ThreadRng,
     ) {
-        self.root.tick(npc, state, clients, time);
+        self.root.tick(npc, state, clients, time, rng);
     }
 }
 
@@ -237,9 +240,10 @@ impl AINode for SequenceNode {
         state: &mut ShardServerState,
         clients: &mut ClientMap,
         time: &SystemTime,
+        rng: &mut ThreadRng,
     ) -> NodeStatus {
         while self.cursor < self.children.len() {
-            let status = self.children[self.cursor].tick(npc, state, clients, time);
+            let status = self.children[self.cursor].tick(npc, state, clients, time, rng);
             match status {
                 NodeStatus::Success => {
                     self.cursor += 1;
@@ -282,9 +286,10 @@ impl AINode for SelectorNode {
         state: &mut ShardServerState,
         clients: &mut ClientMap,
         time: &SystemTime,
+        rng: &mut ThreadRng,
     ) -> NodeStatus {
         while self.cursor < self.children.len() {
-            let status = self.children[self.cursor].tick(npc, state, clients, time);
+            let status = self.children[self.cursor].tick(npc, state, clients, time, rng);
             match status {
                 NodeStatus::Success => {
                     self.cursor = 0;
@@ -321,6 +326,7 @@ impl AINode for FollowAssignedPath {
         state: &mut ShardServerState,
         clients: &mut ClientMap,
         _time: &SystemTime,
+        _rng: &mut ThreadRng,
     ) -> NodeStatus {
         let path = npc.path.take();
         match path {
@@ -373,6 +379,7 @@ impl AINode for FollowEntityLoose {
         state: &mut ShardServerState,
         clients: &mut ClientMap,
         _time: &SystemTime,
+        _rng: &mut ThreadRng,
     ) -> NodeStatus {
         let target_id = match self.target {
             FollowTarget::AssignedEntity => npc.loose_follow,
@@ -436,6 +443,7 @@ impl AINode for FollowEntityTight {
         state: &mut ShardServerState,
         clients: &mut ClientMap,
         _time: &SystemTime,
+        _rng: &mut ThreadRng,
     ) -> NodeStatus {
         let (leader_id, offset) = match npc.tight_follow {
             Some(tight_follow) => tight_follow,
@@ -504,6 +512,7 @@ impl AINode for PatrolPoint {
         state: &mut ShardServerState,
         clients: &mut ClientMap,
         time: &SystemTime,
+        _rng: &mut ThreadRng,
     ) -> NodeStatus {
         match self.roam_state {
             RoamState::Idle => {
@@ -575,11 +584,15 @@ impl AINode for CheckDead {
         state: &mut ShardServerState,
         clients: &mut ClientMap,
         time: &SystemTime,
+        rng: &mut ThreadRng,
     ) -> NodeStatus {
         match self.dead_state {
             DeadState::Alive => {
                 if !npc.is_dead() {
                     return NodeStatus::Success;
+                }
+                if let Some(defeater_id) = npc.last_attacked_by {
+                    log_if_failed(on_mob_defeated(npc.id, defeater_id, state, clients, rng));
                 }
                 let dechunk_time = *time + self.dechunk_after;
                 self.dead_state = DeadState::Dying(dechunk_time);
@@ -648,6 +661,7 @@ impl AINode for CheckLeaderRetreat {
         state: &mut ShardServerState,
         _clients: &mut ClientMap,
         _time: &SystemTime,
+        _rng: &mut ThreadRng,
     ) -> NodeStatus {
         let leader_npc_id = match npc.tight_follow {
             Some((EntityID::NPC(leader_npc_id), _)) => leader_npc_id,
@@ -700,6 +714,7 @@ impl AINode for SyncLeaderTarget {
         state: &mut ShardServerState,
         _clients: &mut ClientMap,
         _time: &SystemTime,
+        _rng: &mut ThreadRng,
     ) -> NodeStatus {
         let leader_npc_id = match npc.tight_follow {
             Some((EntityID::NPC(leader_npc_id), _)) => leader_npc_id,
@@ -788,6 +803,7 @@ impl AINode for ScanForTargets {
         state: &mut ShardServerState,
         _clients: &mut ClientMap,
         _time: &SystemTime,
+        _rng: &mut ThreadRng,
     ) -> NodeStatus {
         if npc.target_id.is_some() {
             return NodeStatus::Success;
@@ -886,6 +902,7 @@ impl AINode for CheckRetreat {
         state: &mut ShardServerState,
         clients: &mut ClientMap,
         _time: &SystemTime,
+        _rng: &mut ThreadRng,
     ) -> NodeStatus {
         match &mut self.retreat_state {
             RetreatState::Idle => {
@@ -973,6 +990,7 @@ impl AINode for CheckAttack {
         state: &mut ShardServerState,
         clients: &mut ClientMap,
         time: &SystemTime,
+        _rng: &mut ThreadRng,
     ) -> NodeStatus {
         let target_id = match npc.target_id {
             Some(target_id) => target_id,
@@ -1041,4 +1059,37 @@ impl AINode for CheckAttack {
             }
         }
     }
+}
+
+fn on_mob_defeated(
+    npc_id: i32,
+    defeater_id: EntityID,
+    state: &mut ShardServerState,
+    clients: &mut ClientMap,
+    rng: &mut ThreadRng,
+) -> FFResult<()> {
+    let defeated_type = state.get_npc(npc_id).unwrap().ty;
+    if let EntityID::Player(pc_id) = defeater_id {
+        let player = state.get_player_mut(pc_id)?;
+        helpers::give_defeat_rewards(player, defeated_type, clients, rng);
+    }
+
+    let defeater = state.get_combatant(defeater_id)?;
+    if let Some(group_id) = defeater.get_group_id() {
+        let position = defeater.get_position();
+        let group = state.groups.get(&group_id).unwrap().clone();
+        for eid in group.get_member_ids() {
+            if let EntityID::Player(member_pc_id) = *eid {
+                if defeater_id == *eid {
+                    // already rewarded
+                    continue;
+                }
+                let player = state.get_player_mut(member_pc_id).unwrap();
+                if player.get_position().distance_to(&position) < RANGE_GROUP_PARTICIPATE {
+                    helpers::give_defeat_rewards(player, defeated_type, clients, rng);
+                }
+            }
+        }
+    }
+    Ok(())
 }

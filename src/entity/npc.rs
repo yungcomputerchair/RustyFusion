@@ -1,5 +1,6 @@
 use std::{collections::HashSet, time::SystemTime};
 
+use rand::rngs::ThreadRng;
 use uuid::Uuid;
 
 use crate::{
@@ -31,6 +32,7 @@ pub struct NPC {
     rotation: i32,
     hp: i32,
     pub target_id: Option<EntityID>,
+    pub last_attacked_by: Option<EntityID>,
     pub invulnerable: bool,
     pub retreating: bool,
     pub instance_id: InstanceID,
@@ -58,6 +60,7 @@ impl NPC {
             rotation: angle % 360,
             hp: stats.max_hp as i32,
             target_id: None,
+            last_attacked_by: None,
             invulnerable: false,
             retreating: false,
             instance_id,
@@ -205,7 +208,13 @@ impl Entity for NPC {
         client.send_packet(PacketID::P_FE2CL_NPC_EXIT, &pkt)
     }
 
-    fn tick(&mut self, time: SystemTime, clients: &mut ClientMap, state: &mut ShardServerState) {
+    fn tick(
+        &mut self,
+        time: &SystemTime,
+        clients: &mut ClientMap,
+        state: &mut ShardServerState,
+        rng: &mut ThreadRng,
+    ) {
         let pc_ids: Vec<i32> = self.interacting_pcs.iter().copied().collect();
         for pc_id in pc_ids {
             let pc_eid = EntityID::Player(pc_id);
@@ -220,7 +229,7 @@ impl Entity for NPC {
         if self.interacting_pcs.is_empty() {
             // we take the AI object out during tick to satisfy the borrow checker
             if let Some(mut ai) = self.ai.take() {
-                ai.tick(self, state, clients, &time);
+                ai.tick(self, state, clients, time, rng);
                 self.ai = Some(ai);
             }
         }
@@ -258,6 +267,10 @@ impl Entity for NPC {
 impl Combatant for NPC {
     fn get_condition_bit_flag(&self) -> i32 {
         placeholder!(0)
+    }
+
+    fn get_group_id(&self) -> Option<Uuid> {
+        self.group_id
     }
 
     fn get_level(&self) -> i16 {
@@ -330,6 +343,7 @@ impl Combatant for NPC {
             return 0;
         }
 
+        self.last_attacked_by = Some(source);
         if self.target_id.is_none() {
             self.target_id = Some(source);
         }
@@ -340,6 +354,7 @@ impl Combatant for NPC {
     }
 
     fn reset(&mut self) {
+        self.last_attacked_by = None;
         self.target_id = None;
         self.retreating = false;
         self.hp = self.get_max_hp();

@@ -23,7 +23,9 @@ mod player;
 pub use player::*;
 
 mod slider;
+use rand::rngs::ThreadRng;
 pub use slider::*;
+use uuid::Uuid;
 
 #[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
 pub enum EntityID {
@@ -45,7 +47,13 @@ pub trait Entity {
     fn send_enter(&self, client: &mut FFClient) -> FFResult<()>;
     fn send_exit(&self, client: &mut FFClient) -> FFResult<()>;
 
-    fn tick(&mut self, time: SystemTime, clients: &mut ClientMap, state: &mut ShardServerState);
+    fn tick(
+        &mut self,
+        time: &SystemTime,
+        clients: &mut ClientMap,
+        state: &mut ShardServerState,
+        rng: &mut ThreadRng,
+    );
     fn cleanup(&mut self, clients: &mut ClientMap, state: &mut ShardServerState);
 
     fn as_combatant(&self) -> Option<&dyn Combatant>;
@@ -57,6 +65,7 @@ pub trait Entity {
 
 pub trait Combatant: Entity {
     fn get_condition_bit_flag(&self) -> i32;
+    fn get_group_id(&self) -> Option<Uuid>;
     fn get_level(&self) -> i16;
     fn get_hp(&self) -> i32;
     fn get_max_hp(&self) -> i32;

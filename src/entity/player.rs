@@ -32,7 +32,7 @@ use crate::{
     Position,
 };
 
-use rand::Rng;
+use rand::{rngs::ThreadRng, Rng};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy)]
@@ -1239,14 +1239,14 @@ impl Player {
 
     fn tick_skyway_ride(
         &mut self,
-        time: SystemTime,
+        time: &SystemTime,
         clients: &mut ClientMap,
         state: &mut ShardServerState,
     ) {
         let pc_id = self.id.unwrap();
         // Skyway ride
         if let Some(ref mut ride) = self.transport_data.skyway_ride {
-            if ride.resume_time > time {
+            if &ride.resume_time > time {
                 return;
             }
 
@@ -1303,13 +1303,13 @@ impl Player {
                 });
 
             // wait for the client to catch up. in theory, takes one second.
-            ride.resume_time = time + Duration::from_secs(1);
+            ride.resume_time = *time + Duration::from_secs(1);
         }
     }
 
     fn tick_missions(
         &mut self,
-        time: SystemTime,
+        time: &SystemTime,
         clients: &mut ClientMap,
         state: &mut ShardServerState,
     ) {
@@ -1317,7 +1317,7 @@ impl Player {
             if task_def.obj_time_limit.is_some() {
                 match task.fail_time {
                     Some(fail_time) => {
-                        if time > fail_time {
+                        if time > &fail_time {
                             return Some(codes::TaskEndErr::TimeLimitExceeded);
                         }
                     }
@@ -1464,7 +1464,7 @@ impl Player {
         }
     }
 
-    fn tick_regen(&mut self, time: SystemTime) -> bool {
+    fn tick_regen(&mut self, time: &SystemTime) -> bool {
         const REGEN_INTERVAL: Duration = Duration::from_secs(4);
 
         if self.in_combat {
@@ -1485,13 +1485,17 @@ impl Player {
         let max_hp = self.get_max_hp();
         let heal_amt = max_hp / 5;
         self.hp = clamp_max(self.hp + heal_amt, max_hp);
-        self.last_heal_time = Some(time);
+        self.last_heal_time = Some(*time);
         true
     }
 }
 impl Combatant for Player {
     fn get_condition_bit_flag(&self) -> i32 {
         placeholder!(0)
+    }
+
+    fn get_group_id(&self) -> Option<Uuid> {
+        self.group_id
     }
 
     fn get_level(&self) -> i16 {
@@ -1662,7 +1666,13 @@ impl Entity for Player {
         }
     }
 
-    fn tick(&mut self, time: SystemTime, clients: &mut ClientMap, state: &mut ShardServerState) {
+    fn tick(
+        &mut self,
+        time: &SystemTime,
+        clients: &mut ClientMap,
+        state: &mut ShardServerState,
+        _rng: &mut ThreadRng,
+    ) {
         if self.is_dead() {
             return;
         }
