@@ -1189,10 +1189,10 @@ impl Player {
 
     pub fn do_revive(&mut self) {
         self.hp = self.get_max_hp() / 2;
-        self.last_heal_time = Some(SystemTime::now());
         for nano_id in self.nano_data.equipped_ids.into_iter().flatten() {
             self.get_nano_mut(nano_id).unwrap().stamina = NANO_STAMINA_MAX / 2;
         }
+        self.reset();
     }
 
     pub fn disconnect(pc_id: i32, state: &mut ShardServerState, clients: &mut ClientMap) {
@@ -1582,7 +1582,8 @@ impl Combatant for Player {
     }
 
     fn reset(&mut self) {
-        // stubbed
+        self.last_attacked_by = None;
+        self.last_heal_time = Some(SystemTime::now());
     }
 }
 impl Entity for Player {

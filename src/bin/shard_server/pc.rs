@@ -540,6 +540,9 @@ pub fn pc_combat_begin_end(
 
     let player = state.get_player_mut(pc_id)?;
     player.in_combat = in_combat; // TODO anticheat
+    if !in_combat {
+        player.reset();
+    }
 
     let special_state_flags = player.get_special_state_bit_flag();
 
