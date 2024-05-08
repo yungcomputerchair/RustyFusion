@@ -50,13 +50,17 @@ pub struct Position {
     pub z: i32,
 }
 impl Position {
-    pub fn distance_to(&self, other: &Position) -> u32 {
+    pub fn distance_to_weighted(&self, other: &Position, weights: (f32, f32, f32)) -> u32 {
         // scaling down for the multiplication helps to avoid overflow here
         const DIST_MATH_SCALE: f32 = 100.0;
-        let dx = self.x.abs_diff(other.x) as f32 / DIST_MATH_SCALE;
-        let dy = self.y.abs_diff(other.y) as f32 / DIST_MATH_SCALE;
-        let dz = self.z.abs_diff(other.z) as f32 / DIST_MATH_SCALE;
+        let dx = self.x.abs_diff(other.x) as f32 * weights.0 / DIST_MATH_SCALE;
+        let dy = self.y.abs_diff(other.y) as f32 * weights.1 / DIST_MATH_SCALE;
+        let dz = self.z.abs_diff(other.z) as f32 * weights.2 / DIST_MATH_SCALE;
         ((dx * dx + dy * dy + dz * dz).sqrt() * DIST_MATH_SCALE) as u32
+    }
+
+    pub fn distance_to(&self, other: &Position) -> u32 {
+        self.distance_to_weighted(other, (1.0, 1.0, 1.0))
     }
 
     pub fn angle_to(&self, other: &Position) -> f32 {

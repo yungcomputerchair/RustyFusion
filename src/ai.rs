@@ -819,7 +819,11 @@ impl AINode for ScanForTargets {
                 None => continue,
             };
 
-            let distance = cb.get_position().distance_to(&npc.get_position());
+            // z distance counts double to avoid mobs on different floors from aggroing too easily
+            let weights = (1.0, 1.0, 2.0);
+            let distance = cb
+                .get_position()
+                .distance_to_weighted(&npc.get_position(), weights);
             if distance > self.scan_radius {
                 continue;
             }
