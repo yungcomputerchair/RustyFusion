@@ -268,11 +268,13 @@ mod commands {
 
     fn init_commands() -> HashMap<&'static str, Command> {
         #[rustfmt::skip]
-        let commands: [(&'static str, &'static str, CommandHandler); 7] = [
+        let commands: [(&'static str, &'static str, CommandHandler); 9] = [
             ("about", "Show information about the server", cmd_about),
             ("ban_a", "Ban an account", cmd_ban),
             ("ban_i", "Ban a player and their account", cmd_ban),
             ("unban", "Unban an account", cmd_unban),
+            ("followme", "Make the nearest NPC start following you", cmd_followme),
+            ("unfollowme", "Stop the nearest NPC from following you", cmd_unfollowme),
             ("perms", "View or change a player's permissions level", cmd_perms),
             ("refresh", "Reinsert the player into the current chunk", cmd_refresh),
             ("help", "Show this help message", cmd_help),
@@ -478,6 +480,84 @@ mod commands {
                 send_system_message(client, &unban_msg)
             }
             Err(e) => send_system_message(client, &format!("Failed to unban: {}", e.get_msg())),
+        }
+    }
+
+    fn cmd_followme(
+        _tokens: Vec<&str>,
+        clients: &mut ClientMap,
+        state: &mut ShardServerState,
+    ) -> FFResult<()> {
+        let client = clients.get_self();
+        let pc_id = client.get_player_id()?;
+        let player = state.get_player(pc_id)?;
+        if player.perms > CN_ACCOUNT_LEVEL__GM as i16 {
+            return send_system_message(client, "You do not have permission to move NPCs");
+        }
+        let player_pos = player.get_position();
+
+        let candidates = state.entity_map.get_around_entity(EntityID::Player(pc_id));
+        let mut closest_npc_id = None;
+        let mut closest_distance = u32::MAX;
+        for eid in candidates {
+            if let EntityID::NPC(npcid) = eid {
+                let npc = state.get_npc(npcid).unwrap();
+                let npc_pos = npc.get_position();
+                let distance = player_pos.distance_to(&npc_pos);
+                if distance < RANGE_INTERACT && distance < closest_distance {
+                    closest_npc_id = Some(npc.id);
+                    closest_distance = distance;
+                }
+            }
+        }
+
+        if let Some(npc_id) = closest_npc_id {
+            let npc = state.get_npc_mut(npc_id).unwrap();
+            npc.set_follow(EntityID::Player(pc_id));
+            send_system_message(client, &format!("{} is now following you", npc))
+        } else {
+            send_system_message(client, "No NPCs nearby")
+        }
+    }
+
+    fn cmd_unfollowme(
+        _tokens: Vec<&str>,
+        clients: &mut ClientMap,
+        state: &mut ShardServerState,
+    ) -> FFResult<()> {
+        let client = clients.get_self();
+        let pc_id = client.get_player_id()?;
+        let player = state.get_player(pc_id)?;
+        if player.perms > CN_ACCOUNT_LEVEL__GM as i16 {
+            return send_system_message(client, "You do not have permission to move NPCs");
+        }
+        let player_pos = player.get_position();
+
+        let candidates = state.entity_map.get_around_entity(EntityID::Player(pc_id));
+        let mut closest_npc_id = None;
+        let mut closest_distance = u32::MAX;
+        for eid in candidates {
+            if let EntityID::NPC(npcid) = eid {
+                let npc = state.get_npc(npcid).unwrap();
+                let npc_pos = npc.get_position();
+                let distance = player_pos.distance_to(&npc_pos);
+                if distance < RANGE_INTERACT && distance < closest_distance {
+                    closest_npc_id = Some(npc.id);
+                    closest_distance = distance;
+                }
+            }
+        }
+
+        if let Some(npc_id) = closest_npc_id {
+            let npc = state.get_npc_mut(npc_id).unwrap();
+            if npc.loose_follow == Some(EntityID::Player(pc_id)) {
+                npc.loose_follow = None;
+                send_system_message(client, &format!("{} is no longer following you", npc))
+            } else {
+                send_system_message(client, &format!("{} is not following you!", npc))
+            }
+        } else {
+            send_system_message(client, "No NPCs nearby")
         }
     }
 

@@ -1,4 +1,8 @@
-use std::{collections::HashSet, time::SystemTime};
+use std::{
+    collections::HashSet,
+    fmt::{Display, Formatter},
+    time::SystemTime,
+};
 
 use rand::rngs::ThreadRng;
 use uuid::Uuid;
@@ -156,6 +160,11 @@ impl NPC {
         let stats = tdata_get().get_npc_stats(self.ty).unwrap();
         stats.ai_type != 0 // no npcs without AI
         && stats.ai_type != 11 // no cars or animals
+    }
+}
+impl Display for NPC {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.get_id())
     }
 }
 impl Entity for NPC {
