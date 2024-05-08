@@ -52,6 +52,8 @@ impl AI {
         }
 
         let include_combatant_nodes = npc.as_combatant().is_some();
+        let include_friendly_nodes =
+            include_combatant_nodes && stats.team == CombatantTeam::Friendly;
         let include_mob_nodes = include_combatant_nodes && stats.team == CombatantTeam::Mob;
         let include_pack_follower_nodes = include_mob_nodes && npc.tight_follow.is_some();
 
@@ -91,7 +93,12 @@ impl AI {
             // Pack followers: sync aggro with leader.
             // This has to happen before movement to avoid yo-yoing
             if include_pack_follower_nodes {
-                root_behaviors.push(SyncLeaderTarget::new_node());
+                root_behaviors.push(SyncPackLeaderTarget::new_node());
+            }
+
+            // Friendly combatants: sync target with player
+            if include_friendly_nodes {
+                root_behaviors.push(SyncPlayerTarget::new_node());
             }
 
             // Do movement
@@ -697,13 +704,59 @@ impl AINode for CheckLeaderRetreat {
 }
 
 #[derive(Debug, Clone)]
-struct SyncLeaderTarget {}
-impl SyncLeaderTarget {
+struct SyncPlayerTarget {}
+impl SyncPlayerTarget {
     fn new_node() -> Box<dyn AINode> {
         Box::new(Self {})
     }
 }
-impl AINode for SyncLeaderTarget {
+impl AINode for SyncPlayerTarget {
+    fn clone_node(&self) -> Box<dyn AINode> {
+        Box::new(self.clone())
+    }
+
+    fn tick(
+        &mut self,
+        npc: &mut NPC,
+        state: &mut ShardServerState,
+        _clients: &mut ClientMap,
+        _time: &SystemTime,
+        _rng: &mut ThreadRng,
+    ) -> NodeStatus {
+        if npc.target_id.is_some() {
+            return NodeStatus::Success;
+        }
+
+        let player_id = match npc.loose_follow {
+            Some(EntityID::Player(player_id)) => player_id,
+            _ => return NodeStatus::Success,
+        };
+
+        let player = match state.get_player(player_id) {
+            Ok(player) => player,
+            Err(_) => return NodeStatus::Success,
+        };
+
+        if player.is_dead() {
+            return NodeStatus::Success;
+        }
+
+        if let Some(opponent) = player.last_attacked_by {
+            npc.target_id = Some(opponent);
+        }
+
+        NodeStatus::Success
+    }
+}
+
+#[derive(Debug, Clone)]
+struct SyncPackLeaderTarget {}
+impl SyncPackLeaderTarget {
+    fn new_node() -> Box<dyn AINode> {
+        Box::new(Self {})
+    }
+}
+impl AINode for SyncPackLeaderTarget {
     fn clone_node(&self) -> Box<dyn AINode> {
         Box::new(self.clone())
     }

@@ -349,6 +349,7 @@ pub struct Player {
     pub invulnerable: bool,
     pub in_menu: bool,
     pub in_combat: bool,
+    pub last_attacked_by: Option<EntityID>,
     pub freechat_muted: bool,
     pub reward_data: RewardData,
     position: Position,
@@ -1568,10 +1569,12 @@ impl Combatant for Player {
         base_defense + total_from_armor
     }
 
-    fn take_damage(&mut self, damage: i32, _source: EntityID) -> i32 {
+    fn take_damage(&mut self, damage: i32, source: EntityID) -> i32 {
         if self.invulnerable {
             return 0;
         }
+
+        self.last_attacked_by = Some(source);
 
         let init_hp = self.hp;
         self.hp = clamp_min(self.hp - damage, 0);
