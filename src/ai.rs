@@ -156,7 +156,7 @@ impl AI {
                         let scan_radius = stats.sight_range;
                         let distance_factor = 0.5;
                         let level_factor = 0.1;
-                        let aggro_rates = (4.0, -3.0);
+                        let aggro_rates = (2.0, -1.5);
                         let aggro_threshold = 1.0;
                         combat_behaviors.push(ScanForTargets::new_node(
                             Some(CombatantTeam::Friendly),
