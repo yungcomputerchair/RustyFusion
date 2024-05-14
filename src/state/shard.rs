@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::mpsc::TryRecvError, time::SystemTime};
+use std::{collections::HashMap, time::SystemTime};
 
 use rand::thread_rng;
 use uuid::Uuid;
@@ -312,22 +312,19 @@ impl ShardServerState {
 
     pub fn check_receivers(&mut self) {
         if let Some(receiver) = &self.autosave_rx {
-            match receiver.rx.try_recv() {
-                Ok(Ok(())) => {
+            match receiver.try_recv() {
+                None => (), // in progress
+                Some(Ok(())) => {
                     let elapsed = receiver.start_time.elapsed().unwrap();
                     log(
                         Severity::Info,
                         &format!("Autosave complete ({:.2}s)", elapsed.as_secs_f32()),
                     );
                 }
-                Ok(Err(e)) => log(
+                Some(Err(e)) => log(
                     Severity::Warning,
                     &format!("Autosave failed: {}", e.get_msg()),
                 ),
-                Err(TryRecvError::Empty) => (),
-                Err(TryRecvError::Disconnected) => {
-                    self.autosave_rx = None;
-                }
             }
         }
     }
