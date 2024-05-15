@@ -3,7 +3,7 @@ use std::time::{Duration, SystemTime};
 use rusty_fusion::{
     chunk::{TickMode, MAP_SQUARE_SIZE},
     config::config_get,
-    database::db_get,
+    database::db_run_sync,
     defines::*,
     entity::{Combatant, Entity, EntityID, Player},
     enums::*,
@@ -53,9 +53,8 @@ pub fn pc_enter(
         Player::disconnect(existing_pc_id, state, clients); // saves to DB synchronously
     }
 
-    let mut db = db_get();
     let pc_id = state.entity_map.gen_next_pc_id();
-    let mut player = db.load_player(login_data.iAccountID, login_data.iPC_UID)?;
+    let mut player = db_run_sync(|db| db.load_player(login_data.iAccountID, login_data.iPC_UID))?;
     player.set_player_id(pc_id);
     player.set_client_id(key);
 

@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     chunk::{ChunkCoords, InstanceID},
-    database::db_get,
+    database::db_run_sync,
     defines::*,
     entity::{Combatant, Entity, EntityID},
     enums::{
@@ -1198,8 +1198,7 @@ impl Player {
     pub fn disconnect(pc_id: i32, state: &mut ShardServerState, clients: &mut ClientMap) {
         let player = state.get_player(pc_id).unwrap();
         let pc_uid = player.get_uid();
-        let mut db = db_get();
-        log_if_failed(db.save_player(player, None));
+        log_if_failed(db_run_sync(|db| db.save_player(player, None)));
         log(
             Severity::Info,
             &format!(

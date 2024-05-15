@@ -4,7 +4,7 @@ use rand::random;
 
 use rusty_fusion::{
     config::config_get,
-    database::db_get,
+    database::db_run_sync,
     defines::*,
     entity::{Combatant, Entity, Player},
     enums::{ItemLocation, ItemType},
@@ -44,14 +44,14 @@ pub fn login(
             .trim()
             .to_owned();
 
-            let mut db = db_get();
-            let account = match db.find_account_from_username(&username)? {
+            let account = match db_run_sync(|db| db.find_account_from_username(&username))? {
                 Some(account) => account,
                 None => {
                     if config_get().login.auto_create_accounts.get() {
                         // automatically create the account with the supplied credentials
                         let password_hashed = util::hash_password(&password)?;
-                        let new_acc = db.create_account(&username, &password_hashed)?;
+                        let new_acc =
+                            db_run_sync(|db| db.create_account(&username, &password_hashed))?;
                         log(
                             Severity::Info,
                             &format!(
@@ -104,7 +104,7 @@ pub fn login(
             }
 
             let last_player_slot = account.selected_slot;
-            let mut players = db.load_players(account.id)?;
+            let mut players = db_run_sync(|db| db.load_players(account.id))?;
             for player in &mut players {
                 // even if the player has a temporary name,
                 // we want to show the real name in character selection
@@ -283,9 +283,11 @@ pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> FF
     player.last_name = last_name;
     player.flags.name_check_flag = true; // TODO check name + config
 
-    let mut db = db_get();
-    db.init_player(acc_id, &player)?;
-    db.update_selected_player(acc_id, slot_num as i32)?;
+    db_run_sync(|db| {
+        db.init_player(acc_id, &player)?;
+        db.update_selected_player(acc_id, slot_num as i32)?;
+        Ok(())
+    })?;
 
     let style = &player.get_style();
     let resp = sP_LS2CL_REP_SAVE_CHAR_NAME_SUCC {
@@ -308,25 +310,30 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
     let pc_uid = pkt.PCStyle.iPC_UID;
     if let Some(player) = state.get_players_mut(acc_id)?.get_mut(&pc_uid) {
         player.style = Some(pkt.PCStyle.try_into()?);
-        let mut db = db_get();
-        db.update_player_appearance(player)?;
+        db_run_sync(|db| db.update_player_appearance(player))?;
 
-        player.set_item(
-            ItemLocation::Equip,
-            EQUIP_SLOT_UPPERBODY as usize,
-            Some(Item::new(ItemType::UpperBody, pkt.sOn_Item.iEquipUBID)),
-        )?;
-        player.set_item(
-            ItemLocation::Equip,
-            EQUIP_SLOT_LOWERBODY as usize,
-            Some(Item::new(ItemType::LowerBody, pkt.sOn_Item.iEquipLBID)),
-        )?;
-        player.set_item(
-            ItemLocation::Equip,
-            EQUIP_SLOT_FOOT as usize,
-            Some(Item::new(ItemType::Foot, pkt.sOn_Item.iEquipFootID)),
-        )?;
-        db.save_player(player, None)?;
+        player
+            .set_item(
+                ItemLocation::Equip,
+                EQUIP_SLOT_UPPERBODY as usize,
+                Some(Item::new(ItemType::UpperBody, pkt.sOn_Item.iEquipUBID)),
+            )
+            .unwrap();
+        player
+            .set_item(
+                ItemLocation::Equip,
+                EQUIP_SLOT_LOWERBODY as usize,
+                Some(Item::new(ItemType::LowerBody, pkt.sOn_Item.iEquipLBID)),
+            )
+            .unwrap();
+        player
+            .set_item(
+                ItemLocation::Equip,
+                EQUIP_SLOT_FOOT as usize,
+                Some(Item::new(ItemType::Foot, pkt.sOn_Item.iEquipFootID)),
+            )
+            .unwrap();
+        db_run_sync(|db| db.save_player(player, None))?;
 
         let resp = sP_LS2CL_REP_CHAR_CREATE_SUCC {
             iLevel: player.get_level(),
@@ -355,8 +362,7 @@ pub fn char_delete(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
             Severity::Warning,
             format!("Couldn't get player {}", pc_uid),
         ))?;
-    let mut db = db_get();
-    db.delete_player(pc_uid)?;
+    db_run_sync(|db| db.delete_player(pc_uid))?;
     let resp = sP_LS2CL_REP_CHAR_DELETE_SUCC {
         iSlotNum: player.get_slot_num() as i8,
     };
@@ -376,8 +382,7 @@ pub fn save_char_tutor(client: &mut FFClient, state: &mut LoginServerState) -> F
         ))?;
     if pkt.iTutorialFlag == 1 {
         player.set_tutorial_done();
-        let mut db = db_get();
-        db.save_player(player, None)
+        db_run_sync(|db| db.save_player(player, None))
     } else {
         Err(FFError::build(
             Severity::Warning,
@@ -410,9 +415,7 @@ pub fn char_select(
         }
 
         log_if_failed(state.set_selected_player_id(account_id, pc_uid));
-
-        let mut db = db_get();
-        db.update_selected_player(account_id, slot_num as i32)?;
+        db_run_sync(|db| db.update_selected_player(account_id, slot_num as i32))?;
 
         let pkt = sP_LS2CL_REP_CHAR_SELECT_SUCC { UNUSED: unused!() };
         client.send_packet(P_LS2CL_REP_CHAR_SELECT_SUCC, &pkt)

@@ -1,13 +1,15 @@
 #![allow(dead_code)]
 
-use std::sync::mpsc::Receiver;
-use std::sync::{Mutex, MutexGuard, OnceLock};
-use std::time::SystemTime;
+use std::collections::VecDeque;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Mutex, OnceLock};
+use std::thread::JoinHandle;
+use std::time::{Duration, SystemTime};
 
 use crate::config::*;
 use crate::entity::Player;
 use crate::error::*;
-use crate::state::Account;
+use crate::state::{Account, FFReceiver, FFTransmitter};
 
 #[cfg(feature = "postgres")]
 mod postgresql;
@@ -19,6 +21,23 @@ type Int = i32;
 type BigInt = i64;
 type Text = String;
 type Bytes = Vec<u8>;
+
+type DbOperation = dyn FnMut(&mut dyn Database) -> FFResult<()>;
+
+struct DbManager {
+    db_impl: Box<dyn Database>,
+    op_queue: VecDeque<(Box<DbOperation>, FFTransmitter<()>)>,
+}
+unsafe impl Send for DbManager {}
+impl DbManager {
+    fn flush(&mut self) {
+        self.op_queue.iter_mut().for_each(|(op, tx)| {
+            let result = op(&mut *self.db_impl);
+            log_if_failed(tx.send(result));
+        });
+        self.op_queue.clear();
+    }
+}
 
 pub trait Database: Send + std::fmt::Debug {
     fn find_account_from_username(&mut self, username: &Text) -> FFResult<Option<Account>>;
@@ -44,7 +63,8 @@ pub trait Database: Send + std::fmt::Debug {
 }
 
 const DB_NAME: &str = "rustyfusion";
-static DATABASE: OnceLock<Mutex<Box<dyn Database>>> = OnceLock::new();
+static DB_MANAGER: OnceLock<Mutex<DbManager>> = OnceLock::new();
+static DB_SIGNAL: AtomicBool = AtomicBool::new(false);
 
 fn db_connect(config: &GeneralConfig) -> FFResult<Box<dyn Database>> {
     let _db_impl: Option<FFResult<Box<dyn Database>>> = None;
@@ -68,14 +88,17 @@ fn db_connect(config: &GeneralConfig) -> FFResult<Box<dyn Database>> {
     }
 }
 
-pub fn db_init() -> MutexGuard<'static, Box<dyn Database>> {
-    match DATABASE.get() {
+pub fn db_init() -> JoinHandle<()> {
+    match DB_MANAGER.get() {
         Some(_) => panic_log("Database already initialized"),
         None => {
             log(Severity::Info, "Connecting to database...");
             let config = &config_get().general;
-            let db = panic_if_failed(db_connect(config));
-            DATABASE.set(Mutex::new(db)).unwrap();
+            let db_impl = panic_if_failed(db_connect(config));
+            let _ = DB_MANAGER.set(Mutex::new(DbManager {
+                db_impl,
+                op_queue: VecDeque::new(),
+            }));
             log(
                 Severity::Info,
                 &format!(
@@ -85,25 +108,52 @@ pub fn db_init() -> MutexGuard<'static, Box<dyn Database>> {
                     config.db_port.get()
                 ),
             );
-            db_get()
+
+            std::thread::spawn(|| loop {
+                let sig = DB_SIGNAL.load(Ordering::Acquire);
+                if !sig {
+                    std::thread::sleep(Duration::from_millis(100));
+                    continue;
+                }
+
+                let mut db_manager = DB_MANAGER.get().unwrap().lock().unwrap();
+                db_manager.flush();
+                DB_SIGNAL.store(false, Ordering::Release);
+            })
         }
     }
 }
 
-pub fn db_get() -> MutexGuard<'static, Box<dyn Database>> {
-    match DATABASE.get() {
-        Some(db) => db.lock().unwrap(),
+pub fn db_run_sync<T, F>(mut f: F) -> FFResult<T>
+where
+    T: Send,
+    F: FnMut(&mut dyn Database) -> FFResult<T> + Send,
+{
+    match DB_MANAGER.get() {
+        Some(db_mgr_lock) => {
+            let mut db_mgr = db_mgr_lock.lock().unwrap();
+            db_mgr.flush(); // ensure all previous operations are completed
+            f(db_mgr.db_impl.as_mut())
+        }
         None => panic_log("Database not initialized"),
     }
 }
 
-pub fn db_run_parallel<T, F>(f: F) -> FFResult<Receiver<FFResult<T>>>
+pub fn db_run_async<F>(f: F) -> FFReceiver<()>
 where
-    T: Send + 'static,
-    F: FnOnce(&mut dyn Database) -> FFResult<T> + Send + 'static,
+    F: FnMut(&mut dyn Database) -> FFResult<()> + Send + 'static,
 {
-    let mut db = db_connect(&config_get().general)?;
-    let (tx, rx) = std::sync::mpsc::channel();
-    std::thread::spawn(move || tx.send(f(db.as_mut())));
-    Ok(rx)
+    match DB_MANAGER.get() {
+        Some(db_mgr_lock) => {
+            let mut db_mgr = db_mgr_lock.lock().unwrap();
+            DB_SIGNAL.store(true, Ordering::Release);
+            let (tx, rx) = std::sync::mpsc::channel();
+            let start_time = SystemTime::now();
+            db_mgr
+                .op_queue
+                .push_back((Box::new(f), FFTransmitter::new(tx)));
+            FFReceiver::new(start_time, rx)
+        }
+        None => panic_log("Database not initialized"),
+    }
 }

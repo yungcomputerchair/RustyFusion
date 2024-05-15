@@ -1,7 +1,7 @@
 use uuid::Uuid;
 
 use rusty_fusion::{
-    database::db_run_parallel,
+    database::db_run_async,
     defines::*,
     entity::{Entity, EntityID},
     enums::*,
@@ -436,11 +436,8 @@ pub fn trade_confirm(clients: &mut ClientMap, state: &mut ShardServerState) -> F
         *state.get_player_mut(pc_id).unwrap() = player.clone();
         *state.get_player_mut(pc_id_other).unwrap() = player_other.clone();
 
-        // try to update the players in the DB. this is best-effort
-        log_if_failed(db_run_parallel(move |db| {
-            let _ = db.save_players(&[&player, &player_other], None);
-            Ok(())
-        }));
+        // update the players in the DB
+        db_run_async(move |db| db.save_players(&[&player, &player_other], None));
 
         let resp = sP_FE2CL_REP_PC_TRADE_CONFIRM_SUCC {
             iID_Request: resp.iID_Request,

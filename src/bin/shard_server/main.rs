@@ -10,7 +10,7 @@ use std::{
 
 use rusty_fusion::{
     config::{config_get, config_init},
-    database::{db_init, db_run_parallel},
+    database::{db_init, db_run_async},
     defines::SHARD_TICKS_PER_SECOND,
     entity::Player,
     error::{
@@ -24,7 +24,7 @@ use rusty_fusion::{
         },
         ClientMap, ClientType, FFClient, FFServer,
     },
-    state::{FFReceiver, ServerState, ShardServerState},
+    state::{ServerState, ShardServerState},
     tabledata::tdata_init,
     timer::TimerMap,
     unused,
@@ -411,17 +411,11 @@ fn do_autosave(time: SystemTime, state: &mut ShardServerState) -> FFResult<()> {
         .iter()
         .map(|pc_id| state.get_player(*pc_id).unwrap().clone())
         .collect();
-    let rx = db_run_parallel(move |db| {
+    let rx = db_run_async(move |db| {
         let player_refs: Vec<&Player> = players.iter().collect();
         db.save_players(&player_refs, Some(time))
-    })
-    .map_err(|e| {
-        FFError::build(
-            Severity::Warning,
-            format!("Autosave cancelled: {}", e.get_msg()),
-        )
-    })?;
+    });
 
-    state.autosave_rx = Some(FFReceiver::new(time, rx));
+    state.autosave_rx = Some(rx);
     Ok(())
 }

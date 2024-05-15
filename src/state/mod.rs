@@ -38,12 +38,11 @@ impl<T> FFReceiver<T> {
 
 #[derive(Debug)]
 pub struct FFTransmitter<T> {
-    start_time: SystemTime,
     tx: Sender<FFResult<T>>,
 }
 impl<T> FFTransmitter<T> {
-    pub fn new(start_time: SystemTime, tx: Sender<FFResult<T>>) -> Self {
-        Self { start_time, tx }
+    pub fn new(tx: Sender<FFResult<T>>) -> Self {
+        Self { tx }
     }
 
     pub fn send(&self, result: FFResult<T>) -> FFResult<()> {
@@ -51,11 +50,7 @@ impl<T> FFTransmitter<T> {
             Ok(_) => Ok(()),
             Err(e) => Err(FFError::build(
                 Severity::Warning,
-                format!(
-                    "Failed to send result: {} (started {}s ago)",
-                    e,
-                    self.start_time.elapsed().unwrap_or_default().as_secs()
-                ),
+                format!("Failed to send result: {}", e,),
             )),
         }
     }

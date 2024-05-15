@@ -254,7 +254,7 @@ mod helpers {
 mod commands {
     use std::{collections::HashMap, sync::OnceLock, time::SystemTime};
 
-    use rusty_fusion::{ai::AI, database::db_get};
+    use rusty_fusion::{ai::AI, database::db_run_sync};
 
     use super::*;
 
@@ -382,12 +382,13 @@ mod commands {
             return send_system_message(client, "You cannot ban yourself");
         }
 
-        let mut db = db_get();
         let acc_id = if is_ban_i {
             let Ok(player) = state.get_player(pc_id) else {
                 return send_system_message(client, &format!("Player {} not found", pc_id));
             };
-            db.find_account_from_player(player.get_uid()).unwrap().id
+            db_run_sync(|db| db.find_account_from_player(player.get_uid()))
+                .unwrap()
+                .id
         } else {
             let Ok(acc_id) = tokens[1].parse::<i64>() else {
                 return send_system_message(client, "Invalid account ID");
@@ -408,7 +409,7 @@ mod commands {
             "No reason given".to_string()
         };
 
-        match db.ban_account(acc_id, banned_until, ban_reason.clone()) {
+        match db_run_sync(|db| db.ban_account(acc_id, banned_until, ban_reason.clone())) {
             Ok(()) => {
                 let ban_msg = format!(
                     "Account {} banned for {}\n\
@@ -469,8 +470,8 @@ mod commands {
         let Ok(acc_id) = tokens[1].parse::<i64>() else {
             return send_system_message(client, "Invalid account ID");
         };
-        let mut db = db_get();
-        match db.unban_account(acc_id) {
+
+        match db_run_sync(|db| db.unban_account(acc_id)) {
             Ok(()) => {
                 let unban_msg = format!("Account {} unbanned", acc_id);
                 log(
@@ -651,11 +652,13 @@ mod commands {
         ));
 
         if tokens.get(3).is_some_and(|arg| *arg == "save") {
-            let mut db = db_get();
-            let acc = db
-                .find_account_from_player(target_player.get_uid())
-                .unwrap();
-            match db.change_account_level(acc.id, new_perms as i32) {
+            let saved = db_run_sync(|db| {
+                let acc = db
+                    .find_account_from_player(target_player.get_uid())
+                    .unwrap();
+                db.change_account_level(acc.id, new_perms as i32)
+            });
+            match saved {
                 Ok(()) => log_if_failed(send_system_message(
                     client,
                     "Permissions level saved to account!",
