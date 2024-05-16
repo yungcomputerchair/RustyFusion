@@ -397,7 +397,7 @@ fn send_live_check(client: &mut FFClient) -> FFResult<()> {
     }
 }
 
-fn do_autosave(time: SystemTime, state: &mut ShardServerState) -> FFResult<()> {
+fn do_autosave(_time: SystemTime, state: &mut ShardServerState) -> FFResult<()> {
     let pc_ids: Vec<i32> = state.entity_map.get_player_ids().collect();
     if pc_ids.is_empty() {
         return Ok(());
@@ -413,7 +413,7 @@ fn do_autosave(time: SystemTime, state: &mut ShardServerState) -> FFResult<()> {
         .collect();
     let rx = db_run_async(move |db| {
         let player_refs: Vec<&Player> = players.iter().collect();
-        db.save_players(&player_refs, Some(time))
+        db.save_players(&player_refs)
     });
 
     state.autosave_rx = Some(rx);

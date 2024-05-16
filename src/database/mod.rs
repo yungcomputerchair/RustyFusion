@@ -54,9 +54,8 @@ pub trait Database: Send + std::fmt::Debug {
     fn init_player(&mut self, acc_id: BigInt, player: &Player) -> FFResult<()>;
     fn update_player_appearance(&mut self, player: &Player) -> FFResult<()>;
     fn update_selected_player(&mut self, acc_id: BigInt, slot_num: Int) -> FFResult<()>;
-    fn save_player(&mut self, player: &Player, state_time: Option<SystemTime>) -> FFResult<()>;
-    fn save_players(&mut self, players: &[&Player], state_time: Option<SystemTime>)
-        -> FFResult<()>;
+    fn save_player(&mut self, player: &Player) -> FFResult<()>;
+    fn save_players(&mut self, players: &[&Player]) -> FFResult<()>;
     fn load_player(&mut self, acc_id: BigInt, pc_uid: BigInt) -> FFResult<Player>;
     fn load_players(&mut self, acc_id: BigInt) -> FFResult<Vec<Player>>;
     fn delete_player(&mut self, pc_uid: BigInt) -> FFResult<()>;
