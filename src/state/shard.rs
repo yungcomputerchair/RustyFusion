@@ -320,11 +320,15 @@ impl ShardServerState {
                         Severity::Info,
                         &format!("Autosave complete ({:.2}s)", elapsed.as_secs_f32()),
                     );
+                    self.autosave_rx = None;
                 }
-                Some(Err(e)) => log(
-                    Severity::Warning,
-                    &format!("Autosave failed: {}", e.get_msg()),
-                ),
+                Some(Err(e)) => {
+                    log(
+                        Severity::Warning,
+                        &format!("Autosave failed: {}", e.get_msg()),
+                    );
+                    self.autosave_rx = None;
+                }
             }
         }
     }
