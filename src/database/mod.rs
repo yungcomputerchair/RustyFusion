@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::thread::JoinHandle;
 use std::time::{Duration, SystemTime};
@@ -63,7 +62,6 @@ pub trait Database: Send + std::fmt::Debug {
 
 const DB_NAME: &str = "rustyfusion";
 static DB_MANAGER: OnceLock<Mutex<DbManager>> = OnceLock::new();
-static DB_SIGNAL: AtomicBool = AtomicBool::new(false);
 
 fn db_connect(config: &GeneralConfig) -> FFResult<Box<dyn Database>> {
     let _db_impl: Option<FFResult<Box<dyn Database>>> = None;
@@ -109,15 +107,9 @@ pub fn db_init() -> JoinHandle<()> {
             );
 
             std::thread::spawn(|| loop {
-                let sig = DB_SIGNAL.load(Ordering::Acquire);
-                if !sig {
-                    std::thread::sleep(Duration::from_millis(100));
-                    continue;
-                }
-
+                std::thread::sleep(Duration::from_millis(100));
                 let mut db_manager = DB_MANAGER.get().unwrap().lock().unwrap();
                 db_manager.flush();
-                DB_SIGNAL.store(false, Ordering::Release);
             })
         }
     }
@@ -145,7 +137,6 @@ where
     match DB_MANAGER.get() {
         Some(db_mgr_lock) => {
             let mut db_mgr = db_mgr_lock.lock().unwrap();
-            DB_SIGNAL.store(true, Ordering::Release);
             let (tx, rx) = std::sync::mpsc::channel();
             let start_time = SystemTime::now();
             db_mgr
