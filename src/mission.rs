@@ -97,7 +97,8 @@ impl Task {
     pub fn set_remaining_enemy_defeats(&mut self, counts: [usize; 3]) {
         let task_def = self.get_task_def();
         let enemy_types = task_def.obj_enemy_id_ordering.as_slice();
-        self.remaining_enemy_defeats = task_def.obj_enemies.clone();
+        self.remaining_enemy_defeats
+            .clone_from(&task_def.obj_enemies);
         for (idx, enemy_type) in enemy_types.iter().enumerate() {
             self.remaining_enemy_defeats
                 .insert(*enemy_type, counts[idx]);

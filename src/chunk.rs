@@ -673,7 +673,7 @@ impl EntityMap {
             for x in 0..NCHUNKS {
                 for y in 0..NCHUNKS {
                     for id in template_chunks[x][y].get_all() {
-                        let tick_mode = self.registry[&id].tick_mode;
+                        let tick_mode = self.registry[id].tick_mode;
                         if let EntityID::NPC(npc_id) = *id {
                             let mut npc = self.get_npc(npc_id).unwrap().clone();
                             npc.instance_id = instance_id;
