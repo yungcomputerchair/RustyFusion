@@ -131,23 +131,9 @@ where
     T: Send + 'static,
     F: FnOnce(&mut dyn Database) -> FFResult<T> + Send + 'static,
 {
+    const TIMEOUT: Duration = Duration::from_secs(5);
     let rx = db_run_async(f);
-    let start_time = SystemTime::now();
-    loop {
-        match rx.try_recv() {
-            Some(Ok(res)) => return res.get(),
-            Some(Err(e)) => return Err(e),
-            None => {
-                if start_time.elapsed().unwrap_or_default().as_secs() > 5 {
-                    return Err(FFError::build(
-                        Severity::Warning,
-                        "Database operation timed out".to_string(),
-                    ));
-                }
-                std::thread::sleep(Duration::from_millis(100));
-            }
-        }
-    }
+    rx.recv(Some(TIMEOUT)).and_then(|res| res.get())
 }
 
 pub fn db_run_async<T, F>(f: F) -> FFReceiver<DbResult>

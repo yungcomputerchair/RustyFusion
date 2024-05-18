@@ -1,6 +1,6 @@
 use std::{
     sync::mpsc::{Receiver, Sender, TryRecvError},
-    time::SystemTime,
+    time::{Duration, SystemTime},
 };
 
 use crate::error::{FFError, FFResult, Severity};
@@ -19,6 +19,25 @@ pub struct FFReceiver<T> {
 impl<T> FFReceiver<T> {
     pub fn new(start_time: SystemTime, rx: Receiver<T>) -> Self {
         Self { start_time, rx }
+    }
+
+    pub fn recv(&self, timeout: Option<Duration>) -> FFResult<T> {
+        match timeout {
+            Some(timeout) => match self.rx.recv_timeout(timeout) {
+                Ok(res) => Ok(res),
+                Err(e) => Err(FFError::build(
+                    Severity::Warning,
+                    format!("Failed to receive result: {}", e),
+                )),
+            },
+            None => match self.rx.recv() {
+                Ok(res) => Ok(res),
+                Err(e) => Err(FFError::build(
+                    Severity::Warning,
+                    format!("Failed to receive result: {}", e),
+                )),
+            },
+        }
     }
 
     pub fn try_recv(&self) -> Option<FFResult<T>> {
