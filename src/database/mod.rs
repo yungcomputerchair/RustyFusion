@@ -8,7 +8,7 @@ use std::time::{Duration, SystemTime};
 use crate::config::*;
 use crate::entity::Player;
 use crate::error::*;
-use crate::state::{Account, FFReceiver, FFTransmitter};
+use crate::state::{Account, FFReceiver, FFSender};
 
 #[cfg(feature = "postgres")]
 mod postgresql;
@@ -25,7 +25,7 @@ type DbOperation = dyn FnMut(&mut dyn Database) -> FFResult<()>;
 
 struct DbManager {
     db_impl: Box<dyn Database>,
-    op_queue: VecDeque<(Box<DbOperation>, FFTransmitter<()>)>,
+    op_queue: VecDeque<(Box<DbOperation>, FFSender<()>)>,
 }
 unsafe impl Send for DbManager {}
 impl DbManager {
@@ -139,9 +139,7 @@ where
             let mut db_mgr = db_mgr_lock.lock().unwrap();
             let (tx, rx) = std::sync::mpsc::channel();
             let start_time = SystemTime::now();
-            db_mgr
-                .op_queue
-                .push_back((Box::new(f), FFTransmitter::new(tx)));
+            db_mgr.op_queue.push_back((Box::new(f), FFSender::new(tx)));
             FFReceiver::new(start_time, rx)
         }
         None => panic_log("Database not initialized"),

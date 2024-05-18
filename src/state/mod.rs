@@ -37,10 +37,10 @@ impl<T> FFReceiver<T> {
 }
 
 #[derive(Debug)]
-pub struct FFTransmitter<T> {
+pub struct FFSender<T> {
     tx: Sender<FFResult<T>>,
 }
-impl<T> FFTransmitter<T> {
+impl<T> FFSender<T> {
     pub fn new(tx: Sender<FFResult<T>>) -> Self {
         Self { tx }
     }
