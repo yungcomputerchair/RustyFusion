@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std::any::Any;
 use std::collections::VecDeque;
 use std::sync::{Mutex, OnceLock};
 use std::thread::JoinHandle;
@@ -21,18 +22,28 @@ type BigInt = i64;
 type Text = String;
 type Bytes = Vec<u8>;
 
-type DbOperation = dyn FnMut(&mut dyn Database) -> FFResult<()>;
+pub struct DbResult {
+    result: FFResult<Box<dyn Any>>,
+}
+impl DbResult {
+    pub fn get<T: 'static>(self) -> FFResult<T> {
+        self.result.map(|v| {
+            *v.downcast::<T>()
+                .unwrap_or_else(|_| panic_log("Bad DbResult cast"))
+        })
+    }
+}
+type DbOperation = dyn FnOnce(&mut dyn Database);
 
 struct DbManager {
     db_impl: Box<dyn Database>,
-    op_queue: VecDeque<(Box<DbOperation>, FFSender<()>)>,
+    op_queue: VecDeque<Box<DbOperation>>,
 }
 unsafe impl Send for DbManager {}
 impl DbManager {
     fn flush(&mut self) {
-        self.op_queue.iter_mut().for_each(|(op, tx)| {
-            let result = op(&mut *self.db_impl);
-            log_if_failed(tx.send(result));
+        self.op_queue.drain(..).for_each(|op| {
+            op(&mut *self.db_impl);
         });
         self.op_queue.clear();
     }
@@ -115,31 +126,47 @@ pub fn db_init() -> JoinHandle<()> {
     }
 }
 
-pub fn db_run_sync<T, F>(mut f: F) -> FFResult<T>
+// TODO migrate most DB operations to async
+pub fn db_run_sync<T, F>(f: F) -> FFResult<T>
 where
-    T: Send,
-    F: FnMut(&mut dyn Database) -> FFResult<T> + Send,
+    T: Send + 'static,
+    F: FnOnce(&mut dyn Database) -> FFResult<T> + Send + 'static,
 {
-    match DB_MANAGER.get() {
-        Some(db_mgr_lock) => {
-            let mut db_mgr = db_mgr_lock.lock().unwrap();
-            db_mgr.flush(); // ensure all previous operations are completed
-            f(db_mgr.db_impl.as_mut())
+    let rx = db_run_async(f);
+    let start_time = SystemTime::now();
+    loop {
+        match rx.try_recv() {
+            Some(Ok(res)) => return res.get(),
+            Some(Err(e)) => return Err(e),
+            None => {
+                if start_time.elapsed().unwrap_or_default().as_secs() > 5 {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        "Database operation timed out".to_string(),
+                    ));
+                }
+                std::thread::sleep(Duration::from_millis(100));
+            }
         }
-        None => panic_log("Database not initialized"),
     }
 }
 
-pub fn db_run_async<F>(f: F) -> FFReceiver<()>
+pub fn db_run_async<T, F>(f: F) -> FFReceiver<DbResult>
 where
-    F: FnMut(&mut dyn Database) -> FFResult<()> + Send + 'static,
+    T: Send + Any,
+    F: FnOnce(&mut dyn Database) -> FFResult<T> + Send + 'static,
 {
     match DB_MANAGER.get() {
         Some(db_mgr_lock) => {
             let mut db_mgr = db_mgr_lock.lock().unwrap();
             let (tx, rx) = std::sync::mpsc::channel();
             let start_time = SystemTime::now();
-            db_mgr.op_queue.push_back((Box::new(f), FFSender::new(tx)));
+            let f = move |db: &mut dyn Database| {
+                let result = f(db).map(|v| Box::new(v) as Box<dyn Any>);
+                let db_result = DbResult { result };
+                let _ = FFSender::new(tx).send(db_result);
+            };
+            db_mgr.op_queue.push_back(Box::new(f));
             FFReceiver::new(start_time, rx)
         }
         None => panic_log("Database not initialized"),

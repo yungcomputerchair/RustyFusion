@@ -14,16 +14,16 @@ pub use shard::*;
 #[derive(Debug)]
 pub struct FFReceiver<T> {
     start_time: SystemTime,
-    rx: Receiver<FFResult<T>>,
+    rx: Receiver<T>,
 }
 impl<T> FFReceiver<T> {
-    pub fn new(start_time: SystemTime, rx: Receiver<FFResult<T>>) -> Self {
+    pub fn new(start_time: SystemTime, rx: Receiver<T>) -> Self {
         Self { start_time, rx }
     }
 
     pub fn try_recv(&self) -> Option<FFResult<T>> {
         match self.rx.try_recv() {
-            Ok(res) => Some(res),
+            Ok(res) => Some(Ok(res)),
             Err(TryRecvError::Empty) => None,
             Err(TryRecvError::Disconnected) => Some(Err(FFError::build(
                 Severity::Warning,
@@ -38,15 +38,15 @@ impl<T> FFReceiver<T> {
 
 #[derive(Debug)]
 pub struct FFSender<T> {
-    tx: Sender<FFResult<T>>,
+    tx: Sender<T>,
 }
 impl<T> FFSender<T> {
-    pub fn new(tx: Sender<FFResult<T>>) -> Self {
+    pub fn new(tx: Sender<T>) -> Self {
         Self { tx }
     }
 
-    pub fn send(&self, result: FFResult<T>) -> FFResult<()> {
-        match self.tx.send(result) {
+    pub fn send(&self, val: T) -> FFResult<()> {
+        match self.tx.send(val) {
             Ok(_) => Ok(()),
             Err(e) => Err(FFError::build(
                 Severity::Warning,

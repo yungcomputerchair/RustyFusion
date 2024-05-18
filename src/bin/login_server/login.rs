@@ -44,31 +44,35 @@ pub fn login(
             .trim()
             .to_owned();
 
-            let account = match db_run_sync(|db| db.find_account_from_username(&username))? {
-                Some(account) => account,
-                None => {
-                    if config_get().login.auto_create_accounts.get() {
-                        // automatically create the account with the supplied credentials
-                        let password_hashed = util::hash_password(&password)?;
-                        let new_acc =
-                            db_run_sync(|db| db.create_account(&username, &password_hashed))?;
-                        log(
-                            Severity::Info,
-                            &format!(
-                                "Created account {} with ID {} and level {}",
-                                username, new_acc.id, new_acc.account_level
-                            ),
-                        );
-                        new_acc
-                    } else {
-                        error_code = 1; // "Sorry, the ID you have entered does not exist. Please try again."
-                        return Err(FFError::build(
-                            Severity::Warning,
-                            format!("Couldn't find account {}", username),
-                        ));
+            let lookup_username = username.clone();
+            let account =
+                match db_run_sync(move |db| db.find_account_from_username(&lookup_username))? {
+                    Some(account) => account,
+                    None => {
+                        if config_get().login.auto_create_accounts.get() {
+                            // automatically create the account with the supplied credentials
+                            let new_username = username.clone();
+                            let password_hashed = util::hash_password(&password)?;
+                            let new_acc = db_run_sync(move |db| {
+                                db.create_account(&new_username, &password_hashed)
+                            })?;
+                            log(
+                                Severity::Info,
+                                &format!(
+                                    "Created account {} with ID {} and level {}",
+                                    username, new_acc.id, new_acc.account_level
+                                ),
+                            );
+                            new_acc
+                        } else {
+                            error_code = 1; // "Sorry, the ID you have entered does not exist. Please try again."
+                            return Err(FFError::build(
+                                Severity::Warning,
+                                format!("Couldn't find account {}", username),
+                            ));
+                        }
                     }
-                }
-            };
+                };
 
             // check password
             if !util::check_password(&password, &account.password_hashed)? {
@@ -104,7 +108,7 @@ pub fn login(
             }
 
             let last_player_slot = account.selected_slot;
-            let mut players = db_run_sync(|db| db.load_players(account.id))?;
+            let mut players = db_run_sync(move |db| db.load_players(account.id))?;
             for player in &mut players {
                 // even if the player has a temporary name,
                 // we want to show the real name in character selection
@@ -283,8 +287,9 @@ pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> FF
     player.last_name = last_name;
     player.flags.name_check_flag = true; // TODO check name + config
 
-    db_run_sync(|db| {
-        db.init_player(acc_id, &player)?;
+    let player_saved = player.clone();
+    db_run_sync(move |db| {
+        db.init_player(acc_id, &player_saved)?;
         db.update_selected_player(acc_id, slot_num as i32)?;
         Ok(())
     })?;
@@ -310,7 +315,8 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
     let pc_uid = pkt.PCStyle.iPC_UID;
     if let Some(player) = state.get_players_mut(acc_id)?.get_mut(&pc_uid) {
         player.style = Some(pkt.PCStyle.try_into()?);
-        db_run_sync(|db| db.update_player_appearance(player))?;
+        let player_saved = player.clone();
+        db_run_sync(move |db| db.update_player_appearance(&player_saved))?;
 
         player
             .set_item(
@@ -333,7 +339,9 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
                 Some(Item::new(ItemType::Foot, pkt.sOn_Item.iEquipFootID)),
             )
             .unwrap();
-        db_run_sync(|db| db.save_player(player))?;
+
+        let player_saved = player.clone();
+        db_run_sync(move |db| db.save_player(&player_saved))?;
 
         let resp = sP_LS2CL_REP_CHAR_CREATE_SUCC {
             iLevel: player.get_level(),
@@ -362,7 +370,7 @@ pub fn char_delete(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
             Severity::Warning,
             format!("Couldn't get player {}", pc_uid),
         ))?;
-    db_run_sync(|db| db.delete_player(pc_uid))?;
+    db_run_sync(move |db| db.delete_player(pc_uid))?;
     let resp = sP_LS2CL_REP_CHAR_DELETE_SUCC {
         iSlotNum: player.get_slot_num() as i8,
     };
@@ -382,7 +390,8 @@ pub fn save_char_tutor(client: &mut FFClient, state: &mut LoginServerState) -> F
         ))?;
     if pkt.iTutorialFlag == 1 {
         player.set_tutorial_done();
-        db_run_sync(|db| db.save_player(player))
+        let player_saved = player.clone();
+        db_run_sync(move |db| db.save_player(&player_saved))
     } else {
         Err(FFError::build(
             Severity::Warning,
@@ -415,7 +424,7 @@ pub fn char_select(
         }
 
         log_if_failed(state.set_selected_player_id(account_id, pc_uid));
-        db_run_sync(|db| db.update_selected_player(account_id, slot_num as i32))?;
+        db_run_sync(move |db| db.update_selected_player(account_id, slot_num as i32))?;
 
         let pkt = sP_LS2CL_REP_CHAR_SELECT_SUCC { UNUSED: unused!() };
         client.send_packet(P_LS2CL_REP_CHAR_SELECT_SUCC, &pkt)

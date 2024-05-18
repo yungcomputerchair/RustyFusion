@@ -7,6 +7,7 @@ use crate::{
     ai::AI,
     chunk::{EntityMap, InstanceID, TickMode},
     config::config_get,
+    database::DbResult,
     defines::*,
     entity::{Combatant, Entity, EntityID, Group, Player, Slider, NPC},
     enums::ItemType,
@@ -27,7 +28,7 @@ pub struct ShardServerState {
     pub shard_id: i32,
     pub login_server_conn_id: Option<Uuid>,
     pub login_data: HashMap<i64, LoginData>,
-    pub autosave_rx: Option<FFReceiver<()>>,
+    pub autosave_rx: Option<FFReceiver<DbResult>>,
     pub entity_map: EntityMap,
     pub buyback_lists: HashMap<i32, Vec<Item>>,
     pub ongoing_trades: HashMap<Uuid, TradeContext>,
@@ -314,7 +315,7 @@ impl ShardServerState {
         if let Some(receiver) = &self.autosave_rx {
             match receiver.try_recv() {
                 None => (), // in progress
-                Some(Ok(())) => {
+                Some(Ok(_)) => {
                     let elapsed = receiver.start_time.elapsed().unwrap();
                     log(
                         Severity::Info,

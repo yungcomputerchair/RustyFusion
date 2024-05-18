@@ -54,7 +54,8 @@ pub fn pc_enter(
     }
 
     let pc_id = state.entity_map.gen_next_pc_id();
-    let mut player = db_run_sync(|db| db.load_player(login_data.iAccountID, login_data.iPC_UID))?;
+    let mut player =
+        db_run_sync(move |db| db.load_player(login_data.iAccountID, login_data.iPC_UID))?;
     player.set_player_id(pc_id);
     player.set_client_id(key);
 

@@ -1197,8 +1197,9 @@ impl Player {
 
     pub fn disconnect(pc_id: i32, state: &mut ShardServerState, clients: &mut ClientMap) {
         let player = state.get_player(pc_id).unwrap();
+        let player_saved = player.clone();
         let pc_uid = player.get_uid();
-        log_if_failed(db_run_sync(|db| db.save_player(player)));
+        log_if_failed(db_run_sync(move |db| db.save_player(&player_saved)));
         log(
             Severity::Info,
             &format!(

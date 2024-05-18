@@ -386,7 +386,8 @@ mod commands {
             let Ok(player) = state.get_player(pc_id) else {
                 return send_system_message(client, &format!("Player {} not found", pc_id));
             };
-            db_run_sync(|db| db.find_account_from_player(player.get_uid()))
+            let pc_uid = player.get_uid();
+            db_run_sync(move |db| db.find_account_from_player(pc_uid))
                 .unwrap()
                 .id
         } else {
@@ -409,7 +410,8 @@ mod commands {
             "No reason given".to_string()
         };
 
-        match db_run_sync(|db| db.ban_account(acc_id, banned_until, ban_reason.clone())) {
+        let ban_reason_clone = ban_reason.clone();
+        match db_run_sync(move |db| db.ban_account(acc_id, banned_until, ban_reason_clone)) {
             Ok(()) => {
                 let ban_msg = format!(
                     "Account {} banned for {}\n\
@@ -471,7 +473,7 @@ mod commands {
             return send_system_message(client, "Invalid account ID");
         };
 
-        match db_run_sync(|db| db.unban_account(acc_id)) {
+        match db_run_sync(move |db| db.unban_account(acc_id)) {
             Ok(()) => {
                 let unban_msg = format!("Account {} unbanned", acc_id);
                 log(
@@ -607,6 +609,7 @@ mod commands {
             return send_system_message(client, &format!("Player {} not found", target_pc_id));
         };
         let target_perms = target_player.perms;
+        let target_uid = target_player.get_uid();
 
         if tokens.len() < 3 {
             return send_system_message(
@@ -652,10 +655,8 @@ mod commands {
         ));
 
         if tokens.get(3).is_some_and(|arg| *arg == "save") {
-            let saved = db_run_sync(|db| {
-                let acc = db
-                    .find_account_from_player(target_player.get_uid())
-                    .unwrap();
+            let saved = db_run_sync(move |db| {
+                let acc = db.find_account_from_player(target_uid).unwrap();
                 db.change_account_level(acc.id, new_perms as i32)
             });
             match saved {
