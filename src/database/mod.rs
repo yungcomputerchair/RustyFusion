@@ -45,7 +45,6 @@ impl DbManager {
         self.op_queue.drain(..).for_each(|op| {
             op(&mut *self.db_impl);
         });
-        self.op_queue.clear();
     }
 }
 
