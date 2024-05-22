@@ -73,44 +73,54 @@ impl TradeOffer {
     }
 }
 pub struct TradeContext {
-    pc_ids: [i32; 2],
-    offers: [TradeOffer; 2],
+    from_pc_id: i32,
+    from_offer: TradeOffer,
+    to_pc_id: i32,
+    to_offer: TradeOffer,
 }
 impl TradeContext {
-    pub fn new(pc_ids: [i32; 2]) -> Self {
+    pub fn new(from_pc_id: i32, to_pc_id: i32) -> Self {
         Self {
-            pc_ids,
-            offers: Default::default(),
+            from_pc_id,
+            from_offer: TradeOffer::default(),
+            to_pc_id,
+            to_offer: TradeOffer::default(),
         }
     }
 
     pub fn get_id_from(&self) -> i32 {
-        self.pc_ids[0]
+        self.from_pc_id
     }
 
     pub fn get_id_to(&self) -> i32 {
-        self.pc_ids[1]
+        self.to_pc_id
     }
 
     pub fn get_other_id(&self, pc_id: i32) -> i32 {
-        for id in self.pc_ids {
-            if id != pc_id {
-                return id;
-            }
+        if self.from_pc_id != pc_id {
+            return self.from_pc_id;
         }
+
+        if self.to_pc_id != pc_id {
+            return self.to_pc_id;
+        }
+
         panic_log("Bad trade state");
     }
 
     fn get_offer_mut(&mut self, pc_id: i32) -> FFResult<&mut TradeOffer> {
-        let idx = self
-            .pc_ids
-            .iter()
-            .position(|id| *id == pc_id)
-            .ok_or(FFError::build(
-                Severity::Warning,
-                format!("Player {} is not a part of the trade", pc_id),
-            ))?;
-        Ok(&mut self.offers[idx])
+        if pc_id == self.from_pc_id {
+            return Ok(&mut self.from_offer);
+        }
+
+        if pc_id == self.to_pc_id {
+            return Ok(&mut self.to_offer);
+        }
+
+        Err(FFError::build(
+            Severity::Warning,
+            format!("Player {} not in trade", pc_id),
+        ))
     }
 
     pub fn set_taros(&mut self, pc_id: i32, taros: u32) -> FFResult<()> {
@@ -139,7 +149,7 @@ impl TradeContext {
     }
 
     fn is_ready(&self) -> bool {
-        self.offers.iter().all(|offer| offer.confirmed)
+        self.from_offer.confirmed && self.to_offer.confirmed
     }
 
     pub fn lock_in(&mut self, pc_id: i32) -> FFResult<bool> {
