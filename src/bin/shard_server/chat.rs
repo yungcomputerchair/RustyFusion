@@ -166,7 +166,7 @@ pub fn send_group_freechat_message(
     if let Some(group_id) = player.group_id {
         let group = state.groups.get(&group_id).unwrap();
         for eid in group.get_member_ids() {
-            let entity = state.entity_map.get_from_id(*eid).unwrap();
+            let entity = state.entity_map.get_entity_raw(*eid).unwrap();
             if let Some(client) = entity.get_client(clients) {
                 log_if_failed(
                     client.send_packet(P_FE2CL_REP_SEND_ALL_GROUP_FREECHAT_MESSAGE_SUCC, &pkt),
@@ -206,7 +206,7 @@ pub fn send_group_menuchat_message(
     if let Some(group_id) = player.group_id {
         let group = state.groups.get(&group_id).unwrap();
         for eid in group.get_member_ids() {
-            let entity = state.entity_map.get_from_id(*eid).unwrap();
+            let entity = state.entity_map.get_entity_raw(*eid).unwrap();
             if let Some(client) = entity.get_client(clients) {
                 log_if_failed(
                     client.send_packet(P_FE2CL_REP_SEND_ALL_GROUP_MENUCHAT_MESSAGE_SUCC, &pkt),

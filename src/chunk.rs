@@ -9,7 +9,7 @@ use std::{
 use crate::{
     config::config_get,
     defines::{ID_OVERWORLD, MAX_NUM_CHANNELS},
-    entity::{Egg, Entity, EntityID, Player, Slider, NPC},
+    entity::{Entity, EntityID, Player, NPC},
     enums::ShardChannelStatus,
     error::{log, log_if_failed, panic_log, FFError, FFResult, Severity},
     net::{ClientMap, FFClient},
@@ -122,11 +122,25 @@ pub struct EntityMap {
 }
 
 impl EntityMap {
-    pub fn get_from_id(&self, id: EntityID) -> Option<&dyn Entity> {
+    pub fn get_entity<T: Entity + 'static>(&self, id: EntityID) -> Option<&T> {
+        self.registry.get(&id).and_then(|entry| {
+            let any_ref = entry.entity.as_ref().as_any();
+            any_ref.downcast_ref()
+        })
+    }
+
+    pub fn get_entity_mut<T: Entity + 'static>(&mut self, id: EntityID) -> Option<&mut T> {
+        self.registry.get_mut(&id).and_then(|entry| {
+            let any_ref = entry.entity.as_mut().as_any_mut();
+            any_ref.downcast_mut()
+        })
+    }
+
+    pub fn get_entity_raw(&self, id: EntityID) -> Option<&dyn Entity> {
         self.registry.get(&id).map(|entry| entry.entity.as_ref())
     }
 
-    pub fn get_from_id_mut(&mut self, id: EntityID) -> Option<&mut dyn Entity> {
+    pub fn get_entity_raw_mut(&mut self, id: EntityID) -> Option<&mut dyn Entity> {
         // compiler doesn't like the use of a closure here
         match self.registry.get_mut(&id) {
             Some(entry) => Some(entry.entity.as_mut()),
@@ -175,24 +189,6 @@ impl EntityMap {
         entities
     }
 
-    pub fn get_player(&self, pc_id: i32) -> Option<&Player> {
-        let id = EntityID::Player(pc_id);
-        self.registry.get(&id).and_then(|entry| {
-            let entity_ref = entry.entity.as_ref().as_any();
-            let player_ref = entity_ref.downcast_ref();
-            player_ref
-        })
-    }
-
-    pub fn get_player_mut(&mut self, pc_id: i32) -> Option<&mut Player> {
-        let id = EntityID::Player(pc_id);
-        self.registry.get_mut(&id).and_then(|entry| {
-            let entity_ref = entry.entity.as_mut().as_any_mut();
-            let player_ref = entity_ref.downcast_mut();
-            player_ref
-        })
-    }
-
     pub fn get_player_ids(&self) -> impl Iterator<Item = i32> + '_ {
         self.registry.keys().filter_map(|id| {
             if let EntityID::Player(pc_id) = id {
@@ -209,7 +205,7 @@ impl EntityMap {
             .filter_map(|entry| {
                 let entity_id = entry.entity.get_id();
                 if let EntityID::Player(pc_id) = entity_id {
-                    let pc = self.get_player(pc_id).unwrap();
+                    let pc = self.get_entity(entity_id).unwrap();
                     if f(pc) {
                         return Some(pc_id);
                     }
@@ -217,24 +213,6 @@ impl EntityMap {
                 None
             })
             .collect()
-    }
-
-    pub fn get_npc(&self, npc_id: i32) -> Option<&NPC> {
-        let id = EntityID::NPC(npc_id);
-        self.registry.get(&id).and_then(|entry| {
-            let entity_ref = entry.entity.as_ref().as_any();
-            let npc_ref = entity_ref.downcast_ref();
-            npc_ref
-        })
-    }
-
-    pub fn get_npc_mut(&mut self, npc_id: i32) -> Option<&mut NPC> {
-        let id = EntityID::NPC(npc_id);
-        self.registry.get_mut(&id).and_then(|entry| {
-            let entity_ref = entry.entity.as_mut().as_any_mut();
-            let npc_ref = entity_ref.downcast_mut();
-            npc_ref
-        })
     }
 
     pub fn get_npc_ids(&self) -> impl Iterator<Item = i32> + '_ {
@@ -253,7 +231,7 @@ impl EntityMap {
             .filter_map(|entry| {
                 let entity_id = entry.entity.get_id();
                 if let EntityID::NPC(npc_id) = entity_id {
-                    let npc = self.get_npc(npc_id).unwrap();
+                    let npc = self.get_entity(entity_id).unwrap();
                     if f(npc) {
                         return Some(npc_id);
                     }
@@ -261,42 +239,6 @@ impl EntityMap {
                 None
             })
             .collect()
-    }
-
-    pub fn get_slider(&self, slider_id: i32) -> Option<&Slider> {
-        let id = EntityID::Slider(slider_id);
-        self.registry.get(&id).and_then(|entry| {
-            let entity_ref = entry.entity.as_ref().as_any();
-            let slider_ref = entity_ref.downcast_ref();
-            slider_ref
-        })
-    }
-
-    pub fn get_slider_mut(&mut self, slider_id: i32) -> Option<&mut Slider> {
-        let id = EntityID::Slider(slider_id);
-        self.registry.get_mut(&id).and_then(|entry| {
-            let entity_ref = entry.entity.as_mut().as_any_mut();
-            let slider_ref = entity_ref.downcast_mut();
-            slider_ref
-        })
-    }
-
-    pub fn get_egg(&self, egg_id: i32) -> Option<&Egg> {
-        let id = EntityID::Egg(egg_id);
-        self.registry.get(&id).and_then(|entry| {
-            let entity_ref = entry.entity.as_ref().as_any();
-            let egg_ref = entity_ref.downcast_ref();
-            egg_ref
-        })
-    }
-
-    pub fn get_egg_mut(&mut self, egg_id: i32) -> Option<&mut Egg> {
-        let id = EntityID::Egg(egg_id);
-        self.registry.get_mut(&id).and_then(|entry| {
-            let entity_ref = entry.entity.as_mut().as_any_mut();
-            let egg_ref = entity_ref.downcast_mut();
-            egg_ref
-        })
     }
 
     pub fn validate_proximity(&self, ids: &[EntityID], range: u32) -> FFResult<()> {
@@ -440,19 +382,19 @@ impl EntityMap {
         let removed = around_from.difference(&around_to);
         for e in removed {
             // us to them
-            let from = self.get_from_id(id).unwrap();
+            let from = self.get_entity_raw(id).unwrap();
             if let Some(from_client) = from.get_client(client_map) {
                 // possible for the ID to be unregistered if the instance was cleaned up
-                if let Some(to) = self.get_from_id(*e) {
+                if let Some(to) = self.get_entity_raw(*e) {
                     log_if_failed(to.send_exit(from_client));
                 }
             }
 
             // them to us
             // possible for the ID to be unregistered if the instance was cleaned up
-            if let Some(from) = self.get_from_id(*e) {
+            if let Some(from) = self.get_entity_raw(*e) {
                 if let Some(from_client) = from.get_client(client_map) {
-                    let to = self.get_from_id(id).unwrap();
+                    let to = self.get_entity_raw(id).unwrap();
                     log_if_failed(to.send_exit(from_client));
                 }
             }
@@ -461,16 +403,16 @@ impl EntityMap {
         let added = around_to.difference(&around_from);
         for e in added {
             // us to them
-            let from = self.get_from_id(id).unwrap();
+            let from = self.get_entity_raw(id).unwrap();
             if let Some(from_client) = from.get_client(client_map) {
-                let to = self.get_from_id(*e).unwrap();
+                let to = self.get_entity_raw(*e).unwrap();
                 log_if_failed(to.send_enter(from_client));
             }
 
             // them to us
-            let from = self.get_from_id(*e).unwrap();
+            let from = self.get_entity_raw(*e).unwrap();
             if let Some(from_client) = from.get_client(client_map) {
-                let to = self.get_from_id(id).unwrap();
+                let to = self.get_entity_raw(id).unwrap();
                 log_if_failed(to.send_enter(from_client));
             }
         }
@@ -674,8 +616,8 @@ impl EntityMap {
                 for y in 0..NCHUNKS {
                     for id in template_chunks[x][y].get_all() {
                         let tick_mode = self.registry[id].tick_mode;
-                        if let EntityID::NPC(npc_id) = *id {
-                            let mut npc = self.get_npc(npc_id).unwrap().clone();
+                        if let EntityID::NPC(_) = *id {
+                            let mut npc = self.get_entity::<NPC>(*id).unwrap().clone();
                             npc.instance_id = instance_id;
                             let new_id = self.gen_next_npc_id();
                             id_mappings.insert(*id, EntityID::NPC(new_id));
@@ -698,7 +640,7 @@ impl EntityMap {
 
             // update leaders
             for (new_npc_id, (old_leader_id, offset)) in tight_follow_mappings {
-                let npc = self.get_npc_mut(new_npc_id).unwrap();
+                let npc: &mut NPC = self.get_entity_mut(EntityID::NPC(new_npc_id)).unwrap();
                 let new_leader_id = id_mappings[&old_leader_id];
                 npc.tight_follow = Some((new_leader_id, offset));
             }

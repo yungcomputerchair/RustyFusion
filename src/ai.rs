@@ -395,7 +395,7 @@ impl AINode for FollowEntityLoose {
 
         match target_id {
             Some(eid) => {
-                let entity = match state.entity_map.get_from_id(eid) {
+                let entity = match state.entity_map.get_entity_raw(eid) {
                     Some(entity) => entity,
                     None => return NodeStatus::Failure,
                 };
@@ -457,7 +457,7 @@ impl AINode for FollowEntityTight {
             None => return NodeStatus::Failure,
         };
 
-        let leader = match state.entity_map.get_from_id(leader_id) {
+        let leader = match state.entity_map.get_entity_raw(leader_id) {
             Some(leader) => leader,
             None => return NodeStatus::Failure,
         };
@@ -866,7 +866,7 @@ impl AINode for ScanForTargets {
 
         // gain aggro
         for eid in state.entity_map.get_around_entity(npc.get_id()) {
-            let entity = state.entity_map.get_from_id(eid).unwrap();
+            let entity = state.entity_map.get_entity_raw(eid).unwrap();
             let cb = match entity.as_combatant() {
                 Some(cb) => cb,
                 None => continue,
@@ -972,7 +972,7 @@ impl AINode for CheckRetreat {
                     }
                 };
 
-                let should_retreat = match state.entity_map.get_from_id(target_id) {
+                let should_retreat = match state.entity_map.get_entity_raw(target_id) {
                     Some(target) => {
                         let cb = target.as_combatant().unwrap();
                         cb.is_dead() // target dead

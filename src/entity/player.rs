@@ -1759,7 +1759,7 @@ impl PlayerSearchQuery {
     pub fn execute(&self, state: &ShardServerState) -> Option<i32> {
         match self {
             PlayerSearchQuery::ByID(pc_id) => {
-                if state.entity_map.get_player(*pc_id).is_some() {
+                if state.get_player(*pc_id).is_ok() {
                     Some(*pc_id)
                 } else {
                     None

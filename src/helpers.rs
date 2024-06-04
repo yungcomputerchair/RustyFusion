@@ -82,7 +82,7 @@ pub fn remove_group_member(
         // (except the leaver; that is the caller's job)
         let leaver_pkt = sP_FE2CL_PC_GROUP_LEAVE_SUCC { UNUSED: unused!() };
         for eid in group.get_member_ids() {
-            let entity = state.entity_map.get_from_id(*eid).unwrap();
+            let entity = state.entity_map.get_entity_raw(*eid).unwrap();
             if let Some(client) = entity.get_client(clients) {
                 log_if_failed(client.send_packet(P_FE2CL_PC_GROUP_LEAVE_SUCC, &leaver_pkt));
             }
@@ -112,7 +112,7 @@ pub fn remove_group_member(
                 iMemberNPCCnt: npc_group_data.len() as i32,
             };
             for eid in group.get_member_ids() {
-                let entity = state.entity_map.get_from_id(*eid).unwrap();
+                let entity = state.entity_map.get_entity_raw(*eid).unwrap();
                 if let Some(client) = entity.get_client(clients) {
                     client.queue_packet(P_FE2CL_PC_GROUP_LEAVE, &update_pkt);
                     for pc_data in &pc_group_data {
@@ -133,7 +133,7 @@ pub fn remove_group_member(
                 iMemberNPCCnt: npc_group_data.len() as i32,
             };
             for eid in group.get_member_ids() {
-                let entity = state.entity_map.get_from_id(*eid).unwrap();
+                let entity = state.entity_map.get_entity_raw(*eid).unwrap();
                 if let Some(client) = entity.get_client(clients) {
                     client.queue_packet(P_FE2CL_REP_NPC_GROUP_KICK_SUCC, &update_pkt);
                     for pc_data in &pc_group_data {

@@ -117,7 +117,7 @@ pub fn pc_group_join(clients: &mut ClientMap, state: &mut ShardServerState) -> F
                 iMemberNPCCnt: npc_group_data.len() as i32,
             };
             for eid in group.get_member_ids() {
-                let entity = state.entity_map.get_from_id(*eid).unwrap();
+                let entity = state.entity_map.get_entity_raw(*eid).unwrap();
                 if let Some(client) = entity.get_client(clients) {
                     client.queue_packet(P_FE2CL_PC_GROUP_JOIN_SUCC, &pkt);
                     for pc_data in &pc_group_data {
@@ -217,7 +217,7 @@ pub fn npc_group_invite(clients: &mut ClientMap, state: &mut ShardServerState) -
         iMemberNPCCnt: npc_group_data.len() as i32,
     };
     for eid in group.get_member_ids() {
-        let entity = state.entity_map.get_from_id(*eid).unwrap();
+        let entity = state.entity_map.get_entity_raw(*eid).unwrap();
         if let Some(client) = entity.get_client(clients) {
             client.queue_packet(P_FE2CL_REP_NPC_GROUP_INVITE_SUCC, &pkt);
             for pc_data in &pc_group_data {

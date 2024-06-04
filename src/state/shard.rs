@@ -9,7 +9,7 @@ use crate::{
     config::config_get,
     database::DbResult,
     defines::*,
-    entity::{Combatant, Entity, EntityID, Group, Player, Slider, NPC},
+    entity::{Combatant, Egg, Entity, EntityID, Group, Player, Slider, NPC},
     enums::ItemType,
     error::{log, log_if_failed, panic_log, FFError, FFResult, Severity},
     helpers,
@@ -133,51 +133,71 @@ impl ShardServerState {
 }
 impl ShardServerState {
     pub fn get_npc(&self, npc_id: i32) -> FFResult<&NPC> {
-        self.entity_map.get_npc(npc_id).ok_or(FFError::build(
+        let id = EntityID::NPC(npc_id);
+        self.entity_map.get_entity(id).ok_or(FFError::build(
             Severity::Warning,
             format!("NPC with ID {} doesn't exist", npc_id),
         ))
     }
 
     pub fn get_npc_mut(&mut self, npc_id: i32) -> FFResult<&mut NPC> {
-        self.entity_map.get_npc_mut(npc_id).ok_or(FFError::build(
+        let id = EntityID::NPC(npc_id);
+        self.entity_map.get_entity_mut(id).ok_or(FFError::build(
             Severity::Warning,
             format!("NPC with ID {} doesn't exist", npc_id),
         ))
     }
 
     pub fn get_player(&self, pc_id: i32) -> FFResult<&Player> {
-        self.entity_map.get_player(pc_id).ok_or(FFError::build(
+        let id = EntityID::Player(pc_id);
+        self.entity_map.get_entity(id).ok_or(FFError::build(
             Severity::Warning,
             format!("Player with ID {} doesn't exist", pc_id),
         ))
     }
 
     pub fn get_player_mut(&mut self, pc_id: i32) -> FFResult<&mut Player> {
-        self.entity_map.get_player_mut(pc_id).ok_or(FFError::build(
+        let id = EntityID::Player(pc_id);
+        self.entity_map.get_entity_mut(id).ok_or(FFError::build(
             Severity::Warning,
             format!("Player with ID {} doesn't exist", pc_id),
         ))
     }
 
     pub fn get_slider(&self, slider_id: i32) -> FFResult<&Slider> {
-        self.entity_map.get_slider(slider_id).ok_or(FFError::build(
+        let id = EntityID::Slider(slider_id);
+        self.entity_map.get_entity(id).ok_or(FFError::build(
             Severity::Warning,
             format!("Slider with ID {} doesn't exist", slider_id),
         ))
     }
 
     pub fn get_slider_mut(&mut self, slider_id: i32) -> FFResult<&mut Slider> {
-        self.entity_map
-            .get_slider_mut(slider_id)
-            .ok_or(FFError::build(
-                Severity::Warning,
-                format!("Slider with ID {} doesn't exist", slider_id),
-            ))
+        let id = EntityID::Slider(slider_id);
+        self.entity_map.get_entity_mut(id).ok_or(FFError::build(
+            Severity::Warning,
+            format!("Slider with ID {} doesn't exist", slider_id),
+        ))
+    }
+
+    pub fn get_egg(&self, egg_id: i32) -> FFResult<&Egg> {
+        let id = EntityID::Egg(egg_id);
+        self.entity_map.get_entity(id).ok_or(FFError::build(
+            Severity::Warning,
+            format!("Egg with ID {} doesn't exist", egg_id),
+        ))
+    }
+
+    pub fn get_egg_mut(&mut self, egg_id: i32) -> FFResult<&mut Egg> {
+        let id = EntityID::Egg(egg_id);
+        self.entity_map.get_entity_mut(id).ok_or(FFError::build(
+            Severity::Warning,
+            format!("Egg with ID {} doesn't exist", egg_id),
+        ))
     }
 
     pub fn get_combatant(&self, id: EntityID) -> FFResult<&dyn Combatant> {
-        let entity = self.entity_map.get_from_id(id).ok_or(FFError::build(
+        let entity = self.entity_map.get_entity_raw(id).ok_or(FFError::build(
             Severity::Warning,
             format!("Entity with ID {:?} doesn't exist", id),
         ))?;
@@ -189,10 +209,13 @@ impl ShardServerState {
     }
 
     pub fn get_combatant_mut(&mut self, id: EntityID) -> FFResult<&mut dyn Combatant> {
-        let entity = self.entity_map.get_from_id_mut(id).ok_or(FFError::build(
-            Severity::Warning,
-            format!("Entity with ID {:?} doesn't exist", id),
-        ))?;
+        let entity = self
+            .entity_map
+            .get_entity_raw_mut(id)
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Entity with ID {:?} doesn't exist", id),
+            ))?;
 
         entity.as_combatant_mut().ok_or(FFError::build(
             Severity::Warning,
@@ -205,7 +228,7 @@ impl ShardServerState {
         let pc_ids: Vec<i32> = self.entity_map.get_player_ids().collect();
         let mut pc_ids_dismounted = Vec::with_capacity(pc_ids.len());
         for pc_id in pc_ids {
-            let player = self.entity_map.get_player_mut(pc_id).unwrap();
+            let player = self.get_player_mut(pc_id).unwrap();
             for (location, slot_num) in player.find_items_any(|item| item.ty == ItemType::Vehicle) {
                 let vehicle_slot = player.get_item_mut(location, slot_num).unwrap();
                 if let Some(expiry_time) = vehicle_slot.unwrap().get_expiry_time() {
@@ -236,7 +259,7 @@ impl ShardServerState {
         }
 
         for pc_id in pc_ids_dismounted {
-            let player = self.entity_map.get_player(pc_id).unwrap();
+            let player = self.get_player(pc_id).unwrap();
             helpers::broadcast_state(pc_id, player.get_state_bit_flag(), clients, self);
         }
     }
@@ -265,7 +288,7 @@ impl ShardServerState {
                 iMemberNPCCnt: npc_group_data.len() as i32,
             };
             for eid in group.get_member_ids() {
-                let entity = self.entity_map.get_from_id(*eid).unwrap();
+                let entity = self.entity_map.get_entity_raw(*eid).unwrap();
                 if let Some(client) = entity.get_client(clients) {
                     client.queue_packet(P_FE2CL_PC_GROUP_JOIN_SUCC, &pkt);
                     for pc_data in &pc_group_data {
@@ -288,24 +311,24 @@ impl ShardServerState {
                 // we copy the entity here so we can mutably borrow the state.
                 // we put it back when we're done.
                 EntityID::Player(pc_id) => {
-                    let mut player = self.entity_map.get_player_mut(pc_id).unwrap().clone();
+                    let mut player = self.get_player_mut(pc_id).unwrap().clone();
                     player.tick(&time, clients, self, &mut rng);
-                    *self.entity_map.get_player_mut(pc_id).unwrap() = player;
+                    *self.get_player_mut(pc_id).unwrap() = player;
                 }
                 EntityID::NPC(npc_id) => {
-                    let mut npc = self.entity_map.get_npc_mut(npc_id).unwrap().clone();
+                    let mut npc = self.get_npc_mut(npc_id).unwrap().clone();
                     npc.tick(&time, clients, self, &mut rng);
-                    *self.entity_map.get_npc_mut(npc_id).unwrap() = npc;
+                    *self.get_npc_mut(npc_id).unwrap() = npc;
                 }
                 EntityID::Slider(slider_id) => {
-                    let mut slider = self.entity_map.get_slider_mut(slider_id).unwrap().clone();
+                    let mut slider = self.get_slider_mut(slider_id).unwrap().clone();
                     slider.tick(&time, clients, self, &mut rng);
-                    *self.entity_map.get_slider_mut(slider_id).unwrap() = slider;
+                    *self.get_slider_mut(slider_id).unwrap() = slider;
                 }
                 EntityID::Egg(egg_id) => {
-                    let mut egg = self.entity_map.get_egg_mut(egg_id).unwrap().clone();
+                    let mut egg = self.get_egg_mut(egg_id).unwrap().clone();
                     egg.tick(&time, clients, self, &mut rng);
-                    *self.entity_map.get_egg_mut(egg_id).unwrap() = egg;
+                    *self.get_egg_mut(egg_id).unwrap() = egg;
                 }
             }
         }
