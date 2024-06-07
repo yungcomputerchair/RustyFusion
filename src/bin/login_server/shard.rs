@@ -256,7 +256,9 @@ pub fn pc_location(
 ) -> FFResult<()> {
     let server = clients.get_mut(&shard_key).unwrap();
     let pkt: sP_FE2LS_REQ_PC_LOCATION = *server.get_packet(P_FE2LS_REQ_PC_LOCATION)?;
-    if state.player_search_reqeust.is_some() {
+    let req_shard_id = server.get_shard_id()?;
+    let request_key = (req_shard_id, pkt.iPC_ID);
+    if state.player_search_reqeusts.contains_key(&request_key) {
         let resp = sP_LS2FE_REP_PC_LOCATION_FAIL {
             iPC_ID: pkt.iPC_ID,
             sReq: pkt.sReq,
@@ -265,22 +267,31 @@ pub fn pc_location(
         server.send_packet(P_LS2FE_REP_PC_LOCATION_FAIL, &resp)?;
         return Err(FFError::build(
             Severity::Warning,
-            "Player search request already in progress".to_string(),
+            format!(
+                "Player search request {:?} already in progress",
+                request_key
+            ),
         ));
     }
 
     // search all shards except the one that requested the search
-    let req_shard_id = server.get_shard_id()?;
     let search_shard_ids: HashSet<i32> = state
         .get_shard_ids()
         .into_iter()
         .filter(|id| *id != req_shard_id)
         .collect();
-    state.player_search_reqeust = Some(PlayerSearchRequest {
-        requesting_shard_id: req_shard_id,
-        searching_shard_ids: search_shard_ids,
-    });
+    state.player_search_reqeusts.insert(
+        request_key,
+        PlayerSearchRequest {
+            searching_shard_ids: search_shard_ids,
+        },
+    );
 
+    let pkt = sP_LS2FE_REQ_PC_LOCATION {
+        iReqShard_ID: req_shard_id,
+        iPC_ID: pkt.iPC_ID,
+        sReq: pkt.sReq,
+    };
     clients.iter_mut().for_each(|(_, client)| {
         if let ClientType::ShardServer(shard_id) = client.client_type {
             if shard_id == req_shard_id {
@@ -299,25 +310,29 @@ pub fn pc_location_succ(
 ) -> FFResult<()> {
     let server = clients.get_mut(&shard_key).unwrap();
     let pkt: sP_FE2LS_REP_PC_LOCATION_SUCC = *server.get_packet(P_FE2LS_REP_PC_LOCATION_SUCC)?;
+    let req_shard_id = pkt.iReqShard_ID;
+    let request_key = (req_shard_id, pkt.iPC_ID);
 
-    let search = state.player_search_reqeust.take().ok_or(FFError::build(
-        Severity::Warning,
-        "No player search request in progress".to_string(),
-    ))?;
+    state
+        .player_search_reqeusts
+        .remove(&request_key)
+        .ok_or(FFError::build(
+            Severity::Warning,
+            format!("Player search request {:?} not found", request_key),
+        ))?;
 
     // find the shard that requested the search and forward the results
-    let requesting_shard_id = search.requesting_shard_id;
     let client = clients
         .values_mut()
         .find(|c| match c.client_type {
-            ClientType::ShardServer(shard_id) => shard_id == requesting_shard_id,
+            ClientType::ShardServer(shard_id) => shard_id == req_shard_id,
             _ => false,
         })
         .ok_or(FFError::build(
             Severity::Warning,
             format!(
                 "Shard {}, which initiated the player search, not found",
-                requesting_shard_id
+                req_shard_id
             ),
         ))?;
 
@@ -336,8 +351,10 @@ pub fn pc_location_fail(
 ) -> FFResult<()> {
     let server = clients.get_mut(&shard_key).unwrap();
     let pkt: sP_FE2LS_REP_PC_LOCATION_FAIL = *server.get_packet(P_FE2LS_REP_PC_LOCATION_FAIL)?;
+    let req_shard_id = pkt.iReqShard_ID;
+    let request_key = (req_shard_id, pkt.iPC_ID);
 
-    let search = match state.player_search_reqeust.as_mut() {
+    let search = match state.player_search_reqeusts.get_mut(&request_key) {
         Some(search) => search,
         None => {
             return Ok(()); // search completed already
@@ -348,8 +365,7 @@ pub fn pc_location_fail(
     search.searching_shard_ids.remove(&shard_id);
     if search.searching_shard_ids.is_empty() {
         // every shard got back to us with a failure, so return not found
-        let req_shard_id = search.requesting_shard_id;
-        state.player_search_reqeust = None;
+        state.player_search_reqeusts.remove(&request_key).unwrap();
         let resp = sP_LS2FE_REP_PC_LOCATION_FAIL {
             iPC_ID: pkt.iPC_ID,
             sReq: pkt.sReq,

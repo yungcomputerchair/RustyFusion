@@ -6609,6 +6609,7 @@ impl FFPacket for sP_LS2FE_REP_PC_LOCATION_FAIL {}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct sP_LS2FE_REQ_PC_LOCATION {
+    pub iReqShard_ID: i32,
     pub iPC_ID: i32,
     pub sReq: sP_CL2FE_GM_REQ_PC_LOCATION,
 }
@@ -6730,6 +6731,7 @@ impl FFPacket for sP_FE2LS_REQ_PC_LOCATION {}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct sP_FE2LS_REP_PC_LOCATION_SUCC {
+    pub iReqShard_ID: i32,
     pub iPC_ID: i32,
     pub sResp: sP_FE2CL_GM_REP_PC_LOCATION,
 }
@@ -6739,6 +6741,7 @@ impl FFPacket for sP_FE2LS_REP_PC_LOCATION_SUCC {}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct sP_FE2LS_REP_PC_LOCATION_FAIL {
+    pub iReqShard_ID: i32,
     pub iPC_ID: i32,
     pub sReq: sP_CL2FE_GM_REQ_PC_LOCATION,
     pub iErrorCode: i32,

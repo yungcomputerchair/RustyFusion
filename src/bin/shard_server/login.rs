@@ -189,6 +189,7 @@ pub fn login_pc_location(clients: &mut ClientMap, state: &mut ShardServerState) 
         };
         if let Some(login_server) = clients.get_login_server() {
             let resp = sP_FE2LS_REP_PC_LOCATION_SUCC {
+                iReqShard_ID: pkt.iReqShard_ID,
                 iPC_ID: pkt.iPC_ID,
                 sResp: resp,
             };
@@ -196,6 +197,7 @@ pub fn login_pc_location(clients: &mut ClientMap, state: &mut ShardServerState) 
         }
     } else if let Some(login_server) = clients.get_login_server() {
         let resp = sP_FE2LS_REP_PC_LOCATION_FAIL {
+            iReqShard_ID: pkt.iReqShard_ID,
             iPC_ID: pkt.iPC_ID,
             sReq: pkt.sReq,
             iErrorCode: PlayerSearchReqErr::NotFound as i32,

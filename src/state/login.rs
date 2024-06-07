@@ -42,7 +42,6 @@ impl Default for ShardServerInfo {
 }
 
 pub struct PlayerSearchRequest {
-    pub requesting_shard_id: i32,
     pub searching_shard_ids: HashSet<i32>,
 }
 
@@ -50,7 +49,7 @@ pub struct LoginServerState {
     pub server_id: Uuid,
     sessions: HashMap<i64, LoginSession>,
     shards: HashMap<i32, ShardServerInfo>,
-    pub player_search_reqeust: Option<PlayerSearchRequest>,
+    pub player_search_reqeusts: HashMap<(i32, i32), PlayerSearchRequest>,
 }
 impl Default for LoginServerState {
     fn default() -> Self {
@@ -58,7 +57,7 @@ impl Default for LoginServerState {
             server_id: Uuid::new_v4(),
             sessions: HashMap::new(),
             shards: HashMap::new(),
-            player_search_reqeust: None,
+            player_search_reqeusts: HashMap::new(),
         }
     }
 }
