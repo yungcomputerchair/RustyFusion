@@ -395,6 +395,7 @@ pub struct Player {
     weapon_boosts: u32,
     pub buddy_list_synced: bool,
     buddy_list: Vec<BuddyListEntry>,
+    pub buddy_offered_to: Option<i64>,
     buddy_warp_time: i32,
     last_heal_time: Option<SystemTime>,
     pub last_warp_away_time: Option<SystemTime>,
@@ -1223,17 +1224,17 @@ impl Player {
         self.reset();
     }
 
-    pub fn is_buddies_with(&mut self, pc_uid: i64) -> bool {
+    pub fn is_buddies_with(&self, pc_uid: i64) -> bool {
         self.buddy_list.iter().any(|entry| entry.pc_uid == pc_uid)
     }
 
-    pub fn is_blocked(&mut self, pc_uid: i64) -> bool {
+    pub fn is_blocked(&self, pc_uid: i64) -> bool {
         self.buddy_list
             .iter()
             .any(|entry| entry.pc_uid == pc_uid && entry.blocked)
     }
 
-    pub fn add_buddy(&mut self, buddy_info: BuddyListEntry) -> FFResult<()> {
+    pub fn add_buddy(&mut self, buddy_info: BuddyListEntry) -> FFResult<usize> {
         if self.buddy_list.len() >= SIZEOF_BUDDYLIST_SLOT as usize {
             return Err(FFError::build(
                 Severity::Warning,
@@ -1253,23 +1254,27 @@ impl Player {
         }
 
         self.buddy_list.push(buddy_info);
-        Ok(())
+        Ok(self.buddy_list.len())
     }
 
-    pub fn remove_buddy(&mut self, pc_uid: i64) -> FFResult<()> {
+    pub fn remove_buddy(&mut self, pc_uid: i64) -> FFResult<usize> {
         let idx = self
             .buddy_list
             .iter()
             .position(|entry| entry.pc_uid == pc_uid);
         if let Some(idx) = idx {
             self.buddy_list.remove(idx);
-            Ok(())
+            Ok(idx)
         } else {
             Err(FFError::build(
                 Severity::Warning,
                 "Player is not on buddy list".to_string(),
             ))
         }
+    }
+
+    pub fn get_num_buddies(&self) -> usize {
+        self.buddy_list.len()
     }
 
     pub fn get_all_buddy_info(&self) -> Vec<BuddyListEntry> {

@@ -184,6 +184,7 @@ fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>, state: 
     }
 }
 
+mod buddy;
 mod chat;
 mod combat;
 mod gm;
@@ -297,6 +298,8 @@ fn handle_packet(
         P_CL2FE_REQ_NANO_UNEQUIP => nano::nano_unequip(&mut clients, state),
         P_CL2FE_REQ_NANO_ACTIVE => nano::nano_active(&mut clients, state),
         P_CL2FE_REQ_NANO_TUNE => nano::nano_tune(clients.get_self(), state),
+        //
+        P_CL2FE_REQ_REQUEST_MAKE_BUDDY => buddy::request_make_buddy(&mut clients, state),
         //
         P_CL2FE_REQ_PC_TRADE_OFFER => trade::trade_offer(&mut clients, state),
         P_CL2FE_REQ_PC_TRADE_OFFER_REFUSAL => trade::trade_offer_refusal(&mut clients, state),
