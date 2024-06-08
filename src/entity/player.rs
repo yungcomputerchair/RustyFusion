@@ -335,6 +335,32 @@ pub struct PreWarpData {
     pub position: Position,
 }
 
+#[derive(Debug, Clone)]
+pub struct BuddyListEntry {
+    pub pc_uid: i64,
+    pub first_name: String,
+    pub last_name: String,
+    pub style: PlayerStyle,
+    pub name_check: bool,
+    pub free_chat: bool,
+    pub blocked: bool,
+}
+impl From<BuddyListEntry> for sBuddyBaseInfo {
+    fn from(value: BuddyListEntry) -> Self {
+        Self {
+            iID: unused!(),      // updated later
+            iPCState: unused!(), // updated later
+            iPCUID: value.pc_uid,
+            bBlocked: value.blocked as i8,
+            bFreeChat: value.free_chat as i8,
+            szFirstName: util::encode_utf16(&value.first_name),
+            szLastName: util::encode_utf16(&value.last_name),
+            iGender: value.style.gender,
+            iNameCheckFlag: value.name_check as i8,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Player {
     id: Option<i32>,
@@ -367,6 +393,8 @@ pub struct Player {
     fusion_matter: u32,
     nano_potions: u32,
     weapon_boosts: u32,
+    pub buddy_list_synced: bool,
+    buddy_list: Vec<BuddyListEntry>,
     buddy_warp_time: i32,
     last_heal_time: Option<SystemTime>,
     pub last_warp_away_time: Option<SystemTime>,
@@ -1193,6 +1221,64 @@ impl Player {
             self.get_nano_mut(nano_id).unwrap().stamina = NANO_STAMINA_MAX / 2;
         }
         self.reset();
+    }
+
+    pub fn is_buddies_with(&mut self, pc_uid: i64) -> bool {
+        self.buddy_list.iter().any(|entry| entry.pc_uid == pc_uid)
+    }
+
+    pub fn is_blocked(&mut self, pc_uid: i64) -> bool {
+        self.buddy_list
+            .iter()
+            .any(|entry| entry.pc_uid == pc_uid && entry.blocked)
+    }
+
+    pub fn add_buddy(&mut self, buddy_info: BuddyListEntry) -> FFResult<()> {
+        if self.buddy_list.len() >= SIZEOF_BUDDYLIST_SLOT as usize {
+            return Err(FFError::build(
+                Severity::Warning,
+                "Buddy list is full".to_string(),
+            ));
+        }
+
+        if self
+            .buddy_list
+            .iter()
+            .any(|entry| entry.pc_uid == buddy_info.pc_uid)
+        {
+            return Err(FFError::build(
+                Severity::Warning,
+                "Player is already on buddy list".to_string(),
+            ));
+        }
+
+        self.buddy_list.push(buddy_info);
+        Ok(())
+    }
+
+    pub fn remove_buddy(&mut self, pc_uid: i64) -> FFResult<()> {
+        let idx = self
+            .buddy_list
+            .iter()
+            .position(|entry| entry.pc_uid == pc_uid);
+        if let Some(idx) = idx {
+            self.buddy_list.remove(idx);
+            Ok(())
+        } else {
+            Err(FFError::build(
+                Severity::Warning,
+                "Player is not on buddy list".to_string(),
+            ))
+        }
+    }
+
+    pub fn get_all_buddy_info(&self) -> Vec<BuddyListEntry> {
+        // in theory, should never have more than 50 buddies, but crop just in case
+        self.buddy_list
+            .iter()
+            .take(SIZEOF_BUDDYLIST_SLOT as usize)
+            .cloned()
+            .collect()
     }
 
     pub fn disconnect(pc_id: i32, state: &mut ShardServerState, clients: &mut ClientMap) {

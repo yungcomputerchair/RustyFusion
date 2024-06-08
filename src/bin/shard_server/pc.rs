@@ -137,7 +137,8 @@ pub fn pc_loading_complete(clients: &mut ClientMap, state: &mut ShardServerState
     let resp = sP_FE2CL_REP_PC_LOADING_COMPLETE_SUCC { iPC_ID: unused!() };
     catch_fail(
         (|| {
-            let player = state.get_player(clients.get_self().get_player_id()?)?;
+            let pc_id = clients.get_self().get_player_id()?;
+            let player = state.get_player(pc_id)?;
             let map_num = player.instance_id.map_num;
             let chunk = player.get_chunk_coords();
             state
@@ -146,36 +147,56 @@ pub fn pc_loading_complete(clients: &mut ClientMap, state: &mut ShardServerState
             let client = clients.get_self();
             client.send_packet(P_FE2CL_REP_PC_LOADING_COMPLETE_SUCC, &resp)?;
 
-            if map_num == ID_OVERWORLD {
-                return Ok(());
+            // map info sync
+            if map_num != ID_OVERWORLD {
+                let map_data = tdata_get().get_map_data(map_num)?;
+                let x_min = map_data.map_square.0 * MAP_SQUARE_SIZE;
+                let y_min = map_data.map_square.1 * MAP_SQUARE_SIZE;
+                let mut map_info_pkt = sP_FE2CL_INSTANCE_MAP_INFO {
+                    iInstanceMapNum: map_num as i32,
+                    iCreateTick: unused!(),
+                    iMapCoordX_Min: x_min,
+                    iMapCoordX_Max: x_min + MAP_SQUARE_SIZE,
+                    iMapCoordY_Min: y_min,
+                    iMapCoordY_Max: y_min + MAP_SQUARE_SIZE,
+                    iMapCoordZ_Min: i32::MIN,
+                    iMapCoordZ_Max: i32::MAX,
+                    iEP_ID: unused!(),
+                    iEPTopRecord_Score: unused!(),
+                    iEPTopRecord_Rank: unused!(),
+                    iEPTopRecord_Time: unused!(),
+                    iEPTopRecord_RingCount: unused!(),
+                    iEPSwitch_StatusON_Cnt: unused!(),
+                };
+
+                if let Some(ep_id) = map_data.ep_id {
+                    map_info_pkt.iEP_ID = ep_id as i32;
+                    // TODO remaining EP data
+                }
+                client.send_packet(P_FE2CL_INSTANCE_MAP_INFO, &map_info_pkt)?;
             }
 
-            // transmit map info
-            let map_data = tdata_get().get_map_data(map_num)?;
-            let x_min = map_data.map_square.0 * MAP_SQUARE_SIZE;
-            let y_min = map_data.map_square.1 * MAP_SQUARE_SIZE;
-            let mut map_info_pkt = sP_FE2CL_INSTANCE_MAP_INFO {
-                iInstanceMapNum: map_num as i32,
-                iCreateTick: unused!(),
-                iMapCoordX_Min: x_min,
-                iMapCoordX_Max: x_min + MAP_SQUARE_SIZE,
-                iMapCoordY_Min: y_min,
-                iMapCoordY_Max: y_min + MAP_SQUARE_SIZE,
-                iMapCoordZ_Min: i32::MIN,
-                iMapCoordZ_Max: i32::MAX,
-                iEP_ID: unused!(),
-                iEPTopRecord_Score: unused!(),
-                iEPTopRecord_Rank: unused!(),
-                iEPTopRecord_Time: unused!(),
-                iEPTopRecord_RingCount: unused!(),
-                iEPSwitch_StatusON_Cnt: unused!(),
-            };
-
-            if let Some(ep_id) = map_data.ep_id {
-                map_info_pkt.iEP_ID = ep_id as i32;
-                // TODO remaining EP data
+            // buddy list sync.
+            // we only want to do this once and we can't do it on initial load
+            let player = state.get_player_mut(pc_id).unwrap();
+            if !player.buddy_list_synced {
+                let buddy_info = player.get_all_buddy_info();
+                let buddy_list_pkt = sP_FE2CL_REP_PC_BUDDYLIST_INFO_SUCC {
+                    iID: unused!(),
+                    iPCUID: unused!(),
+                    iListNum: 0, // we don't need to chunk the buddy list
+                    iBuddyCnt: buddy_info.len() as i8,
+                };
+                client.queue_packet(P_FE2CL_REP_PC_BUDDYLIST_INFO_SUCC, &buddy_list_pkt);
+                for entry in buddy_info {
+                    let buddy_pkt: sBuddyBaseInfo = entry.into();
+                    client.queue_struct(&buddy_pkt);
+                }
+                client.flush()?;
+                player.buddy_list_synced = true;
             }
-            client.send_packet(P_FE2CL_INSTANCE_MAP_INFO, &map_info_pkt)
+
+            Ok(())
         })(),
         || {
             Err(FFError::build_dc(
