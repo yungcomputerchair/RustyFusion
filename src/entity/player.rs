@@ -345,6 +345,19 @@ pub struct BuddyListEntry {
     pub free_chat: bool,
     pub blocked: bool,
 }
+impl BuddyListEntry {
+    pub fn new(player: &Player) -> Self {
+        Self {
+            pc_uid: player.uid,
+            first_name: player.first_name.clone(),
+            last_name: player.last_name.clone(),
+            style: player.style.unwrap(),
+            name_check: player.flags.name_check_flag,
+            free_chat: true,
+            blocked: false,
+        }
+    }
+}
 impl From<BuddyListEntry> for sBuddyBaseInfo {
     fn from(value: BuddyListEntry) -> Self {
         Self {
