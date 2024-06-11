@@ -10,7 +10,7 @@ use std::{
 
 use rusty_fusion::{
     config::config_init,
-    database::db_init,
+    database::{db_init, db_shutdown},
     error::{
         log, log_error, log_if_failed, logger_flush, logger_flush_scheduled, logger_init,
         panic_log, FFError, FFResult, Severity,
@@ -29,11 +29,11 @@ use rusty_fusion::{
 };
 
 fn main() -> Result<()> {
-    let _cleanup = Cleanup {};
+    let mut cleanup = Cleanup::default();
 
     let config = config_init();
     logger_init(config.login.log_path.get());
-    drop(db_init());
+    cleanup.db_thread_handle = Some(db_init());
     tdata_init();
 
     let polling_interval = Duration::from_millis(50);
@@ -88,11 +88,20 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-struct Cleanup {}
+#[derive(Default)]
+struct Cleanup {
+    db_thread_handle: Option<std::thread::JoinHandle<()>>,
+}
 impl Drop for Cleanup {
     fn drop(&mut self) {
         print!("Cleaning up...");
-        logger_flush().expect("Errors writing final log");
+        if let Some(handle) = self.db_thread_handle.take() {
+            db_shutdown();
+            handle.join().unwrap();
+        }
+        if let Err(e) = logger_flush() {
+            println!("Could not flush log: {}", e);
+        }
         println!("done");
     }
 }

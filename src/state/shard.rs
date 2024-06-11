@@ -28,7 +28,7 @@ pub struct ShardServerState {
     pub shard_id: i32,
     pub login_server_conn_id: Option<Uuid>,
     pub login_data: HashMap<i64, LoginData>,
-    pub autosave_rx: Option<FFReceiver<DbResult>>,
+    pub save_rx: Option<FFReceiver<DbResult>>,
     pub entity_map: EntityMap,
     pub buyback_lists: HashMap<i32, Vec<Item>>,
     pub ongoing_trades: HashMap<Uuid, TradeContext>,
@@ -41,7 +41,7 @@ impl ShardServerState {
             login_server_conn_id: None,
             shard_id,
             login_data: HashMap::new(),
-            autosave_rx: None,
+            save_rx: None,
             entity_map: EntityMap::default(),
             buyback_lists: HashMap::new(),
             ongoing_trades: HashMap::new(),
@@ -130,8 +130,7 @@ impl ShardServerState {
         }
         state
     }
-}
-impl ShardServerState {
+
     pub fn get_npc(&self, npc_id: i32) -> FFResult<&NPC> {
         let id = EntityID::NPC(npc_id);
         self.entity_map.get_entity(id).ok_or(FFError::build(
@@ -334,26 +333,25 @@ impl ShardServerState {
         }
     }
 
-    pub fn check_receivers(&mut self) {
-        if let Some(receiver) = &self.autosave_rx {
+    pub fn check_receivers(&mut self) -> bool {
+        if let Some(receiver) = &self.save_rx {
             match receiver.try_recv() {
                 None => (), // in progress
-                Some(Ok(_)) => {
-                    let elapsed = receiver.start_time.elapsed().unwrap();
+                Some(Ok(res)) => {
+                    let elapsed = res.completed.elapsed().unwrap_or_default();
                     log(
                         Severity::Info,
-                        &format!("Autosave complete ({:.2}s)", elapsed.as_secs_f32()),
+                        &format!("Save complete ({:.2}s)", elapsed.as_secs_f32()),
                     );
-                    self.autosave_rx = None;
+                    self.save_rx = None;
                 }
                 Some(Err(e)) => {
-                    log(
-                        Severity::Warning,
-                        &format!("Autosave failed: {}", e.get_msg()),
-                    );
-                    self.autosave_rx = None;
+                    log(Severity::Warning, &format!("Save failed: {}", e.get_msg()));
+                    self.save_rx = None;
                 }
             }
         }
+
+        self.save_rx.is_some()
     }
 }

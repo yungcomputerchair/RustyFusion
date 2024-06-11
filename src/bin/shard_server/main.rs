@@ -10,7 +10,7 @@ use std::{
 
 use rusty_fusion::{
     config::{config_get, config_init},
-    database::{db_init, db_run_async},
+    database::{db_init, db_run_async, db_shutdown},
     defines::SHARD_TICKS_PER_SECOND,
     entity::Player,
     error::{
@@ -31,7 +31,7 @@ use rusty_fusion::{
 };
 
 fn main() -> Result<()> {
-    let _cleanup = Cleanup {};
+    let mut cleanup = Cleanup::default();
 
     let config = config_init();
     let shard_id = config.shard.shard_id.get();
@@ -40,7 +40,7 @@ fn main() -> Result<()> {
         Severity::Info,
         &format!("Shard server #{} starting up...", shard_id),
     );
-    drop(db_init());
+    cleanup.db_thread_handle = Some(db_init());
     tdata_init();
 
     let polling_interval = Duration::from_millis(50);
@@ -69,7 +69,7 @@ fn main() -> Result<()> {
         true,
     );
     timers.register_timer(
-        |t, _, st| do_autosave(t, st.as_shard()),
+        |t, _, st| do_save(t, st.as_shard()),
         Duration::from_secs(config.shard.autosave_interval.get() * 60),
         false,
     );
@@ -134,15 +134,36 @@ fn main() -> Result<()> {
     }
 
     log(Severity::Info, "Shard server shutting down...");
-    log_if_failed(do_autosave(SystemTime::now(), state.as_shard()));
+    log_if_failed(do_save(SystemTime::now(), state.as_shard()));
+
+    let mut attempts = 5;
+    while state.as_shard().check_receivers() {
+        // Wait for all receivers to finish
+        if attempts == 0 {
+            log(Severity::Warning, "Some receivers hanging!");
+            break;
+        }
+        std::thread::sleep(Duration::from_secs(1));
+        attempts -= 1;
+    }
+
     Ok(())
 }
 
-struct Cleanup {}
+#[derive(Default)]
+struct Cleanup {
+    db_thread_handle: Option<std::thread::JoinHandle<()>>,
+}
 impl Drop for Cleanup {
     fn drop(&mut self) {
         print!("Cleaning up...");
-        logger_flush().expect("Errors writing final log");
+        if let Some(handle) = self.db_thread_handle.take() {
+            db_shutdown();
+            handle.join().unwrap();
+        }
+        if let Err(e) = logger_flush() {
+            println!("Could not flush log: {}", e);
+        }
         println!("done");
     }
 }
@@ -400,7 +421,7 @@ fn send_live_check(client: &mut FFClient) -> FFResult<()> {
     }
 }
 
-fn do_autosave(_time: SystemTime, state: &mut ShardServerState) -> FFResult<()> {
+fn do_save(_time: SystemTime, state: &mut ShardServerState) -> FFResult<()> {
     let pc_ids: Vec<i32> = state.entity_map.get_player_ids().collect();
     if pc_ids.is_empty() {
         return Ok(());
@@ -408,7 +429,7 @@ fn do_autosave(_time: SystemTime, state: &mut ShardServerState) -> FFResult<()> 
 
     log(
         Severity::Info,
-        &format!("Autosaving {} player(s)...", pc_ids.len()),
+        &format!("Saving {} player(s)...", pc_ids.len()),
     );
     let players: Vec<Player> = pc_ids
         .iter()
@@ -419,6 +440,6 @@ fn do_autosave(_time: SystemTime, state: &mut ShardServerState) -> FFResult<()> 
         db.save_players(&player_refs)
     });
 
-    state.autosave_rx = Some(rx);
+    state.save_rx = Some(rx);
     Ok(())
 }

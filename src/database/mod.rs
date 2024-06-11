@@ -24,6 +24,7 @@ type Bytes = Vec<u8>;
 
 pub struct DbResult {
     result: FFResult<Box<dyn Any>>,
+    pub completed: SystemTime,
 }
 impl DbResult {
     pub fn get<T: 'static>(self) -> FFResult<T> {
@@ -38,6 +39,7 @@ type DbOperation = dyn FnOnce(&mut dyn Database);
 struct DbManager {
     db_impl: Box<dyn Database>,
     op_queue: VecDeque<Box<DbOperation>>,
+    shutdown: bool,
 }
 unsafe impl Send for DbManager {}
 impl DbManager {
@@ -105,6 +107,7 @@ pub fn db_init() -> JoinHandle<()> {
             let _ = DB_MANAGER.set(Mutex::new(DbManager {
                 db_impl,
                 op_queue: VecDeque::new(),
+                shutdown: false,
             }));
             log(
                 Severity::Info,
@@ -120,9 +123,17 @@ pub fn db_init() -> JoinHandle<()> {
                 std::thread::sleep(Duration::from_millis(100));
                 let mut db_manager = DB_MANAGER.get().unwrap().lock().unwrap();
                 db_manager.flush();
+                if db_manager.shutdown {
+                    break;
+                }
             })
         }
     }
+}
+
+pub fn db_shutdown() {
+    let mut db_manager = DB_MANAGER.get().unwrap().lock().unwrap();
+    db_manager.shutdown = true;
 }
 
 // TODO migrate most DB operations to async
@@ -148,7 +159,10 @@ where
             let start_time = SystemTime::now();
             let f = move |db: &mut dyn Database| {
                 let result = f(db).map(|v| Box::new(v) as Box<dyn Any>);
-                let db_result = DbResult { result };
+                let db_result = DbResult {
+                    result,
+                    completed: SystemTime::now(),
+                };
                 let _ = FFSender::new(tx).send(db_result);
             };
             db_mgr.op_queue.push_back(Box::new(f));
