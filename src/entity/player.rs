@@ -374,6 +374,70 @@ impl From<BuddyListEntry> for sBuddyBaseInfo {
     }
 }
 
+#[derive(Debug, Clone)]
+struct BuddyList {
+    slots: [Option<Box<BuddyListEntry>>; SIZEOF_BUDDYLIST_SLOT as usize],
+}
+impl Default for BuddyList {
+    fn default() -> Self {
+        Self {
+            slots: std::array::from_fn(|_| None),
+        }
+    }
+}
+impl BuddyList {
+    fn get_buddy_slot_number(&self, pc_uid: i64) -> Option<usize> {
+        self.slots
+            .iter()
+            .position(|entry| entry.as_ref().map_or(false, |entry| entry.pc_uid == pc_uid))
+    }
+
+    fn is_buddies_with(&self, pc_uid: i64) -> bool {
+        self.get_buddy_slot_number(pc_uid).is_some()
+    }
+
+    fn insert_buddy(&mut self, buddy: BuddyListEntry) -> FFResult<usize> {
+        if self.is_buddies_with(buddy.pc_uid) {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Player {} is already on the buddy list", buddy.pc_uid),
+            ));
+        }
+
+        for (idx, slot) in self.slots.iter_mut().enumerate() {
+            if slot.is_none() {
+                *slot = Some(Box::new(buddy));
+                return Ok(idx);
+            }
+        }
+
+        Err(FFError::build(
+            Severity::Warning,
+            "No free buddy slots".to_string(),
+        ))
+    }
+
+    fn erase_buddy(&mut self, pc_uid: i64) -> FFResult<usize> {
+        let idx = self.get_buddy_slot_number(pc_uid).ok_or(FFError::build(
+            Severity::Warning,
+            format!("Player {} is not on the buddy list", pc_uid),
+        ))?;
+        self.slots[idx] = None;
+        Ok(idx)
+    }
+
+    fn get_num_buddies(&self) -> usize {
+        self.slots.iter().filter(|entry| entry.is_some()).count()
+    }
+
+    fn get_all_entries(&self) -> Vec<BuddyListEntry> {
+        self.slots
+            .iter()
+            .filter_map(|entry| entry.as_ref().map(|entry| entry.as_ref().clone()))
+            .collect()
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Player {
     id: Option<i32>,
@@ -407,7 +471,7 @@ pub struct Player {
     nano_potions: u32,
     weapon_boosts: u32,
     pub buddy_list_synced: bool,
-    buddy_list: Vec<BuddyListEntry>,
+    buddy_list: BuddyList,
     pub buddy_offered_to: Option<i64>,
     buddy_warp_time: i32,
     last_heal_time: Option<SystemTime>,
@@ -1238,65 +1302,23 @@ impl Player {
     }
 
     pub fn is_buddies_with(&self, pc_uid: i64) -> bool {
-        self.buddy_list.iter().any(|entry| entry.pc_uid == pc_uid)
-    }
-
-    pub fn is_blocked(&self, pc_uid: i64) -> bool {
-        self.buddy_list
-            .iter()
-            .any(|entry| entry.pc_uid == pc_uid && entry.blocked)
+        self.buddy_list.is_buddies_with(pc_uid)
     }
 
     pub fn add_buddy(&mut self, buddy_info: BuddyListEntry) -> FFResult<usize> {
-        if self.buddy_list.len() >= SIZEOF_BUDDYLIST_SLOT as usize {
-            return Err(FFError::build(
-                Severity::Warning,
-                "Buddy list is full".to_string(),
-            ));
-        }
-
-        if self
-            .buddy_list
-            .iter()
-            .any(|entry| entry.pc_uid == buddy_info.pc_uid)
-        {
-            return Err(FFError::build(
-                Severity::Warning,
-                "Player is already on buddy list".to_string(),
-            ));
-        }
-
-        self.buddy_list.push(buddy_info);
-        Ok(self.buddy_list.len())
+        self.buddy_list.insert_buddy(buddy_info)
     }
 
     pub fn remove_buddy(&mut self, pc_uid: i64) -> FFResult<usize> {
-        let idx = self
-            .buddy_list
-            .iter()
-            .position(|entry| entry.pc_uid == pc_uid);
-        if let Some(idx) = idx {
-            self.buddy_list.remove(idx);
-            Ok(idx)
-        } else {
-            Err(FFError::build(
-                Severity::Warning,
-                "Player is not on buddy list".to_string(),
-            ))
-        }
+        self.buddy_list.erase_buddy(pc_uid)
     }
 
     pub fn get_num_buddies(&self) -> usize {
-        self.buddy_list.len()
+        self.buddy_list.get_num_buddies()
     }
 
     pub fn get_all_buddy_info(&self) -> Vec<BuddyListEntry> {
-        // in theory, should never have more than 50 buddies, but crop just in case
-        self.buddy_list
-            .iter()
-            .take(SIZEOF_BUDDYLIST_SLOT as usize)
-            .cloned()
-            .collect()
+        self.buddy_list.get_all_entries()
     }
 
     pub fn disconnect(pc_id: i32, state: &mut ShardServerState, clients: &mut ClientMap) {
