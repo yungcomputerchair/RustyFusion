@@ -388,3 +388,30 @@ pub fn pc_location_fail(
     }
     Ok(())
 }
+
+pub fn get_buddy_state(
+    shard_key: usize,
+    clients: &mut HashMap<usize, FFClient>,
+    state: &mut LoginServerState,
+) -> FFResult<()> {
+    let server = clients.get_mut(&shard_key).unwrap();
+    let pkt: sP_FE2LS_REQ_GET_BUDDY_STATE = *server.get_packet(P_FE2LS_REQ_GET_BUDDY_STATE)?;
+
+    let mut resp = sP_LS2FE_REP_GET_BUDDY_STATE {
+        iPC_UID: pkt.iPC_UID,
+        aBuddyUID: pkt.aBuddyUID,
+        aBuddyState: [0; 50],
+    };
+
+    let uids = pkt.aBuddyUID;
+    for (i, &buddy_uid) in uids.iter().enumerate() {
+        if buddy_uid == 0 {
+            continue;
+        }
+        if state.get_player_shard(buddy_uid).is_some() {
+            resp.aBuddyState[i] = 1;
+        }
+    }
+
+    server.send_packet(P_LS2FE_REP_GET_BUDDY_STATE, &resp)
+}

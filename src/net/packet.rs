@@ -543,6 +543,7 @@ pub enum PacketID {
     P_LS2FE_REQ_PC_EXIT_DUPLICATE = 0x2300000a, // 587202570
     P_LS2FE_REP_LIVE_CHECK = 0x2300000b,        // 587202571
     P_LS2FE_REP_AUTH_CHALLENGE = 0x2300000c,    // 587202572
+    P_LS2FE_REP_GET_BUDDY_STATE = 0x2300000d,   // 587202573
 
     P_FE2LS_REQ_CONNECT = 0x32000001,                // 838860801
     P_FE2LS_REP_LIVE_CHECK = 0x32000002,             // 838860802
@@ -558,6 +559,7 @@ pub enum PacketID {
     P_FE2LS_REP_PC_LOCATION_FAIL = 0x3200000c,       // 838860812
     P_FE2LS_REQ_LIVE_CHECK = 0x3200000d,             // 838860813
     P_FE2LS_REQ_AUTH_CHALLENGE = 0x3200000e,         // 838860814
+    P_FE2LS_REQ_GET_BUDDY_STATE = 0x3200000f,        // 838860815
 }
 
 pub trait FFPacket: std::fmt::Debug {}
@@ -6642,6 +6644,16 @@ impl FFPacket for sP_LS2FE_REP_AUTH_CHALLENGE {}
 #[repr(packed(4))]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
+pub struct sP_LS2FE_REP_GET_BUDDY_STATE {
+    pub iPC_UID: i64,
+    pub aBuddyUID: [i64; 50],
+    pub aBuddyState: [u8; 50],
+}
+impl FFPacket for sP_LS2FE_REP_GET_BUDDY_STATE {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct sP_FE2LS_REQ_CONNECT {
     pub aChallengeSolved: [u8; AUTH_CHALLENGE_SIZE],
     pub iShardID: i32,
@@ -6763,3 +6775,12 @@ pub struct sP_FE2LS_REQ_AUTH_CHALLENGE {
     pub iTempValue: i32,
 }
 impl FFPacket for sP_FE2LS_REQ_AUTH_CHALLENGE {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_REQ_GET_BUDDY_STATE {
+    pub iPC_UID: i64,
+    pub aBuddyUID: [i64; 50],
+}
+impl FFPacket for sP_FE2LS_REQ_GET_BUDDY_STATE {}

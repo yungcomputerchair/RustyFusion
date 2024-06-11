@@ -12,6 +12,32 @@ use rusty_fusion::{
 
 const ERROR_CODE_BUDDY_DENY: i32 = 6;
 
+pub fn get_buddy_state(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let client = clients.get_self();
+    let pc_id = client.get_player_id()?;
+    let player = state.get_player(pc_id)?;
+
+    let mut req = sP_FE2LS_REQ_GET_BUDDY_STATE {
+        iPC_UID: player.get_uid(),
+        aBuddyUID: [0; 50],
+    };
+
+    let buddy_info = player.get_all_buddy_info();
+    for (i, buddy_uid) in buddy_info.iter().map(|info| info.pc_uid).enumerate() {
+        req.aBuddyUID[i] = buddy_uid;
+    }
+
+    if let Some(login_server) = clients.get_login_server() {
+        log_if_failed(login_server.send_packet(P_FE2LS_REQ_GET_BUDDY_STATE, &req));
+        Ok(())
+    } else {
+        Err(FFError::build(
+            Severity::Warning,
+            "No login server connected".to_string(),
+        ))
+    }
+}
+
 pub fn request_make_buddy(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
     let pkt: sP_CL2FE_REQ_REQUEST_MAKE_BUDDY =

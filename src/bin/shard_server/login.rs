@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{collections::HashMap, net::SocketAddr};
 
 use uuid::Uuid;
 
@@ -283,5 +283,64 @@ pub fn login_pc_exit_duplicate(
     };
     log_if_failed(client.send_packet(P_FE2CL_REP_PC_EXIT_DUPLICATE, &pkt));
     client.disconnect();
+    Ok(())
+}
+
+pub fn login_get_buddy_state(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let pkt: sP_LS2FE_REP_GET_BUDDY_STATE =
+        *clients.get_self().get_packet(P_LS2FE_REP_GET_BUDDY_STATE)?;
+    let pc_uid = pkt.iPC_UID;
+
+    // buddy list may have changed during flight, so we can't just index into the query
+    let buddy_uids = pkt.aBuddyUID;
+    let buddy_states = pkt.aBuddyState;
+    let query_results: HashMap<i64, u8> = buddy_uids
+        .iter()
+        .zip(buddy_states.iter())
+        .filter_map(
+            |(id, state)| {
+                if *id == 0 {
+                    None
+                } else {
+                    Some((*id, *state))
+                }
+            },
+        )
+        .collect();
+
+    let pc_id = *state
+        .entity_map
+        .find_players(|p| p.get_uid() == pc_uid)
+        .first()
+        .ok_or(FFError::build(
+            Severity::Warning,
+            format!("Couldn't find player with UID {}", pc_uid),
+        ))?;
+    let player = state.get_player(pc_id).unwrap();
+    let buddy_info = player.get_all_buddy_info();
+
+    let mut resp = sP_FE2CL_REP_GET_BUDDY_STATE_SUCC {
+        aBuddyID: [0; SIZEOF_BUDDYLIST_SLOT as usize],
+        aBuddyState: [0; SIZEOF_BUDDYLIST_SLOT as usize],
+    };
+    for (i, buddy_uid) in buddy_info.iter().map(|info| info.pc_uid).enumerate() {
+        let online = query_results.get(&buddy_uid).is_some_and(|v| *v != 0);
+        resp.aBuddyState[i] = if online { 1 } else { 0 };
+        if online {
+            // lookup shard-local ID
+            let buddy_id = *state
+                .entity_map
+                .find_players(|p| p.get_uid() == buddy_uid)
+                .first()
+                .unwrap_or(&0);
+            resp.aBuddyID[i] = buddy_id;
+        }
+    }
+
+    let client = player.get_client(clients).unwrap();
+    log_if_failed(client.send_packet(P_FE2CL_REP_GET_BUDDY_STATE_SUCC, &resp));
     Ok(())
 }

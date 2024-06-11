@@ -239,6 +239,7 @@ fn handle_packet(
         P_LS2FE_REP_PC_LOCATION_SUCC => login::login_pc_location_succ(&mut clients, state),
         P_LS2FE_REP_PC_LOCATION_FAIL => login::login_pc_location_fail(&mut clients, state),
         P_LS2FE_REQ_PC_EXIT_DUPLICATE => login::login_pc_exit_duplicate(&mut clients, state),
+        P_LS2FE_REP_GET_BUDDY_STATE => login::login_get_buddy_state(&mut clients, state),
         P_LS2FE_REP_LIVE_CHECK => Ok(()),
         //
         P_CL2LS_REQ_LOGIN => wrong_server(clients.get_self()),
@@ -322,6 +323,7 @@ fn handle_packet(
         //
         P_CL2FE_REQ_REQUEST_MAKE_BUDDY => buddy::request_make_buddy(&mut clients, state),
         P_CL2FE_REQ_ACCEPT_MAKE_BUDDY => buddy::accept_make_buddy(&mut clients, state),
+        P_CL2FE_REQ_GET_BUDDY_STATE => buddy::get_buddy_state(&mut clients, state),
         //
         P_CL2FE_REQ_PC_TRADE_OFFER => trade::trade_offer(&mut clients, state),
         P_CL2FE_REQ_PC_TRADE_OFFER_REFUSAL => trade::trade_offer_refusal(&mut clients, state),
