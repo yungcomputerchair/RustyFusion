@@ -426,6 +426,15 @@ impl BuddyList {
         Ok(idx)
     }
 
+    fn block_buddy(&mut self, pc_uid: i64) -> FFResult<usize> {
+        let idx = self.get_buddy_slot_number(pc_uid).ok_or(FFError::build(
+            Severity::Warning,
+            format!("Player {} is not on the buddy list", pc_uid),
+        ))?;
+        self.slots[idx].as_mut().unwrap().blocked = true;
+        Ok(idx)
+    }
+
     fn get_num_buddies(&self) -> usize {
         self.slots.iter().filter(|entry| entry.is_some()).count()
     }
@@ -1313,12 +1322,30 @@ impl Player {
         self.buddy_list.erase_buddy(pc_uid)
     }
 
+    pub fn block_player(&mut self, pc_uid: i64) -> FFResult<usize> {
+        self.buddy_list.block_buddy(pc_uid)
+    }
+
     pub fn get_num_buddies(&self) -> usize {
         self.buddy_list.get_num_buddies()
     }
 
     pub fn get_all_buddy_info(&self) -> Vec<BuddyListEntry> {
         self.buddy_list.get_all_entries()
+    }
+
+    pub fn get_buddy_uids(&self) -> Vec<i64> {
+        self.get_all_buddy_info()
+            .iter()
+            .filter_map(|b| if !b.blocked { Some(b.pc_uid) } else { None })
+            .collect()
+    }
+
+    pub fn get_blocked_uids(&self) -> Vec<i64> {
+        self.get_all_buddy_info()
+            .iter()
+            .filter_map(|b| if b.blocked { Some(b.pc_uid) } else { None })
+            .collect()
     }
 
     pub fn disconnect(pc_id: i32, state: &mut ShardServerState, clients: &mut ClientMap) {

@@ -1,4 +1,4 @@
-use std::time::SystemTime;
+use std::{collections::HashSet, time::SystemTime};
 
 use mongodb::{
     bson::doc,
@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     database::*,
     defines::*,
-    entity::{Combatant, Entity, PlayerFlags, PlayerStyle},
+    entity::{BuddyListEntry, Combatant, Entity, PlayerFlags, PlayerStyle},
     enums::PlayerGuide,
     item::Item,
     mission::Task,
@@ -226,6 +226,8 @@ struct DbPlayer {
     items: Option<Vec<DbItem>>,
     quest_items: Option<Vec<DbQuestItem>>,
     running_quests: Option<Vec<DbTask>>,
+    buddy_uids: Option<Vec<BigInt>>, // reference to player collection
+    blocked_uids: Option<Vec<BigInt>>, // reference to player collection
 }
 impl From<(BigInt, &Player)> for DbPlayer {
     fn from(values: (BigInt, &Player)) -> Self {
@@ -266,6 +268,9 @@ impl From<(BigInt, &Player)> for DbPlayer {
             .map(|task| task.into())
             .collect();
 
+        let buddy_uids = player.get_buddy_uids();
+        let blocked_uids = player.get_blocked_uids();
+
         Self {
             uid: player.get_uid(),
             account_id,
@@ -296,6 +301,9 @@ impl From<(BigInt, &Player)> for DbPlayer {
             items: Some(items),
             quest_items: Some(quest_items),
             running_quests: Some(running_quests),
+            //
+            buddy_uids: Some(buddy_uids),
+            blocked_uids: Some(blocked_uids),
         }
     }
 }
@@ -406,6 +414,25 @@ impl TryFrom<DbPlayer> for Player {
         }
 
         Ok(player)
+    }
+}
+impl TryFrom<DbPlayer> for BuddyListEntry {
+    type Error = FFError;
+
+    fn try_from(db_player: DbPlayer) -> FFResult<Self> {
+        let style = match db_player.style {
+            Some(style) => style.try_into()?,
+            None => PlayerStyle::default(),
+        };
+        Ok(Self {
+            first_name: db_player.first_name,
+            last_name: db_player.last_name,
+            pc_uid: db_player.uid,
+            style,
+            name_check: db_player.name_check != 0,
+            free_chat: placeholder!(true),
+            blocked: false,
+        })
     }
 }
 
@@ -766,8 +793,43 @@ impl Database for MongoDatabase {
             ));
         }
 
+        let buddy_uids = match &db_player.buddy_uids {
+            Some(buddy_uids) => buddy_uids.clone(),
+            None => Vec::new(),
+        };
+        let blocked_uids: HashSet<i64> = match &db_player.blocked_uids {
+            Some(blocked_uids) => blocked_uids.clone(),
+            None => Vec::new(),
+        }
+        .into_iter()
+        .collect();
         let mut player: Player = db_player.try_into()?;
         player.perms = db_acc.account_level as i16;
+        for buddy_uid in buddy_uids {
+            if let Ok(Some(db_buddy)) = self
+                .db
+                .collection::<DbPlayer>("players")
+                .find_one(doc! { "_id": buddy_uid }, None)
+                .map_err(FFError::from_db_error)
+            {
+                let buddy_info_res: FFResult<BuddyListEntry> = db_buddy.try_into();
+                match buddy_info_res {
+                    Ok(buddy_info) => {
+                        let buddy_uid = buddy_info.pc_uid;
+                        let buddy_add_res = player.add_buddy(buddy_info);
+                        if let Err(e) = buddy_add_res {
+                            log_error(&e);
+                            continue;
+                        }
+                        if blocked_uids.contains(&buddy_uid) {
+                            player.block_player(buddy_uid).unwrap();
+                        }
+                    }
+                    Err(e) => log_error(&e),
+                }
+            }
+        }
+
         Ok(player)
     }
 

@@ -6,7 +6,7 @@ use regex::Regex;
 use crate::{
     database::*,
     defines::*,
-    entity::{Combatant, Entity, PlayerFlags, PlayerStyle},
+    entity::{BuddyListEntry, Combatant, Entity, PlayerFlags, PlayerStyle},
     enums::PlayerGuide,
     item::Item,
     mission::Task,
@@ -256,6 +256,16 @@ impl PostgresDatabase {
                 .map_err(FFError::from_db_err)?;
         }
 
+        Self::exec(client, "clear_buddies", &[&pc_uid])?;
+        for buddy_uid in player.get_buddy_uids() {
+            Self::exec(client, "save_buddy", &[&pc_uid, &buddy_uid])?;
+        }
+
+        Self::exec(client, "clear_blocks", &[&pc_uid])?;
+        for blocked_uid in player.get_blocked_uids() {
+            Self::exec(client, "save_block", &[&pc_uid, &blocked_uid])?;
+        }
+
         tsct.commit().map_err(FFError::from_db_err)?;
         Ok(())
     }
@@ -400,10 +410,55 @@ impl PostgresDatabase {
             player.set_quest_item_count(item_id as i16, count as usize)?;
         }
 
+        log_if_failed(Self::load_buddies(client, &mut player));
+        log_if_failed(Self::load_blocks(client, &mut player));
+
         let perms: Int = row.get("AccountLevel");
         player.perms = perms as i16;
 
         Ok(player)
+    }
+
+    fn load_buddies(client: &mut impl GenericClient, player: &mut Player) -> FFResult<()> {
+        let rows = Self::query(client, "load_buddy_ids", &[&player.get_uid()])?;
+        for row in rows {
+            let buddy_uid: BigInt = row.get("PlayerBId");
+            let buddy_load_result = Self::query(client, "load_player", &[&buddy_uid]);
+            match buddy_load_result {
+                Ok(buddy_rows) => {
+                    if let Some(buddy_row) = buddy_rows.first() {
+                        let buddy = Self::load_player_internal(client, buddy_row)?;
+                        let buddy_info = BuddyListEntry::new(&buddy);
+                        log_if_failed(player.add_buddy(buddy_info));
+                    } else {
+                        log(
+                            Severity::Warning,
+                            &format!("Buddy with UID {} not found", buddy_uid),
+                        );
+                    }
+                }
+                Err(e) => {
+                    log(
+                        Severity::Warning,
+                        &format!(
+                            "Failed to load buddy with UID {}: {}",
+                            buddy_uid,
+                            e.get_msg()
+                        ),
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn load_blocks(client: &mut impl GenericClient, player: &mut Player) -> FFResult<()> {
+        let rows = Self::query(client, "load_blocked_ids", &[&player.get_uid()])?;
+        for row in rows {
+            let blocked_uid: BigInt = row.get("BlockedPlayerId");
+            log_if_failed(player.block_player(blocked_uid));
+        }
+        Ok(())
     }
 }
 impl Database for PostgresDatabase {
