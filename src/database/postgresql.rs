@@ -270,7 +270,11 @@ impl PostgresDatabase {
         Ok(())
     }
 
-    fn load_player_internal(client: &mut impl GenericClient, row: &Row) -> FFResult<Player> {
+    fn load_player_internal(
+        client: &mut impl GenericClient,
+        row: &Row,
+        load_buddies: bool,
+    ) -> FFResult<Player> {
         let pc_uid = row.get("PlayerId");
         let slot_num: Int = row.get("Slot");
         let mut player = Player::new(pc_uid, slot_num as usize);
@@ -410,8 +414,10 @@ impl PostgresDatabase {
             player.set_quest_item_count(item_id as i16, count as usize)?;
         }
 
-        log_if_failed(Self::load_buddies(client, &mut player));
-        log_if_failed(Self::load_blocks(client, &mut player));
+        if load_buddies {
+            log_if_failed(Self::load_buddies(client, &mut player));
+            log_if_failed(Self::load_blocks(client, &mut player));
+        }
 
         let perms: Int = row.get("AccountLevel");
         player.perms = perms as i16;
@@ -427,7 +433,7 @@ impl PostgresDatabase {
             match buddy_load_result {
                 Ok(buddy_rows) => {
                     if let Some(buddy_row) = buddy_rows.first() {
-                        let buddy = Self::load_player_internal(client, buddy_row)?;
+                        let buddy = Self::load_player_internal(client, buddy_row, false)?;
                         let buddy_info = BuddyListEntry::new(&buddy);
                         log_if_failed(player.add_buddy(buddy_info));
                     } else {
@@ -639,7 +645,7 @@ impl Database for PostgresDatabase {
         let rows = Self::query(client, "load_players", &[&acc_id])?;
         for row in &rows {
             if row.get::<_, BigInt>("PlayerId") == pc_uid {
-                return Self::load_player_internal(client, row);
+                return Self::load_player_internal(client, row, true);
             }
         }
         Err(FFError::build(
@@ -656,7 +662,7 @@ impl Database for PostgresDatabase {
         let chars = Self::query(client, "load_players", &[&acc_id])?;
         let mut players = Vec::with_capacity(chars.len());
         for row in chars {
-            match Self::load_player_internal(client, &row) {
+            match Self::load_player_internal(client, &row, true) {
                 Ok(p) => players.push(p),
                 Err(e) => {
                     let pc_uid: BigInt = row.get("PlayerId");
