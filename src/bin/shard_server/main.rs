@@ -323,6 +323,8 @@ fn handle_packet(
         //
         P_CL2FE_REQ_REQUEST_MAKE_BUDDY => buddy::request_make_buddy(&mut clients, state),
         P_CL2FE_REQ_ACCEPT_MAKE_BUDDY => buddy::accept_make_buddy(&mut clients, state),
+        P_CL2FE_REQ_PC_FIND_NAME_MAKE_BUDDY => buddy::find_name_make_buddy(&mut clients, state),
+        P_CL2FE_REQ_PC_FIND_NAME_ACCEPT_BUDDY => buddy::find_name_accept_buddy(&mut clients, state),
         P_CL2FE_REQ_GET_BUDDY_STATE => buddy::get_buddy_state(&mut clients, state),
         //
         P_CL2FE_REQ_PC_TRADE_OFFER => trade::trade_offer(&mut clients, state),
