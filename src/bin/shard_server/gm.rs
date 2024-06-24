@@ -1,4 +1,7 @@
-use std::cmp::max;
+use std::{
+    cmp::max,
+    time::{Duration, SystemTime},
+};
 
 use rusty_fusion::{
     chunk::{EntityMap, InstanceID, TickMode},
@@ -62,7 +65,14 @@ pub fn gm_pc_give_item(client: &mut FFClient, state: &mut ShardServerState) -> F
             let pkt: &sP_CL2FE_REQ_PC_GIVE_ITEM = client.get_packet(P_CL2FE_REQ_PC_GIVE_ITEM)?;
             let player = state.get_player_mut(pc_id)?;
 
-            let item: Option<Item> = pkt.Item.try_into()?;
+            let mut item: Option<Item> = pkt.Item.try_into()?;
+            let time = pkt.iTimeLeft as u32;
+            if time > 0 && item.is_some() {
+                let duration = Duration::from_secs(time as u64);
+                let expiry_time = SystemTime::now() + duration;
+                item.as_mut().unwrap().set_expiry_time(expiry_time);
+            }
+
             let location = pkt.eIL.try_into()?;
             let slot_number = match location {
                 ItemLocation::QInven => {
