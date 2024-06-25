@@ -7,7 +7,7 @@ use std::{
     time::SystemTime,
 };
 
-use crate::{config::config_get, net::FFServer, state::ServerState};
+use crate::{config::config_get, net::FFServer, state::ServerState, util};
 
 pub type FFResult<T> = std::result::Result<T, FFError>;
 pub fn catch_fail<T>(
@@ -66,6 +66,7 @@ pub struct FFError {
     severity: Severity,
     msg: String,
     should_dc: bool,
+    timestamp: SystemTime,
     parent: Option<Box<FFError>>,
 }
 impl FFError {
@@ -74,6 +75,7 @@ impl FFError {
             severity,
             msg,
             should_dc,
+            timestamp: SystemTime::now(),
             parent: None,
         }
     }
@@ -87,37 +89,33 @@ impl FFError {
     }
 
     pub fn from_bcrypt_err(error: bcrypt::BcryptError) -> Self {
-        Self {
-            severity: Severity::Warning,
-            msg: format!("BCrypt error ({:?})", error),
-            should_dc: false,
-            parent: None,
-        }
+        Self::new(
+            Severity::Warning,
+            format!("BCrypt error ({:?})", error),
+            false,
+        )
     }
 
     pub fn from_io_err(error: std::io::Error) -> Self {
-        Self {
-            severity: match error.kind() {
-                ErrorKind::UnexpectedEof => Severity::Debug,
-                ErrorKind::BrokenPipe => Severity::Debug,
-                ErrorKind::ConnectionReset => Severity::Debug,
-                ErrorKind::ConnectionAborted => Severity::Debug,
-                ErrorKind::WouldBlock => Severity::Debug,
-                _ => Severity::Warning,
-            },
-            msg: format!("I/O error ({:?})", error.kind()),
-            should_dc: error.kind() != ErrorKind::WouldBlock && error.kind() != ErrorKind::TimedOut,
-            parent: None,
-        }
+        let severity = match error.kind() {
+            ErrorKind::UnexpectedEof => Severity::Debug,
+            ErrorKind::BrokenPipe => Severity::Debug,
+            ErrorKind::ConnectionReset => Severity::Debug,
+            ErrorKind::ConnectionAborted => Severity::Debug,
+            ErrorKind::WouldBlock => Severity::Debug,
+            _ => Severity::Warning,
+        };
+        let should_dc =
+            error.kind() != ErrorKind::WouldBlock && error.kind() != ErrorKind::TimedOut;
+        Self::new(
+            severity,
+            format!("I/O error ({:?})", error.kind()),
+            should_dc,
+        )
     }
 
     pub fn from_enum_err<T: std::fmt::Debug>(val: T) -> Self {
-        Self {
-            severity: Severity::Warning,
-            msg: format!("Enum error ({:?})", val),
-            should_dc: true,
-            parent: None,
-        }
+        Self::new(Severity::Warning, format!("Enum error ({:?})", val), true)
     }
 
     pub fn chain(self, other: FFError) -> Self {
@@ -153,10 +151,23 @@ impl FFError {
         }
     }
 
-    pub fn get_formatted(&self, colored: bool) -> String {
-        let mut msg = format!("{} {}", self.severity.get_label(colored), self.msg);
+    pub fn get_formatted(&self, colored: bool, with_time: bool) -> String {
+        let mut msg = if with_time {
+            let time_str = util::get_timestamp_str(self.timestamp);
+            format!(
+                "[{}] {} {}",
+                time_str,
+                self.severity.get_label(colored),
+                self.msg
+            )
+        } else {
+            format!("{} {}", self.severity.get_label(colored), self.msg)
+        };
         if let Some(parent) = self.parent.as_ref() {
-            msg.push_str(&format!("\n\tfrom: {}", parent.get_formatted(colored)));
+            msg.push_str(&format!(
+                "\n\tfrom: {}",
+                parent.get_formatted(colored, with_time)
+            ));
         }
         msg
     }
@@ -216,7 +227,7 @@ pub fn log_error(err: &FFError) {
 
     if severity as usize <= threshold_console {
         // Log to console, colored output
-        let msg = err.get_formatted(true);
+        let msg = err.get_formatted(true, true);
         if severity == Severity::Fatal {
             // Print to stderr instead
             eprintln!("{}", msg);
@@ -227,7 +238,7 @@ pub fn log_error(err: &FFError) {
 
     if severity as usize <= threshold_file {
         // Log to file
-        let msg = err.get_formatted(false);
+        let msg = err.get_formatted(false, true);
         if let Some(logger) = LOGGER.get() {
             let mut logger = logger.lock().unwrap();
             if writeln!(logger, "{}", msg).is_err() {

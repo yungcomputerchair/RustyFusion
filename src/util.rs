@@ -1,5 +1,6 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use chrono::{DateTime, Local};
 use rand::{distributions::uniform::SampleUniform, Rng};
 
 use crate::{
@@ -73,6 +74,11 @@ pub fn encode_utf16<const SIZE: usize>(chars: &str) -> [u16; SIZE] {
     }
     str_vec.resize(SIZE, 0);
     str_vec.try_into().unwrap()
+}
+
+pub fn get_timestamp_str(time: SystemTime) -> String {
+    let date_time_local: DateTime<Local> = time.into();
+    date_time_local.format("%Y-%m-%d %H:%M:%S").to_string()
 }
 
 pub fn get_timestamp_ms(time: SystemTime) -> u64 {
