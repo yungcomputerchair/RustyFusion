@@ -24,6 +24,7 @@ pub const ID_TIME_MACHINE_WARP: i32 = 28;
 pub const ID_OVERWORLD: u32 = 0;
 pub const ID_GUMBALL: i16 = 119;
 
+pub const TYPE_NANO_MACHINE: i32 = 640;
 pub const TYPE_TIME_MACHINE: i32 = 1425;
 pub const TYPE_SLIDER: i32 = 1;
 

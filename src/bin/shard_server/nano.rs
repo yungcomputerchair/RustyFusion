@@ -1,5 +1,6 @@
 use rusty_fusion::{
-    entity::{Combatant, EntityID},
+    defines::*,
+    entity::{Combatant, Entity, EntityID},
     enums::*,
     error::*,
     item::Item,
@@ -17,6 +18,22 @@ pub fn nano_equip(clients: &mut ClientMap, state: &mut ShardServerState) -> FFRe
     let client = clients.get_self();
     let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_NANO_EQUIP = client.get_packet(P_CL2FE_REQ_NANO_EQUIP)?;
+
+    let player = state.get_player(pc_id)?;
+    if player.perms as u32 > CN_ACCOUNT_LEVEL__DEVELOPER {
+        // check for nano station
+        let nano_station_ids = state.entity_map.find_npcs(|npc| {
+            npc.ty == TYPE_NANO_MACHINE
+                && npc.get_position().distance_to(&player.get_position()) <= RANGE_INTERACT
+                && npc.instance_id == player.instance_id
+        });
+        if nano_station_ids.is_empty() {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("{} tried to equip a nano without a nano station", player),
+            ));
+        }
+    }
 
     let player = state.get_player_mut(pc_id)?;
     player.change_nano(pkt.iNanoSlotNum as usize, Some(pkt.iNanoID))?;
