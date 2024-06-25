@@ -457,75 +457,26 @@ pub fn shard_select(
     let client = clients.get_mut(&client_key).unwrap();
     let pkt: sP_CL2LS_REQ_SHARD_SELECT = *client.get_packet(P_CL2LS_REQ_SHARD_SELECT)?;
     let req_shard_id = pkt.ShardNum as i32;
-    if let ClientType::GameClient {
-        account_id,
-        serial_key,
-        ..
-    } = client.client_type
-    {
-        let mut error_code = -1;
+    if let ClientType::GameClient { account_id, .. } = client.client_type {
+        let mut error_code = 1; // "Shard connection error"
         catch_fail(
             (|| {
-                let client = clients.get_mut(&client_key).unwrap();
-                let fe_key = client.get_fe_key_uint();
-                let pc_uid = match state.get_selected_player_id(account_id)? {
-                    Some(pc_uid) => pc_uid,
-                    None => {
-                        error_code = 2; // "Selected character error"
-                        return Err(FFError::build(
-                            Severity::Warning,
-                            format!("No selected player for account {}", account_id),
-                        ));
-                    }
-                };
-
-                let shard_id = if req_shard_id == 0 {
-                    // pick the shard with the lowest population
-                    match state.get_lowest_pop_shard_id() {
-                        Some(shard_id) => shard_id,
-                        None => {
-                            error_code = 1; // "Shard connection error"
-                            return Err(FFError::build(
-                                Severity::Warning,
-                                "No shard servers available".to_string(),
-                            ));
-                        }
-                    }
-                } else {
-                    req_shard_id
-                };
-
-                let shard_server = match clients.values_mut().find(
-                    |c| matches!(c.client_type, ClientType::ShardServer(sid) if sid == shard_id),
-                ) {
-                    Some(shard) => shard,
-                    None => {
-                        error_code = 0; // "Shard number error"
-                        return Err(FFError::build(
-                            Severity::Warning,
-                            format!("Couldn't find shard server with ID {}", shard_id),
-                        ));
-                    }
-                };
-
-                let login_info = sP_LS2FE_REQ_UPDATE_LOGIN_INFO {
-                    iAccountID: account_id,
-                    iEnterSerialKey: serial_key,
-                    iPC_UID: pc_uid,
-                    uiFEKey: fe_key,
-                    uiSvrTime: util::get_timestamp_ms(time),
-                };
-                if shard_server
-                    .send_packet(P_LS2FE_REQ_UPDATE_LOGIN_INFO, &login_info)
-                    .is_err()
-                {
-                    error_code = 1; // "Shard connection error"
+                if state.get_selected_player_id(account_id)?.is_none() {
+                    error_code = 2; // "Selected character error"
                     return Err(FFError::build(
                         Severity::Warning,
-                        format!("Couldn't send login info to shard server {}", req_shard_id),
+                        format!("No selected player for account {}", account_id),
                     ));
                 }
 
+                let shard_id = if req_shard_id == 0 {
+                    None
+                } else {
+                    Some(req_shard_id)
+                };
+
+                state.request_shard_connection(account_id, shard_id)?;
+                state.process_shard_connection_requests(clients, time);
                 Ok(())
             })(),
             || {

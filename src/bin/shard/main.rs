@@ -11,7 +11,7 @@ use std::{
 use rusty_fusion::{
     config::{config_get, config_init},
     database::{db_init, db_run_async, db_shutdown},
-    defines::SHARD_TICKS_PER_SECOND,
+    defines::*,
     entity::Player,
     error::{
         log, log_error, log_if_failed, logger_flush, logger_flush_scheduled, logger_init,
@@ -27,7 +27,7 @@ use rusty_fusion::{
     state::{ServerState, ShardServerState},
     tabledata::tdata_init,
     timer::TimerMap,
-    unused,
+    unused, util,
 };
 
 fn main() -> Result<()> {
@@ -147,6 +147,8 @@ fn main() -> Result<()> {
         attempts -= 1;
     }
 
+    let ask_reconnect = state.as_shard().login_server_conn_id.is_some();
+    shutdown_notify_clients(&mut server, state.as_shard(), ask_reconnect);
     Ok(())
 }
 
@@ -447,4 +449,49 @@ fn do_save(_time: SystemTime, state: &mut ShardServerState) -> FFResult<()> {
 
     state.save_rx = Some(rx);
     Ok(())
+}
+
+fn shutdown_notify_clients(server: &mut FFServer, state: &mut ShardServerState, reconnect: bool) {
+    for client in server.get_client_map().get_all_gameclient() {
+        let Ok(pc_id) = client.get_player_id() else {
+            continue;
+        };
+
+        if !reconnect {
+            let shutdown_pkt = sP_FE2CL_REP_PC_EXIT_SUCC {
+                iID: pc_id,
+                iExitCode: EXIT_CODE_REQ_BY_SVR as i32, // "You have lost your connection with the server."
+            };
+            let _ = client.send_packet(P_FE2CL_REP_PC_EXIT_SUCC, &shutdown_pkt);
+            continue;
+        }
+
+        // We trick the client into attempting to reconnect to this same shard.
+        // The login server will attempt to reconnect them for a short amount of time.
+        let alert_pkt = sP_FE2CL_ANNOUNCE_MSG {
+            iAnnounceType: unused!(),
+            iDuringTime: 5,
+            szAnnounceMsg: util::encode_utf16(
+                "Lost connection to shard server.\nAttemping to reconnect...",
+            ),
+        };
+        let _ = client.send_packet(P_FE2CL_ANNOUNCE_MSG, &alert_pkt);
+
+        let Ok(player) = state.get_player(pc_id) else {
+            continue;
+        };
+        let channel_num = if player.instance_id.channel_num > 1 {
+            Some(player.instance_id.channel_num as i32)
+        } else {
+            // Channel 1 is the default; we don't need to tell the client to switch
+            None
+        };
+
+        let dc_pkt = sP_FE2CL_REP_PC_BUDDY_WARP_OTHER_SHARD_SUCC {
+            iBuddyPCUID: unused!(),
+            iShardNum: state.shard_id as i8,
+            iChannelNum: channel_num.unwrap_or(0),
+        };
+        let _ = client.send_packet(P_FE2CL_REP_PC_BUDDY_WARP_OTHER_SHARD_SUCC, &dc_pkt);
+    }
 }

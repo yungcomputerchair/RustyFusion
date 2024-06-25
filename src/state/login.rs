@@ -1,15 +1,20 @@
 use std::{
     collections::{HashMap, HashSet},
-    time::SystemTime,
+    time::{Duration, SystemTime},
 };
 
 use uuid::Uuid;
 
 use crate::{
-    defines::{MAX_NUM_CHANNELS, MAX_NUM_SHARDS},
+    defines::*,
     entity::Player,
     enums::ShardChannelStatus,
-    error::{FFError, FFResult, Severity},
+    error::{log_if_failed, FFError, FFResult, Severity},
+    net::{
+        packet::{PacketID::*, *},
+        ClientType, FFClient,
+    },
+    util,
 };
 
 pub struct Account {
@@ -22,10 +27,16 @@ pub struct Account {
     pub ban_reason: String,
 }
 
+struct ShardConnectionRequest {
+    pub shard_id: Option<i32>,
+    pub expire_time: SystemTime,
+}
+
 struct LoginSession {
     account: Account,
     players: HashMap<i64, Player>,
     selected_player_uid: Option<i64>,
+    shard_connection_request: Option<ShardConnectionRequest>,
 }
 
 struct ShardServerInfo {
@@ -91,6 +102,7 @@ impl LoginServerState {
                 account,
                 players,
                 selected_player_uid: None,
+                shard_connection_request: None,
             },
         );
     }
@@ -201,6 +213,92 @@ impl LoginServerState {
         let shard = self.shards.get_mut(&shard_id).unwrap();
         for (i, status) in statuses.iter().enumerate() {
             shard.channel_statuses[i] = *status;
+        }
+    }
+
+    pub fn request_shard_connection(&mut self, acc_id: i64, shard_id: Option<i32>) -> FFResult<()> {
+        const SHARD_CONN_TIMEOUT_SEC: u64 = 20;
+        let session = self.get_session_mut(acc_id)?;
+        session.shard_connection_request = Some(ShardConnectionRequest {
+            shard_id,
+            expire_time: SystemTime::now() + Duration::from_secs(SHARD_CONN_TIMEOUT_SEC),
+        });
+        Ok(())
+    }
+
+    pub fn process_shard_connection_requests(
+        &mut self,
+        clients: &mut HashMap<usize, FFClient>,
+        time: SystemTime,
+    ) {
+        let lowest_pop_shard_id = self.get_lowest_pop_shard_id();
+        let client_keys = clients.keys().copied().collect::<Vec<_>>();
+        for client_key in client_keys {
+            let client = clients.get_mut(&client_key).unwrap();
+            let fe_key = client.get_fe_key_uint();
+            let Ok(acc_id) = client.get_account_id() else {
+                continue;
+            };
+            let Ok(serial_key) = client.get_serial_key() else {
+                continue;
+            };
+            let Some(session) = self.sessions.get_mut(&acc_id) else {
+                continue;
+            };
+            let Some(pc_uid) = session.selected_player_uid else {
+                continue;
+            };
+            let Some(request) = &session.shard_connection_request else {
+                continue;
+            };
+
+            if request.expire_time < time {
+                let resp = sP_LS2CL_REP_SHARD_SELECT_FAIL {
+                    iErrorCode: 1, // "Shard connection error"
+                };
+                log_if_failed(client.send_packet(P_LS2CL_REP_SHARD_SELECT_FAIL, &resp));
+                session.shard_connection_request = None;
+                continue;
+            }
+
+            let shard_id = match request.shard_id {
+                Some(shard_id) => shard_id,
+                None => {
+                    // no specific shard requested. if there's one online (lowest population) use it
+                    if let Some(shard_id) = lowest_pop_shard_id {
+                        shard_id
+                    } else {
+                        continue;
+                    }
+                }
+            };
+
+            let Some(shard) = clients
+                .values_mut()
+                .find(|c| matches!(c.client_type, ClientType::ShardServer(sid) if sid == shard_id))
+            else {
+                continue;
+            };
+
+            let login_info = sP_LS2FE_REQ_UPDATE_LOGIN_INFO {
+                iAccountID: acc_id,
+                iEnterSerialKey: serial_key,
+                iPC_UID: pc_uid,
+                uiFEKey: fe_key,
+                uiSvrTime: util::get_timestamp_ms(time),
+            };
+
+            if shard
+                .send_packet(P_LS2FE_REQ_UPDATE_LOGIN_INFO, &login_info)
+                .is_err()
+            {
+                let resp = sP_LS2CL_REP_SHARD_SELECT_FAIL {
+                    iErrorCode: 1, // "Shard connection error"
+                };
+                let client = clients.get_mut(&client_key).unwrap();
+                log_if_failed(client.send_packet(P_LS2CL_REP_SHARD_SELECT_FAIL, &resp));
+            }
+            session.shard_connection_request = None;
         }
     }
 }

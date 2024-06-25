@@ -217,6 +217,17 @@ impl FFClient {
         }
     }
 
+    pub fn get_serial_key(&self) -> FFResult<i64> {
+        if let ClientType::GameClient { serial_key, .. } = self.client_type {
+            Ok(serial_key)
+        } else {
+            Err(FFError::build(
+                Severity::Warning,
+                "Couldn't get serial key for client".to_string(),
+            ))
+        }
+    }
+
     pub fn get_player_id(&self) -> FFResult<i32> {
         if let ClientType::GameClient {
             pc_id: Some(pc_id), ..

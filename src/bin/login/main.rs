@@ -61,6 +61,15 @@ fn main() -> Result<()> {
         Duration::from_secs(config.general.log_write_interval.get()),
         false,
     );
+    timers.register_timer(
+        |t, srv, st| {
+            st.as_login()
+                .process_shard_connection_requests(srv.get_clients(), t);
+            Ok(())
+        },
+        Duration::from_millis(250),
+        false,
+    );
 
     log(
         Severity::Info,

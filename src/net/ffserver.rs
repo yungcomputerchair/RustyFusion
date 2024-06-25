@@ -161,8 +161,8 @@ impl FFServer {
         self.sock.local_addr().unwrap().to_string()
     }
 
-    pub fn get_clients(&mut self) -> impl Iterator<Item = (&usize, &mut FFClient)> + '_ {
-        self.clients.iter_mut()
+    pub fn get_clients(&mut self) -> &mut HashMap<usize, FFClient> {
+        &mut self.clients
     }
 
     pub fn get_client_map(&mut self) -> ClientMap {
