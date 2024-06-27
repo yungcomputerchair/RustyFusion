@@ -611,16 +611,17 @@ impl EntityMap {
             let mut npc_count = 0;
             let mut id_mappings = HashMap::new();
             let mut tight_follow_mappings = HashMap::new();
-            let template_chunks = self.chunk_maps.get(&main_instance).unwrap().chunks.clone();
             for x in 0..NCHUNKS {
                 for y in 0..NCHUNKS {
-                    for id in template_chunks[x][y].get_all() {
-                        let tick_mode = self.registry[id].tick_mode;
-                        if let EntityID::NPC(_) = *id {
-                            let mut npc = self.get_entity::<NPC>(*id).unwrap().clone();
+                    let template_chunks = &self.chunk_maps.get(&main_instance).unwrap().chunks;
+                    let template_chunk = &template_chunks[x][y];
+                    for id in template_chunk.get_all().clone() {
+                        let tick_mode = self.registry[&id].tick_mode;
+                        if let EntityID::NPC(_) = id {
+                            let mut npc = self.get_entity::<NPC>(id).unwrap().clone();
                             npc.instance_id = instance_id;
                             let new_id = self.gen_next_npc_id();
-                            id_mappings.insert(*id, EntityID::NPC(new_id));
+                            id_mappings.insert(id, EntityID::NPC(new_id));
                             npc.id = new_id;
 
                             // since there's no guarantee on what order the NPCs will be iterated upon,
