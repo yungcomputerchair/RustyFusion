@@ -11,11 +11,11 @@
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=login_server",
+                    "--bin=login",
                     "--package=rusty_fusion"
                 ],
                 "filter": {
-                    "name": "login_server",
+                    "name": "login",
                     "kind": "bin"
                 }
             },
@@ -29,11 +29,11 @@
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=shard_server",
+                    "--bin=shard",
                     "--package=rusty_fusion"
                 ],
                 "filter": {
-                    "name": "shard_server",
+                    "name": "shard",
                     "kind": "bin"
                 }
             },
