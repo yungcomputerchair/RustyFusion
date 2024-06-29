@@ -118,6 +118,10 @@ impl FFError {
         Self::new(Severity::Warning, format!("Enum error ({:?})", val), true)
     }
 
+    pub fn from_lua_err(error: mlua::Error) -> Self {
+        Self::new(Severity::Warning, format!("Lua error ({:?})", error), false)
+    }
+
     pub fn chain(self, other: FFError) -> Self {
         Self {
             parent: Some(Box::new(other)),

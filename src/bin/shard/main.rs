@@ -24,6 +24,7 @@ use rusty_fusion::{
         },
         ClientMap, ClientType, FFClient, FFServer,
     },
+    scripting::ScriptManager,
     state::{ServerState, ShardServerState},
     tabledata::tdata_init,
     timer::TimerMap,
@@ -42,6 +43,17 @@ fn main() -> Result<()> {
     );
     cleanup.db_thread_handle = Some(db_init());
     tdata_init();
+
+    let mut sm = match ScriptManager::new() {
+        Ok(s) => s,
+        Err(e) => {
+            log(
+                Severity::Fatal,
+                &format!("Failed to initialize Lua: {}", e.get_msg()),
+            );
+            return Ok(());
+        }
+    };
 
     let polling_interval = Duration::from_millis(50);
     let listen_addr = config_get().shard.listen_addr.get();
@@ -105,6 +117,13 @@ fn main() -> Result<()> {
             Ok(())
         }),
         Duration::from_secs(1),
+        false,
+    );
+
+    // Scripting timer, runs every half second
+    timers.register_timer(
+        Box::new(move |_, _, st| sm.tick_entity_scripts(st.as_shard())),
+        Duration::from_millis(500),
         false,
     );
 
