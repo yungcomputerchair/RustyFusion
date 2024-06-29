@@ -32,6 +32,10 @@ impl ScriptManager {
         })?;
         lua.globals().set("print", log_lua)?;
 
+        // Shared state for all scripts
+        let blackboard = lua.create_table()?;
+        lua.globals().set("bb", blackboard)?;
+
         lua.load("print('Scripting engine initialized')").exec()?;
 
         Ok(lua)
@@ -81,9 +85,9 @@ impl ScriptManager {
         entity_env.set("entity_id", entity_id.to_string())?;
 
         // link allowed Lua globals
-        let aliases = ["print"];
+        let aliases = ["bb", "print"];
         for &alias in aliases.iter() {
-            entity_env.set(alias, self.lua.globals().get::<_, LuaFunction>(alias)?)?;
+            entity_env.set(alias, self.lua.globals().get::<_, LuaValue>(alias)?)?;
         }
 
         let entity_env_key = self.lua.create_registry_value(entity_env)?;
