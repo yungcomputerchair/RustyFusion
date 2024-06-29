@@ -57,16 +57,16 @@ fn main() -> Result<()> {
 
     let mut timers = TimerMap::default();
     timers.register_timer(
-        logger_flush_scheduled,
+        Box::new(|_, _, _| logger_flush_scheduled()),
         Duration::from_secs(config.general.log_write_interval.get()),
         false,
     );
     timers.register_timer(
-        |t, srv, st| {
+        Box::new(|t, srv, st| {
             st.as_login()
                 .process_shard_connection_requests(srv.get_clients(), t);
             Ok(())
-        },
+        }),
         Duration::from_millis(250),
         false,
     );

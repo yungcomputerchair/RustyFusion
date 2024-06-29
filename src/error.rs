@@ -7,7 +7,7 @@ use std::{
     time::SystemTime,
 };
 
-use crate::{config::config_get, net::FFServer, state::ServerState, util};
+use crate::{config::config_get, util};
 
 pub type FFResult<T> = std::result::Result<T, FFError>;
 pub fn catch_fail<T>(
@@ -205,11 +205,7 @@ pub fn logger_flush() -> std::io::Result<()> {
     }
 }
 
-pub fn logger_flush_scheduled(
-    _: SystemTime,
-    _: &mut FFServer,
-    _: &mut ServerState,
-) -> FFResult<()> {
+pub fn logger_flush_scheduled() -> FFResult<()> {
     logger_flush().map_err(FFError::from_io_err)
 }
 

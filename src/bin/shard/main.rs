@@ -59,51 +59,51 @@ fn main() -> Result<()> {
 
     // Special timers
     timers.register_timer(
-        logger_flush_scheduled,
+        Box::new(|_, _, _| logger_flush_scheduled()),
         Duration::from_secs(config.general.log_write_interval.get()),
         false,
     );
     timers.register_timer(
-        connect_to_login_server,
+        Box::new(|_, srv, st| connect_to_login_server(srv, st.as_shard())),
         Duration::from_secs(config.shard.login_server_conn_interval.get()),
         true,
     );
     timers.register_timer(
-        |t, _, st| do_save(t, st.as_shard()),
+        Box::new(|t, _, st| do_save(t, st.as_shard())),
         Duration::from_secs(config.shard.autosave_interval.get() * 60),
         false,
     );
 
     // Per-minute timer
     timers.register_timer(
-        |t, srv, st| {
+        Box::new(|t, srv, st| {
             st.as_shard()
                 .check_for_expired_vehicles(t, &mut srv.get_client_map());
             Ok(())
-        },
+        }),
         Duration::from_secs(60),
         false,
     );
 
     // Per-tick "fast" timer
     timers.register_timer(
-        |t, srv, st| {
+        Box::new(|t, srv, st| {
             st.as_shard().tick_entities(t, &mut srv.get_client_map());
             Ok(())
-        },
+        }),
         Duration::from_millis(1000 / SHARD_TICKS_PER_SECOND as u64),
         false,
     );
 
     // Per-second "slow" timer
     timers.register_timer(
-        |_, srv, st| {
+        Box::new(|_, srv, st| {
             let state = st.as_shard();
             state.tick_garbage_collection(&mut srv.get_client_map());
             state.tick_groups(&mut srv.get_client_map());
             state.check_receivers();
             Ok(())
-        },
+        }),
         Duration::from_secs(1),
         false,
     );
@@ -384,11 +384,9 @@ fn wrong_server(client: &mut FFClient) -> FFResult<()> {
 }
 
 fn connect_to_login_server(
-    _time: SystemTime,
     shard_server: &mut FFServer,
-    state: &mut ServerState,
+    state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let state = state.as_shard();
     if is_login_server_connected(state) {
         return Ok(());
     }

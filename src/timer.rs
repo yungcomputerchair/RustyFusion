@@ -9,7 +9,7 @@ use crate::{
     state::ServerState,
 };
 
-type TimerCallback = fn(SystemTime, &mut FFServer, &mut ServerState) -> FFResult<()>;
+type TimerCallback = Box<dyn FnMut(SystemTime, &mut FFServer, &mut ServerState) -> FFResult<()>>;
 
 struct Timer {
     callback: TimerCallback,
