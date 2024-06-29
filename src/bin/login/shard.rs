@@ -207,14 +207,15 @@ pub fn motd(client: &mut FFClient) -> FFResult<()> {
 
     // load the MOTD from the MOTD file
     let motd_path = config_get().login.motd_path.get();
-    let motd = if let Ok(motd) = std::fs::read_to_string(motd_path.clone()) {
-        motd.trim().to_string()
-    } else {
-        log(
-            Severity::Warning,
-            &format!("MOTD file {} not found, using default MOTD", motd_path),
-        );
-        "Welcome to RustyFusion!".to_string()
+    let motd = match util::get_text_file_contents(&motd_path) {
+        Ok(motd) => motd.trim().to_string(),
+        Err(e) => {
+            log(
+                Severity::Warning,
+                &format!("Couldn't load MOTD, using default ({})", e.get_msg()),
+            );
+            "Welcome to RustyFusion!".to_string()
+        }
     };
     let resp = sP_LS2FE_REP_MOTD {
         iPC_ID: pkt.iPC_ID,

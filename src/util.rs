@@ -207,6 +207,15 @@ pub fn rand_range_exclusive<T: SampleUniform + Ord>(min: T, max: T) -> T {
     rand::thread_rng().gen_range(min..max)
 }
 
+pub fn get_text_file_contents(path: &str) -> FFResult<String> {
+    std::fs::read_to_string(path).map_err(|e| {
+        FFError::build(
+            Severity::Warning,
+            format!("Failed to read file '{}': {}", path, e),
+        )
+    })
+}
+
 pub fn get_random_gumball() -> Item {
     let gumballs = [
         Item::new(ItemType::General, ID_GUMBALL),
