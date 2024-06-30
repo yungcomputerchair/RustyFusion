@@ -23,7 +23,7 @@ regex = "1.10.3"
 bcrypt = "0.15.0"
 serde_repr = "0.1.18"
 chrono = "0.4.38"
-mlua = { version = "0.9.9", features = ["vendored", "luajit"] }
+mlua = { version = "0.9.9", features = ["vendored", "luajit", "send"] }
 
 [features]
 default = ["postgres"]

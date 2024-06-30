@@ -1,15 +1,50 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{Mutex, MutexGuard, OnceLock},
+};
 
 use mlua::{prelude::*, Variadic};
 
 use crate::{
     entity::EntityID,
-    error::{log, FFError, FFResult, Severity},
+    error::{log, log_if_failed, panic_log, FFError, FFResult, Severity},
     state::ShardServerState,
     util,
 };
 
 const TICK_CALLBACK_TABLE: &str = "onTick";
+
+static SCRIPT_MANAGER: OnceLock<Mutex<ScriptManager>> = OnceLock::new();
+
+enum LuaScript {
+    File(String),
+    Raw(String),
+}
+
+pub fn scripting_init() {
+    match SCRIPT_MANAGER.get() {
+        Some(_) => panic_log("Scripting already initialized"),
+        None => {
+            log(Severity::Info, "Initializing scripting engine...");
+            match ScriptManager::new() {
+                Ok(sm) => {
+                    let _ = SCRIPT_MANAGER.set(Mutex::new(sm));
+                }
+                Err(e) => panic_log(&format!(
+                    "Failed to initialize scripting engine: {}",
+                    e.get_msg()
+                )),
+            }
+        }
+    }
+}
+
+pub fn scripting_get() -> MutexGuard<'static, ScriptManager> {
+    match SCRIPT_MANAGER.get() {
+        None => panic_log("Scripting accessed before init"),
+        Some(mutex) => mutex.lock().unwrap(),
+    }
+}
 
 pub struct ScriptManager {
     lua: Lua,
@@ -48,7 +83,7 @@ impl ScriptManager {
         Ok((lua, global_env_key))
     }
 
-    pub fn new() -> FFResult<Self> {
+    fn new() -> FFResult<Self> {
         Self::new_internal()
             .map(|(lua, global_env_key)| Self {
                 lua,
@@ -169,5 +204,16 @@ impl ScriptManager {
             }
         }
         Ok(())
+    }
+
+    pub fn reset(mut self) -> FFResult<Self> {
+        self.entity_envs.clear();
+        log_if_failed(
+            self.lua
+                .remove_registry_value(self.global_env)
+                .map_err(FFError::from_lua_err),
+        );
+        self.lua.expire_registry_values();
+        Self::new()
     }
 }
