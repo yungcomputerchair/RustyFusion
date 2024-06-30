@@ -200,8 +200,13 @@ impl ScriptManager {
         }
 
         // tick entity scripts
-        let to_tick = self.entity_envs.keys().cloned().collect::<Vec<_>>();
+        let tickable = state.entity_map.get_tickable_ids();
+        let to_tick: Vec<EntityID> = self.entity_envs.keys().copied().collect();
         for eid in to_tick {
+            if !tickable.contains(&eid) {
+                continue;
+            }
+
             if let Err(e) = self.tick_scripts(Some(eid), state) {
                 log(
                     Severity::Warning,

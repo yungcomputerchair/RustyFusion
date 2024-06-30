@@ -304,7 +304,7 @@ impl ShardServerState {
 
     pub fn tick_entities(&mut self, time: SystemTime, clients: &mut ClientMap) {
         let mut rng = thread_rng();
-        let eids: Vec<EntityID> = self.entity_map.get_tickable_ids().collect();
+        let eids = self.entity_map.get_tickable_ids();
         for eid in eids {
             match eid {
                 // we copy the entity here so we can mutably borrow the state.

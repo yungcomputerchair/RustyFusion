@@ -152,7 +152,7 @@ impl EntityMap {
         self.registry.keys().cloned()
     }
 
-    pub fn get_tickable_ids(&self) -> impl Iterator<Item = EntityID> + '_ {
+    pub fn get_tickable_ids(&self) -> HashSet<EntityID> {
         self.registry
             .iter()
             .filter_map(|(id, entry)| match entry.tick_mode {
@@ -175,6 +175,7 @@ impl EntityMap {
                     }
                 }
             })
+            .collect()
     }
 
     pub fn get_around_entity(&mut self, id: EntityID) -> HashSet<EntityID> {
