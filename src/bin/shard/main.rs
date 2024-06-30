@@ -43,7 +43,11 @@ fn main() -> Result<()> {
     );
     cleanup.db_thread_handle = Some(db_init());
     tdata_init();
-    scripting_init();
+
+    {
+        let mut sm = scripting_init();
+        let _ = sm.load_script(None, "server_start");
+    }
 
     let polling_interval = Duration::from_millis(50);
     let listen_addr = config_get().shard.listen_addr.get();

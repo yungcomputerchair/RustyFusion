@@ -9,7 +9,7 @@ use crate::{
     entity::EntityID,
     error::{log, log_if_failed, panic_log, FFError, FFResult, Severity},
     state::ShardServerState,
-    util,
+    util, Position,
 };
 
 const TICK_CALLBACK_TABLE: &str = "onTick";
@@ -21,7 +21,7 @@ enum LuaScript {
     Raw(String),
 }
 
-pub fn scripting_init() {
+pub fn scripting_init() -> MutexGuard<'static, ScriptManager> {
     match SCRIPT_MANAGER.get() {
         Some(_) => panic_log("Scripting already initialized"),
         None => {
@@ -29,6 +29,7 @@ pub fn scripting_init() {
             match ScriptManager::new() {
                 Ok(sm) => {
                     let _ = SCRIPT_MANAGER.set(Mutex::new(sm));
+                    scripting_get()
                 }
                 Err(e) => panic_log(&format!(
                     "Failed to initialize scripting engine: {}",
@@ -74,6 +75,14 @@ impl ScriptManager {
         // Shared state for all scripts
         let blackboard = lua.create_table()?;
         lua.globals().set("bb", blackboard)?;
+
+        // Constructors for userdata types
+        lua.globals().set(
+            "pos",
+            lua.create_function(|_, (x, y, z): (i32, i32, i32)| Ok(Position { x, y, z }))?,
+        )?;
+
+        dbg!(lua.globals());
 
         // Environment for non-entity scripts
         let global_env = Self::make_env(&lua)?;
@@ -142,14 +151,34 @@ impl ScriptManager {
         let env = lua.create_table()?;
 
         // link allowed Lua globals
-        let aliases = ["bb", "print", "table"];
-        for &alias in aliases.iter() {
-            env.set(alias, lua.globals().get::<_, LuaValue>(alias)?)?;
+        let aliases = [
+            ("bb", "bb"),
+            ("print", "print"),
+            ("table", "table"),
+            ("pos", "pos"),
+            ("bit", "bit"),
+            ("ipairs", "ipairs"),
+            ("math", "math"),
+            ("version", "jit.version"),
+        ];
+        for &(alias, path) in aliases.iter() {
+            let tables: Vec<&str> = path.split('.').collect();
+            let num_tables = tables.len() - 1;
+            let mut table = lua.globals();
+            for (i, &key) in tables.iter().enumerate() {
+                if i == num_tables {
+                    env.set(alias, table.get::<_, LuaValue>(key)?)?;
+                } else {
+                    table = table.get::<_, LuaTable>(key)?;
+                }
+            }
         }
 
         // link custom globals
         let tick_callbacks = lua.create_table()?;
         env.set(TICK_CALLBACK_TABLE, tick_callbacks)?;
+
+        dbg!(&env);
 
         let env_key = lua.create_registry_value(env)?;
         Ok(env_key)
@@ -239,5 +268,27 @@ impl ScriptManager {
         self.lua = new_lua;
         self.global_env = new_global_env;
         Ok(())
+    }
+}
+
+impl<'lua> FromLua<'lua> for Position {
+    fn from_lua(value: LuaValue<'lua>, _: &'lua Lua) -> LuaResult<Self> {
+        match value {
+            LuaValue::UserData(ud) => Ok(*ud.borrow::<Self>()?),
+            _ => unreachable!(),
+        }
+    }
+}
+impl LuaUserData for Position {
+    fn add_fields<'lua, F: LuaUserDataFields<'lua, Self>>(fields: &mut F) {
+        fields.add_field_method_get("x", |_, p| Ok(p.x));
+        fields.add_field_method_get("y", |_, p| Ok(p.y));
+        fields.add_field_method_get("z", |_, p| Ok(p.z));
+    }
+
+    fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
+        methods.add_method("distance_to", |_, p, other: Position| {
+            Ok(p.distance_to(&other))
+        });
     }
 }
