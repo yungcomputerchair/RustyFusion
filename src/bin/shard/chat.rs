@@ -254,7 +254,7 @@ mod helpers {
 mod commands {
     use std::{collections::HashMap, sync::OnceLock, time::SystemTime};
 
-    use rusty_fusion::{ai::AI, database::db_run_sync};
+    use rusty_fusion::{ai::AI, database::db_run_sync, scripting::scripting_get};
 
     use super::*;
 
@@ -268,7 +268,7 @@ mod commands {
 
     fn init_commands() -> HashMap<&'static str, Command> {
         #[rustfmt::skip]
-        let commands: [(&'static str, &'static str, CommandHandler); 9] = [
+        let commands: [(&'static str, &'static str, CommandHandler); 10] = [
             ("about", "Show information about the server", cmd_about),
             ("ban_a", "Ban an account", cmd_ban),
             ("ban_i", "Ban a player and their account", cmd_ban),
@@ -277,6 +277,7 @@ mod commands {
             ("unfollowme", "Stop the nearest NPC from following you", cmd_unfollowme),
             ("perms", "View or change a player's permissions level", cmd_perms),
             ("refresh", "Reinsert the player into the current chunk", cmd_refresh),
+            ("scripts", "Manage Lua scripts", cmd_scripts),
             ("help", "Show this help message", cmd_help),
         ];
 
@@ -688,6 +689,32 @@ mod commands {
             .entity_map
             .update(EntityID::Player(pc_id), Some(chunk_coords), Some(clients));
         Ok(())
+    }
+
+    fn cmd_scripts(
+        tokens: Vec<&str>,
+        clients: &mut ClientMap,
+        _state: &mut ShardServerState,
+    ) -> FFResult<()> {
+        let client = clients.get_self();
+        if tokens.len() < 2 {
+            let mut usage_msg = "Usage:\n".to_string();
+            usage_msg.push_str(&format!("{}{} reload\n", CUSTOM_COMMAND_PREFIX, tokens[0]));
+            return send_system_message(client, &usage_msg);
+        }
+
+        let mut sm = scripting_get();
+        match tokens[1] {
+            "reload" => {
+                if let Err(e) = sm.reload() {
+                    log_error(&e);
+                    send_system_message(client, &format!("Failed to load scripts: {}", e.get_msg()))
+                } else {
+                    send_system_message(client, "Reloaded scripts!")
+                }
+            }
+            other => send_system_message(client, &format!("Unknown option '{}'", other)),
+        }
     }
 
     fn cmd_help(

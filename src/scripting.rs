@@ -50,6 +50,7 @@ pub struct ScriptManager {
     lua: Lua,
     global_env: LuaRegistryKey,
     entity_envs: HashMap<EntityID, LuaRegistryKey>,
+    assigned_scripts: Vec<(Option<EntityID>, LuaScript)>,
 }
 impl ScriptManager {
     fn new_internal() -> LuaResult<(Lua, LuaRegistryKey)> {
@@ -89,6 +90,7 @@ impl ScriptManager {
                 lua,
                 global_env: global_env_key,
                 entity_envs: HashMap::new(),
+                assigned_scripts: Vec::new(),
             })
             .map_err(FFError::from_lua_err)
     }
@@ -157,12 +159,18 @@ impl ScriptManager {
         let path = format!("scripts/{}.lua", script_name);
         let source = util::get_text_file_contents(&path)?;
         self.load_script_internal(entity_id, &source, Some(script_name))
-            .map_err(FFError::from_lua_err)
+            .map_err(FFError::from_lua_err)?;
+        self.assigned_scripts
+            .push((entity_id, LuaScript::File(script_name.to_string())));
+        Ok(())
     }
 
     pub fn load_script_raw(&mut self, entity_id: Option<EntityID>, source: &str) -> FFResult<()> {
         self.load_script_internal(entity_id, source, None)
-            .map_err(FFError::from_lua_err)
+            .map_err(FFError::from_lua_err)?;
+        self.assigned_scripts
+            .push((entity_id, LuaScript::Raw(source.to_string())));
+        Ok(())
     }
 
     fn tick_scripts(
@@ -206,14 +214,25 @@ impl ScriptManager {
         Ok(())
     }
 
-    pub fn reset(mut self) -> FFResult<Self> {
+    pub fn reload(&mut self) -> FFResult<()> {
+        let loaded_scripts: Vec<(Option<EntityID>, LuaScript)> =
+            self.assigned_scripts.drain(..).collect();
+        self.reset()?;
+        for (eid, script) in loaded_scripts {
+            log_if_failed(match script {
+                LuaScript::File(script_name) => self.load_script(eid, &script_name),
+                LuaScript::Raw(source) => self.load_script_raw(eid, &source),
+            });
+        }
+        Ok(())
+    }
+
+    fn reset(&mut self) -> FFResult<()> {
         self.entity_envs.clear();
-        log_if_failed(
-            self.lua
-                .remove_registry_value(self.global_env)
-                .map_err(FFError::from_lua_err),
-        );
-        self.lua.expire_registry_values();
-        Self::new()
+        self.lua.expire_registry_values(); // just in case
+        let (new_lua, new_global_env) = Self::new_internal().map_err(FFError::from_lua_err)?;
+        self.lua = new_lua;
+        self.global_env = new_global_env;
+        Ok(())
     }
 }
