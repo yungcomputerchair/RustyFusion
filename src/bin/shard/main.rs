@@ -122,7 +122,7 @@ fn main() -> Result<()> {
 
     // Scripting timer, runs every half second
     timers.register_timer(
-        Box::new(move |_, _, st| sm.tick_entity_scripts(st.as_shard())),
+        Box::new(move |_, _, st| sm.tick(st.as_shard())),
         Duration::from_millis(500),
         false,
     );

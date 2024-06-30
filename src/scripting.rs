@@ -9,6 +9,8 @@ use crate::{
     util,
 };
 
+const TICK_CALLBACK_TABLE: &str = "onTick";
+
 pub struct ScriptManager {
     lua: Lua,
     global_env: LuaRegistryKey,
@@ -38,7 +40,7 @@ impl ScriptManager {
         lua.globals().set("bb", blackboard)?;
 
         // Environment for non-entity scripts
-        let global_env = lua.create_table()?;
+        let global_env = Self::make_env(&lua)?;
         let global_env_key = lua.create_registry_value(global_env)?;
 
         lua.load("print('Scripting engine initialized')").exec()?;
@@ -77,7 +79,7 @@ impl ScriptManager {
             Some(eid) => {
                 // populate the entity environment if it doesn't exist
                 if !self.is_entity_registered(eid) {
-                    let entity_env_key = self.make_env()?;
+                    let entity_env_key = Self::make_env(&self.lua)?;
                     let entity_env = self
                         .lua
                         .registry_value::<LuaTable>(&entity_env_key)
@@ -99,16 +101,20 @@ impl ScriptManager {
         self.entity_envs.contains_key(&entity_id)
     }
 
-    fn make_env(&self) -> LuaResult<LuaRegistryKey> {
-        let env = self.lua.create_table()?;
+    fn make_env(lua: &Lua) -> LuaResult<LuaRegistryKey> {
+        let env = lua.create_table()?;
 
         // link allowed Lua globals
-        let aliases = ["bb", "print"];
+        let aliases = ["bb", "print", "table"];
         for &alias in aliases.iter() {
-            env.set(alias, self.lua.globals().get::<_, LuaValue>(alias)?)?;
+            env.set(alias, lua.globals().get::<_, LuaValue>(alias)?)?;
         }
 
-        let env_key = self.lua.create_registry_value(env)?;
+        // link custom globals
+        let tick_callbacks = lua.create_table()?;
+        env.set(TICK_CALLBACK_TABLE, tick_callbacks)?;
+
+        let env_key = lua.create_registry_value(env)?;
         Ok(env_key)
     }
 
@@ -124,31 +130,42 @@ impl ScriptManager {
             .map_err(FFError::from_lua_err)
     }
 
-    fn tick_entity_script(
+    fn tick_scripts(
         &self,
-        entity_id: EntityID,
+        entity_id: Option<EntityID>,
         _state: &mut ShardServerState,
     ) -> LuaResult<()> {
-        let entity_env_key = self.entity_envs.get(&entity_id).unwrap();
-        let entity_env = self.lua.registry_value::<LuaTable>(entity_env_key)?;
-        let tick_fn = entity_env.get::<_, LuaFunction>("tick")?;
-        tick_fn.set_environment(entity_env.clone())?;
-        tick_fn.call::<_, ()>(())?;
+        let script_env_key = match entity_id {
+            Some(eid) => self.entity_envs.get(&eid).unwrap(),
+            None => &self.global_env,
+        };
+        let script_env = self.lua.registry_value::<LuaTable>(script_env_key)?;
+        let tick_callbacks = script_env.get::<_, LuaTable>(TICK_CALLBACK_TABLE).unwrap();
+        for tick_fn in tick_callbacks.sequence_values::<LuaFunction>() {
+            tick_fn?.call(())?;
+        }
         Ok(())
     }
 
-    pub fn tick_entity_scripts(&mut self, state: &mut ShardServerState) -> FFResult<()> {
+    pub fn tick(&mut self, state: &mut ShardServerState) -> FFResult<()> {
+        // tick global scripts first
+        if let Err(e) = self.tick_scripts(None, state) {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Error ticking global scripts: {}", e),
+            ));
+        }
+
+        // tick entity scripts
         let to_tick = self.entity_envs.keys().cloned().collect::<Vec<_>>();
         for eid in to_tick {
-            match self.tick_entity_script(eid, state) {
-                Ok(_) => {}
-                Err(e) => {
-                    log(
-                        Severity::Warning,
-                        &format!("Error ticking script for entity {:?}: {}", eid, e),
-                    );
-                    self.entity_envs.remove(&eid);
-                }
+            if let Err(e) = self.tick_scripts(Some(eid), state) {
+                log(
+                    Severity::Warning,
+                    &format!("Error ticking script for entity {:?}: {}", eid, e),
+                );
+                // if something goes wrong, we unregister the entity completely
+                self.entity_envs.remove(&eid);
             }
         }
         Ok(())
