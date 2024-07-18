@@ -28,7 +28,7 @@ use crate::{
     path::Path,
     state::ShardServerState,
     tabledata::{tdata_get, TripData},
-    util::{self, clamp, clamp_max, clamp_min},
+    util::{self, clamp, clamp_max, clamp_min, Bitfield},
     Position,
 };
 
@@ -78,12 +78,26 @@ impl Default for PlayerStyle {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone)]
 pub struct PlayerFlags {
     pub name_check_flag: bool,
     pub tutorial_flag: bool,
     pub payzone_flag: bool,
-    pub tip_flags: i128,
+    pub tip_flags: Bitfield<i64>,
+    pub scamper_flags: Bitfield<i32>,
+    pub skyway_flags: Bitfield<i64>,
+}
+impl Default for PlayerFlags {
+    fn default() -> Self {
+        Self {
+            name_check_flag: false,
+            tutorial_flag: false,
+            payzone_flag: false,
+            tip_flags: Bitfield::new(SIZEOF_TIP_FLAGS),
+            scamper_flags: Bitfield::new(SIZEOF_SCAMPER_FLAGS),
+            skyway_flags: Bitfield::new(WYVERN_LOCATION_FLAG_SIZE as usize),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -106,81 +120,6 @@ struct SkywayRideState {
     path: Path,
     monkey_pos: Position,
     resume_time: SystemTime,
-}
-
-#[derive(Debug, Default, Clone)]
-struct TransportData {
-    pub scamper_flags: i32,
-    pub skyway_flags: [i64; WYVERN_LOCATION_FLAG_SIZE as usize],
-    pub skyway_ride: Option<SkywayRideState>,
-}
-impl TransportData {
-    pub fn set_scamper_flag(&mut self, location_id: i32) -> FFResult<i32> {
-        match location_id {
-            (1..=32) => {
-                let offset = location_id - 1;
-                self.scamper_flags |= 1 << offset;
-                Ok(self.scamper_flags)
-            }
-            _ => Err(FFError::build(
-                Severity::Warning,
-                format!("Invalid S.C.A.M.P.E.R. location ID: {}", location_id),
-            )),
-        }
-    }
-
-    pub fn test_scamper_flag(&self, location_id: i32) -> FFResult<bool> {
-        match location_id {
-            1..=32 => {
-                let offset = location_id - 1;
-                Ok(self.scamper_flags & (1 << offset) != 0)
-            }
-            _ => Err(FFError::build(
-                Severity::Warning,
-                format!("Invalid S.C.A.M.P.E.R. location ID: {}", location_id),
-            )),
-        }
-    }
-
-    pub fn set_skyway_flag(
-        &mut self,
-        location_id: i32,
-    ) -> FFResult<[i64; WYVERN_LOCATION_FLAG_SIZE as usize]> {
-        match location_id {
-            1..=63 => {
-                let offset = location_id - 1;
-                self.skyway_flags[0] |= 1 << offset;
-            }
-            64..=127 => {
-                let offset = location_id - 64;
-                self.skyway_flags[1] |= 1 << offset;
-            }
-            _ => {
-                return Err(FFError::build(
-                    Severity::Warning,
-                    format!("Invalid skyway location ID: {}", location_id),
-                ))
-            }
-        };
-        Ok(self.skyway_flags)
-    }
-
-    pub fn test_skyway_flag(&self, location_id: i32) -> FFResult<bool> {
-        match location_id {
-            (1..=63) => {
-                let offset = location_id - 1;
-                Ok(self.skyway_flags[0] & (1 << offset) != 0)
-            }
-            (64..=127) => {
-                let offset = location_id - 64;
-                Ok(self.skyway_flags[1] & (1 << offset) != 0)
-            }
-            _ => Err(FFError::build(
-                Severity::Warning,
-                format!("Invalid skyway location ID: {}", location_id),
-            )),
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -485,7 +424,7 @@ pub struct Player {
     buddy_warp_time: i32,
     last_heal_time: Option<SystemTime>,
     pub last_warp_away_time: Option<SystemTime>,
-    transport_data: TransportData,
+    skyway_ride: Option<SkywayRideState>,
     pub trade_id: Option<Uuid>,
     pub trade_offered_to: Option<i32>,
     pub group_id: Option<Uuid>,
@@ -703,18 +642,22 @@ impl Player {
                 iValue: placeholder!(0),
                 iConfirmNum: placeholder!(0),
             },
-            aQuestFlag: self.mission_journal.completed_mission_flags,
+            aQuestFlag: self
+                .mission_journal
+                .completed_mission_flags
+                .to_array()
+                .unwrap(),
             aRepeatQuestFlag: unused!(),
             aRunningQuest: self.mission_journal.get_running_quests(),
             iCurrentMissionID: self.mission_journal.get_active_mission_id().unwrap_or(0),
-            iWarpLocationFlag: self.transport_data.scamper_flags,
-            aWyvernLocationFlag: self.transport_data.skyway_flags,
+            iWarpLocationFlag: self.flags.scamper_flags.get_chunk(0).unwrap(),
+            aWyvernLocationFlag: self.flags.skyway_flags.to_array().unwrap(),
             iBuddyWarpTime: self.buddy_warp_time,
             iFatigue: unused!(),
             iFatigue_Level: unused!(),
             iFatigueRate: unused!(),
-            iFirstUseFlag1: self.flags.tip_flags as i64,
-            iFirstUseFlag2: (self.flags.tip_flags >> 64) as i64,
+            iFirstUseFlag1: self.flags.tip_flags.get_chunk(0).unwrap(),
+            iFirstUseFlag2: self.flags.tip_flags.get_chunk(1).unwrap(),
             aiPCSkill: [unused!(); 33],
         }
     }
@@ -1082,51 +1025,31 @@ impl Player {
         self.fusion_matter
     }
 
-    pub fn update_first_use_flag(&mut self, bit_offset: i32) -> FFResult<i128> {
-        if !(1..=129).contains(&bit_offset) {
-            Err(FFError::build(
-                Severity::Warning,
-                format!("First use flag offset out of range: {}", bit_offset),
-            ))
-        } else {
-            self.flags.tip_flags |= 1 << (bit_offset - 1);
-            Ok(self.flags.tip_flags)
-        }
+    pub fn update_first_use_flag(&mut self, num: i32) -> FFResult<()> {
+        self.flags.tip_flags.set((num - 1) as usize, true)?;
+        Ok(())
     }
 
-    pub fn get_scamper_flags(&self) -> i32 {
-        self.transport_data.scamper_flags
-    }
-
-    pub fn get_skyway_flags(&self) -> [i64; WYVERN_LOCATION_FLAG_SIZE as usize] {
-        self.transport_data.skyway_flags
-    }
-
-    pub fn set_scamper_flag(&mut self, flags: i32) {
-        self.transport_data.scamper_flags = flags;
-    }
-
-    pub fn set_skyway_flags(&mut self, flags: [i64; WYVERN_LOCATION_FLAG_SIZE as usize]) {
-        self.transport_data.skyway_flags = flags;
-    }
-
-    pub fn unlock_scamper_location(&mut self, location_id: i32) -> FFResult<i32> {
-        self.transport_data.set_scamper_flag(location_id)
+    pub fn unlock_scamper_location(&mut self, location_id: i32) -> FFResult<()> {
+        self.flags
+            .scamper_flags
+            .set((location_id - 1) as usize, true)?;
+        Ok(())
     }
 
     pub fn is_scamper_location_unlocked(&self, location_id: i32) -> FFResult<bool> {
-        self.transport_data.test_scamper_flag(location_id)
+        self.flags.scamper_flags.get((location_id - 1) as usize)
     }
 
-    pub fn unlock_skyway_location(
-        &mut self,
-        location_id: i32,
-    ) -> FFResult<[i64; WYVERN_LOCATION_FLAG_SIZE as usize]> {
-        self.transport_data.set_skyway_flag(location_id)
+    pub fn unlock_skyway_location(&mut self, location_id: i32) -> FFResult<()> {
+        self.flags
+            .skyway_flags
+            .set((location_id - 1) as usize, true)?;
+        Ok(())
     }
 
     pub fn is_skyway_location_unlocked(&self, location_id: i32) -> FFResult<bool> {
-        self.transport_data.test_skyway_flag(location_id)
+        self.flags.skyway_flags.get((location_id - 1) as usize)
     }
 
     pub fn set_tutorial_done(&mut self) {
@@ -1294,7 +1217,7 @@ impl Player {
 
     pub fn start_skyway_ride(&mut self, trip_data: &'static TripData, mut path: Path) {
         path.tick(&mut self.position); // advance to Moving state
-        self.transport_data.skyway_ride = Some(SkywayRideState {
+        self.skyway_ride = Some(SkywayRideState {
             trip_data,
             path,
             monkey_pos: self.position,
@@ -1399,7 +1322,7 @@ impl Player {
     ) {
         let pc_id = self.id.unwrap();
         // Skyway ride
-        if let Some(ref mut ride) = self.transport_data.skyway_ride {
+        if let Some(ref mut ride) = self.skyway_ride {
             if &ride.resume_time > time {
                 return;
             }
@@ -1410,7 +1333,7 @@ impl Player {
                 let cost = ride.trip_data.cost;
                 self.set_taros(self.taros - cost);
                 self.set_position(final_pos);
-                self.transport_data.skyway_ride = None;
+                self.skyway_ride = None;
                 crate::helpers::broadcast_monkey(pc_id, RideType::None, clients, state);
                 return;
             }

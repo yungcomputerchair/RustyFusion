@@ -1,4 +1,7 @@
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::{
+    ops::{BitAnd, BitAndAssign, BitOrAssign, Not, Shl, Shr},
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 use chrono::{DateTime, Local};
 use rand::{distributions::uniform::SampleUniform, Rng};
@@ -9,6 +12,188 @@ use crate::{
     error::{panic_log, FFError, FFResult, Severity},
     item::Item,
 };
+
+pub trait AsBytes {
+    fn to_bytes(&self) -> Vec<u8>;
+    fn from_bytes(bytes: &[u8]) -> Self;
+}
+impl AsBytes for i32 {
+    fn to_bytes(&self) -> Vec<u8> {
+        self.to_le_bytes().to_vec()
+    }
+
+    fn from_bytes(bytes: &[u8]) -> Self {
+        let mut bytes_array = [0; 4];
+        bytes_array.copy_from_slice(&bytes[..4]);
+        Self::from_le_bytes(bytes_array)
+    }
+}
+impl AsBytes for i64 {
+    fn to_bytes(&self) -> Vec<u8> {
+        self.to_le_bytes().to_vec()
+    }
+
+    fn from_bytes(bytes: &[u8]) -> Self {
+        let mut bytes_array = [0; 8];
+        bytes_array.copy_from_slice(&bytes[..8]);
+        Self::from_le_bytes(bytes_array)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Bitfield<T> {
+    chunks: Vec<T>,
+}
+impl<
+        T: Clone
+            + Copy
+            + From<bool>
+            + AsBytes
+            + Shl<usize, Output = T>
+            + Shr<usize, Output = T>
+            + Not<Output = T>
+            + PartialEq
+            + BitOrAssign
+            + BitAndAssign
+            + BitAnd<Output = T>,
+    > Bitfield<T>
+{
+    pub fn new(num_chunks: usize) -> Self {
+        Self {
+            chunks: vec![Self::false_value(); num_chunks],
+        }
+    }
+
+    pub fn from_single(val: T) -> Self {
+        Self { chunks: vec![val] }
+    }
+
+    const fn chunk_size_bytes() -> usize {
+        std::mem::size_of::<T>()
+    }
+
+    const fn chunk_size_bits() -> usize {
+        Self::chunk_size_bytes() * 8
+    }
+
+    fn false_value() -> T {
+        T::from(false)
+    }
+
+    fn true_value() -> T {
+        T::from(true)
+    }
+
+    pub fn set(&mut self, idx: usize, val: bool) -> FFResult<bool> {
+        let chunk_idx = idx / Self::chunk_size_bits();
+        if chunk_idx >= self.chunks.len() {
+            let max_idx = self.chunks.len() * Self::chunk_size_bits() - 1;
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Bitfield index {} out of bounds, max {}", idx, max_idx),
+            ));
+        }
+
+        let bit_idx = idx % Self::chunk_size_bits();
+        let mask = Self::true_value() << bit_idx;
+        let old_val = self.chunks[chunk_idx];
+        if val {
+            self.chunks[chunk_idx] |= mask;
+        } else {
+            self.chunks[chunk_idx] &= !mask;
+        }
+        Ok(old_val != self.chunks[chunk_idx])
+    }
+
+    pub fn get(&self, idx: usize) -> FFResult<bool> {
+        let chunk_idx = idx / Self::chunk_size_bits();
+        if chunk_idx >= self.chunks.len() {
+            let max_idx = self.chunks.len() * Self::chunk_size_bits() - 1;
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Bitfield index {} out of bounds, max {}", idx, max_idx),
+            ));
+        }
+
+        let bit_idx = idx % Self::chunk_size_bits();
+        let mask = Self::true_value() << bit_idx;
+        Ok((self.chunks[chunk_idx] & mask) != Self::false_value())
+    }
+
+    pub fn get_chunk(&self, idx: usize) -> FFResult<T> {
+        if idx >= self.chunks.len() {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Bitfield chunk index {} out of bounds, max {}",
+                    idx,
+                    self.chunks.len() - 1
+                ),
+            ));
+        }
+        Ok(self.chunks[idx])
+    }
+
+    pub fn set_chunk(&mut self, idx: usize, val: T) -> FFResult<()> {
+        if idx >= self.chunks.len() {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Bitfield chunk index {} out of bounds, max {}",
+                    idx,
+                    self.chunks.len() - 1
+                ),
+            ));
+        }
+        self.chunks[idx] = val;
+        Ok(())
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        for chunk in &self.chunks {
+            let chunk_bytes = chunk.to_bytes();
+            for byte in &chunk_bytes {
+                bytes.push(*byte);
+            }
+        }
+        bytes
+    }
+
+    pub fn from_bytes(bytes: &[u8], num_chunks: usize) -> FFResult<Self> {
+        let mut chunks = Vec::new();
+        let chunk_size_bytes = Self::chunk_size_bytes();
+        for i in 0..num_chunks {
+            let start = i * chunk_size_bytes;
+            let end = start + chunk_size_bytes;
+            if start >= bytes.len() || end > bytes.len() {
+                chunks.push(Self::false_value());
+            } else {
+                let chunk_bytes = &bytes[start..end];
+                chunks.push(T::from_bytes(chunk_bytes));
+            }
+        }
+        Ok(Self { chunks })
+    }
+
+    pub fn to_array<const SIZE: usize>(&self) -> FFResult<[T; SIZE]> {
+        if SIZE > self.chunks.len() {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Bitfield has {} chunks, but array size is {}",
+                    self.chunks.len(),
+                    SIZE
+                ),
+            ));
+        }
+        let mut array = [Self::false_value(); SIZE];
+        for (i, chunk) in self.chunks.iter().enumerate() {
+            array[i] = *chunk;
+        }
+        Ok(array)
+    }
+}
 
 pub fn clamp<T: Ord>(val: T, min: T, max: T) -> T {
     if val < min {

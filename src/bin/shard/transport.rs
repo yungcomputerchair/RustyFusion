@@ -67,8 +67,8 @@ pub fn regist_transportation_location(
             let resp = sP_FE2CL_REP_PC_REGIST_TRANSPORTATION_LOCATION_SUCC {
                 eTT: pkt.eTT,
                 iLocationID: pkt.iLocationID,
-                iWarpLocationFlag: player.get_scamper_flags(),
-                aWyvernLocationFlag: player.get_skyway_flags(),
+                iWarpLocationFlag: player.flags.scamper_flags.get_chunk(0).unwrap(),
+                aWyvernLocationFlag: player.flags.skyway_flags.to_array().unwrap(),
             };
             client.send_packet(P_FE2CL_REP_PC_REGIST_TRANSPORTATION_LOCATION_SUCC, &resp)
         })(),

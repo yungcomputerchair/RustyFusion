@@ -9,6 +9,7 @@ use crate::{
     error::{panic_log, FFError, FFResult, Severity},
     net::packet::sRunningQuest,
     tabledata::tdata_get,
+    util::Bitfield,
 };
 
 #[derive(Debug)]
@@ -119,13 +120,24 @@ impl From<&TaskDefinition> for Task {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct MissionJournal {
     current_nano_mission: Option<Task>,
     current_guide_mission: Option<Task>,
     current_world_missions: Vec<Task>,
     active_mission_slot: Option<usize>,
-    pub completed_mission_flags: [i64; SIZEOF_QUESTFLAG_NUMBER as usize],
+    pub completed_mission_flags: Bitfield<i64>,
+}
+impl Default for MissionJournal {
+    fn default() -> Self {
+        MissionJournal {
+            current_nano_mission: None,
+            current_guide_mission: None,
+            current_world_missions: Vec::new(),
+            active_mission_slot: None,
+            completed_mission_flags: Bitfield::new(SIZEOF_QUESTFLAG_NUMBER as usize),
+        }
+    }
 }
 impl MissionJournal {
     fn get_task_iter(&self) -> impl Iterator<Item = &Task> {
@@ -212,34 +224,12 @@ impl MissionJournal {
     }
 
     pub fn is_mission_completed(&self, mission_id: i32) -> FFResult<bool> {
-        const BITFIELD_CHUNK_SIZE: i32 = i64::BITS as i32;
-        const MAX_MISSION_ID: i32 = (SIZEOF_QUESTFLAG_NUMBER as i32) * BITFIELD_CHUNK_SIZE;
-        if mission_id >= MAX_MISSION_ID {
-            return Err(FFError::build(
-                Severity::Warning,
-                format!("Invalid mission ID {}", mission_id),
-            ));
-        }
-        let offset = mission_id - 1;
-        let chunk_idx = offset / BITFIELD_CHUNK_SIZE;
-        let bit_idx = offset % BITFIELD_CHUNK_SIZE;
-        let bitfield = self.completed_mission_flags[chunk_idx as usize];
-        Ok((bitfield & (1 << bit_idx)) != 0)
+        self.completed_mission_flags.get((mission_id - 1) as usize)
     }
 
     pub fn set_mission_completed(&mut self, mission_id: i32) -> FFResult<()> {
-        const BITFIELD_CHUNK_SIZE: i32 = i64::BITS as i32;
-        const MAX_MISSION_ID: i32 = (SIZEOF_QUESTFLAG_NUMBER as i32) * BITFIELD_CHUNK_SIZE;
-        if mission_id >= MAX_MISSION_ID {
-            return Err(FFError::build(
-                Severity::Warning,
-                format!("Invalid mission ID {}", mission_id),
-            ));
-        }
-        let offset = mission_id - 1;
-        let chunk_idx = offset / BITFIELD_CHUNK_SIZE;
-        let bit_idx = offset % BITFIELD_CHUNK_SIZE;
-        self.completed_mission_flags[chunk_idx as usize] |= 1 << bit_idx;
+        self.completed_mission_flags
+            .set((mission_id - 1) as usize, true)?;
         Ok(())
     }
 

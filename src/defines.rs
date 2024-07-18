@@ -37,6 +37,9 @@ pub const FLAG_PC_STATE_VEHICLE: i8 = 8;
 
 pub const MSG_BOX_DURATION_DEFAULT: i32 = 3;
 
+pub const SIZEOF_TIP_FLAGS: usize = 2;
+pub const SIZEOF_SCAMPER_FLAGS: usize = 1;
+
 /* Constants ripped from the client */
 
 // csDefines.cs

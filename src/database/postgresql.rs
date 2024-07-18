@@ -13,7 +13,8 @@ use crate::{
     nano::Nano,
     net::packet::*,
     tabledata::tdata_get,
-    util, Position,
+    util::{self, Bitfield},
+    Position,
 };
 
 impl FFError {
@@ -142,16 +143,6 @@ impl PostgresDatabase {
         let save_running_quest = Self::prep(client, "save_running_quest")?;
         let pc_uid = player.get_uid();
 
-        let mut skyway_bytes = Vec::new();
-        for sec in player.get_skyway_flags() {
-            skyway_bytes.extend_from_slice(&sec.to_le_bytes());
-        }
-
-        let mut quest_bytes = Vec::new();
-        for sec in player.mission_journal.completed_mission_flags {
-            quest_bytes.extend_from_slice(&sec.to_le_bytes());
-        }
-
         let position = if player.instance_id.instance_num.is_some() {
             player.get_pre_warp().position
         } else {
@@ -180,10 +171,14 @@ impl PostgresDatabase {
                 &(player.get_nano_potions() as Int),
                 &((player.get_guide() as i16) as Int),
                 &player.mission_journal.get_active_mission_id().unwrap_or(0),
-                &player.get_scamper_flags(),
-                &skyway_bytes,
-                &player.flags.tip_flags.to_le_bytes().as_slice(),
-                &quest_bytes,
+                &player.flags.scamper_flags.get_chunk(0).unwrap(),
+                &player.flags.skyway_flags.to_bytes().as_slice(),
+                &player.flags.tip_flags.to_bytes().as_slice(),
+                &player
+                    .mission_journal
+                    .completed_mission_flags
+                    .to_bytes()
+                    .as_slice(),
             ],
         )?;
 
@@ -334,7 +329,7 @@ impl PostgresDatabase {
 
         let mut player_flags = PlayerFlags::default();
         let first_use_bytes: &[u8] = row.get("FirstUseFlag");
-        player_flags.tip_flags = i128::from_le_bytes(first_use_bytes[..16].try_into().unwrap());
+        player_flags.tip_flags = Bitfield::from_bytes(first_use_bytes, SIZEOF_TIP_FLAGS)?;
         player_flags.tutorial_flag = row.get::<_, Int>("TutorialFlag") != 0;
         player_flags.name_check_flag = row.get::<_, Int>("NameCheck") != 0;
         player.flags = player_flags;
@@ -346,17 +341,18 @@ impl PostgresDatabase {
         }
 
         let skyway_bytes: &[u8] = row.get("SkywayLocationFlag");
-        player.set_skyway_flags([
-            BigInt::from_le_bytes(skyway_bytes[..8].try_into().unwrap()),
-            BigInt::from_le_bytes(skyway_bytes[8..16].try_into().unwrap()),
-        ]);
-        player.set_scamper_flag(row.get("WarpLocationFlag"));
+        player.flags.skyway_flags =
+            Bitfield::from_bytes(skyway_bytes, WYVERN_LOCATION_FLAG_SIZE as usize)?;
+
+        player
+            .flags
+            .scamper_flags
+            .set_chunk(0, row.get("WarpLocationFlag"))
+            .unwrap();
 
         let quest_bytes: &[u8] = row.get("Quests");
-        for i in 0..player.mission_journal.completed_mission_flags.len() {
-            player.mission_journal.completed_mission_flags[i] =
-                BigInt::from_le_bytes(quest_bytes[i * 8..(i + 1) * 8].try_into().unwrap());
-        }
+        player.mission_journal.completed_mission_flags =
+            Bitfield::from_bytes(quest_bytes, SIZEOF_QUESTFLAG_NUMBER as usize)?;
 
         let running_quests = Self::query(client, "load_running_quests", &[&pc_uid])?;
         for quest in running_quests {
@@ -485,9 +481,13 @@ impl Database for PostgresDatabase {
                 &player.get_position().z,
                 &player.get_rotation(),
                 &player.get_hp(),
-                &[0_u8; (64 / 8) * WYVERN_LOCATION_FLAG_SIZE as usize].as_slice(),
-                &[0_u8; 128 / 8].as_slice(),
-                &[0_u8; (32 / 8) * SIZEOF_QUESTFLAG_NUMBER as usize].as_slice(),
+                &player.flags.skyway_flags.to_bytes().as_slice(),
+                &player.flags.tip_flags.to_bytes().as_slice(),
+                &player
+                    .mission_journal
+                    .completed_mission_flags
+                    .to_bytes()
+                    .as_slice(),
                 //
                 &player.get_uid(),
             ],

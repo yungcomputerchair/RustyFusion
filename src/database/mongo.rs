@@ -16,7 +16,8 @@ use crate::{
     nano::Nano,
     net::packet::*,
     tabledata::tdata_get,
-    util, Position,
+    util::{self, Bitfield},
+    Position,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -233,16 +234,6 @@ impl From<(BigInt, &Player)> for DbPlayer {
     fn from(values: (BigInt, &Player)) -> Self {
         let (account_id, player) = values;
 
-        let mut skyway_bytes = Vec::new();
-        for sec in player.get_skyway_flags() {
-            skyway_bytes.extend_from_slice(&sec.to_le_bytes());
-        }
-
-        let mut quest_bytes = Vec::new();
-        for sec in player.mission_journal.completed_mission_flags {
-            quest_bytes.extend_from_slice(&sec.to_le_bytes());
-        }
-
         let position = if player.instance_id.instance_num.is_some() {
             player.get_pre_warp().position
         } else {
@@ -292,10 +283,14 @@ impl From<(BigInt, &Player)> for DbPlayer {
             nano_potions: player.get_nano_potions() as Int,
             guide: (player.get_guide() as i16) as Int,
             active_mission_id: player.mission_journal.get_active_mission_id().unwrap_or(0),
-            scamper_flags: player.get_scamper_flags(),
-            skyway_bytes,
-            tip_flags_bytes: player.flags.tip_flags.to_le_bytes().to_vec(),
-            quest_bytes,
+            scamper_flags: player.flags.scamper_flags.get_chunk(0).unwrap(),
+            skyway_bytes: player.flags.skyway_flags.to_bytes().to_vec(),
+            tip_flags_bytes: player.flags.tip_flags.to_bytes().to_vec(),
+            quest_bytes: player
+                .mission_journal
+                .completed_mission_flags
+                .to_bytes()
+                .to_vec(),
             //
             nanos: Some(nanos),
             items: Some(items),
@@ -354,11 +349,14 @@ impl TryFrom<DbPlayer> for Player {
         }
 
         let first_use_bytes: &[u8] = &db_player.tip_flags_bytes;
+        let skyway_bytes: &[u8] = &db_player.skyway_bytes;
         player.flags = PlayerFlags {
             name_check_flag: db_player.name_check != 0,
             tutorial_flag: db_player.tutorial_flag != 0,
             payzone_flag: db_player.payzone_flag != 0,
-            tip_flags: i128::from_le_bytes(first_use_bytes[..16].try_into().unwrap()),
+            tip_flags: Bitfield::from_bytes(first_use_bytes, SIZEOF_TIP_FLAGS)?,
+            scamper_flags: Bitfield::from_single(db_player.scamper_flags),
+            skyway_flags: Bitfield::from_bytes(skyway_bytes, WYVERN_LOCATION_FLAG_SIZE as usize)?,
         };
 
         // TODO get total number of guides from DB (currently not stored)
@@ -366,13 +364,6 @@ impl TryFrom<DbPlayer> for Player {
         if guide != PlayerGuide::Computress {
             player.update_guide(guide);
         }
-
-        let skyway_bytes: &[u8] = &db_player.skyway_bytes;
-        player.set_skyway_flags([
-            i64::from_le_bytes(skyway_bytes[..8].try_into().unwrap()),
-            i64::from_le_bytes(skyway_bytes[8..16].try_into().unwrap()),
-        ]);
-        player.set_scamper_flag(db_player.scamper_flags);
 
         for item in db_player.items.unwrap_or_default() {
             let values: (usize, Option<Item>) = item.try_into()?;
@@ -394,10 +385,8 @@ impl TryFrom<DbPlayer> for Player {
         }
 
         let quest_bytes: &[u8] = &db_player.quest_bytes;
-        for i in 0..player.mission_journal.completed_mission_flags.len() {
-            player.mission_journal.completed_mission_flags[i] =
-                BigInt::from_le_bytes(quest_bytes[i * 8..(i + 1) * 8].try_into().unwrap());
-        }
+        player.mission_journal.completed_mission_flags =
+            Bitfield::from_bytes(quest_bytes, SIZEOF_QUESTFLAG_NUMBER as usize)?;
 
         for task in db_player.running_quests.unwrap_or_default() {
             let mut task: Task = task.try_into()?;
@@ -454,6 +443,10 @@ impl std::fmt::Debug for MongoDatabase {
 }
 impl MongoDatabase {
     pub fn connect(config: &GeneralConfig) -> FFResult<Box<dyn Database>> {
+        log(
+            Severity::Warning,
+            "The MongoDB backend is experimental! Expect bugs!",
+        );
         match Self::connect_internal(config, true) {
             Ok(db) => Ok(db),
             Err(e) => {
