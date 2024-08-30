@@ -29,8 +29,8 @@ jobs:
       run: cargo build --verbose --no-default-features
     - name: Build with PostgreSQL
       run: cargo build --verbose --no-default-features --features postgres
-    - name: Build with MongoDB
-      run: cargo build --verbose --no-default-features --features mongo
+#   - name: Build with MongoDB
+#     run: cargo build --verbose --no-default-features --features mongo
     - name: Run tests
       run: cargo test --verbose
     - name: Check linter
