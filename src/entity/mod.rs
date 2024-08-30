@@ -1,4 +1,4 @@
-use std::{any::Any, collections::HashSet, time::SystemTime};
+use std::{any::Any, collections::HashSet, fmt::Display, time::SystemTime};
 
 use crate::{
     chunk::ChunkCoords,
@@ -33,6 +33,16 @@ pub enum EntityID {
     NPC(i32),
     Slider(i32),
     Egg(i32),
+}
+impl Display for EntityID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EntityID::Player(id) => write!(f, "Player({})", id),
+            EntityID::NPC(id) => write!(f, "NPC({})", id),
+            EntityID::Slider(id) => write!(f, "Slider({})", id),
+            EntityID::Egg(id) => write!(f, "Egg({})", id),
+        }
+    }
 }
 
 pub trait Entity {
