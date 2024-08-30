@@ -84,11 +84,15 @@ impl PacketBuffer {
 
     pub fn get_packet<T: FFPacket>(&mut self, pkt_id: PacketID) -> FFResult<&T> {
         let buffered_pkt_id = self.peek_packet_id()?;
-        assert_eq!(
-            buffered_pkt_id, pkt_id,
-            "Tried to fetch packet {:?} != buffered {:?}",
-            pkt_id, buffered_pkt_id
-        );
+        if buffered_pkt_id != pkt_id {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Tried to fetch packet {:?} != buffered {:?}",
+                    pkt_id, buffered_pkt_id
+                ),
+            ));
+        }
         self.ptr += 4;
         let pkt = self.get_struct_internal(!SILENCED_PACKETS.contains(&pkt_id))?;
         Ok(pkt)
