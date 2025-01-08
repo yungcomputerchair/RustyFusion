@@ -994,6 +994,8 @@ fn load_item_data(
                 gender: data.m_iReqSex.map(|v| v as i8),
                 single_power: data.m_iPointRat,
                 multi_power: data.m_iGroupRat,
+                target_mode: data.m_iTargetMode,
+                projectile_time: data.m_iDeliverTime.map(|v| Duration::from_millis(v as u64)),
                 defense: data.m_iDefenseRat,
                 speed: data.m_iUp_runSpeed,
             };

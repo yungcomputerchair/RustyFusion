@@ -309,6 +309,10 @@ impl FFClient {
         self.in_buf.get_packet(pkt_id)
     }
 
+    pub fn get_packet_unchecked<T: FFPacket>(&mut self) -> FFResult<&T> {
+        self.in_buf.get_packet(self.peek_packet_id()?)
+    }
+
     pub fn get_struct<T: FFPacket>(&mut self) -> FFResult<&T> {
         self.in_buf.get_struct()
     }

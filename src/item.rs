@@ -1,4 +1,7 @@
-use std::{cmp::min, time::SystemTime};
+use std::{
+    cmp::min,
+    time::{Duration, SystemTime},
+};
 
 use crate::{
     defines::*,
@@ -160,6 +163,8 @@ pub struct ItemStats {
     pub gender: Option<i8>,
     pub single_power: Option<i32>,
     pub multi_power: Option<i32>,
+    pub target_mode: Option<i32>,
+    pub projectile_time: Option<Duration>,
     pub defense: Option<i32>,
     pub speed: Option<i32>,
 }
