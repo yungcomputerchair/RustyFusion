@@ -182,6 +182,7 @@ fn handle_packet(
         P_FE2LS_REP_PC_LOCATION_SUCC => shard::pc_location_succ(key, clients, state),
         P_FE2LS_REP_PC_LOCATION_FAIL => shard::pc_location_fail(key, clients, state),
         P_FE2LS_REQ_GET_BUDDY_STATE => shard::get_buddy_state(key, clients, state),
+        P_FE2LS_DISCONNECTING => shard::handle_disconnecting(key, clients, state),
         P_FE2LS_REQ_LIVE_CHECK => shard::shard_live_check(client),
         //
         P_CL2LS_REQ_LOGIN => login::login(client, state, time),

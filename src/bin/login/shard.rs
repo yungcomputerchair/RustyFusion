@@ -416,3 +416,17 @@ pub fn get_buddy_state(
 
     server.send_packet(P_LS2FE_REP_GET_BUDDY_STATE, &resp)
 }
+
+pub fn handle_disconnecting(
+    shard_key: usize,
+    clients: &mut HashMap<usize, FFClient>,
+    state: &mut LoginServerState,
+) -> FFResult<()> {
+    let server = clients.get(&shard_key).unwrap();
+    let shard_id = server.get_shard_id()?;
+
+    // this packet unregisters the shard early
+    // to mitigate race conditions with i.e. dupe player logins
+    state.unregister_shard(shard_id);
+    Ok(())
+}

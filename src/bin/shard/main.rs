@@ -147,8 +147,7 @@ fn main() -> Result<()> {
         attempts -= 1;
     }
 
-    let ask_reconnect = state.as_shard().login_server_conn_id.is_some();
-    shutdown_notify_clients(&mut server, state.as_shard(), ask_reconnect);
+    shutdown_notify_clients(&mut server, state.as_shard());
     Ok(())
 }
 
@@ -449,8 +448,20 @@ fn do_save(_time: SystemTime, state: &mut ShardServerState) -> FFResult<()> {
     Ok(())
 }
 
-fn shutdown_notify_clients(server: &mut FFServer, state: &mut ShardServerState, reconnect: bool) {
-    for client in server.get_client_map().get_all_gameclient() {
+fn shutdown_notify_clients(server: &mut FFServer, state: &mut ShardServerState) {
+    let clients = &mut server.get_client_map();
+    let reconnect = if let Some(login_server) = clients.get_login_server() {
+        let pkt = sP_FE2LS_DISCONNECTING {
+            iTempValue: unused!(),
+        };
+        login_server
+            .send_packet(P_FE2LS_DISCONNECTING, &pkt)
+            .is_ok()
+    } else {
+        false
+    };
+
+    for client in clients.get_all_gameclient() {
         let Ok(pc_id) = client.get_player_id() else {
             continue;
         };

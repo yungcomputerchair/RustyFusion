@@ -560,6 +560,7 @@ pub enum PacketID {
     P_FE2LS_REQ_LIVE_CHECK = 0x3200000d,             // 838860813
     P_FE2LS_REQ_AUTH_CHALLENGE = 0x3200000e,         // 838860814
     P_FE2LS_REQ_GET_BUDDY_STATE = 0x3200000f,        // 838860815
+    P_FE2LS_DISCONNECTING = 0x32000010,              // 838860816
 }
 
 pub trait FFPacket: std::fmt::Debug {}
@@ -6784,3 +6785,11 @@ pub struct sP_FE2LS_REQ_GET_BUDDY_STATE {
     pub aBuddyUID: [i64; 50],
 }
 impl FFPacket for sP_FE2LS_REQ_GET_BUDDY_STATE {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_DISCONNECTING {
+    pub iTempValue: i32,
+}
+impl FFPacket for sP_FE2LS_DISCONNECTING {}
