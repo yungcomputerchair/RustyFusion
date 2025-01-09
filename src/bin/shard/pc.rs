@@ -121,10 +121,18 @@ pub fn pc_exit(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResul
     let client = clients.get_self();
     let pc_id = client.clear_player_id()?;
     Player::disconnect(pc_id, state, clients);
+
+    let exit_code = if clients.get_login_server().is_some() {
+        EXIT_CODE_REQ_BY_PC
+    } else {
+        EXIT_CODE_SERVER_ERROR
+    };
+
     let resp = sP_FE2CL_REP_PC_EXIT_SUCC {
         iID: pc_id,
-        iExitCode: EXIT_CODE_REQ_BY_PC as i32,
+        iExitCode: exit_code as i32,
     };
+
     clients
         .get_self()
         .send_packet(P_FE2CL_REP_PC_EXIT_SUCC, &resp)
