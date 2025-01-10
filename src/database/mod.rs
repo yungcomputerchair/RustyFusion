@@ -14,9 +14,6 @@ use crate::state::{Account, FFReceiver, FFSender};
 #[cfg(feature = "postgres")]
 mod postgresql;
 
-#[cfg(feature = "mongo")]
-mod mongo;
-
 type Int = i32;
 type BigInt = i64;
 type Text = String;
@@ -80,9 +77,6 @@ fn db_connect(config: &GeneralConfig) -> FFResult<Box<dyn Database>> {
 
     #[cfg(feature = "postgres")]
     let _db_impl = Some(postgresql::PostgresDatabase::connect(config));
-
-    #[cfg(feature = "mongo")]
-    let _db_impl = Some(mongo::MongoDatabase::connect(config));
 
     match _db_impl {
         Some(Ok(db)) => Ok(db),

@@ -124,13 +124,6 @@ cargo build
 cargo run --bin login_server # or shard_server
 ```
 
-### Database Backend
-RustyFusion compiles with the PostgreSQL backend by default. If you'd like to compile RustyFusion to use a specific database backend (such as MongoDB), run the following instead of `cargo build`:
-```
-cargo build --no-default-features --features <mongo|postgres>
-```
-There are currently no plans to implement a SQLite backend, as a SQLite DB can be pretty easily migrated to PostgreSQL.
-
 ## Contributing
 If you have code you want to contribute, make sure you follow the general code style and run the following commands before you commit your code (CI/CD will catch you if you don't):
 ```
