@@ -2,7 +2,7 @@
 name = "rusty_fusion"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.70.0"
+rust-version = "1.80.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -17,7 +17,7 @@ uuid = { version = "1.6.1", features = ['v4', 'fast-rng']}
 vecmath = "1.0.0"
 postgres = { version = "0.19.7", optional = true }
 num_enum = "0.7.2"
-regex = "1.10.3"
+regex = "1.11.1"
 bcrypt = "0.15.0"
 serde_repr = "0.1.18"
 chrono = "0.4.38"

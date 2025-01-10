@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{sync::LazyLock, time::Duration};
 
 use postgres::{tls, types::ToSql, GenericClient, Row};
 use regex::Regex;
@@ -95,11 +95,11 @@ impl PostgresDatabase {
         name: &str,
         mut params: &[&(dyn ToSql + Sync)],
     ) -> FFResult<u64> {
-        static SQL_PARAMETER_REGEX: OnceLock<Regex> = OnceLock::new();
+        static SQL_PARAMETER_REGEX: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"\$[0-9]+").unwrap());
         let calc_num_params = |s: &str| {
             // we can use the parameter with the highest number to determine the number of parameters
             let max_param = SQL_PARAMETER_REGEX
-                .get_or_init(|| Regex::new(r"\$[0-9]+").unwrap())
                 .find_iter(s)
                 .map(|m| m.as_str()[1..].parse::<usize>().unwrap())
                 .max();
