@@ -49,11 +49,6 @@ ffenum!(PlayerNameStatus, i8, {
     Denied = 2,
 });
 
-ffenum!(PlayerShardStatus, i8, {
-    Entered = 0,
-    Exited = 1,
-});
-
 ffenum!(ShardChannelStatus, u8, {
     Closed = 0,
     Empty = 1,

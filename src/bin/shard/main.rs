@@ -12,7 +12,7 @@ use rusty_fusion::{
     config::{config_get, config_init},
     database::{db_init, db_run_async, db_shutdown},
     defines::*,
-    entity::Player,
+    entity::{Entity, Player},
     error::{
         log, log_error, log_if_failed, logger_flush, logger_flush_scheduled, logger_init,
         panic_log, FFError, FFResult, Severity,
@@ -71,6 +71,11 @@ fn main() -> Result<()> {
     timers.register_timer(
         Box::new(|t, _, st| do_save(t, st.as_shard())),
         Duration::from_secs(config.shard.autosave_interval.get() * 60),
+        false,
+    );
+    timers.register_timer(
+        Box::new(|_, srv, st| send_status_to_login_server(srv, st.as_shard())),
+        Duration::from_secs(config.shard.login_server_update_interval.get()),
         false,
     );
 
@@ -405,6 +410,41 @@ fn connect_to_login_server(
 
 fn is_login_server_connected(state: &ShardServerState) -> bool {
     state.login_server_conn_id.is_some()
+}
+
+fn send_status_to_login_server(
+    shard_server: &mut FFServer,
+    state: &ShardServerState,
+) -> FFResult<()> {
+    if !is_login_server_connected(state) {
+        return Ok(());
+    }
+
+    let clients = &mut shard_server.get_client_map();
+    let Some(client) = clients.get_login_server() else {
+        return Ok(());
+    };
+
+    let pc_ids: Vec<i32> = state.entity_map.get_player_ids().collect();
+    let pkt = sP_FE2LS_UPDATE_PC_STATUSES {
+        iCnt: pc_ids.len() as u32,
+    };
+    client.queue_packet(P_FE2LS_UPDATE_PC_STATUSES, &pkt);
+    for pc_id in pc_ids {
+        let player = state.get_player(pc_id).unwrap();
+        let pos = player.get_position();
+        let data = sPlayerMetadata {
+            iPC_UID: player.get_uid(),
+            szFirstName: util::encode_utf16(&player.first_name),
+            szLastName: util::encode_utf16(&player.last_name),
+            iX: pos.x,
+            iY: pos.y,
+            iZ: pos.z,
+            iChannelNum: player.instance_id.channel_num as i8,
+        };
+        client.queue_struct(&data);
+    }
+    client.flush()
 }
 
 fn send_live_check(client: &mut FFClient) -> FFResult<()> {

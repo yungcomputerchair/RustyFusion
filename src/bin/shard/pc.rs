@@ -81,18 +81,9 @@ pub fn pc_enter(
     client.fe_key = login_data.uiFEKey.to_le_bytes();
     client.enc_mode = EncryptionMode::FEKey;
 
-    let pkt_pc = sP_FE2LS_UPDATE_PC_SHARD {
-        iPC_UID: player.get_uid(),
-        ePSS: PlayerShardStatus::Entered as i8,
-    };
-    let pkt_chan = sP_FE2LS_UPDATE_CHANNEL_STATUSES {
-        aChannelStatus: state.entity_map.get_channel_statuses().map(|s| s as u8),
-    };
     let pkt_motd = sP_FE2LS_REQ_MOTD { iPC_ID: pc_id };
     match clients.get_login_server() {
         Some(login_server) => {
-            log_if_failed(login_server.send_packet(P_FE2LS_UPDATE_PC_SHARD, &pkt_pc));
-            log_if_failed(login_server.send_packet(P_FE2LS_UPDATE_CHANNEL_STATUSES, &pkt_chan));
             log_if_failed(login_server.send_packet(P_FE2LS_REQ_MOTD, &pkt_motd));
         }
         None => {
@@ -798,12 +789,6 @@ pub fn pc_warp_channel(clients: &mut ClientMap, state: &mut ShardServerState) ->
                 .entity_map
                 .update(EntityID::Player(pc_id), Some(chunk_coords), Some(clients));
 
-            if let Some(login_server) = clients.get_login_server() {
-                let pkt_chan = sP_FE2LS_UPDATE_CHANNEL_STATUSES {
-                    aChannelStatus: state.entity_map.get_channel_statuses().map(|s| s as u8),
-                };
-                log_if_failed(login_server.send_packet(P_FE2LS_UPDATE_CHANNEL_STATUSES, &pkt_chan));
-            }
             Ok(())
         })(),
         || {

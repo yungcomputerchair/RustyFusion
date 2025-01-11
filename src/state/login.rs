@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::{
     defines::*,
-    entity::Player,
+    entity::{Player, PlayerMetadata},
     enums::ShardChannelStatus,
     error::{log_if_failed, FFError, FFResult, Severity},
     net::{
@@ -40,15 +40,41 @@ struct LoginSession {
 }
 
 struct ShardServerInfo {
-    player_uids: HashSet<i64>,
-    channel_statuses: [ShardChannelStatus; MAX_NUM_CHANNELS],
+    num_channels: u8,
+    max_channel_pop: usize,
+    players: HashMap<i64, PlayerMetadata>,
 }
-impl Default for ShardServerInfo {
-    fn default() -> Self {
-        Self {
-            player_uids: HashSet::new(),
-            channel_statuses: [ShardChannelStatus::Closed; MAX_NUM_CHANNELS],
+impl ShardServerInfo {
+    fn get_channel_population(&self, channel_num: u8) -> usize {
+        self.players
+            .values()
+            .filter(|player| player.channel == channel_num)
+            .count()
+    }
+
+    fn get_channel_status(&self, channel_num: u8) -> ShardChannelStatus {
+        let max_pop = self.max_channel_pop;
+        let pop = self.get_channel_population(channel_num);
+        if pop >= max_pop {
+            ShardChannelStatus::Closed
+        } else {
+            let pop_fraction = pop as f64 / max_pop as f64;
+            if pop_fraction >= 0.75 {
+                ShardChannelStatus::Busy
+            } else if pop_fraction >= 0.25 {
+                ShardChannelStatus::Normal
+            } else {
+                ShardChannelStatus::Empty
+            }
         }
+    }
+
+    fn get_channel_statuses(&self) -> [ShardChannelStatus; MAX_NUM_CHANNELS] {
+        let mut channels = [ShardChannelStatus::Closed; MAX_NUM_CHANNELS];
+        for i in 0..self.num_channels {
+            channels[i as usize] = self.get_channel_status(i);
+        }
+        channels
     }
 }
 
@@ -141,11 +167,16 @@ impl LoginServerState {
     pub fn get_lowest_pop_shard_id(&mut self) -> Option<i32> {
         self.shards
             .iter()
-            .min_by_key(|(_, shard)| shard.player_uids.len())
+            .min_by_key(|(_, shard)| shard.players.len())
             .map(|(shard_id, _)| *shard_id)
     }
 
-    pub fn register_shard(&mut self, shard_id: i32) -> FFResult<()> {
+    pub fn register_shard(
+        &mut self,
+        shard_id: i32,
+        num_channels: u8,
+        max_channel_pop: usize,
+    ) -> FFResult<()> {
         if self.shards.contains_key(&shard_id) {
             return Err(FFError::build(
                 Severity::Warning,
@@ -160,7 +191,14 @@ impl LoginServerState {
             ));
         }
 
-        self.shards.insert(shard_id, ShardServerInfo::default());
+        self.shards.insert(
+            shard_id,
+            ShardServerInfo {
+                num_channels,
+                max_channel_pop,
+                players: HashMap::new(),
+            },
+        );
         Ok(())
     }
 
@@ -172,25 +210,31 @@ impl LoginServerState {
         self.shards.keys().copied().collect()
     }
 
-    pub fn unset_player_shard(&mut self, player_uid: i64) -> Option<i32> {
-        for (shard_id, shard) in self.shards.iter_mut() {
-            if shard.player_uids.remove(&player_uid) {
-                return Some(*shard_id);
-            }
-        }
-        None
+    pub fn clear_shard_players(&mut self, shard_id: i32) {
+        let shard = self.shards.get_mut(&shard_id).unwrap();
+        shard.players.clear();
     }
 
-    pub fn set_player_shard(&mut self, player_uid: i64, shard_id: i32) -> Option<i32> {
-        let old_shard_id = self.unset_player_shard(player_uid);
+    pub fn set_player_shard(
+        &mut self,
+        player_uid: i64,
+        player_data: PlayerMetadata,
+        shard_id: i32,
+    ) -> Option<i32> {
+        let old_shard_id = self.get_player_shard(player_uid);
+        if let Some(old_shard_id) = old_shard_id {
+            let old_shard = self.shards.get_mut(&old_shard_id).unwrap();
+            old_shard.players.remove(&player_uid);
+        }
+
         let shard = self.shards.get_mut(&shard_id).unwrap();
-        shard.player_uids.insert(player_uid);
+        shard.players.insert(player_uid, player_data);
         old_shard_id
     }
 
     pub fn get_player_shard(&self, player_uid: i64) -> Option<i32> {
         for (shard_id, shard) in self.shards.iter() {
-            if shard.player_uids.contains(&player_uid) {
+            if shard.players.contains_key(&player_uid) {
                 return Some(*shard_id);
             }
         }
@@ -202,18 +246,7 @@ impl LoginServerState {
         shard_id: i32,
     ) -> [ShardChannelStatus; MAX_NUM_CHANNELS] {
         let shard = self.shards.get(&shard_id).unwrap();
-        shard.channel_statuses
-    }
-
-    pub fn update_shard_channel_statuses(
-        &mut self,
-        shard_id: i32,
-        statuses: [ShardChannelStatus; MAX_NUM_CHANNELS],
-    ) {
-        let shard = self.shards.get_mut(&shard_id).unwrap();
-        for (i, status) in statuses.iter().enumerate() {
-            shard.channel_statuses[i] = *status;
-        }
+        shard.get_channel_statuses()
     }
 
     pub fn request_shard_connection(&mut self, acc_id: i64, shard_id: Option<i32>) -> FFResult<()> {

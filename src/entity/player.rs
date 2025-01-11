@@ -12,7 +12,7 @@ use crate::{
     entity::{Combatant, Entity, EntityID},
     enums::{
         CharType, CombatStyle, CombatantTeam, ItemLocation, ItemType, PlayerGuide,
-        PlayerNameStatus, PlayerShardStatus, RewardCategory, RewardType, RideType, TaskType,
+        PlayerNameStatus, RewardCategory, RewardType, RideType, TaskType,
     },
     error::{codes, log, log_if_failed, panic_log, FFError, FFResult, Severity},
     item::Item,
@@ -34,6 +34,16 @@ use crate::{
 
 use rand::{rngs::ThreadRng, Rng};
 use uuid::Uuid;
+
+#[derive(Debug, Clone)]
+pub struct PlayerMetadata {
+    pub first_name: String,
+    pub last_name: String,
+    pub x_coord: i32,
+    pub y_coord: i32,
+    pub z_coord: i32,
+    pub channel: u8,
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct PlayerStyle {
@@ -1274,7 +1284,6 @@ impl Player {
     pub fn disconnect(pc_id: i32, state: &mut ShardServerState, clients: &mut ClientMap) {
         let player = state.get_player(pc_id).unwrap();
         let player_saved = player.clone();
-        let pc_uid = player.get_uid();
         log_if_failed(db_run_sync(move |db| db.save_player(&player_saved)));
         log(
             Severity::Info,
@@ -1292,26 +1301,6 @@ impl Player {
         let client = player.get_client(clients).unwrap();
         client.client_type = ClientType::Unknown;
         client.disconnect();
-
-        let pkt_pc = sP_FE2LS_UPDATE_PC_SHARD {
-            iPC_UID: pc_uid,
-            ePSS: PlayerShardStatus::Exited as i8,
-        };
-        let pkt_chan = sP_FE2LS_UPDATE_CHANNEL_STATUSES {
-            aChannelStatus: state.entity_map.get_channel_statuses().map(|s| s as u8),
-        };
-        match clients.get_login_server() {
-            Some(login_server) => {
-                log_if_failed(login_server.send_packet(P_FE2LS_UPDATE_PC_SHARD, &pkt_pc));
-                log_if_failed(login_server.send_packet(P_FE2LS_UPDATE_CHANNEL_STATUSES, &pkt_chan));
-            }
-            None => {
-                log(
-                    Severity::Warning,
-                    "Player::disconnect: No login server connected! Things may break.",
-                );
-            }
-        }
     }
 
     fn tick_skyway_ride(

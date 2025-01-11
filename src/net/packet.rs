@@ -4,7 +4,7 @@
 
 use num_enum::TryFromPrimitive;
 
-use crate::{defines::*, error::FFError};
+use crate::error::FFError;
 
 use super::crypto::AUTH_CHALLENGE_SIZE;
 
@@ -549,18 +549,18 @@ pub enum PacketID {
     P_FE2LS_REP_LIVE_CHECK = 0x32000002,             // 838860802
     P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC = 0x32000003, // 838860803
     P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL = 0x32000004, // 838860804
-    P_FE2LS_UPDATE_PC_SHARD = 0x32000005,            // 838860805
-    P_FE2LS_UPDATE_CHANNEL_STATUSES = 0x32000006,    // 838860806
-    P_FE2LS_REQ_MOTD = 0x32000007,                   // 838860807
-    P_FE2LS_MOTD_REGISTER = 0x32000008,              // 838860808
-    P_FE2LS_ANNOUNCE_MSG = 0x32000009,               // 838860809
-    P_FE2LS_REQ_PC_LOCATION = 0x3200000a,            // 838860810
-    P_FE2LS_REP_PC_LOCATION_SUCC = 0x3200000b,       // 838860811
-    P_FE2LS_REP_PC_LOCATION_FAIL = 0x3200000c,       // 838860812
-    P_FE2LS_REQ_LIVE_CHECK = 0x3200000d,             // 838860813
-    P_FE2LS_REQ_AUTH_CHALLENGE = 0x3200000e,         // 838860814
-    P_FE2LS_REQ_GET_BUDDY_STATE = 0x3200000f,        // 838860815
-    P_FE2LS_DISCONNECTING = 0x32000010,              // 838860816
+    P_FE2LS_UPDATE_PC_STATUSES = 0x32000005,         // 838860805
+    //P_FE2LS_UPDATE_CHANNEL_STATUSES = 0x32000006,    // 838860806
+    P_FE2LS_REQ_MOTD = 0x32000007,             // 838860807
+    P_FE2LS_MOTD_REGISTER = 0x32000008,        // 838860808
+    P_FE2LS_ANNOUNCE_MSG = 0x32000009,         // 838860809
+    P_FE2LS_REQ_PC_LOCATION = 0x3200000a,      // 838860810
+    P_FE2LS_REP_PC_LOCATION_SUCC = 0x3200000b, // 838860811
+    P_FE2LS_REP_PC_LOCATION_FAIL = 0x3200000c, // 838860812
+    P_FE2LS_REQ_LIVE_CHECK = 0x3200000d,       // 838860813
+    P_FE2LS_REQ_AUTH_CHALLENGE = 0x3200000e,   // 838860814
+    P_FE2LS_REQ_GET_BUDDY_STATE = 0x3200000f,  // 838860815
+    P_FE2LS_DISCONNECTING = 0x32000010,        // 838860816
 }
 
 pub trait FFPacket: std::fmt::Debug {}
@@ -6658,6 +6658,8 @@ impl FFPacket for sP_LS2FE_REP_GET_BUDDY_STATE {}
 pub struct sP_FE2LS_REQ_CONNECT {
     pub aChallengeSolved: [u8; AUTH_CHALLENGE_SIZE],
     pub iShardID: i32,
+    pub iMaxChannelPop: i32,
+    pub iNumChannels: i8,
 }
 impl FFPacket for sP_FE2LS_REQ_CONNECT {}
 
@@ -6691,19 +6693,24 @@ impl FFPacket for sP_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL {}
 #[repr(packed(4))]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct sP_FE2LS_UPDATE_PC_SHARD {
-    pub iPC_UID: i64,
-    pub ePSS: i8,
+pub struct sP_FE2LS_UPDATE_PC_STATUSES {
+    pub iCnt: u32,
 }
-impl FFPacket for sP_FE2LS_UPDATE_PC_SHARD {}
+impl FFPacket for sP_FE2LS_UPDATE_PC_STATUSES {}
 
 #[repr(packed(4))]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct sP_FE2LS_UPDATE_CHANNEL_STATUSES {
-    pub aChannelStatus: [u8; MAX_NUM_CHANNELS],
+pub struct sPlayerMetadata {
+    pub iPC_UID: i64,
+    pub szFirstName: [u16; 9],
+    pub szLastName: [u16; 17],
+    pub iX: i32,
+    pub iY: i32,
+    pub iZ: i32,
+    pub iChannelNum: i8,
 }
-impl FFPacket for sP_FE2LS_UPDATE_CHANNEL_STATUSES {}
+impl FFPacket for sPlayerMetadata {}
 
 #[repr(packed(4))]
 #[repr(C)]

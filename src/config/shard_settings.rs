@@ -6,6 +6,7 @@ define_setting!(ListenAddrSetting, String, "127.0.0.1:23001");
 define_setting!(ExternalAddrSetting, String, "127.0.0.1:23001");
 define_setting!(LoginServerAddrSetting, String, "127.0.0.1:23000");
 define_setting!(LoginServerConnIntervalSetting, u64, 10_u64);
+define_setting!(LoginServerUpdateIntervalSetting, u64, 5_u64);
 define_setting!(NumChannelsSetting, u8, 1_u8);
 define_setting!(MaxChannelPopSetting, usize, 100_usize);
 define_setting!(VisibilityRangeSetting, usize, 1_usize);
@@ -21,6 +22,7 @@ pub struct ShardConfig {
     pub external_addr: ExternalAddrSetting,
     pub login_server_addr: LoginServerAddrSetting,
     pub login_server_conn_interval: LoginServerConnIntervalSetting,
+    pub login_server_update_interval: LoginServerUpdateIntervalSetting,
     pub num_channels: NumChannelsSetting,
     pub max_channel_pop: MaxChannelPopSetting,
     pub visibility_range: VisibilityRangeSetting,
@@ -44,6 +46,7 @@ mod tests {
         assert!(shard.external_addr.is_set_to_default());
         assert!(shard.login_server_addr.is_set_to_default());
         assert!(shard.login_server_conn_interval.is_set_to_default());
+        assert!(shard.login_server_update_interval.is_set_to_default());
         assert!(shard.num_channels.is_set_to_default());
         assert!(shard.max_channel_pop.is_set_to_default());
         assert!(shard.visibility_range.is_set_to_default());

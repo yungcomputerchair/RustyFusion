@@ -32,6 +32,8 @@ pub fn login_connect_challenge(server: &mut FFClient, state: &ShardServerState) 
     let pkt = sP_FE2LS_REQ_CONNECT {
         aChallengeSolved: challenge,
         iShardID: state.shard_id,
+        iNumChannels: config_get().shard.num_channels.get() as i8,
+        iMaxChannelPop: config_get().shard.max_channel_pop.get() as i32,
     };
     server.send_packet(P_FE2LS_REQ_CONNECT, &pkt)
 }
@@ -44,22 +46,8 @@ pub fn login_connect_succ(server: &mut FFClient, state: &mut ShardServerState) -
     let iv1: i32 = pkt.aLS_UID.into_iter().reduce(|a, b| a ^ b).unwrap() as i32;
     let iv2: i32 = state.shard_id + 1;
     server.e_key = crypto::gen_key(conn_time, iv1, iv2);
-
-    let pkt = sP_FE2LS_UPDATE_CHANNEL_STATUSES {
-        aChannelStatus: state.entity_map.get_channel_statuses().map(|s| s as u8),
-    };
-    server.send_packet(P_FE2LS_UPDATE_CHANNEL_STATUSES, &pkt)?;
-
-    for pc_id in state.entity_map.get_player_ids() {
-        let player = state.get_player(pc_id).unwrap();
-        let pkt = sP_FE2LS_UPDATE_PC_SHARD {
-            iPC_UID: player.get_uid(),
-            ePSS: PlayerShardStatus::Entered as i8,
-        };
-        log_if_failed(server.send_packet(P_FE2LS_UPDATE_PC_SHARD, &pkt));
-    }
-
     state.login_server_conn_id = Some(login_server_id);
+
     log(
         Severity::Info,
         &format!(

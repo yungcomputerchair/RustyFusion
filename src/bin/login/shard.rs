@@ -5,8 +5,7 @@ use std::{
 
 use rusty_fusion::{
     config::config_get,
-    defines::MAX_NUM_CHANNELS,
-    enums::{PlayerShardStatus, ShardChannelStatus},
+    entity::PlayerMetadata,
     error::{codes::PlayerSearchReqErr, log, log_if_failed, FFError, FFResult, Severity},
     net::{
         crypto,
@@ -36,6 +35,9 @@ pub fn connect(
 ) -> FFResult<()> {
     let pkt: &sP_FE2LS_REQ_CONNECT = server.get_packet(P_FE2LS_REQ_CONNECT)?;
     let shard_id = pkt.iShardID;
+    let num_channels = pkt.iNumChannels;
+    let max_channel_pop = pkt.iMaxChannelPop;
+
     let challenge_solved = pkt.aChallengeSolved;
     let ClientType::UnauthedShardServer(challenge) = &server.client_type else {
         return Err(FFError::build(
@@ -59,7 +61,7 @@ pub fn connect(
         ));
     }
 
-    if let Err(e) = state.register_shard(shard_id) {
+    if let Err(e) = state.register_shard(shard_id, num_channels as u8, max_channel_pop as usize) {
         let resp = sP_LS2FE_REP_CONNECT_FAIL { iErrorCode: 2 };
         log_if_failed(server.send_packet(P_LS2FE_REP_CONNECT_FAIL, &resp));
         return Err(e);
@@ -78,9 +80,11 @@ pub fn connect(
     log(
         Severity::Info,
         &format!(
-            "Connected to shard server #{} ({})",
+            "Connected to shard server #{} ({}) [{} channel(s), {} players per channel]",
             shard_id,
-            server.get_addr()
+            server.get_addr(),
+            num_channels,
+            max_channel_pop
         ),
     );
 
@@ -151,54 +155,26 @@ pub fn update_login_info_fail(
     Ok(())
 }
 
-pub fn update_pc_shard(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
-    let pkt: sP_FE2LS_UPDATE_PC_SHARD = *client.get_packet(P_FE2LS_UPDATE_PC_SHARD)?;
+pub fn update_pc_statuses(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
+    let pkt: &sP_FE2LS_UPDATE_PC_STATUSES = client.get_packet(P_FE2LS_UPDATE_PC_STATUSES)?;
+    let count = pkt.iCnt;
     let shard_id = client.get_shard_id().expect("Packet filter failed");
-    let pc_uid = pkt.iPC_UID;
-    let status: PlayerShardStatus = pkt.ePSS.try_into()?;
-    log(
-        Severity::Info,
-        &format!("Player {} moved (shard {}, {:?})", pc_uid, shard_id, status),
-    );
 
-    match status {
-        PlayerShardStatus::Entered => {
-            let old = state.set_player_shard(pc_uid, shard_id);
-            if let Some(old_shard_id) = old {
-                log(
-                    Severity::Warning,
-                    &format!(
-                        "Player {} was already tracked in shard {}",
-                        pc_uid, old_shard_id
-                    ),
-                );
-            }
-        }
-        PlayerShardStatus::Exited => {
-            if state.unset_player_shard(pc_uid).is_none() {
-                log(
-                    Severity::Warning,
-                    &format!("Player {} was not tracked in shard {}", pc_uid, shard_id),
-                );
-            }
-        }
-    };
-    Ok(())
-}
-
-pub fn update_channel_statuses(
-    client: &mut FFClient,
-    state: &mut LoginServerState,
-) -> FFResult<()> {
-    let pkt: sP_FE2LS_UPDATE_CHANNEL_STATUSES =
-        *client.get_packet(P_FE2LS_UPDATE_CHANNEL_STATUSES)?;
-    let shard_id = client.get_shard_id().expect("Packet filter failed");
-    let mut statuses = [ShardChannelStatus::Closed; MAX_NUM_CHANNELS];
-    for (channel_num, status_raw) in pkt.aChannelStatus.iter().enumerate() {
-        let status: ShardChannelStatus = (*status_raw).try_into()?;
-        statuses[channel_num] = status;
+    state.clear_shard_players(shard_id);
+    for _ in 0..count {
+        let data: &sPlayerMetadata = client.get_struct()?;
+        let player_uid = data.iPC_UID;
+        let player_data = PlayerMetadata {
+            first_name: util::parse_utf16(&data.szFirstName)?,
+            last_name: util::parse_utf16(&data.szLastName)?,
+            x_coord: data.iX,
+            y_coord: data.iY,
+            z_coord: data.iZ,
+            channel: data.iChannelNum as u8,
+        };
+        state.set_player_shard(player_uid, player_data, shard_id);
     }
-    state.update_shard_channel_statuses(shard_id, statuses);
+
     Ok(())
 }
 

@@ -8,9 +8,8 @@ use std::{
 
 use crate::{
     config::config_get,
-    defines::{ID_OVERWORLD, MAX_NUM_CHANNELS},
+    defines::ID_OVERWORLD,
     entity::{Entity, EntityID, Player, NPC},
-    enums::ShardChannelStatus,
     error::{log, log_if_failed, panic_log, FFError, FFResult, Severity},
     net::{ClientMap, FFClient},
     Position,
@@ -464,32 +463,6 @@ impl EntityMap {
         (1..=num_channels)
             .min_by_key(|channel_num| self.get_channel_population(*channel_num))
             .unwrap()
-    }
-
-    pub fn get_channel_statuses(&self) -> [ShardChannelStatus; MAX_NUM_CHANNELS] {
-        let mut statuses = [ShardChannelStatus::Closed; MAX_NUM_CHANNELS];
-        let num_channels = config_get().shard.num_channels.get();
-        for channel_num in 1..=num_channels {
-            statuses[channel_num as usize - 1] = self.get_channel_status(channel_num);
-        }
-        statuses
-    }
-
-    fn get_channel_status(&self, channel_num: u8) -> ShardChannelStatus {
-        let max_pop = config_get().shard.max_channel_pop.get();
-        let pop = self.get_channel_population(channel_num);
-        if pop >= max_pop {
-            ShardChannelStatus::Closed
-        } else {
-            let pop_fraction = pop as f64 / max_pop as f64;
-            if pop_fraction >= 0.75 {
-                ShardChannelStatus::Busy
-            } else if pop_fraction >= 0.25 {
-                ShardChannelStatus::Normal
-            } else {
-                ShardChannelStatus::Empty
-            }
-        }
     }
 
     fn remove_from_chunk(&mut self, id: EntityID) -> HashSet<EntityID> {

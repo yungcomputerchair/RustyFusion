@@ -45,6 +45,7 @@ pub struct PacketBuffer {
     buf: [u8; PACKET_BUFFER_SIZE],
     ptr: usize,
     len: usize,
+    fetched_packet_id: Option<PacketID>,
 }
 impl Default for PacketBuffer {
     fn default() -> Self {
@@ -52,6 +53,7 @@ impl Default for PacketBuffer {
             buf: [0; PACKET_BUFFER_SIZE],
             ptr: 0,
             len: 0,
+            fetched_packet_id: None,
         }
     }
 }
@@ -83,6 +85,7 @@ impl PacketBuffer {
     }
 
     pub fn get_packet<T: FFPacket>(&mut self, pkt_id: PacketID) -> FFResult<&T> {
+        self.fetched_packet_id = None;
         let buffered_pkt_id = self.peek_packet_id()?;
         if buffered_pkt_id != pkt_id {
             return Err(FFError::build(
@@ -93,13 +96,18 @@ impl PacketBuffer {
                 ),
             ));
         }
+        self.fetched_packet_id = Some(pkt_id);
         self.ptr += 4;
-        let pkt = self.get_struct_internal(!SILENCED_PACKETS.contains(&pkt_id))?;
-        Ok(pkt)
+        self.get_struct()
     }
 
     pub fn get_struct<T: FFPacket>(&mut self) -> FFResult<&T> {
-        self.get_struct_internal(true)
+        let pkt_id = self.fetched_packet_id.ok_or(FFError::build(
+            Severity::Warning,
+            "Tried to fetch struct without a packet ID".to_string(),
+        ))?;
+        let log_struct = !SILENCED_PACKETS.contains(&pkt_id);
+        self.get_struct_internal(log_struct)
     }
 
     fn get_struct_internal<T: FFPacket>(&mut self, log_struct: bool) -> FFResult<&T> {
