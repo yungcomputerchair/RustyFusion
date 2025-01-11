@@ -1243,6 +1243,17 @@ impl Player {
         self.nano_potions
     }
 
+    pub fn consume_weapon_boosts(&mut self, amount: u32) -> bool {
+        let weapon_boosts = self.get_weapon_boosts();
+        if weapon_boosts >= amount {
+            self.set_weapon_boosts(weapon_boosts - amount);
+            true
+        } else {
+            self.set_weapon_boosts(0);
+            false
+        }
+    }
+
     pub fn add_projectile(&mut self, projectile: Projectile) -> Option<i8> {
         if self.owned_projectiles.len() == SIZEOF_PC_BULLET_SLOT as usize {
             return None;

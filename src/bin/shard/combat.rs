@@ -3,6 +3,7 @@ use std::time::SystemTime;
 use rusty_fusion::{
     defines::EQUIP_SLOT_HAND,
     entity::{Combatant, Entity, EntityID, Projectile, ProjectileKind},
+    enums::WeaponTargetMode,
     error::*,
     net::{
         packet::{PacketID::*, *},
@@ -12,6 +13,8 @@ use rusty_fusion::{
     state::ShardServerState,
     unused, Position,
 };
+
+const BATTERY_BASE_COST: u32 = 6;
 
 #[allow(non_camel_case_types)]
 #[allow(non_snake_case)]
@@ -29,8 +32,6 @@ fn get_targets(
     target_count: usize,
     max_targets: Option<usize>,
 ) -> FFResult<(Vec<EntityID>, u32)> {
-    const BATTERY_BASE_COST: u32 = 6;
-
     let mut target_ids = Vec::with_capacity(max_targets.unwrap_or(3));
     let mut weapon_boosts_needed = 0;
 
@@ -81,14 +82,8 @@ pub fn pc_attack_npcs(clients: &mut ClientMap, state: &mut ShardServerState) -> 
 
     // consume weapon boosts
     let player = state.get_player_mut(pc_id)?;
-    let weapon_boosts = player.get_weapon_boosts();
-    let charged = if weapon_boosts >= weapon_boosts_needed {
-        player.set_weapon_boosts(weapon_boosts - weapon_boosts_needed);
-        true
-    } else {
-        player.set_weapon_boosts(0);
-        false
-    };
+
+    let charged = player.consume_weapon_boosts(weapon_boosts_needed);
 
     // attack handler
     skills::do_basic_attack(
@@ -104,117 +99,78 @@ pub fn pc_attack_npcs(clients: &mut ClientMap, state: &mut ShardServerState) -> 
     Ok(())
 }
 
-pub fn pc_grenade_fire(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
-    let client = clients.get_self();
-    let pc_id = client.get_player_id()?;
-    let player = state.get_player_mut(pc_id)?;
+pub fn pc_fire_rocket(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let pkt: sP_CL2FE_REQ_PC_ROCKET_STYLE_FIRE = *clients
+        .get_self()
+        .get_packet(P_CL2FE_REQ_PC_ROCKET_STYLE_FIRE)?;
 
-    let pkt: sP_CL2FE_REQ_PC_GRENADE_STYLE_FIRE =
-        *client.get_packet(P_CL2FE_REQ_PC_GRENADE_STYLE_FIRE)?;
-
-    let Some(weapon) = player.get_equipped()[EQUIP_SLOT_HAND as usize] else {
-        return Err(FFError::build(
-            Severity::Warning,
-            "Tried to throw grenade but no weapon in hand".to_string(),
-        ));
-    };
-
-    let weapon_data = weapon.get_stats()?;
-
-    if weapon_data.target_mode != Some(6) {
-        return Err(FFError::build(
-            Severity::Warning,
-            "Tried to throw grenade but holding wrong weapon type".to_string(),
-        ));
-    }
-
-    let projectile = Projectile {
-        projectile_kind: ProjectileKind::Grenade,
-        single_power: player.get_single_power(),
-        multi_power: player.get_multi_power(),
-        charged: false,
-        end_time: SystemTime::now() + weapon_data.projectile_time.unwrap(),
-        start_pos: Position {
-            z: player.get_position().z + 100,
-            ..player.get_position()
-        },
-        // todo: validate
-        end_pos: Position {
-            x: pkt.iToX,
-            y: pkt.iToY,
-            z: pkt.iToZ + 100,
-        },
-    };
-
-    let Some(bullet_id) = player.add_projectile(projectile.clone()) else {
-        return Err(FFError::build(
-            Severity::Warning,
-            "Attempted to throw grenade but player has too many projectiles".to_string(),
-        ));
-    };
-
-    let resp = sP_FE2CL_REP_PC_GRENADE_STYLE_FIRE_SUCC {
-        iSkillID: unused!(),
-        iToX: projectile.end_pos.x,
-        iToY: projectile.end_pos.y,
-        iToZ: projectile.end_pos.z,
-        iBulletID: bullet_id,
-        Bullet: projectile.clone().into(),
-        iBatteryW: player.get_weapon_boosts() as i32,
-        bNanoDeactive: unused!(),
-        iNanoID: unused!(),
-        iNanoStamina: unused!(),
-    };
-
-    let bcast = sP_FE2CL_PC_GRENADE_STYLE_FIRE {
-        iPC_ID: pc_id,
+    let new_pkt = sP_CL2FE_REQ_PC_GRENADE_STYLE_FIRE {
+        iSkillID: pkt.iSkillID,
         iToX: pkt.iToX,
         iToY: pkt.iToY,
         iToZ: pkt.iToZ,
-        iBulletID: bullet_id,
-        Bullet: projectile.into(),
-        bNanoDeactive: unused!(),
     };
 
-    state
-        .entity_map
-        .for_each_around(EntityID::Player(pc_id), clients, |c| {
-            c.send_packet(P_FE2CL_PC_GRENADE_STYLE_FIRE, &bcast)
-        });
-    clients
-        .get_self()
-        .send_packet(P_FE2CL_REP_PC_GRENADE_STYLE_FIRE_SUCC, &resp)
+    pc_fire_projectile(clients, state, new_pkt, false)
 }
 
-pub fn pc_rocket_fire(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+pub fn pc_fire_grenade(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let pkt: sP_CL2FE_REQ_PC_GRENADE_STYLE_FIRE = *clients
+        .get_self()
+        .get_packet(P_CL2FE_REQ_PC_GRENADE_STYLE_FIRE)?;
+
+    pc_fire_projectile(clients, state, pkt, true)
+}
+
+fn pc_fire_projectile(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+    pkt: sP_CL2FE_REQ_PC_GRENADE_STYLE_FIRE,
+    is_grenade: bool,
+) -> FFResult<()> {
     let client = clients.get_self();
     let pc_id = client.get_player_id()?;
     let player = state.get_player_mut(pc_id)?;
 
-    let pkt: sP_CL2FE_REQ_PC_ROCKET_STYLE_FIRE =
-        *client.get_packet(P_CL2FE_REQ_PC_ROCKET_STYLE_FIRE)?;
+    let action_message = if is_grenade {
+        "throw grenade"
+    } else {
+        "fire rocket"
+    };
+    let expected_target_mode = if is_grenade {
+        WeaponTargetMode::Grenade
+    } else {
+        WeaponTargetMode::Rocket
+    };
 
     let Some(weapon) = player.get_equipped()[EQUIP_SLOT_HAND as usize] else {
         return Err(FFError::build(
             Severity::Warning,
-            "Tried to fire rocket but no weapon in hand".to_string(),
+            format!("Tried to {} but no weapon in hand", action_message),
         ));
     };
 
     let weapon_data = weapon.get_stats()?;
 
-    if weapon_data.target_mode != Some(5) {
+    if weapon_data.target_mode != Some(expected_target_mode) {
         return Err(FFError::build(
             Severity::Warning,
-            "Tried to fire rocket but holding wrong weapon type".to_string(),
+            format!("Tried to {} but holding wrong weapon type", action_message),
         ));
     }
 
+    let weapon_boosts_needed = BATTERY_BASE_COST + weapon_data.required_level as u32;
+    let charged = player.consume_weapon_boosts(weapon_boosts_needed);
+
     let projectile = Projectile {
-        projectile_kind: ProjectileKind::Rocket(weapon.id),
+        projectile_kind: if is_grenade {
+            ProjectileKind::Grenade
+        } else {
+            ProjectileKind::Rocket(weapon.id)
+        },
         single_power: player.get_single_power(),
         multi_power: player.get_multi_power(),
-        charged: false,
+        charged,
         end_time: SystemTime::now() + weapon_data.projectile_time.unwrap(),
         start_pos: Position {
             z: player.get_position().z + 100,
@@ -231,7 +187,10 @@ pub fn pc_rocket_fire(clients: &mut ClientMap, state: &mut ShardServerState) -> 
     let Some(bullet_id) = player.add_projectile(projectile.clone()) else {
         return Err(FFError::build(
             Severity::Warning,
-            "Attempted to fire rocket but player has too many projectiles".to_string(),
+            format!(
+                "Attempted to {} but player has too many projectiles",
+                action_message
+            ),
         ));
     };
 
@@ -269,7 +228,7 @@ pub fn pc_rocket_fire(clients: &mut ClientMap, state: &mut ShardServerState) -> 
 }
 
 pub fn pc_projectile_hit(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
-    const EXPLOSION_RADIUS: u32 = 250; // todo pull from tdata
+    const EXPLOSION_RADIUS: u32 = 300; // TODO pull from tdata
     let client = clients.get_self();
     let pc_id = client.get_player_id()?;
     let player = state.get_player_mut(pc_id)?;
@@ -285,7 +244,7 @@ pub fn pc_projectile_hit(clients: &mut ClientMap, state: &mut ShardServerState) 
         get_targets(client, state, pkt.iTargetCnt as usize, None)?;
     let player = state.get_player(pc_id)?;
 
-    // todo: validate
+    // TODO: validate
     let hit_position = Position::new(pkt.iX, pkt.iY, pkt.iZ);
     let target_ids = state.entity_map.filter_ids_in_proximity(
         hit_position,

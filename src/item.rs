@@ -6,7 +6,7 @@ use std::{
 use crate::{
     defines::*,
     entity::RewardData,
-    enums::{ItemType, RewardCategory, RewardType},
+    enums::{ItemType, RewardCategory, RewardType, WeaponTargetMode},
     error::{panic_log, FFError, FFResult},
     net::packet::*,
     tabledata::tdata_get,
@@ -163,7 +163,7 @@ pub struct ItemStats {
     pub gender: Option<i8>,
     pub single_power: Option<i32>,
     pub multi_power: Option<i32>,
-    pub target_mode: Option<i32>,
+    pub target_mode: Option<WeaponTargetMode>,
     pub projectile_time: Option<Duration>,
     pub defense: Option<i32>,
     pub speed: Option<i32>,

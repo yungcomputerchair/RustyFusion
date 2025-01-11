@@ -148,6 +148,17 @@ ffenum!(ItemType, i16, {
     SkillBuffEffect = 138, /*eItemType_SkillBuffEffect*/
 });
 
+// eWeaponTargetMode.cs
+ffenum!(WeaponTargetMode, i32, {
+    Hand = 0,
+    Melee = 1,
+    Pistol = 2,
+    Shotgun = 3,
+    Sniper = 4,
+    Rocket = 5,
+    Grenade = 6,
+});
+
 // eTransportationType.cs
 ffenum!(TransportationType, i32, {
     /*eTT_None*/

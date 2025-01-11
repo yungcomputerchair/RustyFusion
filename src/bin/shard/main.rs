@@ -307,8 +307,8 @@ fn handle_packet(
         P_CL2FE_REQ_PC_AVATAR_EMOTES_CHAT => chat::pc_avatar_emotes_chat(&mut clients, state),
         //
         P_CL2FE_REQ_PC_ATTACK_NPCs => combat::pc_attack_npcs(&mut clients, state),
-        P_CL2FE_REQ_PC_GRENADE_STYLE_FIRE => combat::pc_grenade_fire(&mut clients, state),
-        P_CL2FE_REQ_PC_ROCKET_STYLE_FIRE => combat::pc_rocket_fire(&mut clients, state),
+        P_CL2FE_REQ_PC_GRENADE_STYLE_FIRE => combat::pc_fire_grenade(&mut clients, state),
+        P_CL2FE_REQ_PC_ROCKET_STYLE_FIRE => combat::pc_fire_rocket(&mut clients, state),
         P_CL2FE_REQ_PC_ROCKET_STYLE_HIT => combat::pc_projectile_hit(&mut clients, state),
         P_CL2FE_REQ_PC_GRENADE_STYLE_HIT => combat::pc_projectile_hit(&mut clients, state),
         //
