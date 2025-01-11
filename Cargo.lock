@@ -257,6 +257,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
 
 [[package]]
+name = "ffmonitor"
+version = "2.2.0"
+source = "git+https://github.com/OpenFusionProject/ffmonitor.git?tag=v2.2.0#da79a4be41f788cdeaac0c7c54bb60917133a2d0"
+dependencies = [
+ "log",
+ "regex",
+]
+
+[[package]]
 name = "finl_unicode"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -767,6 +776,7 @@ dependencies = [
  "bcrypt",
  "chrono",
  "ctrlc",
+ "ffmonitor",
  "num_enum",
  "polling",
  "postgres",

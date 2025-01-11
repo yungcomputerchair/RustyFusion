@@ -31,6 +31,8 @@ default_account_level = 99 # default permissions level for a new account.
                            # 50 = No title, most cheats enabled
                            # 99 = No title, normal user
 motd_path = "motd.txt" # path to the MOTD file. the MOTD is sent to each shard
+monitor_enabled = false # whether the moderation monitor should be enabled
+monitor_addr = "127.0.0.1:8003" # address for the monitor to bind to
 
 [shard]
 log_path = "shard.log" # path to log file, or blank for console logging only

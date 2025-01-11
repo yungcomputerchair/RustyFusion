@@ -15,6 +15,7 @@ use rusty_fusion::{
         log, log_error, log_if_failed, logger_flush, logger_flush_scheduled, logger_init,
         panic_log, FFError, FFResult, Severity,
     },
+    monitor::monitor_init,
     net::{
         packet::{
             PacketID::{self, *},
@@ -79,6 +80,13 @@ fn main() -> Result<()> {
             state.as_login().server_id
         ),
     );
+
+    if config.login.monitor_enabled.get() {
+        let monitor_time = Duration::from_secs(5);
+        let monitor_addr = config.login.monitor_addr.get();
+        monitor_init(monitor_addr, monitor_time);
+    }
+
     let live_check_time = Duration::from_secs(config.general.live_check_time.get());
     while running.load(Ordering::SeqCst) {
         server.poll(&mut state, live_check_time)?;

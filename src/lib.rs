@@ -31,6 +31,7 @@ pub mod util;
 
 pub mod config;
 pub mod database;
+pub mod monitor;
 pub mod tabledata;
 
 pub mod ai;

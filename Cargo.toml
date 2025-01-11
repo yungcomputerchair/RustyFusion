@@ -21,6 +21,7 @@ regex = "1.11.1"
 bcrypt = "0.15.0"
 serde_repr = "0.1.18"
 chrono = "0.4.38"
+ffmonitor = { git = "https://github.com/OpenFusionProject/ffmonitor.git", tag = "v2.2.0" }
 
 [features]
 default = ["postgres"]
