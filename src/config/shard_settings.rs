@@ -28,3 +28,27 @@ pub struct ShardConfig {
     pub num_sliders: NumSlidersSetting,
     pub vehicle_duration: VehicleDurationSetting,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    // Validate that every setting is defined with default value in config.toml.default
+    fn test_defaults() {
+        let config = Config::load("config.toml.default").unwrap();
+        let shard = config.shard;
+        assert!(shard.log_path.is_set_to_default());
+        assert!(shard.shard_id.is_set_to_default());
+        assert!(shard.listen_addr.is_set_to_default());
+        assert!(shard.external_addr.is_set_to_default());
+        assert!(shard.login_server_addr.is_set_to_default());
+        assert!(shard.login_server_conn_interval.is_set_to_default());
+        assert!(shard.num_channels.is_set_to_default());
+        assert!(shard.max_channel_pop.is_set_to_default());
+        assert!(shard.visibility_range.is_set_to_default());
+        assert!(shard.autosave_interval.is_set_to_default());
+        assert!(shard.num_sliders.is_set_to_default());
+        assert!(shard.vehicle_duration.is_set_to_default());
+    }
+}

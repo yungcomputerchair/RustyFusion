@@ -16,3 +16,20 @@ pub struct LoginConfig {
     pub default_account_level: DefaultAccountLevelSetting,
     pub motd_path: MotdPathSetting,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    // Validate that every setting is defined with default value in config.toml.default
+    fn test_defaults() {
+        let config = Config::load("config.toml.default").unwrap();
+        let login = config.login;
+        assert!(login.log_path.is_set_to_default());
+        assert!(login.listen_addr.is_set_to_default());
+        assert!(login.auto_create_accounts.is_set_to_default());
+        assert!(login.default_account_level.is_set_to_default());
+        assert!(login.motd_path.is_set_to_default());
+    }
+}

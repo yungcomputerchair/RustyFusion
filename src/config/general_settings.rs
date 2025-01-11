@@ -23,3 +23,25 @@ pub struct GeneralConfig {
     pub db_port: DbPortSetting,
     pub table_data_path: TableDataPathSetting,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    // Validate that every setting is defined with default value in config.toml.default
+    fn test_defaults() {
+        let config = Config::load("config.toml.default").unwrap();
+        let general = config.general;
+        assert!(general.logging_level_console.is_set_to_default());
+        assert!(general.logging_level_file.is_set_to_default());
+        assert!(general.log_write_interval.is_set_to_default());
+        assert!(general.live_check_time.is_set_to_default());
+        assert!(general.server_key.is_set_to_default());
+        assert!(general.db_username.is_set_to_default());
+        assert!(general.db_password.is_set_to_default());
+        assert!(general.db_host.is_set_to_default());
+        assert!(general.db_port.is_set_to_default());
+        assert!(general.table_data_path.is_set_to_default());
+    }
+}

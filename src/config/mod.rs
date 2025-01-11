@@ -92,56 +92,11 @@ macro_rules! define_setting {
             pub fn is_set(&self) -> bool {
                 self.0.is_some()
             }
+
+            pub fn is_set_to_default(&self) -> bool {
+                self.0 == Some($dv.into())
+            }
         }
     };
 }
 use define_setting;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    // Validate that every setting is defined in config.toml.default
-    // The FIRST thing you should do when adding a config setting is
-    // to add an assertion for it here and in config.toml.default
-    fn test_default_config() {
-        let config = Config::load("config.toml.default").unwrap();
-
-        // General settings
-        let general = config.general;
-        assert!(general.logging_level_console.is_set());
-        assert!(general.logging_level_file.is_set());
-        assert!(general.log_write_interval.is_set());
-        assert!(general.live_check_time.is_set());
-        assert!(general.server_key.is_set());
-        assert!(general.db_username.is_set());
-        assert!(general.db_password.is_set());
-        assert!(general.db_host.is_set());
-        assert!(general.db_port.is_set());
-        assert!(general.table_data_path.is_set());
-
-        // Login server settings
-        let login = config.login;
-        assert!(login.log_path.is_set());
-        assert!(login.listen_addr.is_set());
-        assert!(login.auto_create_accounts.is_set());
-        assert!(login.default_account_level.is_set());
-        assert!(login.motd_path.is_set());
-
-        // Shard server settings
-        let shard = config.shard;
-        assert!(shard.log_path.is_set());
-        assert!(shard.shard_id.is_set());
-        assert!(shard.listen_addr.is_set());
-        assert!(shard.external_addr.is_set());
-        assert!(shard.login_server_addr.is_set());
-        assert!(shard.login_server_conn_interval.is_set());
-        assert!(shard.num_channels.is_set());
-        assert!(shard.max_channel_pop.is_set());
-        assert!(shard.visibility_range.is_set());
-        assert!(shard.autosave_interval.is_set());
-        assert!(shard.num_sliders.is_set());
-        assert!(shard.vehicle_duration.is_set());
-    }
-}
