@@ -18,7 +18,7 @@ use crate::{
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct InstanceID {
-    pub channel_num: usize,
+    pub channel_num: u8,
     pub map_num: u32,
     pub instance_num: Option<u32>,
 }
@@ -451,7 +451,7 @@ impl EntityMap {
         }
     }
 
-    pub fn get_channel_population(&self, channel_num: usize) -> usize {
+    pub fn get_channel_population(&self, channel_num: u8) -> usize {
         self.chunk_maps
             .iter()
             .filter(|(instance_id, _)| instance_id.channel_num == channel_num)
@@ -459,7 +459,7 @@ impl EntityMap {
             .sum()
     }
 
-    pub fn get_min_pop_channel_num(&self) -> usize {
+    pub fn get_min_pop_channel_num(&self) -> u8 {
         let num_channels = config_get().shard.num_channels.get();
         (1..=num_channels)
             .min_by_key(|channel_num| self.get_channel_population(*channel_num))
@@ -470,12 +470,12 @@ impl EntityMap {
         let mut statuses = [ShardChannelStatus::Closed; MAX_NUM_CHANNELS];
         let num_channels = config_get().shard.num_channels.get();
         for channel_num in 1..=num_channels {
-            statuses[channel_num - 1] = self.get_channel_status(channel_num);
+            statuses[channel_num as usize - 1] = self.get_channel_status(channel_num);
         }
         statuses
     }
 
-    fn get_channel_status(&self, channel_num: usize) -> ShardChannelStatus {
+    fn get_channel_status(&self, channel_num: u8) -> ShardChannelStatus {
         let max_pop = config_get().shard.max_channel_pop.get();
         let pop = self.get_channel_population(channel_num);
         if pop >= max_pop {

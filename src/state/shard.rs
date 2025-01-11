@@ -48,7 +48,7 @@ impl ShardServerState {
             groups: HashMap::new(),
         };
         let num_channels = config_get().shard.num_channels.get();
-        if num_channels == 0 || num_channels > MAX_NUM_CHANNELS {
+        if num_channels == 0 || num_channels > MAX_NUM_CHANNELS as u8 {
             panic_log("Invalid number of channels");
         }
         for channel_num in 1..=num_channels {

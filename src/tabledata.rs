@@ -432,7 +432,7 @@ impl TableData {
     fn make_npcs_from_spawn_data(
         spawn_data: &NPCSpawnData,
         entity_map: &mut EntityMap,
-        channel_num: usize,
+        channel_num: u8,
     ) -> Vec<NPC> {
         let dat = spawn_data;
         let mut npcs = Vec::new();
@@ -489,7 +489,7 @@ impl TableData {
         npcs
     }
 
-    pub fn make_all_npcs(&self, entity_map: &mut EntityMap, channel_num: usize) -> Vec<NPC> {
+    pub fn make_all_npcs(&self, entity_map: &mut EntityMap, channel_num: u8) -> Vec<NPC> {
         let mut npcs = Vec::new();
         for dat in &self.npcs {
             npcs.extend(Self::make_npcs_from_spawn_data(
@@ -504,7 +504,7 @@ impl TableData {
     pub fn make_group_npcs(
         &self,
         entity_map: &mut EntityMap,
-        channel_num: usize,
+        channel_num: u8,
         group_id: i32,
     ) -> Vec<NPC> {
         let mut npcs = Vec::new();
@@ -522,7 +522,7 @@ impl TableData {
         npcs
     }
 
-    pub fn make_eggs(&self, entity_map: &mut EntityMap, channel_num: usize) -> Vec<Egg> {
+    pub fn make_eggs(&self, entity_map: &mut EntityMap, channel_num: u8) -> Vec<Egg> {
         let mut eggs = Vec::new();
         for dat in &self.egg_data.eggs {
             let egg = Egg::new(

@@ -757,7 +757,7 @@ pub fn pc_warp_channel(clients: &mut ClientMap, state: &mut ShardServerState) ->
     catch_fail(
         (|| {
             let pc_id = clients.get_self().get_player_id()?;
-            let channel_num = pkt.iChannelNum as usize;
+            let channel_num = pkt.iChannelNum as u8;
             let num_channels = config_get().shard.num_channels.get();
 
             if channel_num == 0 || channel_num > num_channels {
