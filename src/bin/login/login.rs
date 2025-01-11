@@ -1,5 +1,6 @@
 use std::{collections::HashMap, time::SystemTime};
 
+use ffmonitor::NameRequestEvent;
 use rand::random;
 
 use rusty_fusion::{
@@ -7,9 +8,10 @@ use rusty_fusion::{
     database::db_run_sync,
     defines::*,
     entity::{Combatant, Entity, Player},
-    enums::{ItemLocation, ItemType},
+    enums::{ItemLocation, ItemType, PlayerNameStatus},
     error::{catch_fail, log, log_if_failed, FFError, FFResult, Severity},
     item::Item,
+    monitor::{monitor_send, MonitorEvent},
     net::{
         crypto,
         packet::{PacketID::*, *},
@@ -108,12 +110,7 @@ pub fn login(
             }
 
             let last_player_slot = account.selected_slot;
-            let mut players = db_run_sync(move |db| db.load_players(account.id))?;
-            for player in &mut players {
-                // even if the player has a temporary name,
-                // we want to show the real name in character selection
-                player.flags.name_check_flag = true;
-            }
+            let players = db_run_sync(move |db| db.load_players(account.id))?;
 
             /*
              * Check if this account is already logged in, meaning:
@@ -283,9 +280,23 @@ pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> FF
     let mut player = Player::new(pc_uid, slot_num);
     let first_name = util::parse_utf16(&pkt.szFirstName)?;
     let last_name = util::parse_utf16(&pkt.szLastName)?;
+
+    let name_check = if pkt.iFNCode != 0 {
+        // name wheel name; TODO validate
+        PlayerNameStatus::Approved
+    } else if config_get().login.auto_approve_custom_names.get() {
+        PlayerNameStatus::Approved
+    } else {
+        monitor_send(MonitorEvent::NameRequest(NameRequestEvent {
+            player_uid: pc_uid as u64,
+            requested_name: format!("{} {}", first_name, last_name),
+        }));
+        PlayerNameStatus::Pending
+    };
+
     player.first_name = first_name;
     player.last_name = last_name;
-    player.flags.name_check_flag = true; // TODO check name + config
+    player.flags.name_check = name_check;
 
     let player_saved = player.clone();
     db_run_sync(move |db| {

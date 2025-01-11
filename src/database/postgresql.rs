@@ -331,7 +331,7 @@ impl PostgresDatabase {
         let first_use_bytes: &[u8] = row.get("FirstUseFlag");
         player_flags.tip_flags = Bitfield::from_bytes(first_use_bytes, SIZEOF_TIP_FLAGS)?;
         player_flags.tutorial_flag = row.get::<_, Int>("TutorialFlag") != 0;
-        player_flags.name_check_flag = row.get::<_, Int>("NameCheck") != 0;
+        player_flags.name_check = (row.get::<_, Int>("NameCheck") as i8).try_into()?;
         player.flags = player_flags;
 
         let guide: PlayerGuide = (row.get::<_, Int>("Mentor") as i16).try_into()?;

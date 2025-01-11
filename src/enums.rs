@@ -43,6 +43,12 @@ ffenum!(PlayerGuide, i16, {
     Computress = 5,
 });
 
+ffenum!(PlayerNameStatus, i8, {
+    Pending = 0,
+    Approved = 1,
+    Denied = 2,
+});
+
 ffenum!(PlayerShardStatus, i8, {
     Entered = 0,
     Exited = 1,

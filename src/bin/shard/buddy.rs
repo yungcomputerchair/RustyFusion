@@ -160,7 +160,7 @@ pub fn find_name_make_buddy(clients: &mut ClientMap, state: &mut ShardServerStat
         szFirstName: util::encode_utf16(&player.first_name),
         szLastName: util::encode_utf16(&player.last_name),
         iPCUID: pc_uid,
-        iNameCheckFlag: player.flags.name_check_flag as i8,
+        iNameCheckFlag: player.flags.name_check as i8,
     };
     log_if_failed(buddy_client.send_packet(P_FE2CL_REP_PC_FIND_NAME_MAKE_BUDDY_SUCC, &req_pkt));
     Ok(())

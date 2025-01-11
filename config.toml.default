@@ -30,6 +30,7 @@ default_account_level = 99 # default permissions level for a new account.
                            # 40 = Moderator, some moderation commands enabled
                            # 50 = No title, most cheats enabled
                            # 99 = No title, normal user
+auto_approve_custom_names = true # whether custom player names should be automatically approved
 motd_path = "motd.txt" # path to the MOTD file. the MOTD is sent to each shard
 monitor_enabled = false # whether the moderation monitor should be enabled
 monitor_addr = "127.0.0.1:8003" # address for the monitor to bind to

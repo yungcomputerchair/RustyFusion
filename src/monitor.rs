@@ -17,16 +17,19 @@ pub type MonitorEvent = Event;
 
 static FEED: OnceLock<Sender<MonitorEvent>> = OnceLock::new();
 
-pub fn monitor_init(addr: String, interval: Duration) -> &'static Sender<MonitorEvent> {
+pub fn monitor_init(addr: String, interval: Duration) {
     assert!(FEED.get().is_none());
     let (tx, rx) = mpsc::channel();
     FEED.set(tx).unwrap();
     std::thread::spawn(move || monitor_thread(rx, addr, interval));
-    monitor_get()
 }
 
-pub fn monitor_get() -> &'static Sender<MonitorEvent> {
-    FEED.get().unwrap()
+pub fn monitor_send(event: MonitorEvent) {
+    if let Some(feed) = FEED.get() {
+        if feed.send(event).is_err() {
+            log(Severity::Warning, "Failed to send monitor event");
+        }
+    }
 }
 
 fn monitor_thread(rx: Receiver<MonitorEvent>, addr: String, interval: Duration) {

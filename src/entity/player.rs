@@ -12,7 +12,7 @@ use crate::{
     entity::{Combatant, Entity, EntityID},
     enums::{
         CharType, CombatStyle, CombatantTeam, ItemLocation, ItemType, PlayerGuide,
-        PlayerShardStatus, RewardCategory, RewardType, RideType, TaskType,
+        PlayerNameStatus, PlayerShardStatus, RewardCategory, RewardType, RideType, TaskType,
     },
     error::{codes, log, log_if_failed, panic_log, FFError, FFResult, Severity},
     item::Item,
@@ -80,7 +80,7 @@ impl Default for PlayerStyle {
 
 #[derive(Debug, Clone)]
 pub struct PlayerFlags {
-    pub name_check_flag: bool,
+    pub name_check: PlayerNameStatus,
     pub tutorial_flag: bool,
     pub payzone_flag: bool,
     pub tip_flags: Bitfield<i64>,
@@ -90,7 +90,7 @@ pub struct PlayerFlags {
 impl Default for PlayerFlags {
     fn default() -> Self {
         Self {
-            name_check_flag: false,
+            name_check: PlayerNameStatus::Pending,
             tutorial_flag: false,
             payzone_flag: false,
             tip_flags: Bitfield::new(SIZEOF_TIP_FLAGS),
@@ -280,7 +280,7 @@ pub struct BuddyListEntry {
     pub first_name: String,
     pub last_name: String,
     pub style: PlayerStyle,
-    pub name_check: bool,
+    pub name_check: PlayerNameStatus,
     pub free_chat: bool,
     pub blocked: bool,
 }
@@ -291,7 +291,7 @@ impl BuddyListEntry {
             first_name: player.first_name.clone(),
             last_name: player.last_name.clone(),
             style: player.style.unwrap(),
-            name_check: player.flags.name_check_flag,
+            name_check: player.flags.name_check,
             free_chat: true,
             blocked: false,
         }
@@ -471,7 +471,7 @@ impl Player {
         let style = self.style.unwrap_or_default();
         sPCStyle {
             iPC_UID: self.uid,
-            iNameCheck: if self.flags.name_check_flag { 1 } else { 0 },
+            iNameCheck: self.flags.name_check as i8,
             szFirstName: util::encode_utf16(&self.first_name),
             szLastName: util::encode_utf16(&self.last_name),
             iGender: style.gender,
@@ -694,7 +694,7 @@ impl Player {
         sPCGroupMemberInfo {
             iPC_ID: self.get_player_id(),
             iPCUID: self.uid as u64,
-            iNameCheck: if self.flags.name_check_flag { 1 } else { 0 },
+            iNameCheck: self.flags.name_check as i8,
             szFirstName: util::encode_utf16(&self.first_name),
             szLastName: util::encode_utf16(&self.last_name),
             iSpecialState: self.get_special_state_bit_flag(),
