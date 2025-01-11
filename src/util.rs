@@ -342,7 +342,8 @@ pub fn format_duration(duration: Duration) -> String {
 }
 
 pub fn get_uid() -> i64 {
-    rand::random()
+    // player ids should really always be positive
+    rand::thread_rng().gen_range(1..i64::MAX)
 }
 
 pub fn slot_num_to_loc_and_slot_num(mut slot_num: usize) -> FFResult<(ItemLocation, usize)> {
