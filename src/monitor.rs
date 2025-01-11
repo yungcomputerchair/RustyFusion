@@ -11,28 +11,48 @@ use std::{
 
 use ffmonitor::{Event, MonitorUpdate};
 
-use crate::error::{log, Severity};
+use crate::error::{log, FFError, FFResult, Severity};
 
 pub type MonitorEvent = Event;
 
 static FEED: OnceLock<Sender<MonitorEvent>> = OnceLock::new();
+static FLUSH_SIGNAL: OnceLock<Sender<()>> = OnceLock::new();
 
-pub fn monitor_init(addr: String, interval: Duration) {
+pub fn monitor_init(addr: String) {
     assert!(FEED.get().is_none());
-    let (tx, rx) = mpsc::channel();
-    FEED.set(tx).unwrap();
-    std::thread::spawn(move || monitor_thread(rx, addr, interval));
+    let (ftx, frx) = mpsc::channel();
+    let (stx, srx) = mpsc::channel();
+    FEED.set(ftx).unwrap();
+    FLUSH_SIGNAL.set(stx).unwrap();
+    std::thread::spawn(move || monitor_thread(frx, srx, addr));
 }
 
-pub fn monitor_send(event: MonitorEvent) {
+pub fn monitor_queue(event: MonitorEvent) {
+    // for ease of use, it's okay to call this function if the monitor is not initialized
     if let Some(feed) = FEED.get() {
         if feed.send(event).is_err() {
-            log(Severity::Warning, "Failed to send monitor event");
+            log(Severity::Warning, "Failed to queue monitor event");
         }
     }
 }
 
-fn monitor_thread(rx: Receiver<MonitorEvent>, addr: String, interval: Duration) {
+pub fn monitor_flush() -> FFResult<()> {
+    let Some(stx) = FLUSH_SIGNAL.get() else {
+        return Err(FFError::build(
+            Severity::Warning,
+            "Monitor flushed while not initialized".to_string(),
+        ));
+    };
+    if stx.send(()).is_err() {
+        return Err(FFError::build(
+            Severity::Warning,
+            "Failed to signal monitor flush".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn monitor_thread(frx: Receiver<MonitorEvent>, srx: Receiver<()>, addr: String) {
     let listener = match TcpListener::bind(&addr) {
         Ok(listener) => listener,
         Err(e) => {
@@ -60,7 +80,7 @@ fn monitor_thread(rx: Receiver<MonitorEvent>, addr: String, interval: Duration) 
     let mut clients = HashMap::new();
     let mut to_disconnect = HashSet::new();
     loop {
-        std::thread::sleep(interval);
+        std::thread::sleep(Duration::from_millis(100));
 
         while let Ok((client, client_addr)) = listener.accept() {
             log(
@@ -70,8 +90,12 @@ fn monitor_thread(rx: Receiver<MonitorEvent>, addr: String, interval: Duration) 
             clients.insert(client_addr, client);
         }
 
+        if srx.try_recv().is_err() {
+            continue;
+        }
+
         let mut update = MonitorUpdate::default();
-        while let Ok(event) = rx.try_recv() {
+        while let Ok(event) = frx.try_recv() {
             update.add_event(event);
         }
 

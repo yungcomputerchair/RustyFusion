@@ -8,6 +8,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+use ffmonitor::PlayerEvent;
 use rusty_fusion::{
     config::config_init,
     database::{db_init, db_shutdown},
@@ -15,7 +16,7 @@ use rusty_fusion::{
         log, log_error, log_if_failed, logger_flush, logger_flush_scheduled, logger_init,
         panic_log, FFError, FFResult, Severity,
     },
-    monitor::monitor_init,
+    monitor::{monitor_flush, monitor_init, monitor_queue, MonitorEvent},
     net::{
         packet::{
             PacketID::{self, *},
@@ -23,7 +24,7 @@ use rusty_fusion::{
         },
         ClientType, FFClient, FFServer,
     },
-    state::ServerState,
+    state::{LoginServerState, ServerState},
     tabledata::tdata_init,
     timer::TimerMap,
     unused,
@@ -82,9 +83,15 @@ fn main() -> Result<()> {
     );
 
     if config.login.monitor_enabled.get() {
-        let monitor_time = Duration::from_secs(5);
         let monitor_addr = config.login.monitor_addr.get();
-        monitor_init(monitor_addr, monitor_time);
+        monitor_init(monitor_addr);
+
+        let monitor_interval = config.login.monitor_interval.get();
+        timers.register_timer(
+            Box::new(move |_, _, st| send_monitor_update(st.as_login())),
+            Duration::from_secs(monitor_interval),
+            false,
+        );
     }
 
     let live_check_time = Duration::from_secs(config.general.live_check_time.get());
@@ -227,4 +234,15 @@ fn send_live_check(client: &mut FFClient) -> FFResult<()> {
         }
         _ => Ok(()),
     }
+}
+
+fn send_monitor_update(state: &LoginServerState) -> FFResult<()> {
+    for data in state.get_all_shard_player_data() {
+        monitor_queue(MonitorEvent::Player(PlayerEvent {
+            x_coord: data.x_coord,
+            y_coord: data.y_coord,
+            name: format!("{} {}", data.first_name, data.last_name),
+        }));
+    }
+    monitor_flush()
 }

@@ -11,7 +11,7 @@ use rusty_fusion::{
     enums::{ItemLocation, ItemType, PlayerNameStatus},
     error::{catch_fail, log, log_if_failed, FFError, FFResult, Severity},
     item::Item,
-    monitor::{monitor_send, MonitorEvent},
+    monitor::{monitor_queue, MonitorEvent},
     net::{
         crypto,
         packet::{PacketID::*, *},
@@ -287,7 +287,7 @@ pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> FF
     } else if config_get().login.auto_approve_custom_names.get() {
         PlayerNameStatus::Approved
     } else {
-        monitor_send(MonitorEvent::NameRequest(NameRequestEvent {
+        monitor_queue(MonitorEvent::NameRequest(NameRequestEvent {
             player_uid: pc_uid as u64,
             requested_name: format!("{} {}", first_name, last_name),
         }));

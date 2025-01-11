@@ -241,6 +241,16 @@ impl LoginServerState {
         None
     }
 
+    pub fn get_all_shard_player_data<'a>(
+        &'a self,
+    ) -> Box<dyn Iterator<Item = &'a PlayerMetadata> + 'a> {
+        Box::new(
+            self.shards
+                .values()
+                .flat_map(|shard| shard.players.values()),
+        )
+    }
+
     pub fn get_shard_channel_statuses(
         &self,
         shard_id: i32,

@@ -10,6 +10,7 @@ define_setting!(AutoApproveCustomNamesSetting, bool, true);
 define_setting!(MotdPathSetting, String, "motd.txt");
 define_setting!(MonitorEnabledSetting, bool, false);
 define_setting!(MonitorAddrSetting, String, "127.0.0.1:8003");
+define_setting!(MonitorIntervalSetting, u64, 5_u64);
 
 #[derive(Deserialize, Default)]
 pub struct LoginConfig {
@@ -21,6 +22,7 @@ pub struct LoginConfig {
     pub motd_path: MotdPathSetting,
     pub monitor_enabled: MonitorEnabledSetting,
     pub monitor_addr: MonitorAddrSetting,
+    pub monitor_interval: MonitorIntervalSetting,
 }
 
 #[cfg(test)]
@@ -40,5 +42,6 @@ mod tests {
         assert!(login.motd_path.is_set_to_default());
         assert!(login.monitor_enabled.is_set_to_default());
         assert!(login.monitor_addr.is_set_to_default());
+        assert!(login.monitor_interval.is_set_to_default());
     }
 }
