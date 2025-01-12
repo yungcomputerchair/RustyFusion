@@ -154,11 +154,11 @@ impl PacketBuffer {
         let from = self.ptr;
         let to = from + sz;
         if to > self.buf.len() {
-            panic_log(&format!(
-                "Payload too big for output ({} > {})",
-                sz,
-                self.buf.len()
-            ));
+            log(
+                Severity::Warning,
+                &format!("Payload too big for output ({} > {})", to, self.buf.len()),
+            );
+            return;
         }
 
         self.buf[from..to].copy_from_slice(dat);

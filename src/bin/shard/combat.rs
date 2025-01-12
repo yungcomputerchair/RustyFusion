@@ -3,7 +3,7 @@ use std::time::SystemTime;
 use rusty_fusion::{
     defines::EQUIP_SLOT_HAND,
     entity::{Combatant, Entity, EntityID, Projectile, ProjectileKind},
-    enums::WeaponTargetMode,
+    enums::{CharType, WeaponTargetMode},
     error::*,
     net::{
         packet::{PacketID::*, *},
@@ -24,12 +24,24 @@ const BATTERY_BASE_COST: u32 = 6;
 struct sTargetNpcId {
     pub iNPC_ID: i32,
 }
+#[allow(non_camel_case_types)]
+#[allow(non_snake_case)]
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+struct sTargetAnyId {
+    pub iEntity_ID: i32,
+    pub eCT: i32,
+}
+
 impl FFPacket for sTargetNpcId {}
+impl FFPacket for sTargetAnyId {}
 
 fn get_targets(
     client: &mut FFClient,
     state: &mut ShardServerState,
     target_count: usize,
+    target_type: Option<CharType>,
     max_targets: Option<usize>,
 ) -> FFResult<(Vec<EntityID>, u32)> {
     let mut target_ids = Vec::with_capacity(max_targets.unwrap_or(3));
@@ -39,28 +51,57 @@ fn get_targets(
         // TODO stricter anti-cheat.
         // validate target count, range, attack cooldown, etc against weapon stats
         if max_targets.is_some_and(|max| i >= max) {
-            return Err(FFError::build(
+            log(
                 Severity::Warning,
-                format!(
+                &format!(
                     "Tried to attack {} entities (max {})",
                     target_count,
                     max_targets.unwrap()
                 ),
-            ));
+            );
+            return Ok((target_ids, weapon_boosts_needed));
         }
-        let Ok(trailer) = client.get_struct::<sTargetNpcId>() else {
-            break;
-        };
-        let npc_id = trailer.iNPC_ID;
-        let npc = match state.get_npc(npc_id) {
-            Ok(npc) => npc,
-            Err(e) => {
-                log_error(&e);
-                continue;
+
+        match target_type {
+            Some(CharType::Player) => todo!(),
+            None | Some(CharType::All) => {
+                let Ok(trailer) = client.get_struct::<sTargetAnyId>() else {
+                    break;
+                };
+                let entity_id = trailer.iEntity_ID;
+                let Ok(char_type) = CharType::try_from(trailer.eCT) else {
+                    continue;
+                };
+
+                let entity_id = match char_type {
+                    CharType::Unknown => continue,
+                    CharType::Player => EntityID::Player(entity_id),
+                    CharType::NPC | CharType::Mob => EntityID::NPC(entity_id),
+                    CharType::All => continue,
+                };
+
+                let Ok(combatant) = state.get_combatant(entity_id) else {
+                    continue;
+                };
+                weapon_boosts_needed += BATTERY_BASE_COST + combatant.get_level() as u32;
+                target_ids.push(combatant.get_id());
             }
-        };
-        weapon_boosts_needed += BATTERY_BASE_COST + npc.get_level() as u32;
-        target_ids.push(npc.get_id());
+            Some(_) => {
+                let Ok(trailer) = client.get_struct::<sTargetNpcId>() else {
+                    break;
+                };
+                let npc_id = trailer.iNPC_ID;
+                let npc = match state.get_npc(npc_id) {
+                    Ok(npc) => npc,
+                    Err(e) => {
+                        log_error(&e);
+                        continue;
+                    }
+                };
+                weapon_boosts_needed += BATTERY_BASE_COST + npc.get_level() as u32;
+                target_ids.push(npc.get_id());
+            }
+        }
     }
 
     Ok((target_ids, weapon_boosts_needed))
@@ -77,12 +118,15 @@ pub fn pc_attack_npcs(clients: &mut ClientMap, state: &mut ShardServerState) -> 
         return Ok(());
     }
 
-    let (target_ids, weapon_boosts_needed) =
-        get_targets(client, state, target_count, Some(MAX_TARGETS))?;
+    let (target_ids, weapon_boosts_needed) = get_targets(
+        client,
+        state,
+        target_count,
+        Some(CharType::Mob),
+        Some(MAX_TARGETS),
+    )?;
 
-    // consume weapon boosts
     let player = state.get_player_mut(pc_id)?;
-
     let charged = player.consume_weapon_boosts(weapon_boosts_needed);
 
     // attack handler
@@ -241,7 +285,7 @@ pub fn pc_projectile_hit(clients: &mut ClientMap, state: &mut ShardServerState) 
     };
 
     let (target_ids, _weapon_boosts_needed) =
-        get_targets(client, state, pkt.iTargetCnt as usize, None)?;
+        get_targets(client, state, pkt.iTargetCnt as usize, None, Some(100))?;
     let player = state.get_player(pc_id)?;
 
     // TODO: validate

@@ -80,7 +80,8 @@ ffenum!(CharType, i32, 5, {
     Unknown = 0,
     Player = 1,
     NPC = 2,
-    Mob = 3,
+    Mob = 4,
+    All = 255,
 });
 
 // eTaskTypeProperty.cs
