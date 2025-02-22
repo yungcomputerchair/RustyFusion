@@ -1085,6 +1085,8 @@ impl AINode for CheckAttack {
                         npc.get_id(),
                         target_ids,
                         false,
+                        (None, None),
+                        (None, None),
                         state,
                         clients,
                     ));

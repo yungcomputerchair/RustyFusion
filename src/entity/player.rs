@@ -285,6 +285,36 @@ pub struct PreWarpData {
 }
 
 #[derive(Debug, Clone)]
+pub enum ProjectileKind {
+    Grenade,
+    Rocket(i16),
+}
+
+#[derive(Debug, Clone)]
+pub struct Projectile {
+    pub projectile_kind: ProjectileKind,
+    pub single_power: i32,
+    pub multi_power: i32,
+    pub charged: bool,
+    pub start_pos: Position,
+    pub end_pos: Position,
+    pub end_time: SystemTime,
+}
+
+impl From<Projectile> for sPCBullet {
+    fn from(value: Projectile) -> Self {
+        Self {
+            eAT: 0,
+            iID: match value.projectile_kind {
+                ProjectileKind::Grenade => 1,
+                ProjectileKind::Rocket(item_id) => item_id as i32,
+            },
+            bCharged: value.charged as i32,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct BuddyListEntry {
     pub pc_uid: i64,
     pub first_name: String,
@@ -428,6 +458,8 @@ pub struct Player {
     fusion_matter: u32,
     nano_potions: u32,
     weapon_boosts: u32,
+    owned_projectiles: HashMap<i8, Projectile>,
+    last_projectile_id: i8,
     pub buddy_list_synced: bool,
     buddy_list: BuddyList,
     pub buddy_offered_to: Option<i64>,
@@ -1209,6 +1241,35 @@ impl Player {
     pub fn set_nano_potions(&mut self, nano_potions: u32) -> u32 {
         self.nano_potions = clamp(nano_potions, 0, PC_BATTERY_MAX);
         self.nano_potions
+    }
+
+    pub fn consume_weapon_boosts(&mut self, amount: u32) -> bool {
+        let weapon_boosts = self.get_weapon_boosts();
+        if weapon_boosts >= amount {
+            self.set_weapon_boosts(weapon_boosts - amount);
+            true
+        } else {
+            self.set_weapon_boosts(0);
+            false
+        }
+    }
+
+    pub fn add_projectile(&mut self, projectile: Projectile) -> Option<i8> {
+        if self.owned_projectiles.len() == SIZEOF_PC_BULLET_SLOT as usize {
+            return None;
+        }
+        let bullet_id = self.last_projectile_id;
+        self.last_projectile_id += 1;
+        if self.last_projectile_id == SIZEOF_PC_BULLET_SLOT as i8 {
+            self.last_projectile_id = 0
+        };
+
+        self.owned_projectiles.insert(bullet_id, projectile);
+        Some(bullet_id)
+    }
+
+    pub fn remove_projectile(&mut self, projectile_id: i8) -> Option<Projectile> {
+        self.owned_projectiles.remove(&projectile_id)
     }
 
     pub fn set_pre_warp(&mut self) {

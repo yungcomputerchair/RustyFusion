@@ -2,7 +2,7 @@ use rand::Rng;
 
 use crate::{
     defines::*,
-    entity::{Combatant, EntityID},
+    entity::{Combatant, EntityID, Projectile},
     enums::CombatStyle,
     error::*,
     net::{
@@ -23,6 +23,8 @@ pub fn do_basic_attack(
     attacker_id: EntityID,
     target_ids: &[EntityID],
     charged: bool,
+    powers: (Option<i32>, Option<i32>),
+    projectile: (Option<i8>, Option<Projectile>),
     state: &mut ShardServerState,
     clients: &mut ClientMap,
 ) -> FFResult<()> {
@@ -32,9 +34,9 @@ pub fn do_basic_attack(
     let mut attacker_client = attacker.get_client(clients);
 
     let power = if target_ids.len() == 1 {
-        attacker.get_single_power()
+        powers.0.unwrap_or(attacker.get_single_power())
     } else {
-        attacker.get_multi_power()
+        powers.1.unwrap_or(attacker.get_multi_power())
     };
     let basic_attack = BasicAttack {
         power,
@@ -129,22 +131,32 @@ pub fn do_basic_attack(
         let mut payload = PacketBuffer::default();
         match attacker_id {
             EntityID::Player(pc_id) => {
-                // response packet
-                let player = state.get_player(pc_id).unwrap();
-                let resp = sP_FE2CL_PC_ATTACK_NPCs_SUCC {
-                    iBatteryW: player.get_weapon_boosts() as i32,
-                    iNPCCnt: npc_attack_count as i32,
-                };
-                if let Some(client) = &mut attacker_client {
-                    client.queue_packet(P_FE2CL_PC_ATTACK_NPCs_SUCC, &resp);
-                }
+                if projectile.0.is_some() && projectile.1.is_some() {
+                    let resp = sP_FE2CL_PC_GRENADE_STYLE_HIT {
+                        iPC_ID: pc_id,
+                        iBulletID: projectile.0.unwrap(),
+                        Bullet: projectile.1.unwrap().into(),
+                        iTargetCnt: npc_attack_count as i32,
+                    };
+                    payload.queue_packet(P_FE2CL_PC_GRENADE_STYLE_HIT, &resp);
+                } else {
+                    // response packet
+                    let player = state.get_player(pc_id).unwrap();
+                    let resp = sP_FE2CL_PC_ATTACK_NPCs_SUCC {
+                        iBatteryW: player.get_weapon_boosts() as i32,
+                        iNPCCnt: npc_attack_count as i32,
+                    };
+                    if let Some(client) = &mut attacker_client {
+                        client.queue_packet(P_FE2CL_PC_ATTACK_NPCs_SUCC, &resp);
+                    }
 
-                // broadcast packet
-                let pkt = sP_FE2CL_PC_ATTACK_NPCs {
-                    iPC_ID: pc_id,
-                    iNPCCnt: npc_attack_count as i32,
-                };
-                payload.queue_packet(P_FE2CL_PC_ATTACK_NPCs, &pkt);
+                    // broadcast packet
+                    let pkt = sP_FE2CL_PC_ATTACK_NPCs {
+                        iPC_ID: pc_id,
+                        iNPCCnt: npc_attack_count as i32,
+                    };
+                    payload.queue_packet(P_FE2CL_PC_ATTACK_NPCs, &pkt);
+                }
             }
             EntityID::NPC(npc_id) => {
                 let pkt = sP_FE2CL_NPC_ATTACK_CHARs {
