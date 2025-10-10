@@ -19,23 +19,31 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  read_msrv:
+    name: Read MSRV
+    uses: actions-rust-lang/msrv/.github/workflows/msrv.yml@main
 
+  build_and_test:
+    name: Build and test
+    needs: read_msrv
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v3
-    - name: Setup Rust toolchain
-      uses: actions-rust-lang/setup-rust-toolchain@v1
-      with:
-        toolchain: stable
-    - name: Build base
-      run: cargo build --verbose --no-default-features
-    - name: Build with PostgreSQL
-      run: cargo build --verbose --no-default-features --features postgres
-    - name: Run tests
-      run: cargo test --verbose
-    - name: Check linter
-      run: cargo clippy -- -Dwarnings
-    - name: Check formatting
-      run: cargo fmt --check
+      - uses: actions/checkout@v5
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: "stable, ${{ needs.read_msrv.outputs.msrv }}"
+      - run: cargo test
+
+  # Check formatting with rustfmt
+  formatting:
+    name: Check formatting
+    needs: read_msrv
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: "stable, ${{ needs.read_msrv.outputs.msrv }}"
+          components: rustfmt
+      - name: Rustfmt Check
+        uses: actions-rust-lang/rustfmt@v1
