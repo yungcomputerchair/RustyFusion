@@ -165,7 +165,7 @@ impl FFServer {
         &mut self.clients
     }
 
-    pub fn get_client_map(&mut self) -> ClientMap {
+    pub fn get_client_map(&mut self) -> ClientMap<'_> {
         ClientMap::new(0, &mut self.clients)
     }
 
