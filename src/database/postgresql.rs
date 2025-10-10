@@ -22,6 +22,11 @@ impl FFError {
         FFError::build(Severity::Warning, format!("Database error: {}", e))
     }
 }
+impl From<postgres::Error> for FFError {
+    fn from(e: postgres::Error) -> Self {
+        Self::from_db_err(e)
+    }
+}
 
 pub struct PostgresDatabase {
     client: postgres::Client,
@@ -42,9 +47,7 @@ impl PostgresDatabase {
             .password(config.db_password.get())
             .dbname(DB_NAME)
             .connect_timeout(Duration::from_secs(5));
-        let mut db_client = db_config
-            .connect(tls::NoTls)
-            .map_err(FFError::from_db_err)?;
+        let mut db_client = db_config.connect(tls::NoTls)?;
 
         let meta_table_exists: bool =
             Self::query(&mut db_client, "meta_table_exists", &[])?[0].get(0);
@@ -110,7 +113,7 @@ impl PostgresDatabase {
         let queries: Vec<&str> = queries.split(';').collect();
 
         // implicit transaction
-        let mut tsct = client.transaction().map_err(FFError::from_db_err)?;
+        let mut tsct = client.transaction()?;
 
         let mut num_updated = 0;
         for query in queries {
@@ -130,12 +133,12 @@ impl PostgresDatabase {
             };
         }
 
-        tsct.commit().map_err(FFError::from_db_err)?;
+        tsct.commit()?;
         Ok(num_updated)
     }
 
     fn save_player_internal(client: &mut impl GenericClient, player: &Player) -> FFResult<()> {
-        let mut tsct = client.transaction().map_err(FFError::from_db_err)?;
+        let mut tsct = client.transaction()?;
         let client = &mut tsct;
         let save_item = Self::prep(client, "save_item")?;
         let save_quest_item = Self::prep(client, "save_quest_item")?;
@@ -185,50 +188,44 @@ impl PostgresDatabase {
         Self::exec(client, "clear_nanos", &[&pc_uid])?;
         for nano in player.get_nano_iter() {
             let nano_raw: sNano = Some(nano.clone()).into();
-            client
-                .execute(
-                    &save_nano,
-                    &[
-                        &pc_uid,
-                        &(nano_raw.iID as Int),
-                        &(nano_raw.iSkillID as Int),
-                        &(nano_raw.iStamina as Int),
-                    ],
-                )
-                .map_err(FFError::from_db_err)?;
+            client.execute(
+                &save_nano,
+                &[
+                    &pc_uid,
+                    &(nano_raw.iID as Int),
+                    &(nano_raw.iSkillID as Int),
+                    &(nano_raw.iStamina as Int),
+                ],
+            )?;
         }
 
         Self::exec(client, "clear_items", &[&pc_uid])?;
         for (slot_num, item) in player.get_item_iter() {
             let item_raw: sItemBase = Some(*item).into();
-            client
-                .execute(
-                    &save_item,
-                    &[
-                        &pc_uid,
-                        &(slot_num as Int),
-                        &(item_raw.iID as Int),
-                        &(item_raw.iType as Int),
-                        &item_raw.iOpt,
-                        &item_raw.iTimeLimit,
-                    ],
-                )
-                .map_err(FFError::from_db_err)?;
+            client.execute(
+                &save_item,
+                &[
+                    &pc_uid,
+                    &(slot_num as Int),
+                    &(item_raw.iID as Int),
+                    &(item_raw.iType as Int),
+                    &item_raw.iOpt,
+                    &item_raw.iTimeLimit,
+                ],
+            )?;
         }
 
         Self::exec(client, "clear_quest_items", &[&pc_uid])?;
         for (virtual_slot, (item_id, count)) in player.get_quest_item_iter().enumerate() {
-            client
-                .execute(
-                    &save_quest_item,
-                    &[
-                        &pc_uid,
-                        &(item_id as Int),
-                        &(count as Int),
-                        &(virtual_slot as Int),
-                    ],
-                )
-                .map_err(FFError::from_db_err)?;
+            client.execute(
+                &save_quest_item,
+                &[
+                    &pc_uid,
+                    &(item_id as Int),
+                    &(count as Int),
+                    &(virtual_slot as Int),
+                ],
+            )?;
         }
 
         Self::exec(client, "clear_running_quests", &[&pc_uid])?;
@@ -237,18 +234,16 @@ impl PostgresDatabase {
                 continue;
             }
 
-            client
-                .execute(
-                    &save_running_quest,
-                    &[
-                        &pc_uid,
-                        &(task.m_aCurrTaskID as Int),
-                        &(task.m_aKillNPCCount[0] as Int),
-                        &(task.m_aKillNPCCount[1] as Int),
-                        &(task.m_aKillNPCCount[2] as Int),
-                    ],
-                )
-                .map_err(FFError::from_db_err)?;
+            client.execute(
+                &save_running_quest,
+                &[
+                    &pc_uid,
+                    &(task.m_aCurrTaskID as Int),
+                    &(task.m_aKillNPCCount[0] as Int),
+                    &(task.m_aKillNPCCount[1] as Int),
+                    &(task.m_aKillNPCCount[2] as Int),
+                ],
+            )?;
         }
 
         Self::exec(client, "clear_buddies", &[&pc_uid])?;
@@ -261,7 +256,7 @@ impl PostgresDatabase {
             Self::exec(client, "save_block", &[&pc_uid, &blocked_uid])?;
         }
 
-        tsct.commit().map_err(FFError::from_db_err)?;
+        tsct.commit()?;
         Ok(())
     }
 
@@ -681,11 +676,11 @@ impl Database for PostgresDatabase {
     }
 
     fn save_players(&mut self, players: &[&Player]) -> FFResult<()> {
-        let mut tsct = self.client.transaction().map_err(FFError::from_db_err)?;
+        let mut tsct = self.client.transaction()?;
         for player in players {
             Self::save_player_internal(&mut tsct, player)?;
         }
-        tsct.commit().map_err(FFError::from_db_err)?;
+        tsct.commit()?;
         Ok(())
     }
 
