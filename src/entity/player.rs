@@ -338,7 +338,7 @@ impl BuddyList {
     fn get_buddy_slot_number(&self, pc_uid: i64) -> Option<usize> {
         self.slots
             .iter()
-            .position(|entry| entry.as_ref().map_or(false, |entry| entry.pc_uid == pc_uid))
+            .position(|entry| entry.as_ref().is_some_and(|entry| entry.pc_uid == pc_uid))
     }
 
     fn is_buddies_with(&self, pc_uid: i64) -> bool {
