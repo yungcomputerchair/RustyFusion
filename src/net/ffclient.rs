@@ -154,11 +154,11 @@ impl PacketBuffer {
         let from = self.ptr;
         let to = from + sz;
         if to > self.buf.len() {
-            panic_log(&format!(
-                "Payload too big for output ({} > {})",
-                sz,
-                self.buf.len()
-            ));
+            log(
+                Severity::Warning,
+                &format!("Payload too big for output ({} > {})", to, self.buf.len()),
+            );
+            return;
         }
 
         self.buf[from..to].copy_from_slice(dat);
@@ -307,6 +307,10 @@ impl FFClient {
 
     pub fn get_packet<T: FFPacket>(&mut self, pkt_id: PacketID) -> FFResult<&T> {
         self.in_buf.get_packet(pkt_id)
+    }
+
+    pub fn get_packet_unchecked<T: FFPacket>(&mut self) -> FFResult<&T> {
+        self.in_buf.get_packet(self.peek_packet_id()?)
     }
 
     pub fn get_struct<T: FFPacket>(&mut self) -> FFResult<&T> {

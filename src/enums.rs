@@ -80,7 +80,8 @@ ffenum!(CharType, i32, 5, {
     Unknown = 0,
     Player = 1,
     NPC = 2,
-    Mob = 3,
+    Mob = 4,
+    All = 255,
 });
 
 // eTaskTypeProperty.cs
@@ -146,6 +147,17 @@ ffenum!(ItemType, i16, {
     Skill = 27,            /*eItemType_Skill*/
     Npc = 30,              /*eItemType_Npc*/
     SkillBuffEffect = 138, /*eItemType_SkillBuffEffect*/
+});
+
+// eWeaponTargetMode.cs
+ffenum!(WeaponTargetMode, i32, {
+    Hand = 0,
+    Melee = 1,
+    Pistol = 2,
+    Shotgun = 3,
+    Sniper = 4,
+    Rocket = 5,
+    Grenade = 6,
 });
 
 // eTransportationType.cs

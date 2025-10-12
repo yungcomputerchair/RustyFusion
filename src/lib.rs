@@ -51,6 +51,10 @@ pub struct Position {
     pub z: i32,
 }
 impl Position {
+    pub fn new(x: i32, y: i32, z: i32) -> Self {
+        Self { x, y, z }
+    }
+
     pub fn distance_to_weighted(&self, other: &Position, weights: (f32, f32, f32)) -> u32 {
         // scaling down for the multiplication helps to avoid overflow here
         const DIST_MATH_SCALE: f32 = 100.0;
