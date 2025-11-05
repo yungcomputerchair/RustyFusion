@@ -256,10 +256,9 @@ pub fn login_pc_exit_duplicate(
         .get_self()
         .get_packet(P_LS2FE_REQ_PC_EXIT_DUPLICATE)?;
     let pc_uid = pkt.iPC_UID;
-    let pc_id = *state
-        .entity_map
-        .find_players(|p| p.get_uid() == pc_uid)
-        .first()
+    let pc_id = state
+        .get_player_by_uid(pc_uid)
+        .map(|p| p.get_player_id())
         .ok_or(FFError::build(
             Severity::Warning,
             format!("Couldn't find player with UID {}", pc_uid),
@@ -299,10 +298,9 @@ pub fn login_get_buddy_state(
         )
         .collect();
 
-    let pc_id = *state
-        .entity_map
-        .find_players(|p| p.get_uid() == pc_uid)
-        .first()
+    let pc_id = state
+        .get_player_by_uid(pc_uid)
+        .map(|p| p.get_player_id())
         .ok_or(FFError::build(
             Severity::Warning,
             format!("Couldn't find player with UID {}", pc_uid),
@@ -319,11 +317,10 @@ pub fn login_get_buddy_state(
         resp.aBuddyState[i] = if online { 1 } else { 0 };
         if online {
             // lookup shard-local ID
-            let buddy_id = *state
-                .entity_map
-                .find_players(|p| p.get_uid() == buddy_uid)
-                .first()
-                .unwrap_or(&0);
+            let buddy_id = state
+                .get_player_by_uid(buddy_uid)
+                .map(|p| p.get_player_id())
+                .unwrap_or(0);
             resp.aBuddyID[i] = buddy_id;
         }
     }

@@ -218,6 +218,80 @@ pub fn send_group_menuchat_message(
     Ok(())
 }
 
+pub fn send_buddy_freechat_message(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+
+    let client = clients.get_self();
+    let pkt: sP_CL2FE_REQ_SEND_BUDDY_FREECHAT_MESSAGE =
+        *client.get_packet(P_CL2FE_REQ_SEND_BUDDY_FREECHAT_MESSAGE)?;
+    let pc_id = client.get_player_id()?;
+    let player = state.get_player(pc_id)?;
+
+    let msg = util::parse_utf16(&pkt.szFreeChat)?;
+    if !helpers::validate_menuchat_message(&msg) {
+        return Err(FFError::build(
+            Severity::Warning,
+            format!("Invalid menuchat message\n\t{}: '{}'", player, msg),
+        ));
+    }
+
+    let pkt = sP_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC {
+        iFromPCUID: player.get_uid(),
+        iToPCUID: pkt.iBuddyPCUID,
+        szFreeChat: pkt.szFreeChat,
+        iEmoteCode: pkt.iEmoteCode,
+    };
+
+    client.send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &pkt)?;
+
+    if let Some(buddy) = state.get_player_by_uid(pkt.iToPCUID) {
+        if let Some(buddy_client) = buddy.get_client(clients) {
+            buddy_client.send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &pkt)?;
+        }
+    }
+
+    Ok(())
+}
+
+pub fn send_buddy_menuchat_message(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+
+    let client = clients.get_self();
+    let pkt: sP_CL2FE_REQ_SEND_BUDDY_MENUCHAT_MESSAGE =
+        *client.get_packet(P_CL2FE_REQ_SEND_BUDDY_MENUCHAT_MESSAGE)?;
+    let pc_id = client.get_player_id()?;
+    let player = state.get_player(pc_id)?;
+
+    let msg = util::parse_utf16(&pkt.szFreeChat)?;
+    if !helpers::validate_menuchat_message(&msg) {
+        return Err(FFError::build(
+            Severity::Warning,
+            format!("Invalid menuchat message\n\t{}: '{}'", player, msg),
+        ));
+    }
+
+    let pkt = sP_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC {
+        iFromPCUID: player.get_uid(),
+        iToPCUID: pkt.iBuddyPCUID,
+        szFreeChat: pkt.szFreeChat,
+        iEmoteCode: pkt.iEmoteCode,
+    };
+
+    client.send_packet(P_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC, &pkt)?;
+
+    if let Some(buddy) = state.get_player_by_uid(pkt.iToPCUID) {
+        if let Some(buddy_client) = buddy.get_client(clients) {
+            buddy_client.send_packet(P_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC, &pkt)?;
+        }
+    }
+
+    Ok(())
+}
+
 pub fn pc_avatar_emotes_chat(
     clients: &mut ClientMap,
     state: &mut ShardServerState,

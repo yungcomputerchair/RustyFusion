@@ -33,6 +33,7 @@ pub struct ShardServerState {
     pub buyback_lists: HashMap<i32, Vec<Item>>,
     pub ongoing_trades: HashMap<Uuid, TradeContext>,
     pub groups: HashMap<Uuid, Group>,
+    pub player_uid_to_id: HashMap<i64, i32>,
 }
 
 impl ShardServerState {
@@ -46,6 +47,7 @@ impl ShardServerState {
             buyback_lists: HashMap::new(),
             ongoing_trades: HashMap::new(),
             groups: HashMap::new(),
+            player_uid_to_id: HashMap::new(),
         };
         let num_channels = config_get().shard.num_channels.get();
         if num_channels == 0 || num_channels > MAX_NUM_CHANNELS as u8 {
@@ -161,6 +163,12 @@ impl ShardServerState {
             Severity::Warning,
             format!("Player with ID {} doesn't exist", pc_id),
         ))
+    }
+
+    pub fn get_player_by_uid(&self, pc_uid: i64) -> Option<&Player> {
+        self.player_uid_to_id
+            .get(&pc_uid)
+            .and_then(|pc_id| self.get_player(*pc_id).ok())
     }
 
     pub fn get_slider(&self, slider_id: i32) -> FFResult<&Slider> {
