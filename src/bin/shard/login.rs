@@ -329,3 +329,32 @@ pub fn login_get_buddy_state(
     log_if_failed(client.send_packet(P_FE2CL_REP_GET_BUDDY_STATE_SUCC, &resp));
     Ok(())
 }
+
+pub fn login_buddy_chat(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let pkt: &sP_LS2FE_REP_BUDDY_CHAT = clients
+        .get_self()
+        .get_packet(P_LS2FE_REP_BUDDY_CHAT)?;
+
+    let pc_uid = pkt.iToPCUID;
+    let pc_id = state
+        .get_player_by_uid(pc_uid)
+        .map(|p| p.get_player_id())
+        .ok_or(FFError::build(
+            Severity::Warning,
+            format!("Couldn't find player with UID {}", pc_uid),
+        ))?;
+    let player = state.get_player(pc_id).unwrap();
+    let pkt = sP_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC {
+        iFromPCUID: pkt.iFromPCUID,
+        iToPCUID: pkt.iToPCUID,
+        szFreeChat: pkt.szFreeChat,
+        iEmoteCode: pkt.iEmoteCode,
+    };
+    let client = player.get_client(clients).unwrap();
+    log_if_failed(client.send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &pkt));
+   
+    Ok(())
+}

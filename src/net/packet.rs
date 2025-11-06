@@ -544,6 +544,7 @@ pub enum PacketID {
     P_LS2FE_REP_LIVE_CHECK = 0x2300000b,        // 587202571
     P_LS2FE_REP_AUTH_CHALLENGE = 0x2300000c,    // 587202572
     P_LS2FE_REP_GET_BUDDY_STATE = 0x2300000d,   // 587202573
+    P_LS2FE_REP_BUDDY_CHAT = 0x2300000e,       // 587202574
 
     P_FE2LS_REQ_CONNECT = 0x32000001,                // 838860801
     P_FE2LS_REP_LIVE_CHECK = 0x32000002,             // 838860802
@@ -561,6 +562,7 @@ pub enum PacketID {
     P_FE2LS_REQ_AUTH_CHALLENGE = 0x3200000e,   // 838860814
     P_FE2LS_REQ_GET_BUDDY_STATE = 0x3200000f,  // 838860815
     P_FE2LS_DISCONNECTING = 0x32000010,        // 838860816
+    P_FE2LS_REQ_BUDDY_CHAT = 0x32000011,       // 838860817
 }
 
 pub trait FFPacket: std::fmt::Debug {}
@@ -6800,3 +6802,25 @@ pub struct sP_FE2LS_DISCONNECTING {
     pub iTempValue: i32,
 }
 impl FFPacket for sP_FE2LS_DISCONNECTING {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_REQ_BUDDY_CHAT {
+    pub iFromPCUID: i64,
+    pub iToPCUID: i64,
+    pub szFreeChat: [u16; 128],
+    pub iEmoteCode: i32,
+}
+impl FFPacket for sP_FE2LS_REQ_BUDDY_CHAT {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_LS2FE_REP_BUDDY_CHAT {
+    pub iFromPCUID: i64,
+    pub iToPCUID: i64,
+    pub szFreeChat: [u16; 128],
+    pub iEmoteCode: i32,
+}
+impl FFPacket for sP_LS2FE_REP_BUDDY_CHAT {}

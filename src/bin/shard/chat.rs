@@ -237,19 +237,26 @@ pub fn send_buddy_freechat_message(
         ));
     }
 
-    let pkt = sP_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC {
+    let response_pkt = sP_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC {
         iFromPCUID: player.get_uid(),
         iToPCUID: pkt.iBuddyPCUID,
         szFreeChat: pkt.szFreeChat,
         iEmoteCode: pkt.iEmoteCode,
     };
 
-    client.send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &pkt)?;
-
-    if let Some(buddy) = state.get_player_by_uid(pkt.iToPCUID) {
+    if let Some(buddy) = state.get_player_by_uid(pkt.iBuddyPCUID) {
         if let Some(buddy_client) = buddy.get_client(clients) {
-            buddy_client.send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &pkt)?;
+            buddy_client.send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &response_pkt)?;
         }
+    } else {
+        let login_server = clients.get_login_server().unwrap();
+        let cross_shard_pkt = sP_FE2LS_REQ_BUDDY_CHAT {
+            iFromPCUID: player.get_uid(),
+            iToPCUID: pkt.iBuddyPCUID,
+            szFreeChat: pkt.szFreeChat,
+            iEmoteCode: pkt.iEmoteCode,
+        };
+        login_server.send_packet(P_FE2LS_REQ_BUDDY_CHAT, &cross_shard_pkt)?;
     }
 
     Ok(())
@@ -291,6 +298,7 @@ pub fn send_buddy_menuchat_message(
 
     Ok(())
 }
+
 
 pub fn pc_avatar_emotes_chat(
     clients: &mut ClientMap,
