@@ -1283,15 +1283,16 @@ impl Player {
 
     pub fn disconnect(pc_id: i32, state: &mut ShardServerState, clients: &mut ClientMap) {
         let player = state.get_player(pc_id).unwrap();
+        let uid = player.get_uid();
+        let display_info = format!(
+            "{} left (channel {})",
+            player, player.instance_id.channel_num
+        );
         let player_saved = player.clone();
         log_if_failed(db_run_sync(move |db| db.save_player(&player_saved)));
-        log(
-            Severity::Info,
-            &format!(
-                "{} left (channel {})",
-                player, player.instance_id.channel_num
-            ),
-        );
+        log(Severity::Info, &display_info);
+
+        state.player_uid_to_id.remove(&uid);
 
         let id = EntityID::Player(pc_id);
         let entity_map = &mut state.entity_map;
@@ -1830,11 +1831,9 @@ impl PlayerSearchQuery {
                     None
                 }
             }
-            PlayerSearchQuery::ByUID(pc_uid) => state
-                .entity_map
-                .find_players(|player| player.get_uid() == *pc_uid)
-                .first()
-                .copied(),
+            PlayerSearchQuery::ByUID(pc_uid) => {
+                state.get_player_by_uid(*pc_uid).map(|p| p.get_player_id())
+            }
             PlayerSearchQuery::ByName(first_name, last_name) => state
                 .entity_map
                 .find_players(|player| {

@@ -32,10 +32,8 @@ pub fn pc_enter(
     // check if this player is already in the shard and kick if so.
     // important that we save the current player to DB first to avoid state desync
     if let Some(existing_pc_id) = state
-        .entity_map
-        .find_players(|p| p.get_uid() == login_data.iPC_UID)
-        .first()
-        .copied()
+        .get_player_by_uid(login_data.iPC_UID)
+        .map(|p| p.get_player_id())
     {
         log(
             Severity::Warning,
@@ -101,7 +99,9 @@ pub fn pc_enter(
             player, player.instance_id.channel_num
         ),
     );
+    let player_uid = player.get_uid();
     state.entity_map.track(Box::new(player), TickMode::Always);
+    state.player_uid_to_id.insert(player_uid, pc_id);
 
     clients
         .get_self()
