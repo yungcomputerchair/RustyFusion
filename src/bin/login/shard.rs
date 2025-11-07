@@ -407,14 +407,14 @@ pub fn handle_disconnecting(
     Ok(())
 }
 
-pub fn buddy_chat(
+pub fn buddy_freechat(
     shard_key: usize,
     clients: &mut HashMap<usize, FFClient>,
     state: &mut LoginServerState,
 ) -> FFResult<()> {
     let server = clients.get_mut(&shard_key).unwrap();
-    let pkt: sP_FE2LS_REQ_BUDDY_CHAT = *server.get_packet(P_FE2LS_REQ_BUDDY_CHAT)?;
-    let resp = sP_LS2FE_REP_BUDDY_CHAT {
+    let pkt: sP_FE2LS_REQ_BUDDY_FREECHAT = *server.get_packet(P_FE2LS_REQ_BUDDY_FREECHAT)?;
+    let resp = sP_LS2FE_REP_BUDDY_FREECHAT {
         iFromPCUID: pkt.iFromPCUID,
         iToPCUID: pkt.iToPCUID,
         szFreeChat: pkt.szFreeChat,
@@ -441,7 +441,126 @@ pub fn buddy_chat(
                 to_shard_id
             ),
         ))?;
-    log_if_failed(client.send_packet(P_LS2FE_REP_BUDDY_CHAT, &resp));
+    log_if_failed(client.send_packet(P_LS2FE_REP_BUDDY_MENUCHAT, &resp));
+
+    Ok(())
+}
+
+pub fn buddy_freechat_succ(
+    shard_key: usize,
+    clients: &mut HashMap<usize, FFClient>,
+    state: &mut LoginServerState,
+) -> FFResult<()> {
+    let server = clients.get_mut(&shard_key).unwrap();
+    let pkt: sP_FE2LS_REP_BUDDY_FREECHAT = *server.get_packet(P_FE2LS_REP_BUDDY_FREECHAT)?;
+    
+    let ack = sP_LS2FE_REP_BUDDY_FREECHAT {
+        iFromPCUID: pkt.iFromPCUID,
+        iToPCUID: pkt.iToPCUID,
+        szFreeChat: pkt.szFreeChat,
+        iEmoteCode: pkt.iEmoteCode,
+    };
+
+    let from_shard_id = match state.get_player_shard(pkt.iFromPCUID) {
+        Some(shard_id) => shard_id,
+        None => {
+            return Ok(());
+        }
+    };
+
+    let client = clients
+        .values_mut()
+        .find(|c| match c.client_type {
+            ClientType::ShardServer(shard_id) => shard_id == from_shard_id,
+            _ => false,
+        })
+        .ok_or(FFError::build(
+            Severity::Warning,
+            format!(
+                "Shard {}, which should host buddy chat sender, not found",
+                from_shard_id
+            ),
+        ))?;
+    log_if_failed(client.send_packet(P_LS2FE_REP_BUDDY_FREECHAT, &ack));
+
+    Ok(())
+}
+
+pub fn buddy_menuchat(
+    shard_key: usize,
+    clients: &mut HashMap<usize, FFClient>,
+    state: &mut LoginServerState,
+) -> FFResult<()> {
+    let server = clients.get_mut(&shard_key).unwrap();
+    let pkt: sP_FE2LS_REQ_BUDDY_MENUCHAT = *server.get_packet(P_FE2LS_REQ_BUDDY_MENUCHAT)?;
+    let resp = sP_LS2FE_REP_BUDDY_MENUCHAT {
+        iFromPCUID: pkt.iFromPCUID,
+        iToPCUID: pkt.iToPCUID,
+        szFreeChat: pkt.szFreeChat,
+        iEmoteCode: pkt.iEmoteCode,
+    };
+
+    let to_shard_id = match state.get_player_shard(pkt.iToPCUID) {
+    Some(shard_id) => shard_id,
+        None => {
+            return Ok(());
+        }
+    };
+
+    let client = clients
+        .values_mut()
+        .find(|c| match c.client_type {
+            ClientType::ShardServer(shard_id) => shard_id == to_shard_id,
+            _ => false,
+        })
+        .ok_or(FFError::build(
+            Severity::Warning,
+            format!(
+                "Shard {}, which should host buddy chat recipient, not found",
+                to_shard_id
+            ),
+        ))?;
+    log_if_failed(client.send_packet(P_LS2FE_REP_BUDDY_MENUCHAT, &resp));
+
+    Ok(())
+}
+
+pub fn buddy_menuchat_succ(
+    shard_key: usize,
+    clients: &mut HashMap<usize, FFClient>,
+    state: &mut LoginServerState,
+) -> FFResult<()> {
+    let server = clients.get_mut(&shard_key).unwrap();
+    let pkt: sP_FE2LS_REP_BUDDY_MENUCHAT = *server.get_packet(P_FE2LS_REP_BUDDY_MENUCHAT)?;
+    
+    let ack = sP_LS2FE_REP_BUDDY_MENUCHAT {
+        iFromPCUID: pkt.iFromPCUID,
+        iToPCUID: pkt.iToPCUID,
+        szFreeChat: pkt.szFreeChat,
+        iEmoteCode: pkt.iEmoteCode,
+    };
+
+    let from_shard_id = match state.get_player_shard(pkt.iFromPCUID) {
+        Some(shard_id) => shard_id,
+        None => {
+            return Ok(());
+        }
+    };
+
+    let client = clients
+        .values_mut()
+        .find(|c| match c.client_type {
+            ClientType::ShardServer(shard_id) => shard_id == from_shard_id,
+            _ => false,
+        })
+        .ok_or(FFError::build(
+            Severity::Warning,
+            format!(
+                "Shard {}, which should host buddy chat sender, not found",
+                from_shard_id
+            ),
+        ))?;
+    log_if_failed(client.send_packet(P_LS2FE_REP_BUDDY_MENUCHAT, &ack));
 
     Ok(())
 }

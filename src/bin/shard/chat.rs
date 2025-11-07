@@ -222,43 +222,55 @@ pub fn send_buddy_freechat_message(
     clients: &mut ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
+    let sender_client = clients.get_self();
+    let packet: sP_CL2FE_REQ_SEND_BUDDY_FREECHAT_MESSAGE =
+        *sender_client.get_packet(P_CL2FE_REQ_SEND_BUDDY_FREECHAT_MESSAGE)?;
+    let sender_id = sender_client.get_player_id()?;
+    let sender = state.get_player(sender_id)?;
 
-    let client = clients.get_self();
-    let pkt: sP_CL2FE_REQ_SEND_BUDDY_FREECHAT_MESSAGE =
-        *client.get_packet(P_CL2FE_REQ_SEND_BUDDY_FREECHAT_MESSAGE)?;
-    let pc_id = client.get_player_id()?;
-    let player = state.get_player(pc_id)?;
-
-    let msg = util::parse_utf16(&pkt.szFreeChat)?;
-    if !helpers::validate_menuchat_message(&msg) {
+    let message = util::parse_utf16(&packet.szFreeChat)?;
+    if !helpers::validate_menuchat_message(&message) {
         return Err(FFError::build(
             Severity::Warning,
-            format!("Invalid menuchat message\n\t{}: '{}'", player, msg),
+            format!("Invalid buddy chat message from {}: '{}'", sender, message),
         ));
     }
 
-    let response_pkt = sP_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC {
-        iFromPCUID: player.get_uid(),
-        iToPCUID: pkt.iBuddyPCUID,
-        szFreeChat: pkt.szFreeChat,
-        iEmoteCode: pkt.iEmoteCode,
+    let buddy_uid = packet.iBuddyPCUID;
+    let response_packet = sP_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC {
+        iFromPCUID: sender.get_uid(),
+        iToPCUID: buddy_uid,
+        szFreeChat: packet.szFreeChat,
+        iEmoteCode: packet.iEmoteCode,
     };
 
-    if let Some(buddy) = state.get_player_by_uid(pkt.iBuddyPCUID) {
+    if let Some(buddy) = state.get_player_by_uid(buddy_uid) {
         if let Some(buddy_client) = buddy.get_client(clients) {
-            buddy_client.send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &response_pkt)?;
+            buddy_client.send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &response_packet)?;
+            let sender = state.get_player_by_uid(response_packet.iFromPCUID).unwrap();
+            let sender_client = sender.get_client(clients).unwrap();
+            sender_client.send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &response_packet)?;
+            return Ok(());
         }
-    } else {
-        let login_server = clients.get_login_server().unwrap();
-        let cross_shard_pkt = sP_FE2LS_REQ_BUDDY_CHAT {
-            iFromPCUID: player.get_uid(),
-            iToPCUID: pkt.iBuddyPCUID,
-            szFreeChat: pkt.szFreeChat,
-            iEmoteCode: pkt.iEmoteCode,
-        };
-        login_server.send_packet(P_FE2LS_REQ_BUDDY_CHAT, &cross_shard_pkt)?;
     }
 
+    let login_server = clients.get_login_server()
+        .ok_or(FFError::build(Severity::Warning, "Login server not available".to_string()))?;
+
+    let cross_shard_packet = sP_FE2LS_REQ_BUDDY_FREECHAT {
+        iFromPCUID: response_packet.iFromPCUID,
+        iToPCUID: buddy_uid,
+        szFreeChat: packet.szFreeChat,
+        iEmoteCode: packet.iEmoteCode,
+    };
+
+    log(Severity::Info, "Sending cross shard packet...");
+    let from_pc_uid = cross_shard_packet.iFromPCUID;
+    let to_pc_uid = cross_shard_packet.iToPCUID;
+
+    log(Severity::Info, &format!("{} (to {}) (buddy freechat)", from_pc_uid, to_pc_uid));
+
+    login_server.send_packet(P_FE2LS_REQ_BUDDY_FREECHAT, &cross_shard_packet)?;
     Ok(())
 }
 
@@ -266,36 +278,48 @@ pub fn send_buddy_menuchat_message(
     clients: &mut ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
+    let sender_client = clients.get_self();
+    let packet: sP_CL2FE_REQ_SEND_BUDDY_MENUCHAT_MESSAGE =
+        *sender_client.get_packet(P_CL2FE_REQ_SEND_BUDDY_MENUCHAT_MESSAGE)?;
+    let sender_id = sender_client.get_player_id()?;
+    let sender = state.get_player(sender_id)?;
 
-    let client = clients.get_self();
-    let pkt: sP_CL2FE_REQ_SEND_BUDDY_MENUCHAT_MESSAGE =
-        *client.get_packet(P_CL2FE_REQ_SEND_BUDDY_MENUCHAT_MESSAGE)?;
-    let pc_id = client.get_player_id()?;
-    let player = state.get_player(pc_id)?;
-
-    let msg = util::parse_utf16(&pkt.szFreeChat)?;
-    if !helpers::validate_menuchat_message(&msg) {
+    let message = util::parse_utf16(&packet.szFreeChat)?;
+    if !helpers::validate_menuchat_message(&message) {
         return Err(FFError::build(
             Severity::Warning,
-            format!("Invalid menuchat message\n\t{}: '{}'", player, msg),
+            format!("Invalid buddy menuchat message from {}: '{}'", sender, message),
         ));
     }
 
-    let pkt = sP_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC {
-        iFromPCUID: player.get_uid(),
-        iToPCUID: pkt.iBuddyPCUID,
-        szFreeChat: pkt.szFreeChat,
-        iEmoteCode: pkt.iEmoteCode,
+    let buddy_uid = packet.iBuddyPCUID;
+    let response_packet = sP_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC {
+        iFromPCUID: sender.get_uid(),
+        iToPCUID: buddy_uid,
+        szFreeChat: packet.szFreeChat,
+        iEmoteCode: packet.iEmoteCode,
     };
 
-    client.send_packet(P_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC, &pkt)?;
+    sender_client.send_packet(P_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC, &response_packet)?;
 
-    if let Some(buddy) = state.get_player_by_uid(pkt.iToPCUID) {
+    if let Some(buddy) = state.get_player_by_uid(buddy_uid) {
         if let Some(buddy_client) = buddy.get_client(clients) {
-            buddy_client.send_packet(P_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC, &pkt)?;
+            buddy_client.send_packet(P_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC, &response_packet)?;
+            return Ok(());
         }
     }
 
+    let login_server = clients.get_login_server()
+        .ok_or(FFError::build(Severity::Warning, "Login server not available".to_string()))?;
+
+    let cross_shard_packet = sP_FE2LS_REQ_BUDDY_MENUCHAT {
+        iFromPCUID: sender.get_uid(),
+        iToPCUID: buddy_uid,
+        szFreeChat: packet.szFreeChat,
+        iEmoteCode: packet.iEmoteCode,
+    };
+
+    login_server.send_packet(P_FE2LS_REQ_BUDDY_MENUCHAT, &cross_shard_packet)?;
     Ok(())
 }
 

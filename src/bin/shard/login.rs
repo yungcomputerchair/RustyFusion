@@ -330,31 +330,136 @@ pub fn login_get_buddy_state(
     Ok(())
 }
 
-pub fn login_buddy_chat(
+pub fn login_buddy_freechat(
     clients: &mut ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_LS2FE_REP_BUDDY_CHAT = clients
-        .get_self()
-        .get_packet(P_LS2FE_REP_BUDDY_CHAT)?;
+    let client = clients.get_self();
+    let packet: &sP_LS2FE_REQ_BUDDY_FREECHAT = client.get_packet(P_LS2FE_REQ_BUDDY_FREECHAT)?;
 
-    let pc_uid = pkt.iToPCUID;
-    let pc_id = state
-        .get_player_by_uid(pc_uid)
-        .map(|p| p.get_player_id())
+    let sender_uid = packet.iFromPCUID;
+    let receiver_uid = packet.iToPCUID;
+    let message = packet.szFreeChat;
+    let emote = packet.iEmoteCode;
+
+    let response_packet = sP_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC {
+        iFromPCUID: sender_uid,
+        iToPCUID: receiver_uid,
+        szFreeChat: message,
+        iEmoteCode: emote,
+    };
+
+    let receiver = state.get_player_by_uid(receiver_uid).unwrap();
+    let receiver_client = receiver.get_client(clients).unwrap();
+    receiver_client.send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &response_packet)?;
+
+    // Send ACK back to login server
+    let login_server = clients.get_login_server().unwrap();
+    let ack_packet = sP_FE2LS_REP_BUDDY_FREECHAT {
+        iFromPCUID: sender_uid,
+        iToPCUID: receiver_uid,
+        szFreeChat: message,
+        iEmoteCode: emote,
+    };
+    login_server.send_packet(P_FE2LS_REP_BUDDY_FREECHAT, &ack_packet)?;
+
+    Ok(())
+}
+
+pub fn login_buddy_freechat_succ(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let client = clients.get_self();
+    let packet: &sP_LS2FE_REP_BUDDY_FREECHAT = client.get_packet(P_LS2FE_REP_BUDDY_FREECHAT)?;
+
+    let sender_uid = packet.iFromPCUID;
+    let receiver_uid = packet.iToPCUID;
+
+    // Now send success packet to the original sender
+    let sender = state.get_player_by_uid(sender_uid).unwrap();
+    let sender_client = sender.get_client(clients).unwrap();
+
+    let response_packet = sP_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC {
+        iFromPCUID: sender_uid,
+        iToPCUID: receiver_uid,
+        szFreeChat: [0; 128], // Message already delivered, client doesn't need it again
+        iEmoteCode: 0,
+    };
+
+    sender_client.send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &response_packet)?;
+
+    Ok(())
+}
+
+pub fn login_buddy_menuchat(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let packet: &sP_LS2FE_REQ_BUDDY_MENUCHAT = clients
+        .get_self()
+        .get_packet(P_LS2FE_REQ_BUDDY_MENUCHAT)?;
+
+    let sender_uid = packet.iFromPCUID;
+    let receiver_uid = packet.iToPCUID;
+    let message = packet.szFreeChat;
+    let emote = packet.iEmoteCode;
+
+    let receiver_id = state
+        .get_player_by_uid(receiver_uid)
         .ok_or(FFError::build(
             Severity::Warning,
-            format!("Couldn't find player with UID {}", pc_uid),
-        ))?;
-    let player = state.get_player(pc_id).unwrap();
-    let pkt = sP_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC {
-        iFromPCUID: pkt.iFromPCUID,
-        iToPCUID: pkt.iToPCUID,
-        szFreeChat: pkt.szFreeChat,
-        iEmoteCode: pkt.iEmoteCode,
+            format!("Player not found: UID {}", receiver_uid),
+        ))?
+        .get_player_id();
+
+    let receiver = state.get_player(receiver_id).unwrap();
+    let receiver_client = receiver.get_client(clients).unwrap();
+
+    let response_packet = sP_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC {
+        iFromPCUID: sender_uid,
+        iToPCUID: receiver_uid,
+        szFreeChat: message,
+        iEmoteCode: emote,
     };
-    let client = player.get_client(clients).unwrap();
-    log_if_failed(client.send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &pkt));
-   
+
+    receiver_client.send_packet(P_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC, &response_packet)?;
+
+    // Send ACK back to login server
+    let login_server = clients.get_login_server().unwrap();
+    let ack_packet = sP_FE2LS_REP_BUDDY_MENUCHAT {
+        iFromPCUID: sender_uid,
+        iToPCUID: receiver_uid,
+        szFreeChat: message,
+        iEmoteCode: emote,
+    };
+    login_server.send_packet(P_FE2LS_REP_BUDDY_MENUCHAT, &ack_packet)?;
+
+    Ok(())
+}
+
+pub fn login_buddy_menuchat_succ(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let client = clients.get_self();
+    let packet: &sP_LS2FE_REP_BUDDY_MENUCHAT = client.get_packet(P_LS2FE_REP_BUDDY_MENUCHAT)?;
+
+    let sender_uid = packet.iFromPCUID;
+    let receiver_uid = packet.iToPCUID;
+
+    // Now send success packet to the original sender
+    let sender = state.get_player_by_uid(sender_uid).unwrap();
+    let sender_client = sender.get_client(clients).unwrap();
+
+    let response_packet = sP_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC {
+        iFromPCUID: sender_uid,
+        iToPCUID: receiver_uid,
+        szFreeChat: [0; 128], // Message already delivered, client doesn't need it again
+        iEmoteCode: 0,
+    };
+
+    sender_client.send_packet(P_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC, &response_packet)?;
+
     Ok(())
 }

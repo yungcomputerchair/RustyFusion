@@ -198,7 +198,10 @@ fn handle_packet(
         P_FE2LS_REQ_GET_BUDDY_STATE => shard::get_buddy_state(key, clients, state),
         P_FE2LS_DISCONNECTING => shard::handle_disconnecting(key, clients, state),
         P_FE2LS_REQ_LIVE_CHECK => shard::shard_live_check(client),
-        P_FE2LS_REQ_BUDDY_CHAT => shard::buddy_chat(key, clients, state),
+        P_FE2LS_REQ_BUDDY_FREECHAT => shard::buddy_freechat(key, clients, state),
+        P_FE2LS_REQ_BUDDY_MENUCHAT => shard::buddy_menuchat(key, clients, state),
+        P_FE2LS_REP_BUDDY_FREECHAT => shard::buddy_freechat_succ(key, clients, state),
+        P_FE2LS_REP_BUDDY_MENUCHAT => shard::buddy_menuchat_succ(key, clients, state),
         //
         P_CL2LS_REQ_LOGIN => login::login(client, state, time),
         P_CL2LS_REQ_PC_EXIT_DUPLICATE => login::pc_exit_duplicate(key, clients, state),
