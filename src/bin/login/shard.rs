@@ -415,7 +415,7 @@ pub fn buddy_freechat(
     let server = clients.get_mut(&shard_key).unwrap();
     let pkt: sP_FE2LS_REQ_SEND_BUDDY_FREECHAT =
         *server.get_packet(P_FE2LS_REQ_SEND_BUDDY_FREECHAT)?;
-    let resp = sP_LS2FE_REP_SEND_BUDDY_FREECHAT {
+    let req = sP_LS2FE_REQ_SEND_BUDDY_FREECHAT {
         iFromPCUID: pkt.iFromPCUID,
         iToPCUID: pkt.iToPCUID,
         szFreeChat: pkt.szFreeChat,
@@ -442,7 +442,7 @@ pub fn buddy_freechat(
                 to_shard_id
             ),
         ))?;
-    log_if_failed(client.send_packet(P_LS2FE_REP_SEND_BUDDY_FREECHAT, &resp));
+    log_if_failed(client.send_packet(P_LS2FE_REQ_SEND_BUDDY_FREECHAT, &req));
 
     Ok(())
 }
@@ -483,7 +483,7 @@ pub fn buddy_menuchat(
     let server = clients.get_mut(&shard_key).unwrap();
     let pkt: sP_FE2LS_REQ_SEND_BUDDY_MENUCHAT =
         *server.get_packet(P_FE2LS_REQ_SEND_BUDDY_MENUCHAT)?;
-    let resp = sP_LS2FE_REP_SEND_BUDDY_MENUCHAT {
+    let req = sP_LS2FE_REQ_SEND_BUDDY_MENUCHAT {
         iFromPCUID: pkt.iFromPCUID,
         iToPCUID: pkt.iToPCUID,
         szFreeChat: pkt.szFreeChat,
@@ -510,7 +510,7 @@ pub fn buddy_menuchat(
                 to_shard_id
             ),
         ))?;
-    log_if_failed(client.send_packet(P_LS2FE_REP_SEND_BUDDY_MENUCHAT, &resp));
+    log_if_failed(client.send_packet(P_LS2FE_REQ_SEND_BUDDY_MENUCHAT, &req));
 
     Ok(())
 }

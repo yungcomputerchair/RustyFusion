@@ -332,8 +332,8 @@ pub fn login_get_buddy_state(
 
 pub fn login_buddy_freechat(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
-    let pkt: sP_LS2FE_REP_SEND_BUDDY_FREECHAT =
-        *client.get_packet(P_LS2FE_REP_SEND_BUDDY_FREECHAT)?;
+    let pkt: sP_LS2FE_REQ_SEND_BUDDY_FREECHAT =
+        *client.get_packet(P_LS2FE_REQ_SEND_BUDDY_FREECHAT)?;
 
     if let Some(buddy) = state.get_player_by_uid(pkt.iToPCUID) {
         if let Some(buddy_client) = buddy.get_client(clients) {
@@ -346,14 +346,20 @@ pub fn login_buddy_freechat(clients: &mut ClientMap, state: &mut ShardServerStat
             buddy_client
                 .send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &response_pkt)?;
 
-            let login_server = clients.get_login_server().unwrap();
-            let succ_pkt = sP_FE2LS_REP_SEND_BUDDY_FREECHAT_SUCC {
-                iFromPCUID: pkt.iFromPCUID,
-                iToPCUID: pkt.iToPCUID,
-                szFreeChat: pkt.szFreeChat,
-                iEmoteCode: pkt.iEmoteCode,
-            };
-            login_server.send_packet(P_FE2LS_REP_SEND_BUDDY_FREECHAT_SUCC, &succ_pkt)?;
+            if let Some(login_server) = clients.get_login_server() {
+                let succ_pkt = sP_FE2LS_REP_SEND_BUDDY_FREECHAT_SUCC {
+                    iFromPCUID: pkt.iFromPCUID,
+                    iToPCUID: pkt.iToPCUID,
+                    szFreeChat: pkt.szFreeChat,
+                    iEmoteCode: pkt.iEmoteCode,
+                };
+                login_server.send_packet(P_FE2LS_REP_SEND_BUDDY_FREECHAT_SUCC, &succ_pkt)?;
+            } else {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    "No login server found to forward buddy freechat message".to_string(),
+                ));
+            }
         }
     }
 
@@ -384,8 +390,8 @@ pub fn buddy_freechat_succ(clients: &mut ClientMap, state: &mut ShardServerState
 
 pub fn login_buddy_menuchat(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
-    let pkt: sP_LS2FE_REP_SEND_BUDDY_MENUCHAT =
-        *client.get_packet(P_LS2FE_REP_SEND_BUDDY_MENUCHAT)?;
+    let pkt: sP_LS2FE_REQ_SEND_BUDDY_MENUCHAT =
+        *client.get_packet(P_LS2FE_REQ_SEND_BUDDY_MENUCHAT)?;
 
     if let Some(buddy) = state.get_player_by_uid(pkt.iToPCUID) {
         if let Some(buddy_client) = buddy.get_client(clients) {
@@ -398,14 +404,20 @@ pub fn login_buddy_menuchat(clients: &mut ClientMap, state: &mut ShardServerStat
             buddy_client
                 .send_packet(P_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC, &response_pkt)?;
 
-            let login_server = clients.get_login_server().unwrap();
-            let succ_pkt = sP_FE2LS_REP_SEND_BUDDY_MENUCHAT_SUCC {
-                iFromPCUID: pkt.iFromPCUID,
-                iToPCUID: pkt.iToPCUID,
-                szFreeChat: pkt.szFreeChat,
-                iEmoteCode: pkt.iEmoteCode,
-            };
-            login_server.send_packet(P_FE2LS_REP_SEND_BUDDY_MENUCHAT_SUCC, &succ_pkt)?;
+            if let Some(login_server) = clients.get_login_server() {
+                let succ_pkt = sP_FE2LS_REP_SEND_BUDDY_MENUCHAT_SUCC {
+                    iFromPCUID: pkt.iFromPCUID,
+                    iToPCUID: pkt.iToPCUID,
+                    szFreeChat: pkt.szFreeChat,
+                    iEmoteCode: pkt.iEmoteCode,
+                };
+                login_server.send_packet(P_FE2LS_REP_SEND_BUDDY_MENUCHAT_SUCC, &succ_pkt)?;
+            } else {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    "No login server found to forward buddy menuchat message".to_string(),
+                ));
+            }
         }
     }
 

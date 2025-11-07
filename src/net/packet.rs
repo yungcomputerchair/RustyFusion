@@ -544,9 +544,9 @@ pub enum PacketID {
     P_LS2FE_REP_LIVE_CHECK = 0x2300000b,          // 587202571
     P_LS2FE_REP_AUTH_CHALLENGE = 0x2300000c,      // 587202572
     P_LS2FE_REP_GET_BUDDY_STATE = 0x2300000d,     // 587202573
-    P_LS2FE_REP_SEND_BUDDY_FREECHAT = 0x2300000e, // 587202574
+    P_LS2FE_REQ_SEND_BUDDY_FREECHAT = 0x2300000e, // 587202574
     P_LS2FE_REP_SEND_BUDDY_FREECHAT_SUCC = 0x2300000f, // 587202575
-    P_LS2FE_REP_SEND_BUDDY_MENUCHAT = 0x23000010, // 587202576
+    P_LS2FE_REQ_SEND_BUDDY_MENUCHAT = 0x23000010, // 587202576
     P_LS2FE_REP_SEND_BUDDY_MENUCHAT_SUCC = 0x23000011, // 587202577
 
     P_FE2LS_REQ_CONNECT = 0x32000001,                // 838860801
@@ -6823,13 +6823,13 @@ impl FFPacket for sP_FE2LS_REQ_SEND_BUDDY_FREECHAT {}
 #[repr(packed(4))]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct sP_LS2FE_REP_SEND_BUDDY_FREECHAT {
+pub struct sP_LS2FE_REQ_SEND_BUDDY_FREECHAT {
     pub iFromPCUID: i64,
     pub iToPCUID: i64,
     pub szFreeChat: [u16; 128],
     pub iEmoteCode: i32,
 }
-impl FFPacket for sP_LS2FE_REP_SEND_BUDDY_FREECHAT {}
+impl FFPacket for sP_LS2FE_REQ_SEND_BUDDY_FREECHAT {}
 
 #[repr(packed(4))]
 #[repr(C)]
@@ -6867,13 +6867,13 @@ impl FFPacket for sP_FE2LS_REQ_SEND_BUDDY_MENUCHAT {}
 #[repr(packed(4))]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct sP_LS2FE_REP_SEND_BUDDY_MENUCHAT {
+pub struct sP_LS2FE_REQ_SEND_BUDDY_MENUCHAT {
     pub iFromPCUID: i64,
     pub iToPCUID: i64,
     pub szFreeChat: [u16; 128],
     pub iEmoteCode: i32,
 }
-impl FFPacket for sP_LS2FE_REP_SEND_BUDDY_MENUCHAT {}
+impl FFPacket for sP_LS2FE_REQ_SEND_BUDDY_MENUCHAT {}
 
 #[repr(packed(4))]
 #[repr(C)]
