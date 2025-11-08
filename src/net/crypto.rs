@@ -1,15 +1,19 @@
 use std::num::Wrapping;
 
-use rand::{thread_rng, Rng};
+use aes_gcm::{aead::Aead, AeadCore as _, Aes128Gcm, Key, KeyInit as _, Nonce};
+use rand::{rngs::OsRng, thread_rng, Rng};
+
+use crate::error::{FFError, FFResult, Severity};
 
 use super::PACKET_BUFFER_SIZE;
 
 pub const DEFAULT_KEY: &[u8] = b"m@rQn~W#";
 pub const CRYPTO_KEY_SIZE: usize = DEFAULT_KEY.len();
-pub const AUTH_CHALLENGE_SIZE: usize = PACKET_BUFFER_SIZE / 2;
+pub const AES128_NONCE_SIZE: usize = 12;
+pub const AUTH_CHALLENGE_BASE_SIZE: usize = PACKET_BUFFER_SIZE / 2;
+pub const AUTH_CHALLENGE_MAX_SIZE: usize = AUTH_CHALLENGE_BASE_SIZE + PACKET_BUFFER_SIZE / 4;
 
 pub type CryptoKey = [u8; CRYPTO_KEY_SIZE];
-pub type AuthChallenge = [u8; AUTH_CHALLENGE_SIZE];
 
 pub enum EncryptionMode {
     EKey,
@@ -65,8 +69,39 @@ pub fn gen_key(time: u64, iv1: i32, iv2: i32) -> CryptoKey {
     result.to_le_bytes()
 }
 
-pub fn gen_auth_challenge() -> AuthChallenge {
-    let mut chall: AuthChallenge = [0; AUTH_CHALLENGE_SIZE];
+/// Key derivation using bcrypt to produce a 128-bit AES key from a password
+fn get_aes_key(password: &str) -> Key<Aes128Gcm> {
+    const COST: u32 = bcrypt::DEFAULT_COST;
+    const SALT: [u8; 16] = [42u8; 16];
+    let hash_bytes = bcrypt::bcrypt(COST, SALT, password.as_bytes());
+    // use the first 16 bytes (128 bits) of the bcrypt hash as the AES key
+    let key: &Key<Aes128Gcm> = hash_bytes[..16].into();
+    *key
+}
+
+pub fn decrypt_payload_aes(
+    nonce: &[u8; AES128_NONCE_SIZE],
+    ciphertext: &[u8],
+    password: &str,
+) -> FFResult<Vec<u8>> {
+    let key = get_aes_key(password);
+    let cipher = Aes128Gcm::new(&key);
+    let nonce = Nonce::from_slice(nonce);
+    cipher
+        .decrypt(nonce, ciphertext)
+        .map_err(|e| FFError::build(Severity::Warning, format!("AES decryption failure: {}", e)))
+}
+
+pub fn encrypt_payload_aes(buf: &[u8], password: &str) -> ([u8; AES128_NONCE_SIZE], Vec<u8>) {
+    let key = get_aes_key(password);
+    let cipher = Aes128Gcm::new(&key);
+    let nonce = Aes128Gcm::generate_nonce(&mut OsRng);
+    let ciphertext = cipher.encrypt(&nonce, buf).unwrap();
+    (nonce.into(), ciphertext)
+}
+
+pub fn gen_auth_challenge() -> Vec<u8> {
+    let mut chall: Vec<u8> = vec![0; AUTH_CHALLENGE_BASE_SIZE];
     thread_rng().fill(&mut chall[..]);
     chall
 }

@@ -12,10 +12,7 @@ use crate::{
 
 use super::{
     bytes_to_struct,
-    crypto::{
-        decrypt_payload, encrypt_payload, AuthChallenge, EncryptionMode, CRYPTO_KEY_SIZE,
-        DEFAULT_KEY,
-    },
+    crypto::{decrypt_payload, encrypt_payload, EncryptionMode, CRYPTO_KEY_SIZE, DEFAULT_KEY},
     packet::{
         FFPacket, PacketID, PACKET_MASK_CL2FE, PACKET_MASK_CL2LS, PACKET_MASK_FE2LS,
         PACKET_MASK_LS2FE,
@@ -36,7 +33,7 @@ pub enum ClientType {
         pc_id: Option<i32>, // iPC_ID
     },
     LoginServer,
-    UnauthedShardServer(Box<AuthChallenge>),
+    UnauthedShardServer(Vec<u8>),
     ShardServer(i32),
 }
 

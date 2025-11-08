@@ -8,7 +8,7 @@ use rusty_fusion::{
     entity::PlayerMetadata,
     error::{codes::PlayerSearchReqErr, log, log_if_failed, FFError, FFResult, Severity},
     net::{
-        crypto,
+        crypto::{self, AUTH_CHALLENGE_MAX_SIZE},
         packet::{PacketID::*, *},
         ClientType, FFClient,
     },
@@ -18,12 +18,19 @@ use rusty_fusion::{
 
 pub fn auth_challenge(server: &mut FFClient) -> FFResult<()> {
     let key = config_get().general.server_key.get().clone();
-    let mut challenge = crypto::gen_auth_challenge();
-    server.client_type = ClientType::UnauthedShardServer(Box::new(challenge));
+    let chall_decrypted = crypto::gen_auth_challenge();
+    server.client_type = ClientType::UnauthedShardServer(chall_decrypted.clone());
 
-    crypto::encrypt_payload(&mut challenge, key.as_bytes());
+    let (nonce, chall_encrypted) = crypto::encrypt_payload_aes(&chall_decrypted, &key);
+    assert!(chall_encrypted.len() <= AUTH_CHALLENGE_MAX_SIZE);
+
+    let mut chall_arr = [0u8; AUTH_CHALLENGE_MAX_SIZE];
+    chall_arr[..chall_encrypted.len()].copy_from_slice(&chall_encrypted);
+
     let resp = sP_LS2FE_REP_AUTH_CHALLENGE {
-        aChallenge: challenge,
+        uiChallengeLength: chall_encrypted.len() as u32,
+        aChallenge: chall_arr,
+        aNonce: nonce,
     };
     server.send_packet(P_LS2FE_REP_AUTH_CHALLENGE, &resp)
 }
@@ -38,7 +45,8 @@ pub fn connect(
     let num_channels = pkt.iNumChannels;
     let max_channel_pop = pkt.iMaxChannelPop;
 
-    let challenge_solved = pkt.aChallengeSolved;
+    let chall_decrypted = pkt.aChallengeSolved[..pkt.uiChallengeSolvedLength as usize].to_vec();
+
     let ClientType::UnauthedShardServer(challenge) = &server.client_type else {
         return Err(FFError::build(
             Severity::Warning,
@@ -49,7 +57,7 @@ pub fn connect(
         ));
     };
 
-    if challenge_solved != *challenge.clone() {
+    if chall_decrypted != challenge[..] {
         let resp = sP_LS2FE_REP_CONNECT_FAIL { iErrorCode: 1 };
         log_if_failed(server.send_packet(P_LS2FE_REP_CONNECT_FAIL, &resp));
         return Err(FFError::build(

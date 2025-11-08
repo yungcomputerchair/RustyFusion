@@ -9,7 +9,7 @@ use rusty_fusion::{
     enums::*,
     error::{codes::PlayerSearchReqErr, *},
     net::{
-        crypto,
+        crypto::{self, AUTH_CHALLENGE_MAX_SIZE},
         packet::{PacketID::*, *},
         ClientMap, FFClient, LoginData,
     },
@@ -27,10 +27,14 @@ pub fn login_connect_req(server: &mut FFClient) {
 pub fn login_connect_challenge(server: &mut FFClient, state: &ShardServerState) -> FFResult<()> {
     let pkt: &sP_LS2FE_REP_AUTH_CHALLENGE = server.get_packet(P_LS2FE_REP_AUTH_CHALLENGE)?;
     let key = config_get().general.server_key.get().clone();
-    let mut challenge = pkt.aChallenge;
-    crypto::decrypt_payload(&mut challenge[..], key.as_bytes());
+    let chall_encrypted: Vec<u8> = pkt.aChallenge[..pkt.uiChallengeLength as usize].to_vec();
+    let chall_decrypted = crypto::decrypt_payload_aes(&pkt.aNonce, &chall_encrypted, &key)?;
+    let mut chall_arr = [0u8; AUTH_CHALLENGE_MAX_SIZE];
+    chall_arr[..chall_decrypted.len()].copy_from_slice(&chall_decrypted);
+
     let pkt = sP_FE2LS_REQ_CONNECT {
-        aChallengeSolved: challenge,
+        uiChallengeSolvedLength: chall_decrypted.len() as u32,
+        aChallengeSolved: chall_arr,
         iShardID: state.shard_id,
         iNumChannels: config_get().shard.num_channels.get() as i8,
         iMaxChannelPop: config_get().shard.max_channel_pop.get() as i32,

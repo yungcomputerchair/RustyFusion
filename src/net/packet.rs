@@ -4,9 +4,10 @@
 
 use num_enum::TryFromPrimitive;
 
-use crate::error::FFError;
-
-use super::crypto::AUTH_CHALLENGE_SIZE;
+use crate::{
+    error::FFError,
+    net::crypto::{AES128_NONCE_SIZE, AUTH_CHALLENGE_MAX_SIZE},
+};
 
 pub const PACKET_MASK_CL2LS: u32 = 0x12000000;
 pub const PACKET_MASK_LS2CL: u32 = 0x21000000;
@@ -6646,7 +6647,9 @@ impl FFPacket for sP_LS2FE_REP_LIVE_CHECK {}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct sP_LS2FE_REP_AUTH_CHALLENGE {
-    pub aChallenge: [u8; AUTH_CHALLENGE_SIZE],
+    pub uiChallengeLength: u32,
+    pub aChallenge: [u8; AUTH_CHALLENGE_MAX_SIZE],
+    pub aNonce: [u8; AES128_NONCE_SIZE],
 }
 impl FFPacket for sP_LS2FE_REP_AUTH_CHALLENGE {}
 
@@ -6664,7 +6667,8 @@ impl FFPacket for sP_LS2FE_REP_GET_BUDDY_STATE {}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct sP_FE2LS_REQ_CONNECT {
-    pub aChallengeSolved: [u8; AUTH_CHALLENGE_SIZE],
+    pub uiChallengeSolvedLength: u32,
+    pub aChallengeSolved: [u8; AUTH_CHALLENGE_MAX_SIZE],
     pub iShardID: i32,
     pub iMaxChannelPop: i32,
     pub iNumChannels: i8,
