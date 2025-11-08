@@ -531,19 +531,23 @@ pub enum PacketID {
     P_LS2CL_REP_SHARD_LIST_INFO_SUCC = 0x21000019,  // 553648153
 
     // custom packets
-    P_LS2FE_REP_CONNECT_SUCC = 0x23000001,      // 587202561
-    P_LS2FE_REP_CONNECT_FAIL = 0x23000002,      // 587202562
-    P_LS2FE_REQ_LIVE_CHECK = 0x23000003,        // 587202563
-    P_LS2FE_REQ_UPDATE_LOGIN_INFO = 0x23000004, // 587202564
-    P_LS2FE_REP_MOTD = 0x23000005,              // 587202565
-    P_LS2FE_ANNOUNCE_MSG = 0x23000006,          // 587202566
-    P_LS2FE_REP_PC_LOCATION_SUCC = 0x23000007,  // 587202567
-    P_LS2FE_REP_PC_LOCATION_FAIL = 0x23000008,  // 587202568
-    P_LS2FE_REQ_PC_LOCATION = 0x23000009,       // 587202569
-    P_LS2FE_REQ_PC_EXIT_DUPLICATE = 0x2300000a, // 587202570
-    P_LS2FE_REP_LIVE_CHECK = 0x2300000b,        // 587202571
-    P_LS2FE_REP_AUTH_CHALLENGE = 0x2300000c,    // 587202572
-    P_LS2FE_REP_GET_BUDDY_STATE = 0x2300000d,   // 587202573
+    P_LS2FE_REP_CONNECT_SUCC = 0x23000001,        // 587202561
+    P_LS2FE_REP_CONNECT_FAIL = 0x23000002,        // 587202562
+    P_LS2FE_REQ_LIVE_CHECK = 0x23000003,          // 587202563
+    P_LS2FE_REQ_UPDATE_LOGIN_INFO = 0x23000004,   // 587202564
+    P_LS2FE_REP_MOTD = 0x23000005,                // 587202565
+    P_LS2FE_ANNOUNCE_MSG = 0x23000006,            // 587202566
+    P_LS2FE_REP_PC_LOCATION_SUCC = 0x23000007,    // 587202567
+    P_LS2FE_REP_PC_LOCATION_FAIL = 0x23000008,    // 587202568
+    P_LS2FE_REQ_PC_LOCATION = 0x23000009,         // 587202569
+    P_LS2FE_REQ_PC_EXIT_DUPLICATE = 0x2300000a,   // 587202570
+    P_LS2FE_REP_LIVE_CHECK = 0x2300000b,          // 587202571
+    P_LS2FE_REP_AUTH_CHALLENGE = 0x2300000c,      // 587202572
+    P_LS2FE_REP_GET_BUDDY_STATE = 0x2300000d,     // 587202573
+    P_LS2FE_REQ_SEND_BUDDY_FREECHAT = 0x2300000e, // 587202574
+    P_LS2FE_REP_SEND_BUDDY_FREECHAT_SUCC = 0x2300000f, // 587202575
+    P_LS2FE_REQ_SEND_BUDDY_MENUCHAT = 0x23000010, // 587202576
+    P_LS2FE_REP_SEND_BUDDY_MENUCHAT_SUCC = 0x23000011, // 587202577
 
     P_FE2LS_REQ_CONNECT = 0x32000001,                // 838860801
     P_FE2LS_REP_LIVE_CHECK = 0x32000002,             // 838860802
@@ -551,16 +555,20 @@ pub enum PacketID {
     P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL = 0x32000004, // 838860804
     P_FE2LS_UPDATE_PC_STATUSES = 0x32000005,         // 838860805
     //P_FE2LS_UPDATE_CHANNEL_STATUSES = 0x32000006,    // 838860806
-    P_FE2LS_REQ_MOTD = 0x32000007,             // 838860807
-    P_FE2LS_MOTD_REGISTER = 0x32000008,        // 838860808
-    P_FE2LS_ANNOUNCE_MSG = 0x32000009,         // 838860809
-    P_FE2LS_REQ_PC_LOCATION = 0x3200000a,      // 838860810
-    P_FE2LS_REP_PC_LOCATION_SUCC = 0x3200000b, // 838860811
-    P_FE2LS_REP_PC_LOCATION_FAIL = 0x3200000c, // 838860812
-    P_FE2LS_REQ_LIVE_CHECK = 0x3200000d,       // 838860813
-    P_FE2LS_REQ_AUTH_CHALLENGE = 0x3200000e,   // 838860814
-    P_FE2LS_REQ_GET_BUDDY_STATE = 0x3200000f,  // 838860815
-    P_FE2LS_DISCONNECTING = 0x32000010,        // 838860816
+    P_FE2LS_REQ_MOTD = 0x32000007,                     // 838860807
+    P_FE2LS_MOTD_REGISTER = 0x32000008,                // 838860808
+    P_FE2LS_ANNOUNCE_MSG = 0x32000009,                 // 838860809
+    P_FE2LS_REQ_PC_LOCATION = 0x3200000a,              // 838860810
+    P_FE2LS_REP_PC_LOCATION_SUCC = 0x3200000b,         // 838860811
+    P_FE2LS_REP_PC_LOCATION_FAIL = 0x3200000c,         // 838860812
+    P_FE2LS_REQ_LIVE_CHECK = 0x3200000d,               // 838860813
+    P_FE2LS_REQ_AUTH_CHALLENGE = 0x3200000e,           // 838860814
+    P_FE2LS_REQ_GET_BUDDY_STATE = 0x3200000f,          // 838860815
+    P_FE2LS_DISCONNECTING = 0x32000010,                // 838860816
+    P_FE2LS_REQ_SEND_BUDDY_FREECHAT = 0x32000011,      // 838860817
+    P_FE2LS_REP_SEND_BUDDY_FREECHAT_SUCC = 0x32000012, // 838860818
+    P_FE2LS_REQ_SEND_BUDDY_MENUCHAT = 0x32000013,      // 838860819
+    P_FE2LS_REP_SEND_BUDDY_MENUCHAT_SUCC = 0x32000014, // 838860820
 }
 
 pub trait FFPacket: std::fmt::Debug {}
@@ -6800,3 +6808,91 @@ pub struct sP_FE2LS_DISCONNECTING {
     pub iTempValue: i32,
 }
 impl FFPacket for sP_FE2LS_DISCONNECTING {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_REQ_SEND_BUDDY_FREECHAT {
+    pub iFromPCUID: i64,
+    pub iToPCUID: i64,
+    pub szFreeChat: [u16; 128],
+    pub iEmoteCode: i32,
+}
+impl FFPacket for sP_FE2LS_REQ_SEND_BUDDY_FREECHAT {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_LS2FE_REQ_SEND_BUDDY_FREECHAT {
+    pub iFromPCUID: i64,
+    pub iToPCUID: i64,
+    pub szFreeChat: [u16; 128],
+    pub iEmoteCode: i32,
+}
+impl FFPacket for sP_LS2FE_REQ_SEND_BUDDY_FREECHAT {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_REP_SEND_BUDDY_FREECHAT_SUCC {
+    pub iFromPCUID: i64,
+    pub iToPCUID: i64,
+    pub szFreeChat: [u16; 128],
+    pub iEmoteCode: i32,
+}
+impl FFPacket for sP_FE2LS_REP_SEND_BUDDY_FREECHAT_SUCC {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_LS2FE_REP_SEND_BUDDY_FREECHAT_SUCC {
+    pub iFromPCUID: i64,
+    pub iToPCUID: i64,
+    pub szFreeChat: [u16; 128],
+    pub iEmoteCode: i32,
+}
+impl FFPacket for sP_LS2FE_REP_SEND_BUDDY_FREECHAT_SUCC {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_REQ_SEND_BUDDY_MENUCHAT {
+    pub iFromPCUID: i64,
+    pub iToPCUID: i64,
+    pub szFreeChat: [u16; 128],
+    pub iEmoteCode: i32,
+}
+impl FFPacket for sP_FE2LS_REQ_SEND_BUDDY_MENUCHAT {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_LS2FE_REQ_SEND_BUDDY_MENUCHAT {
+    pub iFromPCUID: i64,
+    pub iToPCUID: i64,
+    pub szFreeChat: [u16; 128],
+    pub iEmoteCode: i32,
+}
+impl FFPacket for sP_LS2FE_REQ_SEND_BUDDY_MENUCHAT {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_REP_SEND_BUDDY_MENUCHAT_SUCC {
+    pub iFromPCUID: i64,
+    pub iToPCUID: i64,
+    pub szFreeChat: [u16; 128],
+    pub iEmoteCode: i32,
+}
+impl FFPacket for sP_FE2LS_REP_SEND_BUDDY_MENUCHAT_SUCC {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_LS2FE_REP_SEND_BUDDY_MENUCHAT_SUCC {
+    pub iFromPCUID: i64,
+    pub iToPCUID: i64,
+    pub szFreeChat: [u16; 128],
+    pub iEmoteCode: i32,
+}
+impl FFPacket for sP_LS2FE_REP_SEND_BUDDY_MENUCHAT_SUCC {}

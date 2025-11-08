@@ -406,3 +406,139 @@ pub fn handle_disconnecting(
     state.unregister_shard(shard_id);
     Ok(())
 }
+
+pub fn buddy_freechat(
+    shard_key: usize,
+    clients: &mut HashMap<usize, FFClient>,
+    state: &mut LoginServerState,
+) -> FFResult<()> {
+    let server = clients.get_mut(&shard_key).unwrap();
+    let pkt: sP_FE2LS_REQ_SEND_BUDDY_FREECHAT =
+        *server.get_packet(P_FE2LS_REQ_SEND_BUDDY_FREECHAT)?;
+    let req = sP_LS2FE_REQ_SEND_BUDDY_FREECHAT {
+        iFromPCUID: pkt.iFromPCUID,
+        iToPCUID: pkt.iToPCUID,
+        szFreeChat: pkt.szFreeChat,
+        iEmoteCode: pkt.iEmoteCode,
+    };
+
+    let to_shard_id = match state.get_player_shard(pkt.iToPCUID) {
+        Some(shard_id) => shard_id,
+        None => {
+            return Ok(());
+        }
+    };
+
+    let client = clients
+        .values_mut()
+        .find(|c| match c.client_type {
+            ClientType::ShardServer(shard_id) => shard_id == to_shard_id,
+            _ => false,
+        })
+        .ok_or(FFError::build(
+            Severity::Warning,
+            format!(
+                "Shard {}, which should host buddy chat recipient, not found",
+                to_shard_id
+            ),
+        ))?;
+    log_if_failed(client.send_packet(P_LS2FE_REQ_SEND_BUDDY_FREECHAT, &req));
+
+    Ok(())
+}
+
+pub fn buddy_freechat_succ(
+    shard_key: usize,
+    clients: &mut HashMap<usize, FFClient>,
+    state: &mut LoginServerState,
+) -> FFResult<()> {
+    let server = clients.get_mut(&shard_key).unwrap();
+    let pkt: sP_FE2LS_REP_SEND_BUDDY_FREECHAT_SUCC =
+        *server.get_packet(P_FE2LS_REP_SEND_BUDDY_FREECHAT_SUCC)?;
+
+    let succ_pkt = sP_LS2FE_REP_SEND_BUDDY_FREECHAT_SUCC {
+        iFromPCUID: pkt.iFromPCUID,
+        iToPCUID: pkt.iToPCUID,
+        szFreeChat: pkt.szFreeChat,
+        iEmoteCode: pkt.iEmoteCode,
+    };
+
+    if let Some(from_shard_id) = state.get_player_shard(pkt.iFromPCUID) {
+        if let Some(from_shard) = clients
+            .values_mut()
+            .find(|c| c.get_shard_id().is_ok_and(|id| id == from_shard_id))
+        {
+            from_shard.send_packet(P_LS2FE_REP_SEND_BUDDY_FREECHAT_SUCC, &succ_pkt)?;
+        }
+    }
+
+    Ok(())
+}
+
+pub fn buddy_menuchat(
+    shard_key: usize,
+    clients: &mut HashMap<usize, FFClient>,
+    state: &mut LoginServerState,
+) -> FFResult<()> {
+    let server = clients.get_mut(&shard_key).unwrap();
+    let pkt: sP_FE2LS_REQ_SEND_BUDDY_MENUCHAT =
+        *server.get_packet(P_FE2LS_REQ_SEND_BUDDY_MENUCHAT)?;
+    let req = sP_LS2FE_REQ_SEND_BUDDY_MENUCHAT {
+        iFromPCUID: pkt.iFromPCUID,
+        iToPCUID: pkt.iToPCUID,
+        szFreeChat: pkt.szFreeChat,
+        iEmoteCode: pkt.iEmoteCode,
+    };
+
+    let to_shard_id = match state.get_player_shard(pkt.iToPCUID) {
+        Some(shard_id) => shard_id,
+        None => {
+            return Ok(());
+        }
+    };
+
+    let client = clients
+        .values_mut()
+        .find(|c| match c.client_type {
+            ClientType::ShardServer(shard_id) => shard_id == to_shard_id,
+            _ => false,
+        })
+        .ok_or(FFError::build(
+            Severity::Warning,
+            format!(
+                "Shard {}, which should host buddy chat recipient, not found",
+                to_shard_id
+            ),
+        ))?;
+    log_if_failed(client.send_packet(P_LS2FE_REQ_SEND_BUDDY_MENUCHAT, &req));
+
+    Ok(())
+}
+
+pub fn buddy_menuchat_succ(
+    shard_key: usize,
+    clients: &mut HashMap<usize, FFClient>,
+    state: &mut LoginServerState,
+) -> FFResult<()> {
+    let server = clients.get_mut(&shard_key).unwrap();
+    let pkt: sP_FE2LS_REP_SEND_BUDDY_MENUCHAT_SUCC =
+        *server.get_packet(P_FE2LS_REP_SEND_BUDDY_MENUCHAT_SUCC)?;
+
+    let succ_pkt = sP_LS2FE_REP_SEND_BUDDY_MENUCHAT_SUCC {
+        iFromPCUID: pkt.iFromPCUID,
+        iToPCUID: pkt.iToPCUID,
+        szFreeChat: pkt.szFreeChat,
+        iEmoteCode: pkt.iEmoteCode,
+    };
+
+    if let Some(from_shard_id) = state.get_player_shard(pkt.iFromPCUID) {
+        if let Some(from_shard) = clients
+            .values_mut()
+            .find(|c| c.get_shard_id().is_ok_and(|id| id == from_shard_id))
+        {
+            from_shard.send_packet(P_LS2FE_REP_SEND_BUDDY_MENUCHAT_SUCC, &succ_pkt)?;
+        }
+    }
+
+    Ok(())
+}

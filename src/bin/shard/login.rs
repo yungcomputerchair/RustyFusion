@@ -256,10 +256,9 @@ pub fn login_pc_exit_duplicate(
         .get_self()
         .get_packet(P_LS2FE_REQ_PC_EXIT_DUPLICATE)?;
     let pc_uid = pkt.iPC_UID;
-    let pc_id = *state
-        .entity_map
-        .find_players(|p| p.get_uid() == pc_uid)
-        .first()
+    let pc_id = state
+        .get_player_by_uid(pc_uid)
+        .map(|p| p.get_player_id())
         .ok_or(FFError::build(
             Severity::Warning,
             format!("Couldn't find player with UID {}", pc_uid),
@@ -299,10 +298,9 @@ pub fn login_get_buddy_state(
         )
         .collect();
 
-    let pc_id = *state
-        .entity_map
-        .find_players(|p| p.get_uid() == pc_uid)
-        .first()
+    let pc_id = state
+        .get_player_by_uid(pc_uid)
+        .map(|p| p.get_player_id())
         .ok_or(FFError::build(
             Severity::Warning,
             format!("Couldn't find player with UID {}", pc_uid),
@@ -319,16 +317,131 @@ pub fn login_get_buddy_state(
         resp.aBuddyState[i] = if online { 1 } else { 0 };
         if online {
             // lookup shard-local ID
-            let buddy_id = *state
-                .entity_map
-                .find_players(|p| p.get_uid() == buddy_uid)
-                .first()
-                .unwrap_or(&0);
+            let buddy_id = state
+                .get_player_by_uid(buddy_uid)
+                .map(|p| p.get_player_id())
+                .unwrap_or(0);
             resp.aBuddyID[i] = buddy_id;
         }
     }
 
     let client = player.get_client(clients).unwrap();
     log_if_failed(client.send_packet(P_FE2CL_REP_GET_BUDDY_STATE_SUCC, &resp));
+    Ok(())
+}
+
+pub fn login_buddy_freechat(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let client = clients.get_self();
+    let pkt: sP_LS2FE_REQ_SEND_BUDDY_FREECHAT =
+        *client.get_packet(P_LS2FE_REQ_SEND_BUDDY_FREECHAT)?;
+
+    if let Some(buddy) = state.get_player_by_uid(pkt.iToPCUID) {
+        if let Some(buddy_client) = buddy.get_client(clients) {
+            let response_pkt = sP_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC {
+                iFromPCUID: pkt.iFromPCUID,
+                iToPCUID: pkt.iToPCUID,
+                szFreeChat: pkt.szFreeChat,
+                iEmoteCode: pkt.iEmoteCode,
+            };
+            buddy_client
+                .send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &response_pkt)?;
+
+            if let Some(login_server) = clients.get_login_server() {
+                let succ_pkt = sP_FE2LS_REP_SEND_BUDDY_FREECHAT_SUCC {
+                    iFromPCUID: pkt.iFromPCUID,
+                    iToPCUID: pkt.iToPCUID,
+                    szFreeChat: pkt.szFreeChat,
+                    iEmoteCode: pkt.iEmoteCode,
+                };
+                login_server.send_packet(P_FE2LS_REP_SEND_BUDDY_FREECHAT_SUCC, &succ_pkt)?;
+            } else {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    "No login server found to forward buddy freechat message".to_string(),
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub fn buddy_freechat_succ(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let login_server = clients.get_login_server().unwrap();
+    let pkt: sP_LS2FE_REP_SEND_BUDDY_FREECHAT_SUCC =
+        *login_server.get_packet(P_LS2FE_REP_SEND_BUDDY_FREECHAT_SUCC)?;
+
+    let response_pkt = sP_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC {
+        iFromPCUID: pkt.iFromPCUID,
+        iToPCUID: pkt.iToPCUID,
+        szFreeChat: pkt.szFreeChat,
+        iEmoteCode: pkt.iEmoteCode,
+    };
+
+    if let Some(sender) = state.get_player_by_uid(pkt.iFromPCUID) {
+        if let Some(sender_client) = sender.get_client(clients) {
+            sender_client
+                .send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &response_pkt)?;
+        }
+    }
+
+    Ok(())
+}
+
+pub fn login_buddy_menuchat(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let client = clients.get_self();
+    let pkt: sP_LS2FE_REQ_SEND_BUDDY_MENUCHAT =
+        *client.get_packet(P_LS2FE_REQ_SEND_BUDDY_MENUCHAT)?;
+
+    if let Some(buddy) = state.get_player_by_uid(pkt.iToPCUID) {
+        if let Some(buddy_client) = buddy.get_client(clients) {
+            let response_pkt = sP_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC {
+                iFromPCUID: pkt.iFromPCUID,
+                iToPCUID: pkt.iToPCUID,
+                szFreeChat: pkt.szFreeChat,
+                iEmoteCode: pkt.iEmoteCode,
+            };
+            buddy_client
+                .send_packet(P_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC, &response_pkt)?;
+
+            if let Some(login_server) = clients.get_login_server() {
+                let succ_pkt = sP_FE2LS_REP_SEND_BUDDY_MENUCHAT_SUCC {
+                    iFromPCUID: pkt.iFromPCUID,
+                    iToPCUID: pkt.iToPCUID,
+                    szFreeChat: pkt.szFreeChat,
+                    iEmoteCode: pkt.iEmoteCode,
+                };
+                login_server.send_packet(P_FE2LS_REP_SEND_BUDDY_MENUCHAT_SUCC, &succ_pkt)?;
+            } else {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    "No login server found to forward buddy menuchat message".to_string(),
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub fn buddy_menuchat_succ(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let login_server = clients.get_login_server().unwrap();
+    let pkt: sP_LS2FE_REP_SEND_BUDDY_MENUCHAT_SUCC =
+        *login_server.get_packet(P_LS2FE_REP_SEND_BUDDY_MENUCHAT_SUCC)?;
+
+    let response_pkt = sP_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC {
+        iFromPCUID: pkt.iFromPCUID,
+        iToPCUID: pkt.iToPCUID,
+        szFreeChat: pkt.szFreeChat,
+        iEmoteCode: pkt.iEmoteCode,
+    };
+
+    if let Some(sender) = state.get_player_by_uid(pkt.iFromPCUID) {
+        if let Some(sender_client) = sender.get_client(clients) {
+            sender_client
+                .send_packet(P_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC, &response_pkt)?;
+        }
+    }
+
     Ok(())
 }
