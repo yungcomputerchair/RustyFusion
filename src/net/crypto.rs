@@ -5,13 +5,11 @@ use rand::{rngs::OsRng, thread_rng, Rng};
 
 use crate::error::{FFError, FFResult, Severity};
 
-use super::PACKET_BUFFER_SIZE;
-
 pub const DEFAULT_KEY: &[u8] = b"m@rQn~W#";
 pub const CRYPTO_KEY_SIZE: usize = DEFAULT_KEY.len();
 pub const AES128_NONCE_SIZE: usize = 12;
-pub const AUTH_CHALLENGE_BASE_SIZE: usize = PACKET_BUFFER_SIZE / 2;
-pub const AUTH_CHALLENGE_MAX_SIZE: usize = AUTH_CHALLENGE_BASE_SIZE + PACKET_BUFFER_SIZE / 4;
+pub const AUTH_CHALLENGE_BASE_SIZE: usize = 16;
+pub const AUTH_CHALLENGE_MAX_SIZE: usize = 32;
 
 pub type CryptoKey = [u8; CRYPTO_KEY_SIZE];
 
@@ -72,7 +70,9 @@ pub fn gen_key(time: u64, iv1: i32, iv2: i32) -> CryptoKey {
 /// Key derivation using bcrypt to produce a 128-bit AES key from a password
 fn get_aes_key(password: &str) -> Key<Aes128Gcm> {
     const COST: u32 = bcrypt::DEFAULT_COST;
-    const SALT: [u8; 16] = [42u8; 16];
+    const SALT: [u8; 16] = [
+        30, 180, 241, 238, 162, 177, 171, 139, 141, 57, 184, 184, 165, 35, 215, 60,
+    ];
     let hash_bytes = bcrypt::bcrypt(COST, SALT, password.as_bytes());
     // use the first 16 bytes (128 bits) of the bcrypt hash as the AES key
     let key: &Key<Aes128Gcm> = hash_bytes[..16].into();
