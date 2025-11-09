@@ -254,12 +254,9 @@ pub fn send_buddy_freechat_message(
         if let Some(buddy_client) = buddy.get_client(clients) {
             buddy_client
                 .send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &response_pkt)?;
-            if let Some(sender) = state.get_player_by_uid(response_pkt.iFromPCUID) {
-                if let Some(sender_client) = sender.get_client(clients) {
-                    sender_client
-                        .send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &response_pkt)?;
-                }
-            }
+            clients
+                .get_self()
+                .send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &response_pkt)?;
             return Ok(());
         }
     }
@@ -324,12 +321,9 @@ pub fn send_buddy_menuchat_message(
         if let Some(buddy_client) = buddy.get_client(clients) {
             buddy_client
                 .send_packet(P_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC, &response_pkt)?;
-            if let Some(sender) = state.get_player_by_uid(response_pkt.iFromPCUID) {
-                if let Some(sender_client) = sender.get_client(clients) {
-                    sender_client
-                        .send_packet(P_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC, &response_pkt)?;
-                }
-            }
+            clients
+                .get_self()
+                .send_packet(P_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC, &response_pkt)?;
             return Ok(());
         }
     }
