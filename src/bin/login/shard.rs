@@ -10,6 +10,7 @@ use rusty_fusion::{
         codes::{BuddyWarpErr, PlayerSearchReqErr},
         log, log_if_failed, FFError, FFResult, Severity,
     },
+    monitor::{monitor_queue, monitor_update_from_packet},
     net::{
         crypto::{self, AUTH_CHALLENGE_MAX_SIZE},
         packet::{PacketID::*, *},
@@ -186,6 +187,15 @@ pub fn update_pc_statuses(client: &mut FFClient, state: &mut LoginServerState) -
         state.set_player_shard(player_uid, player_data, shard_id);
     }
 
+    Ok(())
+}
+
+pub fn update_monitor(client: &mut FFClient) -> FFResult<()> {
+    let pkt: &sP_FE2LS_UPDATE_MONITOR = client.get_packet(P_FE2LS_UPDATE_MONITOR)?;
+    let update = monitor_update_from_packet(pkt)?;
+    for event in update.get_events() {
+        monitor_queue(event);
+    }
     Ok(())
 }
 

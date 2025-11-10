@@ -11,7 +11,11 @@ use std::{
 
 use ffmonitor::{Event, MonitorUpdate};
 
-use crate::error::{log, FFError, FFResult, Severity};
+use crate::{
+    error::{log, FFError, FFResult, Severity},
+    net::packet::sP_FE2LS_UPDATE_MONITOR,
+    util,
+};
 
 pub type MonitorEvent = Event;
 
@@ -33,6 +37,11 @@ pub fn monitor_queue(event: MonitorEvent) {
         if feed.send(event).is_err() {
             log(Severity::Warning, "Failed to queue monitor event");
         }
+    } else {
+        log(
+            Severity::Warning,
+            "Monitor event queued but monitor not initialized",
+        );
     }
 }
 
@@ -50,6 +59,27 @@ pub fn monitor_flush() -> FFResult<()> {
         ));
     }
     Ok(())
+}
+
+pub fn monitor_update_to_packet(update: MonitorUpdate) -> FFResult<sP_FE2LS_UPDATE_MONITOR> {
+    let s = update.to_string();
+    let pkt = sP_FE2LS_UPDATE_MONITOR {
+        szUpdate: util::encode_utf16(&s)?,
+    };
+    Ok(pkt)
+}
+
+pub fn monitor_event_to_packet(event: MonitorEvent) -> FFResult<sP_FE2LS_UPDATE_MONITOR> {
+    let mut update = MonitorUpdate::default();
+    update.add_event(event);
+    monitor_update_to_packet(update)
+}
+
+pub fn monitor_update_from_packet(pkt: &sP_FE2LS_UPDATE_MONITOR) -> FFResult<MonitorUpdate> {
+    let s = util::parse_utf16(&pkt.szUpdate)?;
+    let mut lines = s.lines().map(|ln| ln.to_string()).collect();
+    let update = MonitorUpdate::from_lines(&mut lines);
+    Ok(update)
 }
 
 fn monitor_thread(frx: Receiver<MonitorEvent>, srx: Receiver<()>, addr: String) {

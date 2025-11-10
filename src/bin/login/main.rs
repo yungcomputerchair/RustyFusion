@@ -189,6 +189,7 @@ fn handle_packet(
         P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL => shard::update_login_info_fail(key, clients),
         P_FE2LS_REP_LIVE_CHECK => Ok(()),
         P_FE2LS_UPDATE_PC_STATUSES => shard::update_pc_statuses(client, state),
+        P_FE2LS_UPDATE_MONITOR => shard::update_monitor(client),
         P_FE2LS_REQ_MOTD => shard::motd(client),
         P_FE2LS_MOTD_REGISTER => shard::motd_register(client),
         P_FE2LS_ANNOUNCE_MSG => shard::announce_msg(key, clients),

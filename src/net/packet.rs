@@ -6,7 +6,10 @@ use num_enum::TryFromPrimitive;
 
 use crate::{
     error::FFError,
-    net::crypto::{AES128_NONCE_SIZE, AUTH_CHALLENGE_MAX_SIZE},
+    net::{
+        crypto::{AES128_NONCE_SIZE, AUTH_CHALLENGE_MAX_SIZE},
+        PACKET_BODY_SIZE,
+    },
 };
 
 pub const PACKET_MASK_CL2LS: u32 = 0x12000000;
@@ -553,12 +556,12 @@ pub enum PacketID {
     P_LS2FE_REP_BUDDY_WARP_SUCC = 0x23000013,     // 587202579
     P_LS2FE_REP_BUDDY_WARP_FAIL = 0x23000014,     // 587202580
 
-    P_FE2LS_REQ_CONNECT = 0x32000001,                // 838860801
-    P_FE2LS_REP_LIVE_CHECK = 0x32000002,             // 838860802
-    P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC = 0x32000003, // 838860803
-    P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL = 0x32000004, // 838860804
-    P_FE2LS_UPDATE_PC_STATUSES = 0x32000005,         // 838860805
-    //P_FE2LS_UPDATE_CHANNEL_STATUSES = 0x32000006,    // 838860806
+    P_FE2LS_REQ_CONNECT = 0x32000001,                  // 838860801
+    P_FE2LS_REP_LIVE_CHECK = 0x32000002,               // 838860802
+    P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC = 0x32000003,   // 838860803
+    P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL = 0x32000004,   // 838860804
+    P_FE2LS_UPDATE_PC_STATUSES = 0x32000005,           // 838860805
+    P_FE2LS_UPDATE_MONITOR = 0x32000006,               // 838860806
     P_FE2LS_REQ_MOTD = 0x32000007,                     // 838860807
     P_FE2LS_MOTD_REGISTER = 0x32000008,                // 838860808
     P_FE2LS_ANNOUNCE_MSG = 0x32000009,                 // 838860809
@@ -6717,6 +6720,14 @@ pub struct sP_FE2LS_UPDATE_PC_STATUSES {
     pub iCnt: u32,
 }
 impl FFPacket for sP_FE2LS_UPDATE_PC_STATUSES {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_UPDATE_MONITOR {
+    pub szUpdate: [u16; PACKET_BODY_SIZE / size_of::<u16>()],
+}
+impl FFPacket for sP_FE2LS_UPDATE_MONITOR {}
 
 #[repr(packed(4))]
 #[repr(C)]

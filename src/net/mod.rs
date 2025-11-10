@@ -10,17 +10,19 @@ use crate::{
 };
 
 const PACKET_BUFFER_SIZE: usize = 4096;
+const PACKET_BODY_SIZE: usize = PACKET_BUFFER_SIZE - size_of::<u32>() - size_of::<u32>(); // total - size - id
 const UNKNOWN_CT_ALLOWED_PACKETS: [PacketID; 3] = [
     P_FE2LS_REQ_AUTH_CHALLENGE,
     P_CL2LS_REQ_LOGIN,
     P_CL2FE_REQ_PC_ENTER,
 ];
-const SILENCED_PACKETS: [PacketID; 14] = [
+const SILENCED_PACKETS: [PacketID; 15] = [
     P_LS2FE_REP_AUTH_CHALLENGE,
     P_LS2FE_REP_CONNECT_SUCC,
     //
     P_FE2LS_REQ_CONNECT,
     P_FE2LS_UPDATE_PC_STATUSES,
+    P_FE2LS_UPDATE_MONITOR,
     //
     P_CL2FE_REQ_PC_MOVE,
     P_CL2FE_REQ_PC_JUMP,
