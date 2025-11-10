@@ -3,18 +3,23 @@ use std::{collections::HashMap, net::SocketAddr};
 use uuid::Uuid;
 
 use rusty_fusion::{
-    config::config_get,
+    chunk::InstanceID,
+    config::{self, config_get},
+    database::db_run_sync,
     defines::*,
-    entity::{Entity, PlayerSearchQuery},
+    entity::{Entity, EntityID, PlayerSearchQuery},
     enums::*,
-    error::{codes::PlayerSearchReqErr, *},
+    error::{
+        codes::{BuddyWarpErr, PlayerSearchReqErr},
+        *,
+    },
     net::{
         crypto,
         packet::{PacketID::*, *},
         ClientMap, FFClient, LoginData,
     },
     state::ShardServerState,
-    unused, util,
+    unused, util, Position,
 };
 
 pub fn login_connect_req(server: &mut FFClient) {
@@ -107,6 +112,7 @@ pub fn login_update_info(server: &mut FFClient, state: &mut ShardServerState) ->
             iPC_UID: pkt.iPC_UID,
             uiFEKey: pkt.uiFEKey,
             uiSvrTime: pkt.uiSvrTime,
+            iChannelRequestNum: pkt.iChannelRequestNum,
         },
     );
 
@@ -444,4 +450,229 @@ pub fn buddy_menuchat_succ(clients: &mut ClientMap, state: &mut ShardServerState
     }
 
     Ok(())
+}
+
+pub fn login_buddy_warp(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let client = clients.get_self();
+    let pkt: sP_LS2FE_REQ_BUDDY_WARP = *client.get_packet(P_LS2FE_REQ_BUDDY_WARP)?;
+
+    let fail_pkt = sP_FE2LS_REP_BUDDY_WARP_FAIL {
+        iBuddyPCUID: pkt.iBuddyPCUID,
+        iFromPCUID: pkt.iFromPCUID,
+        iErrorCode: BuddyWarpErr::CantWarpToLocation as i32,
+    };
+
+    let mut invalid_warp = |msg: String| {
+        log(Severity::Info, &msg);
+        client.send_packet(P_FE2LS_REP_BUDDY_WARP_FAIL, &fail_pkt)
+    };
+
+    let buddy_uid = pkt.iBuddyPCUID;
+    let buddy = match state.get_player_by_uid(buddy_uid) {
+        Some(buddy) => buddy,
+        None => {
+            return client.send_packet(P_FE2LS_REP_BUDDY_WARP_FAIL, &fail_pkt);
+        }
+    };
+
+    let buddy_is_on_skyway = buddy.get_skyway_ride().is_some();
+    let buddy_payzone_flag = buddy.get_payzone_flag();
+    let buddy_instance_id = buddy.get_instance_id();
+    let buddy_position = buddy.get_position();
+
+    if buddy_is_on_skyway {
+        return invalid_warp(format!(
+            "Player {} is currently on a skyway ride",
+            buddy_uid
+        ));
+    }
+
+    if pkt.iPCPayzoneFlag != buddy_payzone_flag as i8 {
+        return invalid_warp(format!(
+            "Buddy {} is in a different payzone state",
+            buddy_uid,
+        ));
+    }
+
+    if buddy_instance_id.map_num != ID_OVERWORLD {
+        return invalid_warp(format!(
+            "Buddy {} is not in the overworld instance",
+            buddy_uid,
+        ));
+    }
+
+    let max_channel_pop = config::config_get().shard.max_channel_pop.get();
+    let current_channel_pop = state
+        .entity_map
+        .get_channel_population(buddy.instance_id.channel_num);
+
+    if current_channel_pop >= max_channel_pop {
+        return invalid_warp(format!(
+            "Buddy {}'s channel is at max population",
+            buddy_uid,
+        ));
+    }
+
+    let resp_pkt = sP_FE2LS_REP_BUDDY_WARP_SUCC {
+        iBuddyPCUID: pkt.iBuddyPCUID,
+        iFromPCUID: pkt.iFromPCUID,
+        iChannelNum: buddy.instance_id.channel_num,
+        iInstanceNum: buddy.instance_id.instance_num.unwrap_or(0),
+        iMapNum: buddy.instance_id.map_num,
+        iX: buddy_position.x,
+        iY: buddy_position.y,
+        iZ: buddy_position.z,
+    };
+
+    client.send_packet(P_FE2LS_REP_BUDDY_WARP_SUCC, &resp_pkt)
+}
+
+pub fn login_buddy_warp_succ(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let login_server = clients.get_login_server().ok_or_else(|| {
+        FFError::build(
+            Severity::Warning,
+            "No login server connected for buddy warp".to_string(),
+        )
+    })?;
+
+    let pkt: sP_LS2FE_REP_BUDDY_WARP_SUCC =
+        *login_server.get_packet(P_LS2FE_REP_BUDDY_WARP_SUCC)?;
+
+    let player_pcuid = pkt.iFromPCUID;
+
+    catch_fail(
+        (|| {
+            let player = state.get_player_by_uid(player_pcuid).ok_or_else(|| {
+                FFError::build(
+                    Severity::Warning,
+                    format!("Couldn't find player with UID {}", player_pcuid),
+                )
+            })?;
+            let pc_id = player.get_player_id();
+            let player = state.get_player_mut(pc_id).unwrap();
+            player.set_instance_id(InstanceID {
+                map_num: pkt.iMapNum,
+                channel_num: pkt.iChannelNum as u8,
+                instance_num: Some(pkt.iInstanceNum as u32),
+            });
+            player.set_position(Position {
+                x: pkt.iX,
+                y: pkt.iY,
+                z: pkt.iZ,
+            });
+
+            // log instance and position values
+            log(
+                Severity::Info,
+                &format!(
+                    "Buddy warp succeeded for player UID {}: map {}, channel {}, instance {}, position ({}, {}, {})",
+                    player_pcuid,
+                    pkt.iMapNum,
+                    pkt.iChannelNum,
+                    pkt.iInstanceNum,
+                    pkt.iX,
+                    pkt.iY,
+                    pkt.iZ
+                ),
+            );
+
+            let player_saved = player.clone();
+
+            log_if_failed(db_run_sync(move |db| db.save_player(&player_saved)));
+
+            state
+                .entity_map
+                .update(EntityID::Player(pc_id), None, Some(clients));
+
+            let other_shard_succ_pkt = sP_FE2CL_REP_PC_BUDDY_WARP_OTHER_SHARD_SUCC {
+                iBuddyPCUID: pkt.iBuddyPCUID,
+                iChannelNum: 0,
+                iShardNum: pkt.iShardNum,
+            };
+
+            let player = state.get_player_mut(pc_id).unwrap();
+
+            let player_client = player.get_client(clients).ok_or_else(|| {
+                FFError::build(
+                    Severity::Warning,
+                    format!("Couldn't find client for player UID {}", player_pcuid),
+                )
+            })?;
+
+            player_client.send_packet(
+                P_FE2CL_REP_PC_BUDDY_WARP_OTHER_SHARD_SUCC,
+                &other_shard_succ_pkt,
+            )
+        })(),
+        || {
+            let response = sP_FE2CL_REP_PC_BUDDY_WARP_FAIL {
+                iBuddyPCUID: pkt.iBuddyPCUID,
+                iErrorCode: BuddyWarpErr::CantWarpToLocation as i32,
+            };
+
+            let player = state.get_player_by_uid(player_pcuid).ok_or_else(|| {
+                FFError::build(
+                    Severity::Warning,
+                    format!("Couldn't find player with UID {}", player_pcuid),
+                )
+            })?;
+
+            let player_client = player.get_client(clients).ok_or_else(|| {
+                FFError::build(
+                    Severity::Warning,
+                    format!("Couldn't find client for player UID {}", player_pcuid),
+                )
+            })?;
+            player_client.send_packet(P_FE2CL_REP_PC_BUDDY_WARP_FAIL, &response)
+        },
+    )
+}
+
+pub fn login_buddy_warp_fail(
+    clients: &mut ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    catch_fail(
+        (|| {
+            let login_server = clients.get_login_server().ok_or_else(|| {
+                FFError::build(
+                    Severity::Warning,
+                    "No login server connected for buddy warp".to_string(),
+                )
+            })?;
+            let pkt: sP_LS2FE_REP_BUDDY_WARP_FAIL =
+                *login_server.get_packet(P_LS2FE_REP_BUDDY_WARP_FAIL)?;
+
+            let player_pcuid = pkt.iFromPCUID;
+
+            let response = sP_FE2CL_REP_PC_BUDDY_WARP_FAIL {
+                iBuddyPCUID: pkt.iBuddyPCUID,
+                iErrorCode: pkt.iErrorCode,
+            };
+
+            let player = state.get_player_by_uid(player_pcuid).ok_or_else(|| {
+                FFError::build(
+                    Severity::Warning,
+                    format!("Couldn't find player with UID {}", player_pcuid),
+                )
+            })?;
+
+            let player_client = player.get_client(clients).ok_or_else(|| {
+                FFError::build(
+                    Severity::Warning,
+                    format!("Couldn't find client for player UID {}", player_pcuid),
+                )
+            })?;
+            player_client.send_packet(P_FE2CL_REP_PC_BUDDY_WARP_FAIL, &response)
+        })(),
+        || {
+            Err(FFError::build(
+                Severity::Warning,
+                "Failed to process buddy warp fail".to_string(),
+            ))
+        },
+    )
 }

@@ -6581,6 +6581,7 @@ pub struct sP_LS2FE_REQ_UPDATE_LOGIN_INFO {
     pub iPC_UID: i64,
     pub uiFEKey: u64,
     pub uiSvrTime: u64,
+    pub iChannelRequestNum: u8,
 }
 impl FFPacket for sP_LS2FE_REQ_UPDATE_LOGIN_INFO {}
 
@@ -6902,3 +6903,74 @@ pub struct sP_LS2FE_REP_SEND_BUDDY_MENUCHAT_SUCC {
     pub iEmoteCode: i32,
 }
 impl FFPacket for sP_LS2FE_REP_SEND_BUDDY_MENUCHAT_SUCC {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_REQ_BUDDY_WARP {
+    pub iPCPayzoneFlag: i8,
+    pub iFromPCUID: i64,
+    pub iBuddyPCUID: i64,
+}
+impl FFPacket for sP_FE2LS_REQ_BUDDY_WARP {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_LS2FE_REQ_BUDDY_WARP {
+    pub iPCPayzoneFlag: i8,
+    pub iFromPCUID: i64,
+    pub iBuddyPCUID: i64,
+}
+impl FFPacket for sP_LS2FE_REQ_BUDDY_WARP {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_REP_BUDDY_WARP_SUCC {
+    pub iBuddyPCUID: i64,
+    pub iFromPCUID: i64,
+    pub iX: i32,
+    pub iY: i32,
+    pub iZ: i32,
+    pub iChannelNum: u8,
+    pub iInstanceNum: u32,
+    pub iMapNum: u32,
+}
+impl FFPacket for sP_FE2LS_REP_BUDDY_WARP_SUCC {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_LS2FE_REP_BUDDY_WARP_SUCC {
+    pub iBuddyPCUID: i64,
+    pub iFromPCUID: i64,
+    pub iX: i32,
+    pub iY: i32,
+    pub iZ: i32,
+    pub iMapNum: u32,
+    pub iChannelNum: u8,
+    pub iInstanceNum: u32,
+    pub iShardNum: i8,
+}
+impl FFPacket for sP_LS2FE_REP_BUDDY_WARP_SUCC {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_REP_BUDDY_WARP_FAIL {
+    pub iBuddyPCUID: i64,
+    pub iFromPCUID: i64,
+    pub iErrorCode: i32,
+}
+impl FFPacket for sP_FE2LS_REP_BUDDY_WARP_FAIL {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_LS2FE_REP_BUDDY_WARP_FAIL {
+    pub iBuddyPCUID: i64,
+    pub iFromPCUID: i64,
+    pub iErrorCode: i32,
+}
+impl FFPacket for sP_LS2FE_REP_BUDDY_WARP_FAIL {}

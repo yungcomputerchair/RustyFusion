@@ -382,23 +382,29 @@ pub fn pc_buddy_warp(clients: &mut ClientMap, state: &mut ShardServerState) -> F
     }
 
     if player_is_warp_on_cooldown {
-        return invalid_warp(format!(
-            "Player {}'s buddy warp is on cooldown",
-            player_uid
-        ));
+        return invalid_warp(format!("Player {}'s buddy warp is on cooldown", player_uid));
     }
 
     let search = PlayerSearchQuery::ByUID(buddy_uid);
     let res = search.execute(state);
     if res.is_none() {
-        log(
-            Severity::Info,
-            &format!(
-                "Cross-shard buddy warp not implemented (player {}, buddy {})",
-                player_uid, buddy_uid
-            ),
-        );
-        return Ok(());
+        let login_server = match clients.get_login_server() {
+            Some(ls) => ls,
+            None => {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    "No login server connected for cross-shard buddy warp".to_string(),
+                ));
+            }
+        };
+
+        let req_pkt = sP_FE2LS_REQ_BUDDY_WARP {
+            iPCPayzoneFlag: player_payzone_flag as i8,
+            iFromPCUID: player_uid,
+            iBuddyPCUID: buddy_uid,
+        };
+
+        return login_server.send_packet(P_FE2LS_REQ_BUDDY_WARP, &req_pkt);
     }
 
     let buddy_id = res.unwrap();
@@ -431,7 +437,7 @@ pub fn pc_buddy_warp(clients: &mut ClientMap, state: &mut ShardServerState) -> F
     }
 
     catch_fail(
-        (|| {
+        {
             let player = state.get_player_mut(pc_id).unwrap();
             player.set_position(buddy_position);
             player.set_instance_id(buddy_instance_id);
@@ -444,9 +450,7 @@ pub fn pc_buddy_warp(clients: &mut ClientMap, state: &mut ShardServerState) -> F
                 .update(EntityID::Player(pc_id), None, Some(clients));
 
             // this packet in client code seems to just leave group
-            let same_shard_succ_pkt = sP_FE2CL_REP_PC_BUDDY_WARP_SAME_SHARD_SUCC {
-                UNUSED: 0,
-            };
+            let same_shard_succ_pkt = sP_FE2CL_REP_PC_BUDDY_WARP_SAME_SHARD_SUCC { UNUSED: 0 };
 
             // this packet in client code loads the new position
             let goto_succ_pkt = sP_FE2CL_REP_PC_GOTO_SUCC {
@@ -455,15 +459,20 @@ pub fn pc_buddy_warp(clients: &mut ClientMap, state: &mut ShardServerState) -> F
                 iZ: buddy_position.z,
             };
 
-            return clients
+            let result = clients
                 .get_self()
-                .send_packet(P_FE2CL_REP_PC_BUDDY_WARP_SAME_SHARD_SUCC, &same_shard_succ_pkt)
+                .send_packet(
+                    P_FE2CL_REP_PC_BUDDY_WARP_SAME_SHARD_SUCC,
+                    &same_shard_succ_pkt,
+                )
                 .and_then(|_| {
                     clients
                         .get_self()
                         .send_packet(P_FE2CL_REP_PC_GOTO_SUCC, &goto_succ_pkt)
                 });
-        })(),
+
+            result
+        },
         || {
             let response = sP_FE2CL_REP_PC_BUDDY_WARP_FAIL {
                 iBuddyPCUID: buddy_uid,

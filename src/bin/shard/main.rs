@@ -250,6 +250,9 @@ fn handle_packet(
         P_LS2FE_REP_SEND_BUDDY_FREECHAT_SUCC => login::buddy_freechat_succ(&mut clients, state),
         P_LS2FE_REQ_SEND_BUDDY_MENUCHAT => login::login_buddy_menuchat(&mut clients, state),
         P_LS2FE_REP_SEND_BUDDY_MENUCHAT_SUCC => login::buddy_menuchat_succ(&mut clients, state),
+        P_LS2FE_REQ_BUDDY_WARP => login::login_buddy_warp(&mut clients, state),
+        P_LS2FE_REP_BUDDY_WARP_SUCC => login::login_buddy_warp_succ(&mut clients, state),
+        P_LS2FE_REP_BUDDY_WARP_FAIL => login::login_buddy_warp_fail(&mut clients, state),
         P_LS2FE_REP_LIVE_CHECK => Ok(()),
         //
         P_CL2LS_REQ_LOGIN => wrong_server(clients.get_self()),

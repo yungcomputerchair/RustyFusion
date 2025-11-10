@@ -6,7 +6,10 @@ use std::{
 use rusty_fusion::{
     config::config_get,
     entity::PlayerMetadata,
-    error::{codes::PlayerSearchReqErr, log, log_if_failed, FFError, FFResult, Severity},
+    error::{
+        codes::{BuddyWarpErr, PlayerSearchReqErr},
+        log, log_if_failed, FFError, FFResult, Severity,
+    },
     net::{
         crypto,
         packet::{PacketID::*, *},
@@ -537,6 +540,123 @@ pub fn buddy_menuchat_succ(
             .find(|c| c.get_shard_id().is_ok_and(|id| id == from_shard_id))
         {
             from_shard.send_packet(P_LS2FE_REP_SEND_BUDDY_MENUCHAT_SUCC, &succ_pkt)?;
+        }
+    }
+
+    Ok(())
+}
+
+pub fn buddy_warp(
+    shard_key: usize,
+    clients: &mut HashMap<usize, FFClient>,
+    state: &mut LoginServerState,
+) -> FFResult<()> {
+    let server = clients.get_mut(&shard_key).unwrap();
+    let pkt: sP_FE2LS_REQ_BUDDY_WARP = *server.get_packet(P_FE2LS_REQ_BUDDY_WARP)?;
+
+    let fail_pkt = sP_LS2FE_REP_BUDDY_WARP_FAIL {
+        iBuddyPCUID: pkt.iBuddyPCUID,
+        iErrorCode: BuddyWarpErr::CantWarpToLocation as i32,
+        iFromPCUID: pkt.iFromPCUID,
+    };
+
+    let buddy_shard_id = match state.get_player_shard(pkt.iBuddyPCUID) {
+        Some(shard_id) => shard_id,
+        None => {
+            let player_shard = clients.get_mut(&shard_key).unwrap();
+            return player_shard.send_packet(P_LS2FE_REP_BUDDY_WARP_FAIL, &fail_pkt);
+        }
+    };
+
+    let buddy_shard: &mut FFClient = match clients.values_mut().find(|c| match c.client_type {
+        ClientType::ShardServer(shard_id) => shard_id == buddy_shard_id,
+        _ => false,
+    }) {
+        Some(shard) => shard,
+        None => {
+            let player_shard = clients.get_mut(&shard_key).unwrap();
+            return player_shard.send_packet(P_LS2FE_REP_BUDDY_WARP_FAIL, &fail_pkt);
+        }
+    };
+
+    let req_pkt = sP_LS2FE_REQ_BUDDY_WARP {
+        iPCPayzoneFlag: pkt.iPCPayzoneFlag,
+        iBuddyPCUID: pkt.iBuddyPCUID,
+        iFromPCUID: pkt.iFromPCUID,
+    };
+
+    if buddy_shard
+        .send_packet(P_LS2FE_REQ_BUDDY_WARP, &req_pkt)
+        .is_err()
+    {
+        let player_shard = clients.get_mut(&shard_key).unwrap();
+        return player_shard.send_packet(P_LS2FE_REP_BUDDY_WARP_FAIL, &fail_pkt);
+    }
+
+    Ok(())
+}
+
+pub fn buddy_warp_succ(
+    shard_key: usize,
+    clients: &mut HashMap<usize, FFClient>,
+    state: &mut LoginServerState,
+) -> FFResult<()> {
+    let server = clients.get_mut(&shard_key).unwrap();
+    let pkt: sP_FE2LS_REP_BUDDY_WARP_SUCC = *server.get_packet(P_FE2LS_REP_BUDDY_WARP_SUCC)?;
+
+    let buddy_pcuid = pkt.iBuddyPCUID;
+
+    let buddy_shard_id = state.get_player_shard(buddy_pcuid).ok_or(FFError::build(
+        Severity::Warning,
+        format!("Couldn't find shard for buddy PC UID {}", buddy_pcuid),
+    ))?;
+
+    let resp_pkt = sP_LS2FE_REP_BUDDY_WARP_SUCC {
+        iBuddyPCUID: pkt.iBuddyPCUID,
+        iFromPCUID: pkt.iFromPCUID,
+        iChannelNum: pkt.iChannelNum,
+        iInstanceNum: pkt.iInstanceNum,
+        iMapNum: pkt.iMapNum,
+        iShardNum: buddy_shard_id as i8,
+        iX: pkt.iX,
+        iY: pkt.iY,
+        iZ: pkt.iZ,
+    };
+
+    state.set_pending_channel_request(pkt.iFromPCUID, pkt.iChannelNum as u8);
+
+    if let Some(from_shard_id) = state.get_player_shard(pkt.iFromPCUID) {
+        if let Some(from_shard) = clients
+            .values_mut()
+            .find(|c| c.get_shard_id().is_ok_and(|id| id == from_shard_id))
+        {
+            from_shard.send_packet(P_LS2FE_REP_BUDDY_WARP_SUCC, &resp_pkt)?;
+        }
+    }
+
+    Ok(())
+}
+
+pub fn buddy_warp_fail(
+    shard_key: usize,
+    clients: &mut HashMap<usize, FFClient>,
+    state: &mut LoginServerState,
+) -> FFResult<()> {
+    let server = clients.get_mut(&shard_key).unwrap();
+    let pkt: sP_FE2LS_REP_BUDDY_WARP_FAIL = *server.get_packet(P_FE2LS_REP_BUDDY_WARP_FAIL)?;
+
+    let resp_pkt = sP_LS2FE_REP_BUDDY_WARP_FAIL {
+        iBuddyPCUID: pkt.iBuddyPCUID,
+        iErrorCode: pkt.iErrorCode,
+        iFromPCUID: pkt.iFromPCUID,
+    };
+
+    if let Some(from_shard_id) = state.get_player_shard(pkt.iFromPCUID) {
+        if let Some(from_shard) = clients
+            .values_mut()
+            .find(|c| c.get_shard_id().is_ok_and(|id| id == from_shard_id))
+        {
+            from_shard.send_packet(P_LS2FE_REP_BUDDY_WARP_FAIL, &resp_pkt)?;
         }
     }
 

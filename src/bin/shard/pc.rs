@@ -57,7 +57,11 @@ pub fn pc_enter(
     player.set_player_id(pc_id);
     player.set_client_id(key);
 
-    let channel_num = state.entity_map.get_min_pop_channel_num();
+    let channel_num = if login_data.iChannelRequestNum > 0 {
+        login_data.iChannelRequestNum
+    } else {
+        state.entity_map.get_min_pop_channel_num()
+    };
     player.instance_id.channel_num = channel_num;
 
     let resp = sP_FE2CL_REP_PC_ENTER_SUCC {

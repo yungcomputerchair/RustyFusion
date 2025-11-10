@@ -60,6 +60,7 @@ pub struct LoginData {
     pub iPC_UID: i64,
     pub uiFEKey: u64,
     pub uiSvrTime: u64,
+    pub iChannelRequestNum: u8,
 }
 
 unsafe fn bytes_to_struct<T: FFPacket>(bytes: &[u8]) -> &T {

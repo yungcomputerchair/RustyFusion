@@ -87,6 +87,7 @@ pub struct LoginServerState {
     sessions: HashMap<i64, LoginSession>,
     shards: HashMap<i32, ShardServerInfo>,
     pub player_search_reqeusts: HashMap<(i32, i32), PlayerSearchRequest>,
+    pub pending_channel_requests: HashMap<i64, u8>,
 }
 impl Default for LoginServerState {
     fn default() -> Self {
@@ -95,6 +96,7 @@ impl Default for LoginServerState {
             sessions: HashMap::new(),
             shards: HashMap::new(),
             player_search_reqeusts: HashMap::new(),
+            pending_channel_requests: HashMap::new(),
         }
     }
 }
@@ -269,6 +271,15 @@ impl LoginServerState {
         Ok(())
     }
 
+    pub fn set_pending_channel_request(&mut self, player_uid: i64, channel_num: u8) {
+        self.pending_channel_requests
+            .insert(player_uid, channel_num);
+    }
+
+    pub fn get_pending_channel_request(&mut self, player_uid: i64) -> Option<u8> {
+        self.pending_channel_requests.remove(&player_uid)
+    }
+
     pub fn process_shard_connection_requests(
         &mut self,
         clients: &mut HashMap<usize, FFClient>,
@@ -285,10 +296,17 @@ impl LoginServerState {
             let Ok(serial_key) = client.get_serial_key() else {
                 continue;
             };
-            let Some(session) = self.sessions.get_mut(&acc_id) else {
+            let pc_uid = if let Some(session) = self.sessions.get(&acc_id) {
+                session.selected_player_uid
+            } else {
                 continue;
             };
-            let Some(pc_uid) = session.selected_player_uid else {
+            let pc_uid = match pc_uid {
+                Some(uid) => uid,
+                None => continue,
+            };
+            let channel_num = self.get_pending_channel_request(pc_uid).unwrap_or(0) as i8;
+            let Some(session) = self.sessions.get_mut(&acc_id) else {
                 continue;
             };
             let Some(request) = &session.shard_connection_request else {
@@ -329,6 +347,7 @@ impl LoginServerState {
                 iPC_UID: pc_uid,
                 uiFEKey: fe_key,
                 uiSvrTime: util::get_timestamp_ms(time),
+                iChannelRequestNum: channel_num as u8,
             };
 
             if shard
