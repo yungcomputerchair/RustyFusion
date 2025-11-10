@@ -330,8 +330,8 @@ pub fn gm_pc_location(clients: &mut ClientMap, state: &mut ShardServerState) -> 
             iX: pos.x,
             iY: pos.y,
             iZ: pos.z,
-            szTargetPC_FirstName: util::encode_utf16(&player.first_name),
-            szTargetPC_LastName: util::encode_utf16(&player.last_name),
+            szTargetPC_FirstName: util::encode_utf16(&player.first_name).unwrap(),
+            szTargetPC_LastName: util::encode_utf16(&player.last_name).unwrap(),
         };
         clients
             .get_self()
@@ -698,7 +698,7 @@ mod helpers {
         let pkt = sP_FE2CL_ANNOUNCE_MSG {
             iAnnounceType: unused!(),
             iDuringTime: MSG_BOX_DURATION_DEFAULT,
-            szAnnounceMsg: util::encode_utf16(&err_msg),
+            szAnnounceMsg: util::encode_utf16(&err_msg).unwrap(),
         };
         log_if_failed(client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt));
         FFError::build(Severity::Warning, err_msg)

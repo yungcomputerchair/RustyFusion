@@ -60,7 +60,7 @@ pub fn send_freechat_message(
 
             let resp = sP_FE2CL_REP_SEND_FREECHAT_MESSAGE_SUCC {
                 iPC_ID: pc_id,
-                szFreeChat: util::encode_utf16(&msg),
+                szFreeChat: util::encode_utf16(&msg).unwrap(),
                 iEmoteCode: pkt.iEmoteCode,
             };
             state
@@ -160,7 +160,7 @@ pub fn send_group_freechat_message(
 
     let pkt = sP_FE2CL_REP_SEND_ALL_GROUP_FREECHAT_MESSAGE_SUCC {
         iSendPCID: pc_id,
-        szFreeChat: util::encode_utf16(&msg),
+        szFreeChat: util::encode_utf16(&msg).unwrap(),
         iEmoteCode: pkt.iEmoteCode,
     };
     if let Some(group_id) = player.group_id {
@@ -241,7 +241,7 @@ pub fn send_buddy_freechat_message(
     }
 
     let msg = helpers::process_freechat_message(util::parse_utf16(&pkt.szFreeChat)?);
-    let reencoded_msg = util::encode_utf16(&msg);
+    let reencoded_msg = util::encode_utf16(&msg).unwrap();
 
     let response_pkt = sP_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC {
         iFromPCUID: player.get_uid(),

@@ -73,8 +73,8 @@ pub fn request_make_buddy(clients: &mut ClientMap, state: &mut ShardServerState)
     let req_pkt = sP_FE2CL_REP_REQUEST_MAKE_BUDDY_SUCC_TO_ACCEPTER {
         iRequestID: pc_id,
         iBuddyID: buddy_id,
-        szFirstName: util::encode_utf16(&player.first_name),
-        szLastName: util::encode_utf16(&player.last_name),
+        szFirstName: util::encode_utf16(&player.first_name).unwrap(),
+        szLastName: util::encode_utf16(&player.last_name).unwrap(),
     };
 
     let buddy = state.get_player(buddy_id)?;
@@ -160,8 +160,8 @@ pub fn find_name_make_buddy(clients: &mut ClientMap, state: &mut ShardServerStat
     let player = state.get_player_mut(pc_id).unwrap();
     player.buddy_offered_to = Some(buddy_uid);
     let req_pkt = sP_FE2CL_REP_PC_FIND_NAME_MAKE_BUDDY_SUCC {
-        szFirstName: util::encode_utf16(&player.first_name),
-        szLastName: util::encode_utf16(&player.last_name),
+        szFirstName: util::encode_utf16(&player.first_name).unwrap(),
+        szLastName: util::encode_utf16(&player.last_name).unwrap(),
         iPCUID: pc_uid,
         iNameCheckFlag: player.flags.name_check as i8,
     };

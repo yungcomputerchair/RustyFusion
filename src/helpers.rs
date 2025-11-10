@@ -157,7 +157,7 @@ pub fn remove_group_member(
 pub fn send_system_message(client: &mut FFClient, msg: &str) -> FFResult<()> {
     let resp = sP_FE2CL_PC_MOTD_LOGIN {
         iType: unused!(),
-        szSystemMsg: util::encode_utf16(msg),
+        szSystemMsg: util::encode_utf16(msg)?,
     };
     client.send_packet(P_FE2CL_PC_MOTD_LOGIN, &resp)
 }

@@ -451,8 +451,8 @@ fn send_status_to_login_server(
         let pos = player.get_position();
         let data = sPlayerMetadata {
             iPC_UID: player.get_uid(),
-            szFirstName: util::encode_utf16(&player.first_name),
-            szLastName: util::encode_utf16(&player.last_name),
+            szFirstName: util::encode_utf16(&player.first_name).unwrap(),
+            szLastName: util::encode_utf16(&player.last_name).unwrap(),
             iX: pos.x,
             iY: pos.y,
             iZ: pos.z,
@@ -538,7 +538,8 @@ fn shutdown_notify_clients(server: &mut FFServer, state: &mut ShardServerState) 
             iDuringTime: 5,
             szAnnounceMsg: util::encode_utf16(
                 "Lost connection to shard server.\nAttemping to reconnect...",
-            ),
+            )
+            .unwrap(),
         };
         let _ = client.send_packet(P_FE2CL_ANNOUNCE_MSG, &alert_pkt);
 

@@ -9,7 +9,7 @@ use rand::{distributions::uniform::SampleUniform, Rng};
 use crate::{
     defines::*,
     enums::{ItemLocation, ItemType},
-    error::{panic_log, FFError, FFResult, Severity},
+    error::{FFError, FFResult, Severity},
     item::Item,
 };
 
@@ -251,14 +251,20 @@ pub fn parse_utf8(chars: &[u8]) -> FFResult<String> {
         .map(|s| s.to_string())
 }
 
-pub fn encode_utf16<const SIZE: usize>(chars: &str) -> [u16; SIZE] {
+pub fn encode_utf16<const SIZE: usize>(chars: &str) -> FFResult<[u16; SIZE]> {
     let mut str_vec: Vec<u16> = chars.encode_utf16().collect();
     str_vec.push(0);
     if str_vec.len() > SIZE {
-        panic_log("Buffer too small for encoded string");
+        return Err(FFError::build(
+            Severity::Warning,
+            format!(
+                "String '{}' too long to encode in UTF-16 array of size {}",
+                chars, SIZE
+            ),
+        ));
     }
     str_vec.resize(SIZE, 0);
-    str_vec.try_into().unwrap()
+    Ok(str_vec.try_into().unwrap())
 }
 
 pub fn get_timestamp_str(time: SystemTime) -> String {

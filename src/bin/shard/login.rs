@@ -183,8 +183,8 @@ pub fn login_pc_location(clients: &mut ClientMap, state: &mut ShardServerState) 
             iX: pos.x,
             iY: pos.y,
             iZ: pos.z,
-            szTargetPC_FirstName: util::encode_utf16(&player.first_name),
-            szTargetPC_LastName: util::encode_utf16(&player.last_name),
+            szTargetPC_FirstName: util::encode_utf16(&player.first_name).unwrap(),
+            szTargetPC_LastName: util::encode_utf16(&player.last_name).unwrap(),
         };
         if let Some(login_server) = clients.get_login_server() {
             let resp = sP_FE2LS_REP_PC_LOCATION_SUCC {
@@ -253,7 +253,7 @@ pub fn login_pc_location_fail(
     let pkt = sP_FE2CL_ANNOUNCE_MSG {
         iAnnounceType: unused!(),
         iDuringTime: MSG_BOX_DURATION_DEFAULT,
-        szAnnounceMsg: util::encode_utf16(&err_msg),
+        szAnnounceMsg: util::encode_utf16(&err_msg)?,
     };
     log_if_failed(client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt));
     Ok(())

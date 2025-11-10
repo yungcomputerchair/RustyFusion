@@ -103,7 +103,7 @@ pub fn login(
                 let resp = sP_FE2CL_GM_REP_PC_ANNOUNCE {
                     iAnnounceType: unused!(),
                     iDuringTime: i32::MAX,
-                    szAnnounceMsg: util::encode_utf16(&ban_message),
+                    szAnnounceMsg: util::encode_utf16(&ban_message)?,
                 };
                 client.send_packet(P_FE2CL_GM_REP_PC_ANNOUNCE, &resp)?;
                 return Ok(());
