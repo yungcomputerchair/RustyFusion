@@ -3,6 +3,7 @@ use rusty_fusion::{
     entity::{Entity, EntityID},
     error::*,
     helpers::send_system_message,
+    monitor::monitor_event_to_packet,
     net::{
         packet::{PacketID::*, *},
         ClientMap,
@@ -56,13 +57,31 @@ pub fn send_freechat_message(
                 return Ok(());
             }
 
-            log(Severity::Info, &format!("{}: \"{}\"", player, msg));
-
             let resp = sP_FE2CL_REP_SEND_FREECHAT_MESSAGE_SUCC {
                 iPC_ID: pc_id,
                 szFreeChat: util::encode_utf16(&msg).unwrap(),
                 iEmoteCode: pkt.iEmoteCode,
             };
+
+            log(Severity::Info, &format!("{}: \"{}\"", player, msg));
+
+            if let Some(login_server) = clients.get_login_server() {
+                let chat_event = ffmonitor::ChatEvent {
+                    kind: ffmonitor::ChatKind::FreeChat,
+                    from: player.to_string(),
+                    to: None,
+                    message: msg,
+                };
+                let monitor_pkt =
+                    monitor_event_to_packet(ffmonitor::Event::Chat(chat_event)).unwrap();
+                log_if_failed(login_server.send_packet(P_FE2LS_UPDATE_MONITOR, &monitor_pkt));
+            } else {
+                log(
+                    Severity::Warning,
+                    "No login server to send monitor chat event",
+                );
+            }
+
             state
                 .entity_map
                 .for_each_around(EntityID::Player(pc_id), clients, |client| {
@@ -105,6 +124,23 @@ pub fn send_menuchat_message(
             }
 
             log(Severity::Info, &format!("{}: '{}'", player, msg));
+
+            if let Some(login_server) = clients.get_login_server() {
+                let chat_event = ffmonitor::ChatEvent {
+                    kind: ffmonitor::ChatKind::MenuChat,
+                    from: player.to_string(),
+                    to: None,
+                    message: msg,
+                };
+                let monitor_pkt =
+                    monitor_event_to_packet(ffmonitor::Event::Chat(chat_event)).unwrap();
+                log_if_failed(login_server.send_packet(P_FE2LS_UPDATE_MONITOR, &monitor_pkt));
+            } else {
+                log(
+                    Severity::Warning,
+                    "No login server to send monitor chat event",
+                );
+            }
 
             let resp = sP_FE2CL_REP_SEND_MENUCHAT_MESSAGE_SUCC {
                 iPC_ID: pc_id,
@@ -153,16 +189,33 @@ pub fn send_group_freechat_message(
         return Ok(());
     }
 
-    log(
-        Severity::Info,
-        &format!("{} (to group): \"{}\"", player, msg),
-    );
-
     let pkt = sP_FE2CL_REP_SEND_ALL_GROUP_FREECHAT_MESSAGE_SUCC {
         iSendPCID: pc_id,
         szFreeChat: util::encode_utf16(&msg).unwrap(),
         iEmoteCode: pkt.iEmoteCode,
     };
+
+    log(
+        Severity::Info,
+        &format!("{} (to group): \"{}\"", player, msg),
+    );
+
+    if let Some(login_server) = clients.get_login_server() {
+        let chat_event = ffmonitor::ChatEvent {
+            kind: ffmonitor::ChatKind::GroupChat,
+            from: player.to_string(),
+            to: None,
+            message: msg,
+        };
+        let monitor_pkt = monitor_event_to_packet(ffmonitor::Event::Chat(chat_event)).unwrap();
+        log_if_failed(login_server.send_packet(P_FE2LS_UPDATE_MONITOR, &monitor_pkt));
+    } else {
+        log(
+            Severity::Warning,
+            "No login server to send monitor chat event",
+        );
+    }
+
     if let Some(group_id) = player.group_id {
         let group = state.groups.get(&group_id).unwrap();
         for eid in group.get_member_ids() {
@@ -197,6 +250,22 @@ pub fn send_group_menuchat_message(
     }
 
     log(Severity::Info, &format!("{} (to group): '{}'", player, msg));
+
+    if let Some(login_server) = clients.get_login_server() {
+        let chat_event = ffmonitor::ChatEvent {
+            kind: ffmonitor::ChatKind::GroupMenuChat,
+            from: player.to_string(),
+            to: None,
+            message: msg,
+        };
+        let monitor_pkt = monitor_event_to_packet(ffmonitor::Event::Chat(chat_event)).unwrap();
+        log_if_failed(login_server.send_packet(P_FE2LS_UPDATE_MONITOR, &monitor_pkt));
+    } else {
+        log(
+            Severity::Warning,
+            "No login server to send monitor chat event",
+        );
+    }
 
     let pkt = sP_FE2CL_REP_SEND_ALL_GROUP_MENUCHAT_MESSAGE_SUCC {
         iSendPCID: pc_id,
@@ -251,14 +320,36 @@ pub fn send_buddy_freechat_message(
     };
 
     if let Some(buddy) = state.get_player_by_uid(buddy_uid) {
-        if let Some(buddy_client) = buddy.get_client(clients) {
-            buddy_client
-                .send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &response_pkt)?;
-            clients
-                .get_self()
-                .send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &response_pkt)?;
-            return Ok(());
+        log(
+            Severity::Info,
+            &format!("{} (to {}): \"{}\"", player, buddy, msg),
+        );
+
+        if let Some(login_server) = clients.get_login_server() {
+            let chat_event = ffmonitor::ChatEvent {
+                kind: ffmonitor::ChatKind::BuddyChat,
+                from: player.to_string(),
+                to: Some(buddy.to_string()),
+                message: msg,
+            };
+            let monitor_pkt = monitor_event_to_packet(ffmonitor::Event::Chat(chat_event)).unwrap();
+            log_if_failed(login_server.send_packet(P_FE2LS_UPDATE_MONITOR, &monitor_pkt));
+        } else {
+            log(
+                Severity::Warning,
+                "No login server to send monitor chat event",
+            );
         }
+
+        if let Some(buddy_client) = buddy.get_client(clients) {
+            log_if_failed(
+                buddy_client
+                    .send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &response_pkt),
+            );
+        }
+        return clients
+            .get_self()
+            .send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &response_pkt);
     }
 
     if let Some(login_server) = clients.get_login_server() {
@@ -318,14 +409,36 @@ pub fn send_buddy_menuchat_message(
     };
 
     if let Some(buddy) = state.get_player_by_uid(buddy_uid) {
-        if let Some(buddy_client) = buddy.get_client(clients) {
-            buddy_client
-                .send_packet(P_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC, &response_pkt)?;
-            clients
-                .get_self()
-                .send_packet(P_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC, &response_pkt)?;
-            return Ok(());
+        log(
+            Severity::Info,
+            &format!("{} (to {}): '{}'", player, buddy, msg),
+        );
+
+        if let Some(login_server) = clients.get_login_server() {
+            let chat_event = ffmonitor::ChatEvent {
+                kind: ffmonitor::ChatKind::BuddyMenuChat,
+                from: player.to_string(),
+                to: Some(buddy.to_string()),
+                message: msg,
+            };
+            let monitor_pkt = monitor_event_to_packet(ffmonitor::Event::Chat(chat_event)).unwrap();
+            log_if_failed(login_server.send_packet(P_FE2LS_UPDATE_MONITOR, &monitor_pkt));
+        } else {
+            log(
+                Severity::Warning,
+                "No login server to send monitor chat event",
+            );
         }
+
+        if let Some(buddy_client) = buddy.get_client(clients) {
+            log_if_failed(
+                buddy_client
+                    .send_packet(P_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC, &response_pkt),
+            );
+        }
+        return clients
+            .get_self()
+            .send_packet(P_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC, &response_pkt);
     }
 
     if let Some(login_server) = clients.get_login_server() {
