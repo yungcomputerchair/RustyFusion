@@ -353,21 +353,6 @@ pub fn pc_buddy_warp(clients: &mut ClientMap, state: &mut ShardServerState) -> F
     let player_payzone_flag = player.get_payzone_flag();
     let player_is_warp_on_cooldown = player.is_warp_on_cooldown();
     let buddy_uid = pkt.iBuddyPCUID;
-    
-    let search = PlayerSearchQuery::ByUID(buddy_uid);
-    let res = search.execute(state);
-    if res.is_none() {
-        log(
-            Severity::Info,
-            &format!(
-                "Cross-shard buddy warp not implemented (player {}, buddy {})",
-                player_uid, buddy_uid
-            ),
-        );
-        return Ok(());
-    }
-
-    let buddy_id = res.unwrap();
 
     let mut invalid_warp = |msg: String| -> FFResult<()> {
         let response = sP_FE2CL_REP_PC_BUDDY_WARP_FAIL {
@@ -402,6 +387,21 @@ pub fn pc_buddy_warp(clients: &mut ClientMap, state: &mut ShardServerState) -> F
             player_uid
         ));
     }
+
+    let search = PlayerSearchQuery::ByUID(buddy_uid);
+    let res = search.execute(state);
+    if res.is_none() {
+        log(
+            Severity::Info,
+            &format!(
+                "Cross-shard buddy warp not implemented (player {}, buddy {})",
+                player_uid, buddy_uid
+            ),
+        );
+        return Ok(());
+    }
+
+    let buddy_id = res.unwrap();
 
     let buddy = state.get_player_mut(buddy_id)?;
     let buddy_is_on_skyway = buddy.get_skyway_ride().is_some();
