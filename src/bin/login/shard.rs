@@ -623,8 +623,16 @@ pub fn buddy_warp_succ(
         iZ: pkt.iZ,
     };
 
-    state.set_pending_channel_request(pkt.iFromPCUID, pkt.iChannelNum as u8);
-
+    let pcuid = pkt.iFromPCUID;
+    
+    state.set_pending_channel_request(pcuid, pkt.iChannelNum as u8);
+    
+    log(Severity::Info, &format!(
+        "Set pending channel request with values PC UID {} -> Channel {}",
+        pcuid, pkt.iChannelNum
+    )
+    );
+    
     if let Some(from_shard_id) = state.get_player_shard(pkt.iFromPCUID) {
         if let Some(from_shard) = clients
             .values_mut()

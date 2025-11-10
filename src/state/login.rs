@@ -9,10 +9,9 @@ use crate::{
     defines::*,
     entity::{Player, PlayerMetadata},
     enums::ShardChannelStatus,
-    error::{log_if_failed, FFError, FFResult, Severity},
+    error::{FFError, FFResult, Severity, log, log_if_failed},
     net::{
-        packet::{PacketID::*, *},
-        ClientType, FFClient,
+        ClientType, FFClient, packet::{PacketID::*, *}
     },
     util,
 };
@@ -306,6 +305,9 @@ impl LoginServerState {
                 None => continue,
             };
             let channel_num = self.get_pending_channel_request(pc_uid).unwrap_or(0) as i8;
+            log(Severity::Info, 
+                &format!("Processing shard connection request for account {}: PC UID {}, Channel {}", acc_id, pc_uid, channel_num)
+            );
             let Some(session) = self.sessions.get_mut(&acc_id) else {
                 continue;
             };
