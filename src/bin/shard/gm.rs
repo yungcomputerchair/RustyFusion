@@ -10,6 +10,7 @@ use rusty_fusion::{
     enums::*,
     error::*,
     item::Item,
+    monitor::monitor_event_to_packet,
     net::{
         packet::{PacketID::*, *},
         ClientMap, FFClient,
@@ -257,14 +258,35 @@ pub fn gm_pc_motd_register(clients: &mut ClientMap, state: &mut ShardServerState
 pub fn gm_pc_announce(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
     let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__CS as i16)?;
+    let player = state.get_player(pc_id).unwrap();
     let pkt: &sP_CL2FE_GM_REQ_PC_ANNOUNCE = client.get_packet(P_CL2FE_GM_REQ_PC_ANNOUNCE)?;
     let area_type: AreaType = pkt.iAreaType.try_into()?;
+
+    let msg = util::parse_utf16(&pkt.szAnnounceMsg)?;
+    log(
+        Severity::Info,
+        &format!("(GM announcement/{:?}) {}: \"{}\"", area_type, player, msg),
+    );
+
+    let bcast_event = ffmonitor::BroadcastEvent {
+        scope: match area_type {
+            AreaType::Local => ffmonitor::BroadcastScope::Local,
+            AreaType::Channel => ffmonitor::BroadcastScope::Channel,
+            AreaType::Shard => ffmonitor::BroadcastScope::Shard,
+            AreaType::Global => ffmonitor::BroadcastScope::Global,
+        },
+        announcement_type: pkt.iAnnounceType as usize,
+        duration_secs: pkt.iDuringTime as usize,
+        from: player.to_string(),
+        message: msg,
+    };
+
     let pkt = sP_FE2CL_ANNOUNCE_MSG {
         iAnnounceType: pkt.iAnnounceType,
         iDuringTime: pkt.iDuringTime,
         szAnnounceMsg: pkt.szAnnounceMsg,
     };
-    let player = state.get_player(pc_id).unwrap();
+
     match area_type {
         AreaType::Local => {
             state
@@ -294,9 +316,26 @@ pub fn gm_pc_announce(clients: &mut ClientMap, state: &mut ShardServerState) -> 
         AreaType::Global => {
             if let Some(login_server) = clients.get_login_server() {
                 log_if_failed(login_server.send_packet(P_FE2LS_ANNOUNCE_MSG, &pkt));
+            } else {
+                log(
+                    Severity::Warning,
+                    "No login server connected; cannot send global announce",
+                );
             }
         }
     }
+
+    if let Some(login_server) = clients.get_login_server() {
+        let monitor_pkt =
+            monitor_event_to_packet(ffmonitor::Event::Broadcast(bcast_event)).unwrap();
+        log_if_failed(login_server.send_packet(P_FE2LS_UPDATE_MONITOR, &monitor_pkt));
+    } else {
+        log(
+            Severity::Warning,
+            "No login server connected; cannot send bcast monitor event",
+        );
+    }
+
     Ok(())
 }
 

@@ -99,7 +99,7 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
   - [ ] **OpenFusion monitor protocol using [ffmonitor](https://github.com/OpenFusionProject/ffmonitor)**
     - [x] `player` events
     - [x] `chat` events
-    - [ ] `bcast` events
+    - [x] `bcast` events
     - [ ] `email` events
     - [x] `namereq` events
   - [ ] ofapi support
