@@ -555,29 +555,14 @@ pub fn login_buddy_warp_succ(
             let player = state.get_player_mut(pc_id).unwrap();
             player.set_instance_id(InstanceID {
                 map_num: pkt.iMapNum,
-                channel_num: pkt.iChannelNum as u8,
-                instance_num: Some(pkt.iInstanceNum as u32),
+                channel_num: pkt.iChannelNum,
+                instance_num: None,
             });
             player.set_position(Position {
                 x: pkt.iX,
                 y: pkt.iY,
                 z: pkt.iZ,
             });
-
-            // log instance and position values
-            log(
-                Severity::Info,
-                &format!(
-                    "Buddy warp succeeded for player UID {}: map {}, channel {}, instance {}, position ({}, {}, {})",
-                    player_pcuid,
-                    pkt.iMapNum,
-                    pkt.iChannelNum,
-                    pkt.iInstanceNum,
-                    pkt.iX,
-                    pkt.iY,
-                    pkt.iZ
-                ),
-            );
 
             let player_saved = player.clone();
 

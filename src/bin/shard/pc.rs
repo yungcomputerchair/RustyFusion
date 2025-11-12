@@ -29,7 +29,13 @@ pub fn pc_enter(
     let serial_key: i64 = pkt.iEnterSerialKey;
     let login_data = state.login_data.remove(&serial_key).unwrap();
 
-    log(Severity::Info, &format!("Loading player {} with pending channel {}", login_data.iPC_UID, login_data.iChannelRequestNum));
+    log(
+        Severity::Info,
+        &format!(
+            "Loading player {} with pending channel {}",
+            login_data.iPC_UID, login_data.iChannelRequestNum
+        ),
+    );
 
     // check if this player is already in the shard and kick if so.
     // important that we save the current player to DB first to avoid state desync

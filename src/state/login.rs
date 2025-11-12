@@ -9,9 +9,10 @@ use crate::{
     defines::*,
     entity::{Player, PlayerMetadata},
     enums::ShardChannelStatus,
-    error::{FFError, FFResult, Severity, log, log_if_failed},
+    error::{log_if_failed, FFError, FFResult, Severity},
     net::{
-        ClientType, FFClient, packet::{PacketID::*, *}
+        packet::{PacketID::*, *},
+        ClientType, FFClient,
     },
     util,
 };
@@ -28,6 +29,7 @@ pub struct Account {
 
 struct ShardConnectionRequest {
     pub shard_id: Option<i32>,
+    pub channel_num: Option<u8>,
     pub expire_time: SystemTime,
 }
 
@@ -260,11 +262,17 @@ impl LoginServerState {
         shard.get_channel_statuses()
     }
 
-    pub fn request_shard_connection(&mut self, acc_id: i64, shard_id: Option<i32>) -> FFResult<()> {
+    pub fn request_shard_connection(
+        &mut self,
+        acc_id: i64,
+        shard_id: Option<i32>,
+        channel_num: Option<u8>,
+    ) -> FFResult<()> {
         const SHARD_CONN_TIMEOUT_SEC: u64 = 20;
         let session = self.get_session_mut(acc_id)?;
         session.shard_connection_request = Some(ShardConnectionRequest {
             shard_id,
+            channel_num,
             expire_time: SystemTime::now() + Duration::from_secs(SHARD_CONN_TIMEOUT_SEC),
         });
         Ok(())
@@ -304,16 +312,14 @@ impl LoginServerState {
                 Some(uid) => uid,
                 None => continue,
             };
-            let channel_num = self.get_pending_channel_request(pc_uid).unwrap_or(0) as i8;
-            log(Severity::Info, 
-                &format!("Processing shard connection request for account {}: PC UID {}, Channel {}", acc_id, pc_uid, channel_num)
-            );
             let Some(session) = self.sessions.get_mut(&acc_id) else {
                 continue;
             };
             let Some(request) = &session.shard_connection_request else {
                 continue;
             };
+
+            let channel_num = request.channel_num.unwrap_or(0) as i8;
 
             if request.expire_time < time {
                 let resp = sP_LS2CL_REP_SHARD_SELECT_FAIL {

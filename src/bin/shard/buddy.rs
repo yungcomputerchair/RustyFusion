@@ -1,4 +1,5 @@
 use rusty_fusion::{
+    chunk::InstanceID,
     database::db_run_sync,
     defines::*,
     entity::{BuddyListEntry, Entity, EntityID, PlayerSearchQuery},
@@ -440,7 +441,11 @@ pub fn pc_buddy_warp(clients: &mut ClientMap, state: &mut ShardServerState) -> F
         {
             let player = state.get_player_mut(pc_id).unwrap();
             player.set_position(buddy_position);
-            player.set_instance_id(buddy_instance_id);
+            player.set_instance_id(InstanceID {
+                map_num: buddy_instance_id.map_num,
+                channel_num: buddy_instance_id.channel_num,
+                instance_num: None,
+            });
             let player_saved = player.clone();
 
             log_if_failed(db_run_sync(move |db| db.save_player(&player_saved)));
