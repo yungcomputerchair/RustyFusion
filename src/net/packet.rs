@@ -549,6 +549,9 @@ pub enum PacketID {
     P_LS2FE_REP_SEND_BUDDY_FREECHAT_SUCC = 0x2300000f, // 587202575
     P_LS2FE_REQ_SEND_BUDDY_MENUCHAT = 0x23000010, // 587202576
     P_LS2FE_REP_SEND_BUDDY_MENUCHAT_SUCC = 0x23000011, // 587202577
+    P_LS2FE_REQ_BUDDY_WARP = 0x23000012,          // 587202578
+    P_LS2FE_REP_BUDDY_WARP_SUCC = 0x23000013,     // 587202579
+    P_LS2FE_REP_BUDDY_WARP_FAIL = 0x23000014,     // 587202580
 
     P_FE2LS_REQ_CONNECT = 0x32000001,                // 838860801
     P_FE2LS_REP_LIVE_CHECK = 0x32000002,             // 838860802
@@ -570,6 +573,9 @@ pub enum PacketID {
     P_FE2LS_REP_SEND_BUDDY_FREECHAT_SUCC = 0x32000012, // 838860818
     P_FE2LS_REQ_SEND_BUDDY_MENUCHAT = 0x32000013,      // 838860819
     P_FE2LS_REP_SEND_BUDDY_MENUCHAT_SUCC = 0x32000014, // 838860820
+    P_FE2LS_REQ_BUDDY_WARP = 0x32000015,               // 838860821
+    P_FE2LS_REP_BUDDY_WARP_SUCC = 0x32000016,          // 838860822
+    P_FE2LS_REP_BUDDY_WARP_FAIL = 0x32000017,          // 838860823
 }
 
 pub trait FFPacket: std::fmt::Debug {}
@@ -6576,6 +6582,8 @@ pub struct sP_LS2FE_REQ_UPDATE_LOGIN_INFO {
     pub iPC_UID: i64,
     pub uiFEKey: u64,
     pub uiSvrTime: u64,
+    pub iChannelRequestNum: u8,
+    pub iBuddyWarpTime: u32,
 }
 impl FFPacket for sP_LS2FE_REQ_UPDATE_LOGIN_INFO {}
 
@@ -6900,3 +6908,76 @@ pub struct sP_LS2FE_REP_SEND_BUDDY_MENUCHAT_SUCC {
     pub iEmoteCode: i32,
 }
 impl FFPacket for sP_LS2FE_REP_SEND_BUDDY_MENUCHAT_SUCC {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_REQ_BUDDY_WARP {
+    pub iPCPayzoneFlag: i8,
+    pub iFromPCUID: i64,
+    pub iBuddyPCUID: i64,
+}
+impl FFPacket for sP_FE2LS_REQ_BUDDY_WARP {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_LS2FE_REQ_BUDDY_WARP {
+    pub iPCPayzoneFlag: i8,
+    pub iFromPCUID: i64,
+    pub iBuddyPCUID: i64,
+}
+impl FFPacket for sP_LS2FE_REQ_BUDDY_WARP {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_REP_BUDDY_WARP_SUCC {
+    pub iBuddyPCUID: i64,
+    pub iFromPCUID: i64,
+    pub iX: i32,
+    pub iY: i32,
+    pub iZ: i32,
+    pub iChannelNum: u8,
+    pub iInstanceNum: u32,
+    pub iMapNum: u32,
+    pub iBuddyWarpTime: u32,
+}
+impl FFPacket for sP_FE2LS_REP_BUDDY_WARP_SUCC {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_LS2FE_REP_BUDDY_WARP_SUCC {
+    pub iBuddyPCUID: i64,
+    pub iFromPCUID: i64,
+    pub iX: i32,
+    pub iY: i32,
+    pub iZ: i32,
+    pub iMapNum: u32,
+    pub iChannelNum: u8,
+    pub iInstanceNum: u32,
+    pub iShardNum: i8,
+    pub iBuddyWarpTime: u32,
+}
+impl FFPacket for sP_LS2FE_REP_BUDDY_WARP_SUCC {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_FE2LS_REP_BUDDY_WARP_FAIL {
+    pub iBuddyPCUID: i64,
+    pub iFromPCUID: i64,
+    pub iErrorCode: i32,
+}
+impl FFPacket for sP_FE2LS_REP_BUDDY_WARP_FAIL {}
+
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sP_LS2FE_REP_BUDDY_WARP_FAIL {
+    pub iBuddyPCUID: i64,
+    pub iFromPCUID: i64,
+    pub iErrorCode: i32,
+}
+impl FFPacket for sP_LS2FE_REP_BUDDY_WARP_FAIL {}

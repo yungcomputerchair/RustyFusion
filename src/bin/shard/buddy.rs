@@ -1,7 +1,8 @@
 use rusty_fusion::{
+    chunk::InstanceID,
     defines::*,
     entity::{BuddyListEntry, Entity, EntityID, PlayerSearchQuery},
-    error::*,
+    error::{codes::BuddyWarpErr, *},
     net::{
         packet::{PacketID::*, *},
         ClientMap,
@@ -9,6 +10,8 @@ use rusty_fusion::{
     state::ShardServerState,
     util,
 };
+
+use std::time::SystemTime;
 
 const ERROR_CODE_BUDDY_DENY: i32 = 6;
 
@@ -336,6 +339,161 @@ pub fn find_name_accept_buddy(
             };
             let buddy_client = buddy.get_client(clients).unwrap();
             log_if_failed(buddy_client.send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_FAIL, &deny_pkt));
+            Ok(())
+        },
+    )
+}
+
+pub fn pc_buddy_warp(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    let client = clients.get_self();
+    let pkt: sP_CL2FE_REQ_PC_BUDDY_WARP = *client.get_packet(P_CL2FE_REQ_PC_BUDDY_WARP)?;
+
+    let pc_id = client.get_player_id()?;
+    let player = state.get_player(pc_id)?;
+    let player_uid = player.get_player_uid();
+    let player_is_on_skyway = player.get_skyway_ride().is_some();
+    let player_payzone_flag = player.get_payzone_flag();
+    let player_is_warp_on_cooldown = player.is_warp_on_cooldown();
+    let buddy_uid = pkt.iBuddyPCUID;
+
+    let mut invalid_warp = |msg: String, error_code: i32| -> FFResult<()> {
+        let response = sP_FE2CL_REP_PC_BUDDY_WARP_FAIL {
+            iBuddyPCUID: buddy_uid,
+            iErrorCode: error_code,
+        };
+        log_if_failed(
+            clients
+                .get_self()
+                .send_packet(P_FE2CL_REP_PC_BUDDY_WARP_FAIL, &response),
+        );
+        Err(FFError::build(Severity::Info, msg))
+    };
+
+    if !player.is_buddies_with(buddy_uid) {
+        return invalid_warp(
+            format!(
+                "Buddy {} is not buddies with player {}",
+                player_uid, buddy_uid
+            ),
+            BuddyWarpErr::CantWarpToLocation as i32,
+        );
+    }
+
+    if player_is_on_skyway {
+        return invalid_warp(
+            format!("Player {} is currently on a skyway ride", player_uid),
+            BuddyWarpErr::CantWarpToLocation as i32,
+        );
+    }
+
+    if player_is_warp_on_cooldown {
+        return invalid_warp(
+            format!("Player {}'s buddy warp is on cooldown", player_uid),
+            BuddyWarpErr::RechargeNotComplete as i32,
+        );
+    }
+
+    let search = PlayerSearchQuery::ByUID(buddy_uid);
+    let res = search.execute(state);
+    if res.is_none() {
+        let login_server = match clients.get_login_server() {
+            Some(ls) => ls,
+            None => {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    "No login server connected for cross-shard buddy warp".to_string(),
+                ));
+            }
+        };
+
+        let req_pkt = sP_FE2LS_REQ_BUDDY_WARP {
+            iPCPayzoneFlag: player_payzone_flag as i8,
+            iFromPCUID: player_uid,
+            iBuddyPCUID: buddy_uid,
+        };
+
+        return login_server.send_packet(P_FE2LS_REQ_BUDDY_WARP, &req_pkt);
+    }
+
+    let buddy_id = res.unwrap();
+
+    let buddy = state.get_player_mut(buddy_id)?;
+    let buddy_is_on_skyway = buddy.get_skyway_ride().is_some();
+    let buddy_payzone_flag = buddy.get_payzone_flag();
+    let buddy_instance_id = buddy.get_instance_id();
+    let buddy_position = buddy.get_position();
+
+    if buddy_is_on_skyway {
+        return invalid_warp(
+            format!("Buddy {} is currently on a skyway ride", buddy_uid),
+            BuddyWarpErr::CantWarpToLocation as i32,
+        );
+    }
+
+    if player_payzone_flag != buddy_payzone_flag {
+        return invalid_warp(
+            format!("Buddy {} is in a different payzone state", buddy_uid,),
+            BuddyWarpErr::CantWarpToLocation as i32,
+        );
+    }
+
+    if buddy_instance_id.map_num != ID_OVERWORLD {
+        return invalid_warp(
+            format!("Buddy {} is not in the overworld instance", buddy_uid,),
+            BuddyWarpErr::CantWarpToLocation as i32,
+        );
+    }
+
+    catch_fail(
+        {
+            let player = state.get_player_mut(pc_id).unwrap();
+            player.set_position(buddy_position);
+            player.set_instance_id(InstanceID {
+                map_num: buddy_instance_id.map_num,
+                channel_num: buddy_instance_id.channel_num,
+                instance_num: None,
+            });
+            player.buddy_warp_available_at =
+                Some(util::get_timestamp_sec(SystemTime::now()) + BUDDYWARP_INTERVAL);
+
+            state
+                .entity_map
+                .update(EntityID::Player(pc_id), None, Some(clients));
+
+            // this packet in client code seems to just leave group
+            let same_shard_succ_pkt = sP_FE2CL_REP_PC_BUDDY_WARP_SAME_SHARD_SUCC { UNUSED: 0 };
+
+            // this packet in client code loads the new position
+            let goto_succ_pkt = sP_FE2CL_REP_PC_GOTO_SUCC {
+                iX: buddy_position.x,
+                iY: buddy_position.y,
+                iZ: buddy_position.z,
+            };
+
+            let result = clients
+                .get_self()
+                .send_packet(
+                    P_FE2CL_REP_PC_BUDDY_WARP_SAME_SHARD_SUCC,
+                    &same_shard_succ_pkt,
+                )
+                .and_then(|_| {
+                    clients
+                        .get_self()
+                        .send_packet(P_FE2CL_REP_PC_GOTO_SUCC, &goto_succ_pkt)
+                });
+
+            result
+        },
+        || {
+            let response = sP_FE2CL_REP_PC_BUDDY_WARP_FAIL {
+                iBuddyPCUID: buddy_uid,
+                iErrorCode: BuddyWarpErr::CantWarpToLocation as i32,
+            };
+            log_if_failed(
+                clients
+                    .get_self()
+                    .send_packet(P_FE2CL_REP_PC_BUDDY_WARP_FAIL, &response),
+            );
             Ok(())
         },
     )

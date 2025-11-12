@@ -250,6 +250,9 @@ fn handle_packet(
         P_LS2FE_REP_SEND_BUDDY_FREECHAT_SUCC => login::buddy_freechat_succ(&mut clients, state),
         P_LS2FE_REQ_SEND_BUDDY_MENUCHAT => login::login_buddy_menuchat(&mut clients, state),
         P_LS2FE_REP_SEND_BUDDY_MENUCHAT_SUCC => login::buddy_menuchat_succ(&mut clients, state),
+        P_LS2FE_REQ_BUDDY_WARP => login::login_buddy_warp(&mut clients, state),
+        P_LS2FE_REP_BUDDY_WARP_SUCC => login::login_buddy_warp_succ(&mut clients, state),
+        P_LS2FE_REP_BUDDY_WARP_FAIL => login::login_buddy_warp_fail(&mut clients, state),
         P_LS2FE_REP_LIVE_CHECK => Ok(()),
         //
         P_CL2LS_REQ_LOGIN => wrong_server(clients.get_self()),
@@ -344,6 +347,7 @@ fn handle_packet(
         P_CL2FE_REQ_PC_FIND_NAME_MAKE_BUDDY => buddy::find_name_make_buddy(&mut clients, state),
         P_CL2FE_REQ_PC_FIND_NAME_ACCEPT_BUDDY => buddy::find_name_accept_buddy(&mut clients, state),
         P_CL2FE_REQ_GET_BUDDY_STATE => buddy::get_buddy_state(&mut clients, state),
+        P_CL2FE_REQ_PC_BUDDY_WARP => buddy::pc_buddy_warp(&mut clients, state),
         //
         P_CL2FE_REQ_PC_TRADE_OFFER => trade::trade_offer(&mut clients, state),
         P_CL2FE_REQ_PC_TRADE_OFFER_REFUSAL => trade::trade_offer_refusal(&mut clients, state),

@@ -29,6 +29,7 @@ pub struct Account {
 
 struct ShardConnectionRequest {
     pub shard_id: Option<i32>,
+    pub channel_num: Option<u8>,
     pub expire_time: SystemTime,
 }
 
@@ -87,6 +88,8 @@ pub struct LoginServerState {
     sessions: HashMap<i64, LoginSession>,
     shards: HashMap<i32, ShardServerInfo>,
     pub player_search_reqeusts: HashMap<(i32, i32), PlayerSearchRequest>,
+    pub pending_channel_requests: HashMap<i64, u8>,
+    pub buddy_warp_times: HashMap<i64, u32>,
 }
 impl Default for LoginServerState {
     fn default() -> Self {
@@ -95,6 +98,8 @@ impl Default for LoginServerState {
             sessions: HashMap::new(),
             shards: HashMap::new(),
             player_search_reqeusts: HashMap::new(),
+            pending_channel_requests: HashMap::new(),
+            buddy_warp_times: HashMap::new(),
         }
     }
 }
@@ -259,14 +264,29 @@ impl LoginServerState {
         shard.get_channel_statuses()
     }
 
-    pub fn request_shard_connection(&mut self, acc_id: i64, shard_id: Option<i32>) -> FFResult<()> {
+    pub fn request_shard_connection(
+        &mut self,
+        acc_id: i64,
+        shard_id: Option<i32>,
+        channel_num: Option<u8>,
+    ) -> FFResult<()> {
         const SHARD_CONN_TIMEOUT_SEC: u64 = 20;
         let session = self.get_session_mut(acc_id)?;
         session.shard_connection_request = Some(ShardConnectionRequest {
             shard_id,
+            channel_num,
             expire_time: SystemTime::now() + Duration::from_secs(SHARD_CONN_TIMEOUT_SEC),
         });
         Ok(())
+    }
+
+    pub fn set_pending_channel_request(&mut self, player_uid: i64, channel_num: u8) {
+        self.pending_channel_requests
+            .insert(player_uid, channel_num);
+    }
+
+    pub fn get_pending_channel_request(&mut self, player_uid: i64) -> Option<u8> {
+        self.pending_channel_requests.remove(&player_uid)
     }
 
     pub fn process_shard_connection_requests(
@@ -285,15 +305,23 @@ impl LoginServerState {
             let Ok(serial_key) = client.get_serial_key() else {
                 continue;
             };
-            let Some(session) = self.sessions.get_mut(&acc_id) else {
+            let pc_uid = if let Some(session) = self.sessions.get(&acc_id) {
+                session.selected_player_uid
+            } else {
                 continue;
             };
-            let Some(pc_uid) = session.selected_player_uid else {
+            let pc_uid = match pc_uid {
+                Some(uid) => uid,
+                None => continue,
+            };
+            let Some(session) = self.sessions.get_mut(&acc_id) else {
                 continue;
             };
             let Some(request) = &session.shard_connection_request else {
                 continue;
             };
+
+            let channel_num = request.channel_num.unwrap_or(0) as i8;
 
             if request.expire_time < time {
                 let resp = sP_LS2CL_REP_SHARD_SELECT_FAIL {
@@ -329,6 +357,8 @@ impl LoginServerState {
                 iPC_UID: pc_uid,
                 uiFEKey: fe_key,
                 uiSvrTime: util::get_timestamp_ms(time),
+                iChannelRequestNum: channel_num as u8,
+                iBuddyWarpTime: self.buddy_warp_times.get(&pc_uid).copied().unwrap_or(0),
             };
 
             if shard

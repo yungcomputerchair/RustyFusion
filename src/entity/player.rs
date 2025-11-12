@@ -125,7 +125,7 @@ impl Default for GuideData {
 }
 
 #[derive(Debug, Clone)]
-struct SkywayRideState {
+pub struct SkywayRideState {
     trip_data: &'static TripData,
     path: Path,
     monkey_pos: Position,
@@ -431,10 +431,10 @@ pub struct Player {
     pub buddy_list_synced: bool,
     buddy_list: BuddyList,
     pub buddy_offered_to: Option<i64>,
-    buddy_warp_time: i32,
+    pub buddy_warp_available_at: Option<u32>,
     last_heal_time: Option<SystemTime>,
     pub last_warp_away_time: Option<SystemTime>,
-    skyway_ride: Option<SkywayRideState>,
+    pub skyway_ride: Option<SkywayRideState>,
     pub trade_id: Option<Uuid>,
     pub trade_offered_to: Option<i32>,
     pub group_id: Option<Uuid>,
@@ -467,6 +467,10 @@ impl Player {
     pub fn get_player_id(&self) -> i32 {
         self.id
             .unwrap_or_else(|| panic_log(&format!("Player with UID {} has no ID", self.uid)))
+    }
+
+    pub fn get_player_uid(&self) -> i64 {
+        self.uid
     }
 
     pub fn set_player_id(&mut self, pc_id: i32) {
@@ -506,6 +510,14 @@ impl Player {
 
     pub fn get_mapnum(&self) -> u32 {
         self.instance_id.map_num
+    }
+
+    pub fn get_instance_id(&self) -> InstanceID {
+        self.instance_id
+    }
+
+    pub fn set_instance_id(&mut self, instance_id: InstanceID) {
+        self.instance_id = instance_id;
     }
 
     pub fn change_nano(&mut self, slot: usize, nano_id: Option<i16>) -> FFResult<()> {
@@ -662,7 +674,9 @@ impl Player {
             iCurrentMissionID: self.mission_journal.get_active_mission_id().unwrap_or(0),
             iWarpLocationFlag: self.flags.scamper_flags.get_chunk(0).unwrap(),
             aWyvernLocationFlag: self.flags.skyway_flags.to_array().unwrap(),
-            iBuddyWarpTime: self.buddy_warp_time,
+            iBuddyWarpTime: self
+                .buddy_warp_available_at
+                .map_or(0, |available_at| available_at as i32),
             iFatigue: unused!(),
             iFatigue_Level: unused!(),
             iFatigueRate: unused!(),
@@ -1235,6 +1249,10 @@ impl Player {
         });
     }
 
+    pub fn get_skyway_ride(&self) -> Option<&SkywayRideState> {
+        self.skyway_ride.as_ref()
+    }
+
     pub fn do_revive(&mut self) {
         self.hp = self.get_max_hp() / 2;
         for nano_id in self.nano_data.equipped_ids.into_iter().flatten() {
@@ -1279,6 +1297,15 @@ impl Player {
             .iter()
             .filter_map(|b| if b.blocked { Some(b.pc_uid) } else { None })
             .collect()
+    }
+
+    pub fn get_payzone_flag(&self) -> bool {
+        self.flags.payzone_flag
+    }
+
+    pub fn is_warp_on_cooldown(&self) -> bool {
+        self.buddy_warp_available_at
+            .is_some_and(|available_at| util::get_timestamp_sec(SystemTime::now()) < available_at)
     }
 
     pub fn disconnect(pc_id: i32, state: &mut ShardServerState, clients: &mut ClientMap) {

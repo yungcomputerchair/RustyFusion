@@ -202,6 +202,9 @@ fn handle_packet(
         P_FE2LS_REP_SEND_BUDDY_FREECHAT_SUCC => shard::buddy_freechat_succ(key, clients, state),
         P_FE2LS_REQ_SEND_BUDDY_MENUCHAT => shard::buddy_menuchat(key, clients, state),
         P_FE2LS_REP_SEND_BUDDY_MENUCHAT_SUCC => shard::buddy_menuchat_succ(key, clients, state),
+        P_FE2LS_REQ_BUDDY_WARP => shard::buddy_warp(key, clients, state),
+        P_FE2LS_REP_BUDDY_WARP_SUCC => shard::buddy_warp_succ(key, clients, state),
+        P_FE2LS_REP_BUDDY_WARP_FAIL => shard::buddy_warp_fail(key, clients, state),
         //
         P_CL2LS_REQ_LOGIN => login::login(client, state, time),
         P_CL2LS_REQ_PC_EXIT_DUPLICATE => login::pc_exit_duplicate(key, clients, state),

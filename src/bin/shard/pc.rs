@@ -31,6 +31,14 @@ pub fn pc_enter(
         return Err(FFError::build(Severity::Warning, format!("Login data for serial key {} missing; double check your shard's external IP config", serial_key)));
     };
 
+    log(
+        Severity::Info,
+        &format!(
+            "Loading player {} with pending channel {}",
+            login_data.iPC_UID, login_data.iChannelRequestNum
+        ),
+    );
+
     // check if this player is already in the shard and kick if so.
     // important that we save the current player to DB first to avoid state desync
     if let Some(existing_pc_id) = state
@@ -59,7 +67,16 @@ pub fn pc_enter(
     player.set_player_id(pc_id);
     player.set_client_id(key);
 
-    let channel_num = state.entity_map.get_min_pop_channel_num();
+    // set buddy warp timestamp from login data if present
+    if login_data.iBuddyWarpTime > 0 {
+        player.buddy_warp_available_at = Some(login_data.iBuddyWarpTime);
+    }
+
+    let channel_num = if login_data.iChannelRequestNum > 0 {
+        login_data.iChannelRequestNum
+    } else {
+        state.entity_map.get_min_pop_channel_num()
+    };
     player.instance_id.channel_num = channel_num;
 
     let resp = sP_FE2CL_REP_PC_ENTER_SUCC {

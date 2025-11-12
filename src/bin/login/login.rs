@@ -472,13 +472,18 @@ pub fn shard_select(
         let mut error_code = 1; // "Shard connection error"
         catch_fail(
             (|| {
-                if state.get_selected_player_id(account_id)?.is_none() {
-                    error_code = 2; // "Selected character error"
-                    return Err(FFError::build(
-                        Severity::Warning,
-                        format!("No selected player for account {}", account_id),
-                    ));
-                }
+                let pc_uid = match state.get_selected_player_id(account_id)? {
+                    Some(uid) => uid,
+                    None => {
+                        error_code = 2; // "Selected character error"
+                        return Err(FFError::build(
+                            Severity::Warning,
+                            format!("No selected player for account {}", account_id),
+                        ));
+                    }
+                };
+
+                let channel_num = state.get_pending_channel_request(pc_uid);
 
                 let shard_id = if req_shard_id == 0 {
                     None
@@ -486,7 +491,7 @@ pub fn shard_select(
                     Some(req_shard_id)
                 };
 
-                state.request_shard_connection(account_id, shard_id)?;
+                state.request_shard_connection(account_id, shard_id, channel_num)?;
                 state.process_shard_connection_requests(clients, time);
                 Ok(())
             })(),
