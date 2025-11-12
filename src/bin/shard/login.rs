@@ -520,7 +520,7 @@ pub fn login_buddy_warp(clients: &mut ClientMap, state: &mut ShardServerState) -
         iX: buddy_position.x,
         iY: buddy_position.y,
         iZ: buddy_position.z,
-        iBuddyWarpTime: util::get_timestamp_sec(SystemTime::now()),
+        iBuddyWarpTime: util::get_timestamp_sec(SystemTime::now()) + BUDDYWARP_INTERVAL,
     };
 
     client.send_packet(P_FE2LS_REP_BUDDY_WARP_SUCC, &resp_pkt)
@@ -562,7 +562,8 @@ pub fn login_buddy_warp_succ(
                 y: pkt.iY,
                 z: pkt.iZ,
             });
-            player.last_buddy_warp_timestamp = Some(util::get_timestamp_sec(SystemTime::now()));
+            player.buddy_warp_available_at =
+                Some(util::get_timestamp_sec(SystemTime::now()) + BUDDYWARP_INTERVAL);
 
             let player_saved = player.clone();
             log_if_failed(db_run_sync(move |db| db.save_player(&player_saved)));

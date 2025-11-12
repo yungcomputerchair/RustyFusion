@@ -67,7 +67,7 @@ pub fn pc_enter(
 
     // set buddy warp timestamp from login data if present
     if login_data.iBuddyWarpTime > 0 {
-        player.last_buddy_warp_timestamp = Some(login_data.iBuddyWarpTime);
+        player.buddy_warp_available_at = Some(login_data.iBuddyWarpTime);
     }
 
     let channel_num = if login_data.iChannelRequestNum > 0 {

@@ -453,7 +453,8 @@ pub fn pc_buddy_warp(clients: &mut ClientMap, state: &mut ShardServerState) -> F
                 channel_num: buddy_instance_id.channel_num,
                 instance_num: None,
             });
-            player.last_buddy_warp_timestamp = Some(util::get_timestamp_sec(SystemTime::now()));
+            player.buddy_warp_available_at =
+                Some(util::get_timestamp_sec(SystemTime::now()) + BUDDYWARP_INTERVAL);
 
             state
                 .entity_map
