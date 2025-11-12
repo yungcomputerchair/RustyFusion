@@ -431,7 +431,7 @@ pub struct Player {
     pub buddy_list_synced: bool,
     buddy_list: BuddyList,
     pub buddy_offered_to: Option<i64>,
-    buddy_warp_time: i32,
+    pub last_buddy_warp_timestamp: Option<u32>,
     last_heal_time: Option<SystemTime>,
     pub last_warp_away_time: Option<SystemTime>,
     pub skyway_ride: Option<SkywayRideState>,
@@ -674,7 +674,15 @@ impl Player {
             iCurrentMissionID: self.mission_journal.get_active_mission_id().unwrap_or(0),
             iWarpLocationFlag: self.flags.scamper_flags.get_chunk(0).unwrap(),
             aWyvernLocationFlag: self.flags.skyway_flags.to_array().unwrap(),
-            iBuddyWarpTime: self.buddy_warp_time,
+            iBuddyWarpTime: self.last_buddy_warp_timestamp.map_or(0, |ts| {
+                let elapsed = util::get_timestamp_sec(SystemTime::now()).saturating_sub(ts);
+                if elapsed < BUDDYWARP_INTERVAL {
+                    // client expects the absolute timestamp when the cooldown ends
+                    (ts + BUDDYWARP_INTERVAL) as i32
+                } else {
+                    0
+                }
+            }),
             iFatigue: unused!(),
             iFatigue_Level: unused!(),
             iFatigueRate: unused!(),
@@ -1302,7 +1310,8 @@ impl Player {
     }
 
     pub fn is_warp_on_cooldown(&self) -> bool {
-        self.buddy_warp_time > 0
+        self.last_buddy_warp_timestamp
+            .is_some_and(|ts| util::get_timestamp_sec(SystemTime::now()) - ts < BUDDYWARP_INTERVAL)
     }
 
     pub fn disconnect(pc_id: i32, state: &mut ShardServerState, clients: &mut ClientMap) {

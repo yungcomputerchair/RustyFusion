@@ -89,6 +89,7 @@ pub struct LoginServerState {
     shards: HashMap<i32, ShardServerInfo>,
     pub player_search_reqeusts: HashMap<(i32, i32), PlayerSearchRequest>,
     pub pending_channel_requests: HashMap<i64, u8>,
+    pub buddy_warp_times: HashMap<i64, u32>,
 }
 impl Default for LoginServerState {
     fn default() -> Self {
@@ -98,6 +99,7 @@ impl Default for LoginServerState {
             shards: HashMap::new(),
             player_search_reqeusts: HashMap::new(),
             pending_channel_requests: HashMap::new(),
+            buddy_warp_times: HashMap::new(),
         }
     }
 }
@@ -356,6 +358,7 @@ impl LoginServerState {
                 uiFEKey: fe_key,
                 uiSvrTime: util::get_timestamp_ms(time),
                 iChannelRequestNum: channel_num as u8,
+                iBuddyWarpTime: self.buddy_warp_times.get(&pc_uid).copied().unwrap_or(0),
             };
 
             if shard

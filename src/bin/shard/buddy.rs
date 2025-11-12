@@ -1,6 +1,5 @@
 use rusty_fusion::{
     chunk::InstanceID,
-    database::db_run_sync,
     defines::*,
     entity::{BuddyListEntry, Entity, EntityID, PlayerSearchQuery},
     error::{codes::BuddyWarpErr, *},
@@ -11,6 +10,8 @@ use rusty_fusion::{
     state::ShardServerState,
     util,
 };
+
+use std::time::SystemTime;
 
 const ERROR_CODE_BUDDY_DENY: i32 = 6;
 
@@ -355,10 +356,10 @@ pub fn pc_buddy_warp(clients: &mut ClientMap, state: &mut ShardServerState) -> F
     let player_is_warp_on_cooldown = player.is_warp_on_cooldown();
     let buddy_uid = pkt.iBuddyPCUID;
 
-    let mut invalid_warp = |msg: String| -> FFResult<()> {
+    let mut invalid_warp = |msg: String, error_code: i32| -> FFResult<()> {
         let response = sP_FE2CL_REP_PC_BUDDY_WARP_FAIL {
             iBuddyPCUID: buddy_uid,
-            iErrorCode: BuddyWarpErr::CantWarpToLocation as i32,
+            iErrorCode: error_code,
         };
         log_if_failed(
             clients
@@ -369,21 +370,27 @@ pub fn pc_buddy_warp(clients: &mut ClientMap, state: &mut ShardServerState) -> F
     };
 
     if !player.is_buddies_with(buddy_uid) {
-        return invalid_warp(format!(
-            "Buddy {} is not buddies with player {}",
-            player_uid, buddy_uid
-        ));
+        return invalid_warp(
+            format!(
+                "Buddy {} is not buddies with player {}",
+                player_uid, buddy_uid
+            ),
+            BuddyWarpErr::CantWarpToLocation as i32,
+        );
     }
 
     if player_is_on_skyway {
-        return invalid_warp(format!(
-            "Player {} is currently on a skyway ride",
-            player_uid
-        ));
+        return invalid_warp(
+            format!("Player {} is currently on a skyway ride", player_uid),
+            BuddyWarpErr::CantWarpToLocation as i32,
+        );
     }
 
     if player_is_warp_on_cooldown {
-        return invalid_warp(format!("Player {}'s buddy warp is on cooldown", player_uid));
+        return invalid_warp(
+            format!("Player {}'s buddy warp is on cooldown", player_uid),
+            BuddyWarpErr::RechargeNotComplete as i32,
+        );
     }
 
     let search = PlayerSearchQuery::ByUID(buddy_uid);
@@ -417,24 +424,24 @@ pub fn pc_buddy_warp(clients: &mut ClientMap, state: &mut ShardServerState) -> F
     let buddy_position = buddy.get_position();
 
     if buddy_is_on_skyway {
-        return invalid_warp(format!(
-            "Player {} is currently on a skyway ride",
-            buddy_uid
-        ));
+        return invalid_warp(
+            format!("Buddy {} is currently on a skyway ride", buddy_uid),
+            BuddyWarpErr::CantWarpToLocation as i32,
+        );
     }
 
     if player_payzone_flag != buddy_payzone_flag {
-        return invalid_warp(format!(
-            "Buddy {} is in a different payzone state",
-            buddy_uid,
-        ));
+        return invalid_warp(
+            format!("Buddy {} is in a different payzone state", buddy_uid,),
+            BuddyWarpErr::CantWarpToLocation as i32,
+        );
     }
 
     if buddy_instance_id.map_num != ID_OVERWORLD {
-        return invalid_warp(format!(
-            "Buddy {} is not in the overworld instance",
-            buddy_uid,
-        ));
+        return invalid_warp(
+            format!("Buddy {} is not in the overworld instance", buddy_uid,),
+            BuddyWarpErr::CantWarpToLocation as i32,
+        );
     }
 
     catch_fail(
@@ -446,9 +453,7 @@ pub fn pc_buddy_warp(clients: &mut ClientMap, state: &mut ShardServerState) -> F
                 channel_num: buddy_instance_id.channel_num,
                 instance_num: None,
             });
-            let player_saved = player.clone();
-
-            log_if_failed(db_run_sync(move |db| db.save_player(&player_saved)));
+            player.last_buddy_warp_timestamp = Some(util::get_timestamp_sec(SystemTime::now()));
 
             state
                 .entity_map

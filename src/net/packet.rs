@@ -6582,6 +6582,7 @@ pub struct sP_LS2FE_REQ_UPDATE_LOGIN_INFO {
     pub uiFEKey: u64,
     pub uiSvrTime: u64,
     pub iChannelRequestNum: u8,
+    pub iBuddyWarpTime: u32,
 }
 impl FFPacket for sP_LS2FE_REQ_UPDATE_LOGIN_INFO {}
 
@@ -6936,6 +6937,7 @@ pub struct sP_FE2LS_REP_BUDDY_WARP_SUCC {
     pub iChannelNum: u8,
     pub iInstanceNum: u32,
     pub iMapNum: u32,
+    pub iBuddyWarpTime: u32,
 }
 impl FFPacket for sP_FE2LS_REP_BUDDY_WARP_SUCC {}
 
@@ -6952,6 +6954,7 @@ pub struct sP_LS2FE_REP_BUDDY_WARP_SUCC {
     pub iChannelNum: u8,
     pub iInstanceNum: u32,
     pub iShardNum: i8,
+    pub iBuddyWarpTime: u32,
 }
 impl FFPacket for sP_LS2FE_REP_BUDDY_WARP_SUCC {}
 

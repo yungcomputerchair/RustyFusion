@@ -621,11 +621,13 @@ pub fn buddy_warp_succ(
         iX: pkt.iX,
         iY: pkt.iY,
         iZ: pkt.iZ,
+        iBuddyWarpTime: pkt.iBuddyWarpTime,
     };
 
     let pcuid = pkt.iFromPCUID;
 
     state.set_pending_channel_request(pcuid, pkt.iChannelNum);
+    state.buddy_warp_times.insert(pcuid, pkt.iBuddyWarpTime);
 
     log(
         Severity::Info,

@@ -1,11 +1,10 @@
-use std::{collections::HashMap, net::SocketAddr};
+use std::{collections::HashMap, net::SocketAddr, time::SystemTime};
 
 use uuid::Uuid;
 
 use rusty_fusion::{
     chunk::InstanceID,
     config::{self, config_get},
-    database::db_run_sync,
     defines::*,
     entity::{Entity, EntityID, PlayerSearchQuery},
     enums::*,
@@ -113,6 +112,7 @@ pub fn login_update_info(server: &mut FFClient, state: &mut ShardServerState) ->
             uiFEKey: pkt.uiFEKey,
             uiSvrTime: pkt.uiSvrTime,
             iChannelRequestNum: pkt.iChannelRequestNum,
+            iBuddyWarpTime: pkt.iBuddyWarpTime,
         },
     );
 
@@ -481,10 +481,7 @@ pub fn login_buddy_warp(clients: &mut ClientMap, state: &mut ShardServerState) -
     let buddy_position = buddy.get_position();
 
     if buddy_is_on_skyway {
-        return invalid_warp(format!(
-            "Player {} is currently on a skyway ride",
-            buddy_uid
-        ));
+        return invalid_warp(format!("Buddy {} is currently on a skyway ride", buddy_uid));
     }
 
     if pkt.iPCPayzoneFlag != buddy_payzone_flag as i8 {
@@ -522,6 +519,7 @@ pub fn login_buddy_warp(clients: &mut ClientMap, state: &mut ShardServerState) -
         iX: buddy_position.x,
         iY: buddy_position.y,
         iZ: buddy_position.z,
+        iBuddyWarpTime: util::get_timestamp_sec(SystemTime::now()),
     };
 
     client.send_packet(P_FE2LS_REP_BUDDY_WARP_SUCC, &resp_pkt)
@@ -563,10 +561,7 @@ pub fn login_buddy_warp_succ(
                 y: pkt.iY,
                 z: pkt.iZ,
             });
-
-            let player_saved = player.clone();
-
-            log_if_failed(db_run_sync(move |db| db.save_player(&player_saved)));
+            player.last_buddy_warp_timestamp = Some(util::get_timestamp_sec(SystemTime::now()));
 
             state
                 .entity_map
@@ -574,7 +569,7 @@ pub fn login_buddy_warp_succ(
 
             let other_shard_succ_pkt = sP_FE2CL_REP_PC_BUDDY_WARP_OTHER_SHARD_SUCC {
                 iBuddyPCUID: pkt.iBuddyPCUID,
-                iChannelNum: 0,
+                iChannelNum: 0, // server will identify target channel on join using get_pending_channel_request
                 iShardNum: pkt.iShardNum,
             };
 
