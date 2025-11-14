@@ -56,8 +56,13 @@ impl Config {
 }
 
 pub fn config_init() -> &'static Config {
+    const CONFIG_PATH: &str = "config.toml";
     assert!(CONFIG.get().is_none());
-    if let Some(loaded_config) = Config::load("config.toml") {
+
+    // Allow overriding config path via command line argument
+    let file_override = std::env::args().nth(1);
+    let file_path = file_override.as_deref().unwrap_or(CONFIG_PATH);
+    if let Some(loaded_config) = Config::load(file_path) {
         if CONFIG.set(loaded_config).is_err() {
             panic_log("Couldn't initialize config");
         }

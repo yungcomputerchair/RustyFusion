@@ -126,7 +126,13 @@ Cargo (Rust's package manager) makes working with Rust projects extremely easy t
 git clone --recurse-submodules https://github.com/gsemaj/RustyFusion
 cd RustyFusion
 cargo build
-cargo run --bin login_server # or shard_server
+cargo run --bin login # for login server
+cargo run --bin shard # for shard server
+```
+To force the server to load the config file from a location other than `config.toml`, you can override it in the command line:
+```
+cargo run --bin shard config1.toml
+cargo run --bin shard config2.toml
 ```
 
 ## Contributing
