@@ -44,7 +44,7 @@ impl Config {
 
         let file_contents = file_read.unwrap();
         let parsed: ConfigLayout = toml::from_str(&file_contents).unwrap_or_else(|e| {
-            panic_log(&format!("Malformed config.toml: {}", e));
+            panic_log(&format!("Malformed config file: {}", e));
         });
 
         Some(Config {
