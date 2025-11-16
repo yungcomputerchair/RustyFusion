@@ -49,8 +49,8 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
   - [x] Basic chat
   - [ ] Buddies
     - [x] Framework
-    - [x] Buddy chat (https://github.com/yungcomputerchair/RustyFusion/pull/11, thanks **lwcasgc**!)
-    - [x] Buddy warping (https://github.com/yungcomputerchair/RustyFusion/pull/12, thanks **lwcasgc**!)
+    - [x] Buddy chat [(thanks **lwcasgc**!)](https://github.com/yungcomputerchair/RustyFusion/pull/11)
+    - [x] Buddy warping [(thanks **lwcasgc**!)](https://github.com/yungcomputerchair/RustyFusion/pull/12)
     - [ ] Emails
     - [ ] Blocking
   - [x] Groups
