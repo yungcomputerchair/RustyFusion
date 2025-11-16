@@ -72,6 +72,14 @@ CREATE TABLE IF NOT EXISTS Players (
     UNIQUE (FirstName, LastName)
 );
 
+CREATE TABLE IF NOT EXISTS Auth (
+    AccountID   BIGINT NOT NULL,
+    Cookie      TEXT NOT NULL,
+    Expires     INTEGER DEFAULT 0 NOT NULL,
+    FOREIGN KEY(AccountID) REFERENCES Accounts(AccountID) ON DELETE CASCADE,
+    UNIQUE (AccountID)
+);
+
 CREATE TABLE IF NOT EXISTS Appearances (
     PlayerID    BIGINT UNIQUE NOT NULL,
     Body        INTEGER DEFAULT 0 NOT NULL,
