@@ -22,16 +22,18 @@ VALUES (
 );
 
 CREATE TABLE IF NOT EXISTS Accounts (
-    AccountID    BIGSERIAL PRIMARY KEY NOT NULL,
-    Login        TEXT    NOT NULL UNIQUE,
-    Password     TEXT    NOT NULL,
-    Selected     INTEGER  DEFAULT 1 NOT NULL,
-    AccountLevel INTEGER NOT NULL,
-    Created      INTEGER DEFAULT extract(epoch from now()) NOT NULL,
-    LastLogin    INTEGER DEFAULT extract(epoch from now()) NOT NULL,
-    BannedUntil  INTEGER DEFAULT 0 NOT NULL,
-    BannedSince  INTEGER DEFAULT 0 NOT NULL,
-    BanReason    TEXT    DEFAULT '' NOT NULL
+    AccountID           BIGSERIAL PRIMARY KEY NOT NULL,
+    Login               TEXT    NOT NULL UNIQUE,
+    Password            TEXT    NOT NULL,
+    Selected            INTEGER  DEFAULT 1 NOT NULL,
+    AccountLevel        INTEGER NOT NULL,
+    Created             INTEGER DEFAULT extract(epoch from now()) NOT NULL,
+    LastLogin           INTEGER DEFAULT extract(epoch from now()) NOT NULL,
+    BannedUntil         INTEGER DEFAULT 0 NOT NULL,
+    BannedSince         INTEGER DEFAULT 0 NOT NULL,
+    BanReason           TEXT    DEFAULT '' NOT NULL,
+    Email               TEXT    DEFAULT '' NOT NULL,
+    LastPasswordReset   INTEGER DEFAULT 0 NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS Players (
