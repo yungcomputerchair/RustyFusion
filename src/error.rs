@@ -275,6 +275,22 @@ pub mod codes {
     #[repr(i32)]
     #[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
     #[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
+    pub enum LoginError {
+        DbConnectionError = 0,     // "DB connection error"
+        UsernameNotFound = 1, // "Sorry, the ID you have entered does not exist. Please try again."
+        IncorrectPassword = 2, // "Sorry, the ID and Password you have entered do not match. Please try again."
+        AlreadyLoggedIn = 3,   // "ID already in use. Disconnect existing connection?"
+        LoginError = 4,        // "Login error"
+        LoginError2 = 5,       // "Login error"
+        ClientVersionOutdated = 6, // "Client version outdated"
+        UnauthorizedForBeta = 7, // "You are not an authorized beta tester"
+        AuthServicesError = 8, // "Authentication connection error"
+        EulaNotAccepted = 9,   // "Updated EUALA acceptance required"
+    }
+
+    #[repr(i32)]
+    #[derive(PartialEq, Eq, Hash, TryFromPrimitive, Clone, Copy, Debug)]
+    #[num_enum(error_type(name = FFError, constructor = FFError::from_enum_err))]
     pub enum PlayerSearchReqErr {
         NotFound = 0,
         SearchInProgress = 1,

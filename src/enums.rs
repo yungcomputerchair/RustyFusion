@@ -29,6 +29,11 @@ macro_rules! ffenum {
     };
 }
 
+ffenum!(LoginType, i32, {
+    Password = 1,
+    Cookie = 2,
+});
+
 ffenum!(CombatStyle, i32, {
     Adaptium = NANO_STYLE_CRYSTAL as i32,
     Blastons = NANO_STYLE_ENERGY as i32,

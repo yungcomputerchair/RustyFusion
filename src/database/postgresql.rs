@@ -12,6 +12,7 @@ use crate::{
     mission::Task,
     nano::Nano,
     net::packet::*,
+    state::Cookie,
     tabledata::tdata_get,
     util::{self, Bitfield},
     Position,
@@ -521,15 +522,40 @@ impl Database for PostgresDatabase {
         let client = &mut self.client;
         let rows = Self::query(client, "find_account", &[username])?;
         assert!(rows.len() <= 1);
-        Ok(rows.first().map(|row| Account {
+
+        let row = match rows.first() {
+            Some(r) => r,
+            None => return Ok(None),
+        };
+
+        let cookie = match row.try_get::<_, String>("Cookie") {
+            Ok(cookie_str) => {
+                let expires_sec: Int = row.get("Expires");
+                Some(Cookie {
+                    token: cookie_str,
+                    expires: util::get_systime_from_sec(expires_sec as u64),
+                })
+            }
+            Err(_) => None,
+        };
+
+        let account = Account {
             id: row.get("AccountId"),
             username: username.clone(),
             password_hashed: row.get("Password"),
+            cookie,
             selected_slot: row.get::<_, Int>("Selected") as u8,
             account_level: row.get::<_, Int>("AccountLevel") as i16,
             banned_until: util::get_systime_from_sec(row.get::<_, Int>("BannedUntil") as u64),
             ban_reason: row.get("BanReason"),
-        }))
+        };
+
+        log_if_failed(Self::exec(
+            client,
+            "invalidate_cookie_for_account",
+            &[&account.id],
+        ));
+        Ok(Some(account))
     }
 
     fn find_account_from_player(&mut self, pc_uid: BigInt) -> FFResult<Account> {
@@ -546,6 +572,7 @@ impl Database for PostgresDatabase {
             id: row.get("AccountId"),
             username: row.get("Login"),
             password_hashed: row.get("Password"),
+            cookie: None, // this query is not for auth
             selected_slot: row.get::<_, Int>("Selected") as u8,
             account_level: row.get::<_, Int>("AccountLevel") as i16,
             banned_until: util::get_systime_from_sec(row.get::<_, Int>("BannedUntil") as u64),

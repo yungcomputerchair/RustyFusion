@@ -106,6 +106,17 @@ pub fn gen_auth_challenge() -> Vec<u8> {
     chall
 }
 
+pub fn timing_safe_strcmp(a: &str, b: &str) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut result: u8 = 0;
+    for (byte_a, byte_b) in a.bytes().zip(b.bytes()) {
+        result |= byte_a ^ byte_b;
+    }
+    result == 0
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::SystemTime;

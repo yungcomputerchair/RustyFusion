@@ -17,10 +17,16 @@ use crate::{
     util,
 };
 
+pub struct Cookie {
+    pub token: String,
+    pub expires: SystemTime,
+}
+
 pub struct Account {
     pub id: i64,
     pub username: String,
     pub password_hashed: String,
+    pub cookie: Option<Cookie>,
     pub selected_slot: u8,
     pub account_level: i16,
     pub banned_until: SystemTime,

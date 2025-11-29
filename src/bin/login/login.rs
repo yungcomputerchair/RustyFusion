@@ -1,15 +1,16 @@
-use std::{collections::HashMap, time::SystemTime};
+use std::{collections::HashMap, sync::LazyLock, time::SystemTime};
 
 use ffmonitor::NameRequestEvent;
 use rand::random;
 
+use regex::Regex;
 use rusty_fusion::{
     config::config_get,
     database::db_run_sync,
     defines::*,
     entity::{Combatant, Entity, Player},
-    enums::{ItemLocation, ItemType, PlayerNameStatus},
-    error::{catch_fail, log, log_if_failed, FFError, FFResult, Severity},
+    enums::{ItemLocation, ItemType, LoginType, PlayerNameStatus},
+    error::{catch_fail, codes::LoginError, log, log_if_failed, FFError, FFResult, Severity},
     item::Item,
     monitor::{monitor_queue, MonitorEvent},
     net::{
@@ -21,27 +22,82 @@ use rusty_fusion::{
     unused, util,
 };
 
+static USERNAME_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"[a-zA-Z0-9_-]{4,32}").unwrap());
+
+static PASSWORD_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"[a-zA-Z0-9!@#$%^&*()_+]{8,32}").unwrap());
+
 pub fn login(
     client: &mut FFClient,
     state: &mut LoginServerState,
     time: SystemTime,
 ) -> FFResult<()> {
+    const PLAINTEXT_PASSWORD_NOT_ALLOWED_MSG: &str = "Password login disabled
+This server has disabled logging in with plaintext passwords.
+Please contact an admin for assistance.";
+    const BAD_USERNAME_REGEX_MSG: &str = "Invalid username
+Username must be 4-32 characters long and contain only letters, numbers, underscores, or hyphens.";
+    const BAD_PASSWORD_REGEX_MSG: &str =
+        "Invalid password
+Password must be 8-32 characters long and contain only letters, numbers, or special characters !@#$%^&*()_+.";
+
     let pkt: sP_CL2LS_REQ_LOGIN = *client.get_packet(P_CL2LS_REQ_LOGIN)?;
-    let mut error_code = 4; // "Login error"
+    let mut error_code = LoginError::LoginError;
     catch_fail(
         (|| {
-            let username = if pkt.szID[0] != 0 {
-                util::parse_utf16(&pkt.szID)?
-            } else {
-                util::parse_utf8(&pkt.szCookie_TEGid)?
+            let login_type = LoginType::try_from(pkt.iLoginType).map_err(|_| {
+                FFError::build(
+                    Severity::Warning,
+                    format!("Bad login type {}", pkt.iLoginType),
+                )
+            })?;
+
+            if login_type == LoginType::Password
+                && !config_get().login.allow_plaintext_passwords.get()
+            {
+                let announce = sP_FE2CL_GM_REP_PC_ANNOUNCE {
+                    iAnnounceType: unused!(),
+                    iDuringTime: 10,
+                    szAnnounceMsg: util::encode_utf16(PLAINTEXT_PASSWORD_NOT_ALLOWED_MSG).unwrap(),
+                };
+                return client.send_packet(P_FE2CL_GM_REP_PC_ANNOUNCE, &announce);
+            }
+
+            let username = match login_type {
+                LoginType::Password => util::parse_utf16(&pkt.szID)?,
+                LoginType::Cookie => util::parse_utf8(&pkt.szCookie_TEGid)?,
             }
             .trim()
             .to_lowercase();
 
-            let password = if pkt.szPassword[0] != 0 {
-                util::parse_utf16(&pkt.szPassword)?
-            } else {
-                util::parse_utf8(&pkt.szCookie_authid)?
+            if !USERNAME_REGEX.is_match(&username) {
+                let announce = sP_FE2CL_GM_REP_PC_ANNOUNCE {
+                    iAnnounceType: unused!(),
+                    iDuringTime: 10,
+                    szAnnounceMsg: util::encode_utf16(BAD_USERNAME_REGEX_MSG).unwrap(),
+                };
+                return client.send_packet(P_FE2CL_GM_REP_PC_ANNOUNCE, &announce);
+            }
+
+            let token = match login_type {
+                LoginType::Password => {
+                    let password = util::parse_utf16(&pkt.szPassword)?;
+                    if !PASSWORD_REGEX.is_match(&password) {
+                        let announce = sP_FE2CL_GM_REP_PC_ANNOUNCE {
+                            iAnnounceType: unused!(),
+                            iDuringTime: 10,
+                            szAnnounceMsg: util::encode_utf16(BAD_PASSWORD_REGEX_MSG).unwrap(),
+                        };
+                        client.send_packet(P_FE2CL_GM_REP_PC_ANNOUNCE, &announce)?;
+                        return Err(FFError::build(
+                            Severity::Warning,
+                            "Password did not match regex".to_string(),
+                        ));
+                    }
+                    password
+                }
+                LoginType::Cookie => util::parse_utf8(&pkt.szCookie_authid)?,
             }
             .trim()
             .to_owned();
@@ -51,10 +107,12 @@ pub fn login(
                 match db_run_sync(move |db| db.find_account_from_username(&lookup_username))? {
                     Some(account) => account,
                     None => {
-                        if config_get().login.auto_create_accounts.get() {
+                        if config_get().login.auto_create_accounts.get()
+                            && login_type == LoginType::Password
+                        {
                             // automatically create the account with the supplied credentials
                             let new_username = username.clone();
-                            let password_hashed = util::hash_password(&password)?;
+                            let password_hashed = util::hash_password(&token)?;
                             let new_acc = db_run_sync(move |db| {
                                 db.create_account(&new_username, &password_hashed)
                             })?;
@@ -67,7 +125,7 @@ pub fn login(
                             );
                             new_acc
                         } else {
-                            error_code = 1; // "Sorry, the ID you have entered does not exist. Please try again."
+                            error_code = LoginError::UsernameNotFound;
                             return Err(FFError::build(
                                 Severity::Warning,
                                 format!("Couldn't find account {}", username),
@@ -77,12 +135,31 @@ pub fn login(
                 };
 
             // check password
-            if !util::check_password(&password, &account.password_hashed)? {
-                error_code = 2; // "Sorry, the ID and Password you have entered do not match. Please try again."
-                return Err(FFError::build(
-                    Severity::Warning,
-                    format!("Incorrect password for account {}", username),
-                ));
+            match login_type {
+                LoginType::Password => {
+                    if !util::check_password(&token, &account.password_hashed)? {
+                        error_code = LoginError::IncorrectPassword;
+                        return Err(FFError::build(
+                            Severity::Debug,
+                            format!("Incorrect password for account {}", username),
+                        ));
+                    }
+                }
+                LoginType::Cookie => {
+                    if account.cookie.is_none()
+                        || account.cookie.as_ref().unwrap().expires < time
+                        || !crypto::timing_safe_strcmp(
+                            account.cookie.as_ref().unwrap().token.as_str(),
+                            &token,
+                        )
+                    {
+                        error_code = LoginError::IncorrectPassword;
+                        return Err(FFError::build(
+                            Severity::Debug,
+                            format!("Invalid or expired cookie for account {}", username),
+                        ));
+                    }
+                }
             }
 
             // check if banned
@@ -105,8 +182,7 @@ pub fn login(
                     iDuringTime: i32::MAX,
                     szAnnounceMsg: util::encode_utf16(&ban_message)?,
                 };
-                client.send_packet(P_FE2CL_GM_REP_PC_ANNOUNCE, &resp)?;
-                return Ok(());
+                return client.send_packet(P_FE2CL_GM_REP_PC_ANNOUNCE, &resp);
             }
 
             let last_player_slot = account.selected_slot;
@@ -136,7 +212,7 @@ pub fn login(
             }
 
             if matches!(client.client_type, ClientType::UnauthedClient { .. }) {
-                error_code = 3; // "ID already in use. Disconnect existing connection?"
+                error_code = LoginError::AlreadyLoggedIn;
                 return Err(FFError::build(
                     Severity::Debug,
                     format!("Account {} already logged in", username),
@@ -189,7 +265,7 @@ pub fn login(
         })(),
         || {
             let resp = sP_LS2CL_REP_LOGIN_FAIL {
-                iErrorCode: error_code,
+                iErrorCode: error_code as i32,
                 szID: pkt.szID,
             };
             client.send_packet(P_LS2CL_REP_LOGIN_FAIL, &resp)
