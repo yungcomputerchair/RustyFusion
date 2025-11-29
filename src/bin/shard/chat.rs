@@ -910,7 +910,7 @@ mod commands {
                     client,
                     &format!("Failed to save permissions level: {}", e.get_msg()),
                 )),
-            }
+            };
         }
         Ok(())
     }

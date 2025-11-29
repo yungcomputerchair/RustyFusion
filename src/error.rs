@@ -250,9 +250,13 @@ pub fn panic_log(msg: &str) -> ! {
     panic!("A fatal error occurred, see log for details");
 }
 
-pub fn log_if_failed<T>(result: FFResult<T>) {
-    if let Err(e) = result {
-        log_error(&e);
+pub fn log_if_failed<T>(result: FFResult<T>) -> Option<T> {
+    match result {
+        Ok(v) => Some(v),
+        Err(e) => {
+            log_error(&e);
+            None
+        }
     }
 }
 
