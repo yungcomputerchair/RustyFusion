@@ -23,6 +23,9 @@ table_data_path = "tabledata/" # path to OpenFusion table data repository
 [login]
 log_path = "login.log" # path to log file, or blank for console logging only
 listen_addr = "127.0.0.1:23000" # address to bind to
+allow_plaintext_passwords = false # accept passwords sent in plaintext.
+                                  # the built-in client login screen does this, but OpenFusionLauncher uses ofapi
+                                  # to send one-time login cookies instead (which is encouraged for security)
 auto_create_accounts = true # whether an account be created automatically if one isn't found
 default_account_level = 99 # default permissions level for a new account.
                            # 1 = Master (first account)
