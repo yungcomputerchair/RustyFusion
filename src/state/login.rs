@@ -50,6 +50,7 @@ struct ShardServerInfo {
     num_channels: u8,
     max_channel_pop: usize,
     players: HashMap<i64, PlayerMetadata>,
+    name: String,
 }
 impl ShardServerInfo {
     fn get_channel_population(&self, channel_num: u8) -> usize {
@@ -182,11 +183,16 @@ impl LoginServerState {
             .map(|(shard_id, _)| *shard_id)
     }
 
+    pub fn get_shard_name(&self, shard_id: i32) -> Option<&str> {
+        self.shards.get(&shard_id).map(|shard| shard.name.as_str())
+    }
+
     pub fn register_shard(
         &mut self,
         shard_id: i32,
         num_channels: u8,
         max_channel_pop: usize,
+        name: &str,
     ) -> FFResult<()> {
         if self.shards.contains_key(&shard_id) {
             return Err(FFError::build(
@@ -208,6 +214,7 @@ impl LoginServerState {
                 num_channels,
                 max_channel_pop,
                 players: HashMap::new(),
+                name: name.to_string(),
             },
         );
         Ok(())

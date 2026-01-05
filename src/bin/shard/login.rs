@@ -41,6 +41,7 @@ pub fn login_connect_challenge(server: &mut FFClient, state: &ShardServerState) 
         uiChallengeSolvedLength: chall_decrypted.len() as u32,
         aChallengeSolved: chall_arr,
         iShardID: state.shard_id,
+        szServerName: util::encode_utf16(&config_get().shard.shard_name.get())?,
         iNumChannels: config_get().shard.num_channels.get() as i8,
         iMaxChannelPop: config_get().shard.max_channel_pop.get() as i32,
     };

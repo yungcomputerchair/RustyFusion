@@ -2,6 +2,7 @@ use super::*;
 
 define_setting!(LogPathSetting, String, "shard.log");
 define_setting!(ShardIDSetting, i32, 1_i32);
+define_setting!(ShardNameSetting, String, "My Shard");
 define_setting!(ListenAddrSetting, String, "127.0.0.1:23001");
 define_setting!(ExternalAddrSetting, String, "127.0.0.1:23001");
 define_setting!(LoginServerAddrSetting, String, "127.0.0.1:23000");
@@ -18,6 +19,7 @@ define_setting!(VehicleDurationSetting, u64, 10_080_u64);
 pub struct ShardConfig {
     pub log_path: LogPathSetting,
     pub shard_id: ShardIDSetting,
+    pub shard_name: ShardNameSetting,
     pub listen_addr: ListenAddrSetting,
     pub external_addr: ExternalAddrSetting,
     pub login_server_addr: LoginServerAddrSetting,
@@ -42,6 +44,7 @@ mod tests {
         let shard = config.shard;
         assert!(shard.log_path.is_set_to_default());
         assert!(shard.shard_id.is_set_to_default());
+        assert!(shard.shard_name.is_set_to_default());
         assert!(shard.listen_addr.is_set_to_default());
         assert!(shard.external_addr.is_set_to_default());
         assert!(shard.login_server_addr.is_set_to_default());

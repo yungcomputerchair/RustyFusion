@@ -48,6 +48,7 @@ pub fn connect(
     let shard_id = pkt.iShardID;
     let num_channels = pkt.iNumChannels;
     let max_channel_pop = pkt.iMaxChannelPop;
+    let server_name = util::parse_utf16(&pkt.szServerName)?;
 
     let chall_decrypted = pkt.aChallengeSolved[..pkt.uiChallengeSolvedLength as usize].to_vec();
 
@@ -55,7 +56,7 @@ pub fn connect(
         return Err(FFError::build(
             Severity::Warning,
             format!(
-                "Shard server tried to connect a second time: {:?}",
+                "Shard server tried to connect before challenge: {:?}",
                 server.client_type
             ),
         ));
@@ -64,7 +65,7 @@ pub fn connect(
     if chall_decrypted != challenge[..] {
         let resp = sP_LS2FE_REP_CONNECT_FAIL { iErrorCode: 1 };
         log_if_failed(server.send_packet(P_LS2FE_REP_CONNECT_FAIL, &resp));
-        return Err(FFError::build(
+        return Err(FFError::build_dc(
             Severity::Warning,
             format!(
                 "Shard server {} tried to connect with wrong password",
@@ -73,7 +74,12 @@ pub fn connect(
         ));
     }
 
-    if let Err(e) = state.register_shard(shard_id, num_channels as u8, max_channel_pop as usize) {
+    if let Err(e) = state.register_shard(
+        shard_id,
+        num_channels as u8,
+        max_channel_pop as usize,
+        &server_name,
+    ) {
         let resp = sP_LS2FE_REP_CONNECT_FAIL { iErrorCode: 2 };
         log_if_failed(server.send_packet(P_LS2FE_REP_CONNECT_FAIL, &resp));
         return Err(e);
@@ -92,8 +98,9 @@ pub fn connect(
     log(
         Severity::Info,
         &format!(
-            "Connected to shard server #{} ({}) [{} channel(s), {} players per channel]",
+            "Connected to shard server #{}: {} ({}) [{} channel(s), {} players per channel]",
             shard_id,
+            server_name,
             server.get_addr(),
             num_channels,
             max_channel_pop

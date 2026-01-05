@@ -6681,6 +6681,7 @@ pub struct sP_FE2LS_REQ_CONNECT {
     pub uiChallengeSolvedLength: u32,
     pub aChallengeSolved: [u8; AUTH_CHALLENGE_MAX_SIZE],
     pub iShardID: i32,
+    pub szServerName: [u16; 32],
     pub iMaxChannelPop: i32,
     pub iNumChannels: i8,
 }
