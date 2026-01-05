@@ -25,6 +25,8 @@ chrono = "0.4.38"
 ffmonitor = { git = "https://github.com/OpenFusionProject/ffmonitor.git", tag = "v2.2.0" }
 aes-gcm = "0.10.3"
 color-eyre = "0.6.5"
+crossterm = "0.29.0"
+ratatui = { version = "0.29.0", features = ["unstable-rendered-line-info"]}
 
 [features]
 default = ["postgres"]

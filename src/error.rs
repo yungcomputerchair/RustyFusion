@@ -135,6 +135,10 @@ impl FFError {
         sev
     }
 
+    pub fn get_timestamp(&self) -> SystemTime {
+        self.timestamp
+    }
+
     pub fn get_msg(&self) -> &str {
         &self.msg
     }
@@ -174,6 +178,12 @@ impl FFError {
 }
 
 static LOGGER: OnceLock<Mutex<BufWriter<File>>> = OnceLock::new();
+pub static TERMINAL: OnceLock<Mutex<Vec<FFError>>> = OnceLock::new();
+
+pub fn terminal_init() {
+    assert!(TERMINAL.get().is_none());
+    TERMINAL.set(Mutex::new(Vec::new())).unwrap();
+}
 
 pub fn logger_init(log_path: String) {
     assert!(LOGGER.get().is_none());
@@ -224,9 +234,9 @@ pub fn log_error(err: &FFError) {
     if severity as usize <= threshold_console {
         // Log to console, colored output
         let msg = err.get_formatted(true, true);
-        if severity == Severity::Fatal {
-            // Print to stderr instead
-            eprintln!("{}", msg);
+        if let Some(terminal) = TERMINAL.get() {
+            let mut terminal = terminal.lock().unwrap();
+            terminal.push(err.clone());
         } else {
             println!("{}", msg);
         }

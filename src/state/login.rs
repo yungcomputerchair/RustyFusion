@@ -176,6 +176,15 @@ impl LoginServerState {
         Ok(&mut acc.players)
     }
 
+    pub fn get_current_and_max_pop_for_shard(&self, shard_id: i32) -> Option<(usize, usize)> {
+        self.shards.get(&shard_id).map(|shard| {
+            (
+                shard.players.len(),
+                shard.num_channels as usize * shard.max_channel_pop,
+            )
+        })
+    }
+
     pub fn get_lowest_pop_shard_id(&mut self) -> Option<i32> {
         self.shards
             .iter()
