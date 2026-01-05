@@ -31,6 +31,7 @@ use rusty_fusion::{
 };
 
 fn main() -> Result<()> {
+    color_eyre::install().unwrap();
     let mut cleanup = Cleanup::default();
 
     let config = config_init();
