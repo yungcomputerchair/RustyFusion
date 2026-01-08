@@ -3,11 +3,12 @@ use std::{
     io::Result,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc,
+        Arc, LazyLock,
     },
     time::{Duration, SystemTime},
 };
 
+use crossterm::event::KeyCode;
 use ffmonitor::PlayerEvent;
 use ratatui::{
     prelude::*,
@@ -117,7 +118,11 @@ fn main() -> Result<()> {
         terminal.draw(|frame| render_tui(frame, state.as_login()))?;
         if crossterm::event::poll(Duration::from_millis(10))? {
             if let crossterm::event::Event::Key(key_event) = crossterm::event::read()? {
-                if key_event.code == crossterm::event::KeyCode::Char('q') {
+                if (key_event.code == KeyCode::Char('c') || key_event.code == KeyCode::Char('C'))
+                    && key_event
+                        .modifiers
+                        .contains(crossterm::event::KeyModifiers::CONTROL)
+                {
                     break;
                 }
             }
@@ -128,12 +133,15 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+static TITLE_PREFORMATTED: LazyLock<String> =
+    LazyLock::new(|| format!(" RustyFusion v{} Login Server ", env!("CARGO_PKG_VERSION")));
 fn render_tui(frame: &mut Frame, state: &LoginServerState) {
     let layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(80), Constraint::Percentage(20)].as_ref())
         .split(frame.area());
-    let title = Line::from(" RustyFusion Login Server ").bold().centered();
+    let title = Line::from(TITLE_PREFORMATTED.as_str()).bold().centered();
+    let footer = Line::from(" Press CTRL+C to stop the server ").centered();
     let events = BACKLOG.get().unwrap().lock().unwrap();
     let lines: Vec<Line> = events
         .iter()
@@ -158,7 +166,8 @@ fn render_tui(frame: &mut Frame, state: &LoginServerState) {
         .block(
             Block::bordered()
                 .padding(Padding::horizontal(1))
-                .title(title),
+                .title(title)
+                .title_bottom(footer),
         )
         .left_aligned()
         .wrap(Wrap { trim: true });
