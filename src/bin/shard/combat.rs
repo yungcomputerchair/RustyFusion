@@ -49,7 +49,7 @@ pub fn pc_attack_npcs(clients: &mut ClientMap, state: &mut ShardServerState) -> 
         let npc = match state.get_npc(npc_id) {
             Ok(npc) => npc,
             Err(e) => {
-                log_error(&e);
+                log_error(e);
                 continue;
             }
         };

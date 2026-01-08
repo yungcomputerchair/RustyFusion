@@ -134,7 +134,7 @@ fn main() -> Result<()> {
                 if e.should_dc() {
                     panic_log(e.get_msg());
                 } else {
-                    log_error(&e);
+                    log_error(e);
                 }
             });
     }

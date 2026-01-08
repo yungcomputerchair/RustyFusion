@@ -18,7 +18,7 @@ use rusty_fusion::{
     database::{db_init, db_shutdown},
     error::{
         log, log_error, log_if_failed, logger_flush, logger_flush_scheduled, logger_init,
-        panic_log, terminal_init, FFError, FFResult, Severity, TERMINAL,
+        panic_log, terminal_init, FFError, FFResult, Severity, BACKLOG,
     },
     monitor::{monitor_flush, monitor_init, monitor_queue, MonitorEvent},
     net::{
@@ -111,7 +111,7 @@ fn main() -> Result<()> {
                 if e.should_dc() {
                     panic_log(e.get_msg());
                 } else {
-                    log_error(&e);
+                    log_error(e);
                 }
             });
         terminal.draw(|frame| render_tui(frame, state.as_login()))?;
@@ -134,7 +134,7 @@ fn render_tui(frame: &mut Frame, state: &LoginServerState) {
         .constraints([Constraint::Percentage(80), Constraint::Percentage(20)].as_ref())
         .split(frame.area());
     let title = Line::from(" RustyFusion Login Server ").bold().centered();
-    let events = TERMINAL.get().unwrap().lock().unwrap();
+    let events = BACKLOG.get().unwrap().lock().unwrap();
     let lines: Vec<Line> = events
         .iter()
         .map(|fe| {

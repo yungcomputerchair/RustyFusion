@@ -269,7 +269,7 @@ pub fn item_chest_open(client: &mut FFClient, state: &mut ShardServerState) -> F
                     // If for some reason we can't find a valid drop for the crate,
                     // give the player a random gumball instead.
                     // This idea was taken from OpenFusion <3
-                    log_error(&e);
+                    log_error(e);
                     util::get_random_gumball()
                 });
 

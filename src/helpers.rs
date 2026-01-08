@@ -273,7 +273,7 @@ pub fn give_defeat_rewards(
                 }
             }
         }
-        Err(e) => log_error(&e),
+        Err(e) => log_error(e),
     }
 
     let reward_pkt = sP_FE2CL_REP_REWARD_ITEM {

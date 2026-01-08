@@ -178,11 +178,11 @@ impl FFError {
 }
 
 static LOGGER: OnceLock<Mutex<BufWriter<File>>> = OnceLock::new();
-pub static TERMINAL: OnceLock<Mutex<Vec<FFError>>> = OnceLock::new();
+pub static BACKLOG: OnceLock<Mutex<Vec<FFError>>> = OnceLock::new();
 
 pub fn terminal_init() {
-    assert!(TERMINAL.get().is_none());
-    TERMINAL.set(Mutex::new(Vec::new())).unwrap();
+    assert!(BACKLOG.get().is_none());
+    BACKLOG.set(Mutex::new(Vec::new())).unwrap();
 }
 
 pub fn logger_init(log_path: String) {
@@ -221,26 +221,15 @@ pub fn logger_flush_scheduled() -> FFResult<()> {
 
 pub fn log(severity: Severity, msg: &str) {
     let err = FFError::build(severity, msg.to_string());
-    log_error(&err);
+    log_error(err);
 }
 
-pub fn log_error(err: &FFError) {
+pub fn log_error(err: FFError) {
     let severity = err.get_severity();
 
     let config = &config_get().general;
     let threshold_console = config.logging_level_console.get();
     let threshold_file = config.logging_level_file.get();
-
-    if severity as usize <= threshold_console {
-        // Log to console, colored output
-        let msg = err.get_formatted(true, true);
-        if let Some(terminal) = TERMINAL.get() {
-            let mut terminal = terminal.lock().unwrap();
-            terminal.push(err.clone());
-        } else {
-            println!("{}", msg);
-        }
-    }
 
     if severity as usize <= threshold_file {
         // Log to file
@@ -252,11 +241,22 @@ pub fn log_error(err: &FFError) {
             }
         }
     }
+
+    if severity as usize <= threshold_console {
+        // Log to console, colored output
+        let msg = err.get_formatted(true, true);
+        if let Some(backlog) = BACKLOG.get() {
+            let mut backlog = backlog.lock().unwrap();
+            backlog.push(err);
+        } else {
+            println!("{}", msg);
+        }
+    }
 }
 
 pub fn panic_log(msg: &str) -> ! {
     let err = FFError::build(Severity::Fatal, msg.to_string());
-    log_error(&err);
+    log_error(err);
     panic!("A fatal error occurred, see log for details");
 }
 
@@ -264,14 +264,14 @@ pub fn log_if_failed<T>(result: FFResult<T>) -> Option<T> {
     match result {
         Ok(v) => Some(v),
         Err(e) => {
-            log_error(&e);
+            log_error(e);
             None
         }
     }
 }
 
 pub fn panic_if_failed<T>(result: FFResult<T>) -> T {
-    if let Err(e) = &result {
+    if let Err(e) = result {
         log_error(e);
         panic!("A fatal error occurred, see log for details");
     }

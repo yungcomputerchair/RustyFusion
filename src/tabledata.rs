@@ -737,7 +737,7 @@ impl TableData {
 
         log_if_failed(apply_misc_drop(&mut rng, &mut reward));
         if let Err(e) = apply_crate_drop(&mut rng, &mut reward) {
-            log_error(&e);
+            log_error(e);
             reward.items.push(util::get_random_gumball());
         }
 

@@ -49,7 +49,7 @@ pub fn do_basic_attack(
         let target = match state.get_combatant_mut(*target_id) {
             Ok(target) => target,
             Err(e) => {
-                log_error(&e);
+                log_error(e);
                 continue;
             }
         };

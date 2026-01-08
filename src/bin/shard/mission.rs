@@ -505,7 +505,7 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
                     .get_mission_reward(reward_id)
                     .map(|r| r.with_rates(&player.reward_data))
                 {
-                    Err(e) => log_error(&e),
+                    Err(e) => log_error(e),
                     Ok(reward) => {
                         let taros_new = player.get_taros() + reward.taros;
                         let fm_new = player.get_fusion_matter() + reward.fusion_matter;
@@ -578,7 +578,7 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
                                 iPC_Level: match player.set_level(new_level) {
                                     Ok(l) => l,
                                     Err(e) => {
-                                        log_error(&e);
+                                        log_error(e);
                                         player.get_level()
                                     }
                                 },
@@ -599,7 +599,7 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
                                 |c| c.send_packet(P_FE2CL_REP_PC_CHANGE_LEVEL, &bcast),
                             );
                         }
-                        Err(e) => log_error(&e),
+                        Err(e) => log_error(e),
                     }
                 }
             }
