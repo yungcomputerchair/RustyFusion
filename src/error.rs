@@ -7,7 +7,10 @@ use std::{
     time::SystemTime,
 };
 
-use crate::{config::config_get, util};
+use crate::{
+    config::config_get,
+    util::{self, RingBuffer},
+};
 
 pub type FFResult<T> = std::result::Result<T, FFError>;
 pub fn catch_fail<T>(
@@ -178,11 +181,14 @@ impl FFError {
 }
 
 static LOGGER: OnceLock<Mutex<BufWriter<File>>> = OnceLock::new();
-pub static BACKLOG: OnceLock<Mutex<Vec<FFError>>> = OnceLock::new();
+pub static BACKLOG: OnceLock<Mutex<RingBuffer<FFError>>> = OnceLock::new();
+const BACKLOG_SIZE: usize = 100;
 
 pub fn terminal_init() {
     assert!(BACKLOG.get().is_none());
-    BACKLOG.set(Mutex::new(Vec::new())).unwrap();
+    BACKLOG
+        .set(Mutex::new(RingBuffer::new(BACKLOG_SIZE)))
+        .unwrap();
 }
 
 pub fn logger_init(log_path: String) {
