@@ -184,7 +184,7 @@ static LOGGER: OnceLock<Mutex<BufWriter<File>>> = OnceLock::new();
 pub static BACKLOG: OnceLock<Mutex<RingBuffer<FFError>>> = OnceLock::new();
 const BACKLOG_SIZE: usize = 100;
 
-pub fn terminal_init() {
+pub fn backlog_init() {
     assert!(BACKLOG.get().is_none());
     BACKLOG
         .set(Mutex::new(RingBuffer::new(BACKLOG_SIZE)))

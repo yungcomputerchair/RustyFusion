@@ -19,7 +19,7 @@ use rusty_fusion::{
     database::{db_init, db_shutdown},
     error::{
         log, log_error, log_if_failed, logger_flush, logger_flush_scheduled, logger_init,
-        panic_log, terminal_init, FFError, FFResult, Severity, BACKLOG,
+        panic_log, backlog_init, FFError, FFResult, Severity, BACKLOG,
     },
     monitor::{monitor_flush, monitor_init, monitor_queue, MonitorEvent},
     net::{
@@ -38,7 +38,7 @@ use rusty_fusion::{
 fn main() -> Result<()> {
     color_eyre::install().unwrap();
     let mut terminal = ratatui::init();
-    terminal_init();
+    backlog_init();
 
     let mut cleanup = Cleanup::default();
 
@@ -261,7 +261,6 @@ struct Cleanup {
 }
 impl Drop for Cleanup {
     fn drop(&mut self) {
-        print!("Cleaning up...");
         ratatui::restore();
         if let Some(handle) = self.db_thread_handle.take() {
             db_shutdown();
@@ -270,7 +269,6 @@ impl Drop for Cleanup {
         if let Err(e) = logger_flush() {
             println!("Could not flush log: {}", e);
         }
-        println!("done");
     }
 }
 
