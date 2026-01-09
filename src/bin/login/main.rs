@@ -18,8 +18,8 @@ use rusty_fusion::{
     config::config_init,
     database::{db_init, db_shutdown},
     error::{
-        log, log_error, log_if_failed, logger_flush, logger_flush_scheduled, logger_init,
-        panic_log, backlog_init, FFError, FFResult, Severity, BACKLOG,
+        backlog_init, log, log_error, log_if_failed, logger_flush, logger_flush_scheduled,
+        logger_init, panic_log, FFError, FFResult, Severity, BACKLOG,
     },
     monitor::{monitor_flush, monitor_init, monitor_queue, MonitorEvent},
     net::{
@@ -138,9 +138,12 @@ static TITLE_PREFORMATTED: LazyLock<String> =
 fn render_tui(frame: &mut Frame, state: &LoginServerState) {
     let layout = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(80), Constraint::Percentage(20)].as_ref())
+        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
         .split(frame.area());
-    let title = Line::from(TITLE_PREFORMATTED.as_str()).bold().centered();
+    let title = Line::from(TITLE_PREFORMATTED.as_str())
+        .light_red()
+        .bold()
+        .centered();
     let footer = Line::from(" Press CTRL+C to stop the server ").centered();
     let events = BACKLOG.get().unwrap().lock().unwrap();
     let lines: Vec<Line> = events
