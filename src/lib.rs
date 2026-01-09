@@ -15,7 +15,10 @@ macro_rules! unused {
 macro_rules! placeholder {
     ($val:expr) => {{
         #[cfg(debug_assertions)]
-        println!("PLACEHOLDER: {} line {}", file!(), line!());
+        $crate::error::log(
+            $crate::error::Severity::Debug,
+            &format!("PLACEHOLDER: {} line {}", file!(), line!()),
+        );
         $val
     }};
 }
