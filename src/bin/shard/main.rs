@@ -3,19 +3,24 @@ use std::{
     io::Result,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc,
+        Arc, LazyLock,
     },
     time::{Duration, SystemTime},
 };
 
+use crossterm::event::KeyCode;
+use ratatui::{
+    prelude::*,
+    widgets::{Block, Padding, Paragraph, Wrap},
+};
 use rusty_fusion::{
     config::{config_get, config_init},
     database::{db_init, db_run_async, db_shutdown},
     defines::*,
     entity::{Entity, Player},
     error::{
-        log, log_error, log_if_failed, logger_flush, logger_flush_scheduled, logger_init,
-        panic_log, FFError, FFResult, Severity,
+        backlog_init, log, log_error, log_if_failed, logger_flush, logger_flush_scheduled,
+        logger_init, panic_log, FFError, FFResult, Severity, BACKLOG,
     },
     net::{
         packet::{
@@ -32,6 +37,9 @@ use rusty_fusion::{
 
 fn main() -> Result<()> {
     color_eyre::install().unwrap();
+    let mut terminal = ratatui::init();
+    backlog_init();
+
     let mut cleanup = Cleanup::default();
 
     let config = config_init();
@@ -137,6 +145,18 @@ fn main() -> Result<()> {
                     log_error(e);
                 }
             });
+        terminal.draw(|frame| render_tui(frame, state.as_shard()))?;
+        if crossterm::event::poll(Duration::from_millis(10))? {
+            if let crossterm::event::Event::Key(key_event) = crossterm::event::read()? {
+                if (key_event.code == KeyCode::Char('c') || key_event.code == KeyCode::Char('C'))
+                    && key_event
+                        .modifiers
+                        .contains(crossterm::event::KeyModifiers::CONTROL)
+                {
+                    break;
+                }
+            }
+        }
     }
 
     log(Severity::Info, "Shard server shutting down...");
@@ -157,13 +177,88 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+static TITLE_PREFORMATTED: LazyLock<String> =
+    LazyLock::new(|| format!(" RustyFusion v{} Shard Server ", env!("CARGO_PKG_VERSION")));
+fn render_tui(frame: &mut Frame, state: &ShardServerState) {
+    let layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
+        .split(frame.area());
+    let title = Line::from(TITLE_PREFORMATTED.as_str())
+        .light_red()
+        .bold()
+        .centered();
+    let footer = Line::from(" Press CTRL+C to stop the server ").centered();
+    let events = BACKLOG.get().unwrap().lock().unwrap();
+    let lines: Vec<Line> = events
+        .iter()
+        .map(|fe| {
+            let ts = util::get_timestamp_str(fe.get_timestamp());
+            let text = fe.get_msg();
+            let severity = fe.get_severity();
+            let sev_span = Span::from(format!("[{}] ", severity));
+            Line::from(vec![
+                Span::from(format!("[{}] ", ts)).dark_gray(),
+                match severity {
+                    Severity::Info => sev_span.green(),
+                    Severity::Warning => sev_span.yellow(),
+                    Severity::Fatal => sev_span.red(),
+                    Severity::Debug => sev_span.cyan(),
+                },
+                Span::from(text).white(),
+            ])
+        })
+        .collect();
+    let pg = Paragraph::new(lines)
+        .block(
+            Block::bordered()
+                .padding(Padding::horizontal(1))
+                .title(title)
+                .title_bottom(footer),
+        )
+        .left_aligned()
+        .wrap(Wrap { trim: true });
+    let lines_to_scroll = pg
+        .line_count(frame.area().width)
+        .saturating_sub(frame.area().height as usize);
+    let pg = pg.scroll((lines_to_scroll as u16, 0));
+    frame.render_widget(pg, layout[0]);
+
+    let title2 = Line::from(" Players ").bold().centered();
+    let block2 = Block::bordered()
+        .padding(Padding::horizontal(1))
+        .title(title2);
+
+    let player_ids = state.entity_map.get_player_ids().collect::<Vec<i32>>();
+    let player_names: Vec<Line> = player_ids
+        .iter()
+        .map(|pid| {
+            let player = state.get_player(*pid).unwrap();
+            Line::from(format!("{}", player))
+        })
+        .collect();
+    for (i, gauge) in player_names.iter().enumerate() {
+        let area = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(
+                player_ids
+                    .iter()
+                    .map(|_| Constraint::Length(3))
+                    .collect::<Vec<Constraint>>(),
+            )
+            .split(block2.inner(layout[1]))[i];
+        frame.render_widget(gauge.clone(), area);
+    }
+    frame.render_widget(block2, layout[1]);
+}
+
 #[derive(Default)]
 struct Cleanup {
     db_thread_handle: Option<std::thread::JoinHandle<()>>,
 }
 impl Drop for Cleanup {
     fn drop(&mut self) {
-        print!("Cleaning up...");
+        ratatui::restore();
         if let Some(handle) = self.db_thread_handle.take() {
             db_shutdown();
             handle.join().unwrap();
@@ -171,7 +266,6 @@ impl Drop for Cleanup {
         if let Err(e) = logger_flush() {
             println!("Could not flush log: {}", e);
         }
-        println!("done");
     }
 }
 
