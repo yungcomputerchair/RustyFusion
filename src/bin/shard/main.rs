@@ -1,10 +1,7 @@
 use std::{
     collections::HashMap,
     io::Result,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc, LazyLock,
-    },
+    sync::LazyLock,
     time::{Duration, SystemTime},
 };
 
@@ -122,19 +119,12 @@ fn main() -> Result<()> {
         false,
     );
 
-    let running = Arc::new(AtomicBool::new(true));
-    let r = running.clone();
-    ctrlc::set_handler(move || {
-        r.store(false, Ordering::SeqCst);
-    })
-    .expect("Couldn't set signal handler");
-
     log(
         Severity::Info,
         &format!("Shard server listening on {}", server.get_endpoint()),
     );
     let live_check_time = Duration::from_secs(config.general.live_check_time.get());
-    while running.load(Ordering::SeqCst) {
+    loop {
         server.poll(&mut state, live_check_time)?;
         timers
             .check_all(&mut server, &mut state)

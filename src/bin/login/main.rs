@@ -1,10 +1,7 @@
 use std::{
     collections::HashMap,
     io::Result,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc, LazyLock,
-    },
+    sync::LazyLock,
     time::{Duration, SystemTime},
 };
 
@@ -59,13 +56,6 @@ fn main() -> Result<()> {
 
     let mut state = ServerState::new_login();
 
-    let running = Arc::new(AtomicBool::new(true));
-    let r = running.clone();
-    ctrlc::set_handler(move || {
-        r.store(false, Ordering::SeqCst);
-    })
-    .expect("Couldn't set signal handler");
-
     let mut timers = TimerMap::default();
     timers.register_timer(
         Box::new(|_, _, _| logger_flush_scheduled()),
@@ -104,7 +94,7 @@ fn main() -> Result<()> {
     }
 
     let live_check_time = Duration::from_secs(config.general.live_check_time.get());
-    while running.load(Ordering::SeqCst) {
+    loop {
         server.poll(&mut state, live_check_time)?;
         timers
             .check_all(&mut server, &mut state)
