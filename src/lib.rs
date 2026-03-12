@@ -30,6 +30,7 @@ pub mod helpers;
 pub mod net;
 pub mod state;
 pub mod timer;
+pub mod tui;
 pub mod util;
 
 pub mod config;

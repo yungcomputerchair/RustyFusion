@@ -1,22 +1,18 @@
 use std::{
     collections::HashMap,
     io::Result,
-    sync::LazyLock,
     time::{Duration, SystemTime},
 };
 
 use crossterm::event::KeyCode;
 use ffmonitor::PlayerEvent;
-use ratatui::{
-    prelude::*,
-    widgets::{Block, Gauge, Padding, Paragraph, Wrap},
-};
+
 use rusty_fusion::{
     config::config_init,
     database::{db_init, db_shutdown},
     error::{
         backlog_init, log, log_error, log_if_failed, logger_flush, logger_flush_scheduled,
-        logger_init, panic_log, FFError, FFResult, Severity, BACKLOG,
+        logger_init, panic_log, FFError, FFResult, Severity,
     },
     monitor::{monitor_flush, monitor_init, monitor_queue, MonitorEvent},
     net::{
@@ -29,13 +25,15 @@ use rusty_fusion::{
     state::{LoginServerState, ServerState},
     tabledata::tdata_init,
     timer::TimerMap,
-    unused, util,
+    tui::{LoginTui, Tui as _},
+    unused,
 };
 
 fn main() -> Result<()> {
     color_eyre::install().unwrap();
     let mut terminal = ratatui::init();
     backlog_init();
+    let mut tui = LoginTui::default();
 
     let mut cleanup = Cleanup::default();
 
@@ -64,7 +62,7 @@ fn main() -> Result<()> {
     );
     timers.register_timer(
         Box::new(|t, srv, st| {
-            st.as_login()
+            st.as_login_mut()
                 .process_shard_connection_requests(srv.get_clients(), t);
             Ok(())
         }),
@@ -105,7 +103,7 @@ fn main() -> Result<()> {
                     log_error(e);
                 }
             });
-        terminal.draw(|frame| render_tui(frame, state.as_login()))?;
+        terminal.draw(|frame| tui.render(frame, &state))?;
         if crossterm::event::poll(Duration::from_millis(10))? {
             if let crossterm::event::Event::Key(key_event) = crossterm::event::read()? {
                 if (key_event.code == KeyCode::Char('c') || key_event.code == KeyCode::Char('C'))
@@ -121,131 +119,6 @@ fn main() -> Result<()> {
 
     log(Severity::Info, "Login server shutting down...");
     Ok(())
-}
-
-static TITLE_PREFORMATTED: LazyLock<String> =
-    LazyLock::new(|| format!(" RustyFusion v{} Login Server ", env!("CARGO_PKG_VERSION")));
-fn render_tui(frame: &mut Frame, state: &LoginServerState) {
-    let layout = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
-        .split(frame.area());
-    let title = Line::from(TITLE_PREFORMATTED.as_str())
-        .light_red()
-        .bold()
-        .centered();
-    let footer = Line::from(" Press CTRL+C to stop the server ").centered();
-    let events = BACKLOG.get().unwrap().lock().unwrap();
-    let lines: Vec<Line> = events
-        .iter()
-        .map(|fe| {
-            let ts = util::get_timestamp_str(fe.get_timestamp());
-            let text = fe.get_msg();
-            let severity = fe.get_severity();
-            let sev_span = Span::from(format!("[{}] ", severity));
-            Line::from(vec![
-                Span::from(format!("[{}] ", ts)).dark_gray(),
-                match severity {
-                    Severity::Info => sev_span.green(),
-                    Severity::Warning => sev_span.yellow(),
-                    Severity::Fatal => sev_span.red(),
-                    Severity::Debug => sev_span.cyan(),
-                },
-                Span::from(text).white(),
-            ])
-        })
-        .collect();
-    let pg = Paragraph::new(lines)
-        .block(
-            Block::bordered()
-                .padding(Padding::horizontal(1))
-                .title(title)
-                .title_bottom(footer),
-        )
-        .left_aligned()
-        .wrap(Wrap { trim: true });
-    let lines_to_scroll = pg
-        .line_count(frame.area().width)
-        .saturating_sub(frame.area().height as usize);
-    let pg = pg.scroll((lines_to_scroll as u16, 0));
-    frame.render_widget(pg, layout[0]);
-
-    let title2 = Line::from(" Shards ").bold().centered();
-    let block2 = Block::bordered()
-        .padding(Padding::horizontal(1))
-        .title(title2);
-
-    let mut shard_ids = state.get_shard_ids();
-    // fill in any gaps
-    if !shard_ids.is_empty() {
-        let max = *shard_ids.iter().max().unwrap();
-        for sid in 1..=max {
-            if !shard_ids.contains(&sid) {
-                shard_ids.push(sid);
-            }
-        }
-    } else {
-        shard_ids.push(1);
-    }
-    shard_ids.sort();
-
-    let gauges: Vec<Gauge> = shard_ids
-        .iter()
-        .map(|sid| {
-            let Some((current, max)) = state.get_current_and_max_pop_for_shard(*sid) else {
-                return Gauge::default()
-                    .block(Block::bordered().title(format!("[#{}]", sid)))
-                    .gauge_style(
-                        Style::default()
-                            .fg(Color::DarkGray)
-                            .bg(Color::Black)
-                            .add_modifier(Modifier::BOLD),
-                    )
-                    .ratio(0.0)
-                    .label("offline");
-            };
-
-            let ratio = if max == 0 {
-                0.0
-            } else {
-                current as f64 / max as f64
-            };
-            let color = if ratio > 1.0 {
-                Color::Red
-            } else if ratio >= 0.5 {
-                Color::Yellow
-            } else {
-                Color::Green
-            };
-            Gauge::default()
-                .block(Block::bordered().title(format!(
-                    "[#{}] {}",
-                    sid,
-                    state.get_shard_name(*sid).unwrap_or("")
-                )))
-                .gauge_style(
-                    Style::default()
-                        .fg(color)
-                        .bg(Color::Black)
-                        .add_modifier(Modifier::BOLD),
-                )
-                .ratio(if ratio > 1.0 { 1.0 } else { ratio })
-                .label(format!("{} / {}", current, max))
-        })
-        .collect();
-    for (i, gauge) in gauges.iter().enumerate() {
-        let area = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(
-                shard_ids
-                    .iter()
-                    .map(|_| Constraint::Length(3))
-                    .collect::<Vec<Constraint>>(),
-            )
-            .split(block2.inner(layout[1]))[i];
-        frame.render_widget(gauge.clone(), area);
-    }
-    frame.render_widget(block2, layout[1]);
 }
 
 #[derive(Default)]
@@ -266,7 +139,7 @@ impl Drop for Cleanup {
 }
 
 fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>, state: &mut ServerState) {
-    let state = state.as_login();
+    let state = state.as_login_mut();
     let client = clients.get_mut(&key).unwrap();
     match client.client_type {
         ClientType::ShardServer(shard_id) => {
@@ -315,7 +188,7 @@ fn handle_packet(
     state: &mut ServerState,
     time: SystemTime,
 ) -> FFResult<()> {
-    let state = state.as_login();
+    let state = state.as_login_mut();
     let client = clients.get_mut(&key).unwrap();
     match pkt_id {
         P_FE2LS_REQ_AUTH_CHALLENGE => shard::auth_challenge(client),

@@ -88,7 +88,7 @@ impl ServerState {
         Self::Shard(Box::new(ShardServerState::new(shard_id)))
     }
 
-    pub fn as_login(&mut self) -> &mut LoginServerState {
+    pub fn as_login(&self) -> &LoginServerState {
         if let Self::Login(state) = self {
             state
         } else {
@@ -96,7 +96,23 @@ impl ServerState {
         }
     }
 
-    pub fn as_shard(&mut self) -> &mut ShardServerState {
+    pub fn as_shard(&self) -> &ShardServerState {
+        if let Self::Shard(state) = self {
+            state
+        } else {
+            panic!("State is not ShardServerState");
+        }
+    }
+
+    pub fn as_login_mut(&mut self) -> &mut LoginServerState {
+        if let Self::Login(state) = self {
+            state
+        } else {
+            panic!("State is not LoginServerState");
+        }
+    }
+
+    pub fn as_shard_mut(&mut self) -> &mut ShardServerState {
         if let Self::Shard(state) = self {
             state
         } else {

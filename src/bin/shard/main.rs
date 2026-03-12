@@ -1,15 +1,11 @@
 use std::{
     collections::HashMap,
     io::Result,
-    sync::LazyLock,
     time::{Duration, SystemTime},
 };
 
 use crossterm::event::KeyCode;
-use ratatui::{
-    prelude::*,
-    widgets::{Block, Padding, Paragraph, Wrap},
-};
+
 use rusty_fusion::{
     config::{config_get, config_init},
     database::{db_init, db_run_async, db_shutdown},
@@ -17,7 +13,7 @@ use rusty_fusion::{
     entity::{Entity, Player},
     error::{
         backlog_init, log, log_error, log_if_failed, logger_flush, logger_flush_scheduled,
-        logger_init, panic_log, FFError, FFResult, Severity, BACKLOG,
+        logger_init, panic_log, FFError, FFResult, Severity,
     },
     net::{
         packet::{
@@ -29,6 +25,7 @@ use rusty_fusion::{
     state::{ServerState, ShardServerState},
     tabledata::tdata_init,
     timer::TimerMap,
+    tui::{ShardTui, Tui as _},
     unused, util,
 };
 
@@ -36,6 +33,7 @@ fn main() -> Result<()> {
     color_eyre::install().unwrap();
     let mut terminal = ratatui::init();
     backlog_init();
+    let mut tui = ShardTui::default();
 
     let mut cleanup = Cleanup::default();
 
@@ -70,12 +68,12 @@ fn main() -> Result<()> {
         false,
     );
     timers.register_timer(
-        Box::new(|_, srv, st| connect_to_login_server(srv, st.as_shard())),
+        Box::new(|_, srv, st| connect_to_login_server(srv, st.as_shard_mut())),
         Duration::from_secs(config.shard.login_server_conn_interval.get()),
         true,
     );
     timers.register_timer(
-        Box::new(|t, _, st| do_save(t, st.as_shard())),
+        Box::new(|t, _, st| do_save(t, st.as_shard_mut())),
         Duration::from_secs(config.shard.autosave_interval.get() * 60),
         false,
     );
@@ -88,7 +86,7 @@ fn main() -> Result<()> {
     // Per-minute timer
     timers.register_timer(
         Box::new(|t, srv, st| {
-            st.as_shard()
+            st.as_shard_mut()
                 .check_for_expired_vehicles(t, &mut srv.get_client_map());
             Ok(())
         }),
@@ -99,7 +97,8 @@ fn main() -> Result<()> {
     // Per-tick "fast" timer
     timers.register_timer(
         Box::new(|t, srv, st| {
-            st.as_shard().tick_entities(t, &mut srv.get_client_map());
+            st.as_shard_mut()
+                .tick_entities(t, &mut srv.get_client_map());
             Ok(())
         }),
         Duration::from_millis(1000 / SHARD_TICKS_PER_SECOND as u64),
@@ -109,7 +108,7 @@ fn main() -> Result<()> {
     // Per-second "slow" timer
     timers.register_timer(
         Box::new(|_, srv, st| {
-            let state = st.as_shard();
+            let state = st.as_shard_mut();
             state.tick_garbage_collection(&mut srv.get_client_map());
             state.tick_groups(&mut srv.get_client_map());
             state.check_receivers();
@@ -135,7 +134,7 @@ fn main() -> Result<()> {
                     log_error(e);
                 }
             });
-        terminal.draw(|frame| render_tui(frame, state.as_shard()))?;
+        terminal.draw(|frame| tui.render(frame, &state))?;
         if crossterm::event::poll(Duration::from_millis(10))? {
             if let crossterm::event::Event::Key(key_event) = crossterm::event::read()? {
                 if (key_event.code == KeyCode::Char('c') || key_event.code == KeyCode::Char('C'))
@@ -150,10 +149,10 @@ fn main() -> Result<()> {
     }
 
     log(Severity::Info, "Shard server shutting down...");
-    log_if_failed(do_save(SystemTime::now(), state.as_shard()));
+    log_if_failed(do_save(SystemTime::now(), state.as_shard_mut()));
 
     let mut attempts = 5;
-    while state.as_shard().check_receivers() {
+    while state.as_shard_mut().check_receivers() {
         // Wait for all receivers to finish
         if attempts == 0 {
             log(Severity::Warning, "Some receivers hanging!");
@@ -163,83 +162,8 @@ fn main() -> Result<()> {
         attempts -= 1;
     }
 
-    shutdown_notify_clients(&mut server, state.as_shard());
+    shutdown_notify_clients(&mut server, state.as_shard_mut());
     Ok(())
-}
-
-static TITLE_PREFORMATTED: LazyLock<String> =
-    LazyLock::new(|| format!(" RustyFusion v{} Shard Server ", env!("CARGO_PKG_VERSION")));
-fn render_tui(frame: &mut Frame, state: &ShardServerState) {
-    let layout = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
-        .split(frame.area());
-    let title = Line::from(TITLE_PREFORMATTED.as_str())
-        .light_red()
-        .bold()
-        .centered();
-    let footer = Line::from(" Press CTRL+C to stop the server ").centered();
-    let events = BACKLOG.get().unwrap().lock().unwrap();
-    let lines: Vec<Line> = events
-        .iter()
-        .map(|fe| {
-            let ts = util::get_timestamp_str(fe.get_timestamp());
-            let text = fe.get_msg();
-            let severity = fe.get_severity();
-            let sev_span = Span::from(format!("[{}] ", severity));
-            Line::from(vec![
-                Span::from(format!("[{}] ", ts)).dark_gray(),
-                match severity {
-                    Severity::Info => sev_span.green(),
-                    Severity::Warning => sev_span.yellow(),
-                    Severity::Fatal => sev_span.red(),
-                    Severity::Debug => sev_span.cyan(),
-                },
-                Span::from(text).white(),
-            ])
-        })
-        .collect();
-    let pg = Paragraph::new(lines)
-        .block(
-            Block::bordered()
-                .padding(Padding::horizontal(1))
-                .title(title)
-                .title_bottom(footer),
-        )
-        .left_aligned()
-        .wrap(Wrap { trim: true });
-    let lines_to_scroll = pg
-        .line_count(frame.area().width)
-        .saturating_sub(frame.area().height as usize);
-    let pg = pg.scroll((lines_to_scroll as u16, 0));
-    frame.render_widget(pg, layout[0]);
-
-    let title2 = Line::from(" Players ").bold().centered();
-    let block2 = Block::bordered()
-        .padding(Padding::horizontal(1))
-        .title(title2);
-
-    let player_ids = state.entity_map.get_player_ids().collect::<Vec<i32>>();
-    let player_names: Vec<Line> = player_ids
-        .iter()
-        .map(|pid| {
-            let player = state.get_player(*pid).unwrap();
-            Line::from(format!("{}", player))
-        })
-        .collect();
-    for (i, gauge) in player_names.iter().enumerate() {
-        let area = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(
-                player_ids
-                    .iter()
-                    .map(|_| Constraint::Length(3))
-                    .collect::<Vec<Constraint>>(),
-            )
-            .split(block2.inner(layout[1]))[i];
-        frame.render_widget(gauge.clone(), area);
-    }
-    frame.render_widget(block2, layout[1]);
 }
 
 #[derive(Default)]
@@ -260,7 +184,7 @@ impl Drop for Cleanup {
 }
 
 fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>, state: &mut ServerState) {
-    let state = state.as_shard();
+    let state = state.as_shard_mut();
     let mut clients = ClientMap::new(key, clients);
     let client = clients.get_self();
     match client.client_type {
@@ -316,7 +240,7 @@ fn handle_packet(
     state: &mut ServerState,
     time: SystemTime,
 ) -> FFResult<()> {
-    let state = state.as_shard();
+    let state = state.as_shard_mut();
     let mut clients = ClientMap::new(key, clients);
     match pkt_id {
         P_LS2FE_REP_AUTH_CHALLENGE => login::login_connect_challenge(clients.get_self(), state),
