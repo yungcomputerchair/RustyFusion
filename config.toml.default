@@ -23,6 +23,7 @@ table_data_path = "tabledata/" # path to OpenFusion table data repository
 [login]
 log_path = "login.log" # path to log file, or blank for console logging only
 listen_addr = "127.0.0.1:23000" # address to bind to
+geo_db_path = "GeoLite2-City.mmdb" # path to mmdb file for optional geo-based shard routing
 allow_plaintext_passwords = false # accept passwords sent in plaintext.
                                   # the built-in client login screen does this, but OpenFusionLauncher uses ofapi
                                   # to send one-time login cookies instead (which is encouraged for security)
