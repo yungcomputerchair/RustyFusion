@@ -4,7 +4,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use crossterm::event::KeyCode;
+use crossterm::event::{self as ce, KeyCode};
 
 use rusty_fusion::{
     config::{config_get, config_init},
@@ -47,13 +47,14 @@ fn main() -> Result<()> {
     cleanup.db_thread_handle = Some(db_init());
     tdata_init();
 
+    let live_check_time = Duration::from_secs(config.general.live_check_time.get());
     let polling_interval = Duration::from_millis(50);
     let listen_addr = config_get().shard.listen_addr.get();
     let mut server = FFServer::new(
         &listen_addr,
         handle_packet,
         Some(handle_disconnect),
-        Some(send_live_check),
+        Some((live_check_time, send_live_check)),
         Some(polling_interval),
     )?;
 
@@ -122,9 +123,10 @@ fn main() -> Result<()> {
         Severity::Info,
         &format!("Shard server listening on {}", server.get_endpoint()),
     );
-    let live_check_time = Duration::from_secs(config.general.live_check_time.get());
-    loop {
-        server.poll(&mut state, live_check_time)?;
+
+    let mut running = true;
+    while running {
+        server.poll(&mut state)?;
         timers
             .check_all(&mut server, &mut state)
             .unwrap_or_else(|e| {
@@ -134,21 +136,28 @@ fn main() -> Result<()> {
                     log_error(e);
                 }
             });
-        terminal.draw(|frame| tui.render(frame, &state))?;
-        if crossterm::event::poll(Duration::from_millis(10))? {
-            if let crossterm::event::Event::Key(key_event) = crossterm::event::read()? {
-                if util::is_ctrl_c(&key_event) {
-                    break;
-                }
 
-                match key_event.code {
-                    KeyCode::Up => tui.state.scroll(1),
-                    KeyCode::Down => tui.state.scroll(-1),
-                    KeyCode::PageUp => tui.state.scroll(10),
-                    KeyCode::PageDown => tui.state.scroll(-10),
-                    KeyCode::Esc => tui.state.reset_scroll(),
-                    _ => {}
-                }
+        terminal.draw(|frame| tui.render(frame, &state))?;
+
+        let mut key_events = Vec::new();
+        while let Ok(true) = ce::poll(Duration::ZERO) {
+            if let ce::Event::Key(key_event) = ce::read().unwrap() {
+                key_events.push(key_event);
+            }
+        }
+
+        for key_event in key_events {
+            if util::is_ctrl_c(&key_event) {
+                running = false;
+            }
+
+            match key_event.code {
+                KeyCode::Up => tui.state.scroll(1),
+                KeyCode::Down => tui.state.scroll(-1),
+                KeyCode::PageUp => tui.state.scroll(10),
+                KeyCode::PageDown => tui.state.scroll(-10),
+                KeyCode::Esc => tui.state.reset_scroll(),
+                _ => {}
             }
         }
     }

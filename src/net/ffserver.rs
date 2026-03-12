@@ -25,7 +25,7 @@ pub struct FFServer {
     next_epoll_key: usize,
     pkt_handler: PacketCallback,
     dc_handler: Option<DisconnectCallback>,
-    live_check_handler: Option<LiveCheckCallback>,
+    live_check: Option<(Duration, LiveCheckCallback)>,
     clients: HashMap<usize, FFClient>,
 }
 
@@ -34,7 +34,7 @@ impl FFServer {
         addr: &str,
         pkt_handler: PacketCallback,
         dc_handler: Option<DisconnectCallback>,
-        live_check_handler: Option<LiveCheckCallback>,
+        live_check: Option<(Duration, LiveCheckCallback)>,
         poll_timeout: Option<Duration>,
     ) -> Result<Self> {
         let server: Self = Self {
@@ -44,7 +44,7 @@ impl FFServer {
             next_epoll_key: EPOLL_KEY_SELF + 1,
             pkt_handler,
             dc_handler,
-            live_check_handler,
+            live_check,
             clients: HashMap::new(),
         };
         server.sock.set_nonblocking(true)?;
@@ -69,13 +69,13 @@ impl FFServer {
         None
     }
 
-    pub fn poll(&mut self, state: &mut ServerState, live_check_interval: Duration) -> Result<()> {
+    pub fn poll(&mut self, state: &mut ServerState) -> Result<()> {
         let time_now = SystemTime::now();
         let client_keys: Vec<usize> = self.clients.keys().copied().collect();
         for key in client_keys {
             let client = self.clients.get_mut(&key).unwrap();
             // live check
-            if let Some(lc_callback) = self.live_check_handler {
+            if let Some((lc_interval, lc_callback)) = self.live_check {
                 match client.live_check_time {
                     Some(dc_time) => {
                         if dc_time < time_now {
@@ -92,13 +92,13 @@ impl FFServer {
                     None => {
                         let time_since_last_heartbeat =
                             time_now.duration_since(client.last_heartbeat).unwrap();
-                        if time_since_last_heartbeat > live_check_interval {
+                        if time_since_last_heartbeat > lc_interval {
                             log(
                                 Severity::Debug,
                                 &format!("Sending live check to client {}", client.get_addr()),
                             );
                             log_if_failed(lc_callback(client));
-                            client.live_check_time = Some(time_now + live_check_interval);
+                            client.live_check_time = Some(time_now + lc_interval);
                         }
                     }
                 }
