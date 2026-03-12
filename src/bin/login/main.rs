@@ -4,7 +4,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use crossterm::event::KeyCode;
+use crossterm::event::{self as ce, KeyCode};
 use ffmonitor::PlayerEvent;
 
 use rusty_fusion::{
@@ -26,7 +26,7 @@ use rusty_fusion::{
     tabledata::tdata_init,
     timer::TimerMap,
     tui::{LoginTui, Tui as _},
-    unused,
+    unused, util,
 };
 
 fn main() -> Result<()> {
@@ -104,14 +104,19 @@ fn main() -> Result<()> {
                 }
             });
         terminal.draw(|frame| tui.render(frame, &state))?;
-        if crossterm::event::poll(Duration::from_millis(10))? {
-            if let crossterm::event::Event::Key(key_event) = crossterm::event::read()? {
-                if (key_event.code == KeyCode::Char('c') || key_event.code == KeyCode::Char('C'))
-                    && key_event
-                        .modifiers
-                        .contains(crossterm::event::KeyModifiers::CONTROL)
-                {
+        if ce::poll(Duration::from_millis(10))? {
+            if let ce::Event::Key(key_event) = ce::read()? {
+                if util::is_ctrl_c(&key_event) {
                     break;
+                }
+
+                match key_event.code {
+                    KeyCode::Up => tui.state.scroll(1),
+                    KeyCode::Down => tui.state.scroll(-1),
+                    KeyCode::PageUp => tui.state.scroll(10),
+                    KeyCode::PageDown => tui.state.scroll(-10),
+                    KeyCode::Esc => tui.state.reset_scroll(),
+                    _ => {}
                 }
             }
         }

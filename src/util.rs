@@ -5,6 +5,7 @@ use std::{
 };
 
 use chrono::{DateTime, Local};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use rand::{distributions::uniform::SampleUniform, Rng};
 
 use crate::{
@@ -440,6 +441,11 @@ pub fn get_text_file_contents(path: &str) -> FFResult<String> {
             format!("Failed to read file '{}': {}", path, e),
         )
     })
+}
+
+pub fn is_ctrl_c(key_event: &KeyEvent) -> bool {
+    (key_event.code == KeyCode::Char('c') || key_event.code == KeyCode::Char('C'))
+        && key_event.modifiers.contains(KeyModifiers::CONTROL)
 }
 
 pub fn get_random_gumball() -> Item {

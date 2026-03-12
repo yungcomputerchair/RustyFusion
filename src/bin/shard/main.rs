@@ -137,12 +137,17 @@ fn main() -> Result<()> {
         terminal.draw(|frame| tui.render(frame, &state))?;
         if crossterm::event::poll(Duration::from_millis(10))? {
             if let crossterm::event::Event::Key(key_event) = crossterm::event::read()? {
-                if (key_event.code == KeyCode::Char('c') || key_event.code == KeyCode::Char('C'))
-                    && key_event
-                        .modifiers
-                        .contains(crossterm::event::KeyModifiers::CONTROL)
-                {
+                if util::is_ctrl_c(&key_event) {
                     break;
+                }
+
+                match key_event.code {
+                    KeyCode::Up => tui.state.scroll(1),
+                    KeyCode::Down => tui.state.scroll(-1),
+                    KeyCode::PageUp => tui.state.scroll(10),
+                    KeyCode::PageDown => tui.state.scroll(-10),
+                    KeyCode::Esc => tui.state.reset_scroll(),
+                    _ => {}
                 }
             }
         }

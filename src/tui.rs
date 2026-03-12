@@ -9,16 +9,47 @@ use crate::{
     util,
 };
 
-struct TuiState {
+enum ScrollMode {
+    Follow,
+    Scroll(usize), // scroll offset from the end, in lines
+}
+
+pub struct TuiState {
     title: String,
-    line_offset: usize,
+    scroll_mode: ScrollMode,
 }
 impl TuiState {
     fn new(title: String) -> Self {
         Self {
             title,
-            line_offset: 0,
+            scroll_mode: ScrollMode::Follow,
         }
+    }
+
+    fn get_scroll_offset(&self) -> usize {
+        match self.scroll_mode {
+            ScrollMode::Follow => 0,
+            ScrollMode::Scroll(offset) => offset,
+        }
+    }
+
+    pub fn scroll(&mut self, mut amount: isize) {
+        match self.scroll_mode {
+            ScrollMode::Follow => {
+                if amount < 0 {
+                    amount = 0;
+                }
+                self.scroll_mode = ScrollMode::Scroll(amount as usize);
+            }
+            ScrollMode::Scroll(ref mut offset) => {
+                // will floor to 0
+                *offset = offset.saturating_add_signed(amount);
+            }
+        }
+    }
+
+    pub fn reset_scroll(&mut self) {
+        self.scroll_mode = ScrollMode::Follow;
     }
 }
 
@@ -27,7 +58,7 @@ pub trait Tui {
 }
 
 pub struct LoginTui {
-    state: TuiState,
+    pub state: TuiState,
 }
 impl Default for LoginTui {
     fn default() -> Self {
@@ -133,7 +164,7 @@ impl Tui for LoginTui {
 }
 
 pub struct ShardTui {
-    state: TuiState,
+    pub state: TuiState,
 }
 impl Default for ShardTui {
     fn default() -> Self {
@@ -216,19 +247,28 @@ fn get_log_widget(state: &'_ TuiState, width: u16, height: u16) -> Paragraph<'_>
             ])
         })
         .collect();
+
+    let mut block = Block::bordered()
+        .padding(Padding::horizontal(1))
+        .title(title)
+        .title_bottom(footer);
+
+    if let ScrollMode::Scroll(offset) = state.scroll_mode {
+        let scroll_title = Line::from(format!(" Scrolling ({} / {}) ", offset, events.len()))
+            .yellow()
+            .bold()
+            .right_aligned();
+        block = block.title_top(scroll_title);
+    }
+
     let pg = Paragraph::new(lines)
-        .block(
-            Block::bordered()
-                .padding(Padding::horizontal(1))
-                .title(title)
-                .title_bottom(footer),
-        )
+        .block(block)
         .left_aligned()
         .wrap(Wrap { trim: true });
     let lines_to_scroll = pg
         .line_count(width)
         .saturating_sub(height as usize)
-        .saturating_sub(state.line_offset);
+        .saturating_sub(state.get_scroll_offset());
     let pg = pg.scroll((lines_to_scroll as u16, 0));
     pg
 }
