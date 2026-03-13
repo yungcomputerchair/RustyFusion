@@ -124,6 +124,7 @@ impl Tui for LoginTui {
                 } else {
                     current as f64 / max as f64
                 };
+
                 let color = if ratio > 1.0 {
                     Color::Red
                 } else if ratio >= 0.5 {
@@ -131,12 +132,19 @@ impl Tui for LoginTui {
                 } else {
                     Color::Green
                 };
+
+                let mut block = Block::bordered().title(format!(
+                    "[#{}] {} ",
+                    sid,
+                    server_state.get_shard_name(*sid).unwrap_or("")
+                ));
+
+                if let Some(city) = server_state.get_shard_city(*sid) {
+                    block = block.title(Line::from(format!(" {} ", city)).right_aligned());
+                }
+
                 Gauge::default()
-                    .block(Block::bordered().title(format!(
-                        "[#{}] {}",
-                        sid,
-                        server_state.get_shard_name(*sid).unwrap_or("")
-                    )))
+                    .block(block)
                     .gauge_style(
                         Style::default()
                             .fg(color)

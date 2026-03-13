@@ -10,7 +10,7 @@ use crate::{
     entity::{Player, PlayerMetadata},
     enums::ShardChannelStatus,
     error::{log_if_failed, FFError, FFResult, Severity},
-    geo,
+    geo::{self, GeoInfo},
     net::{
         packet::{PacketID::*, *},
         ClientType, FFClient,
@@ -52,7 +52,7 @@ struct ShardServerInfo {
     max_channel_pop: usize,
     players: HashMap<i64, PlayerMetadata>,
     name: String,
-    geo: Option<(f64, f64)>,
+    geo: Option<GeoInfo>,
 }
 impl ShardServerInfo {
     fn get_channel_population(&self, channel_num: u8) -> usize {
@@ -140,15 +140,17 @@ impl LoginServerState {
             let geo_shards: Vec<_> = self
                 .shards
                 .iter()
-                .filter_map(|(shard_id, shard)| shard.geo.map(|geo| (shard_id, geo)))
+                .filter_map(|(shard_id, shard)| {
+                    shard.geo.as_ref().map(|geo| (shard_id, geo.coords))
+                })
                 .collect();
 
             if geo_shards.len() >= 2 {
                 let closest_shard_id = geo_shards
                     .into_iter()
-                    .min_by_key(|(_, geo)| {
+                    .min_by_key(|(_, coords)| {
                         // convert distance to an integer for min_by_key
-                        let dist = geo::haversine_distance(client_geo, *geo);
+                        let dist = geo::haversine_distance(client_geo.coords, *coords);
                         (dist * 1000.0) as u64
                     })
                     .map(|(shard_id, _)| *shard_id);
@@ -226,13 +228,22 @@ impl LoginServerState {
         self.shards.get(&shard_id).map(|shard| shard.name.as_str())
     }
 
+    pub fn get_shard_city(&self, shard_id: i32) -> Option<&str> {
+        let geo = self
+            .shards
+            .get(&shard_id)
+            .and_then(|shard| shard.geo.as_ref())?;
+
+        Some(geo.city_name.as_deref().unwrap_or("Unknown"))
+    }
+
     pub fn register_shard(
         &mut self,
         shard_id: i32,
         num_channels: u8,
         max_channel_pop: usize,
         name: &str,
-        geo: Option<(f64, f64)>,
+        geo: Option<GeoInfo>,
     ) -> FFResult<()> {
         if self.shards.contains_key(&shard_id) {
             return Err(FFError::build(

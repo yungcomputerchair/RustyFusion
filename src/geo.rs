@@ -6,6 +6,12 @@ use crate::error::{FFError, FFResult, Severity};
 
 static GEO_DB_READER: OnceLock<Reader<Vec<u8>>> = OnceLock::new();
 
+#[derive(Debug, Clone)]
+pub struct GeoInfo {
+    pub coords: (f64, f64),
+    pub city_name: Option<String>,
+}
+
 fn load_geo_db(path: &str) -> Result<(), String> {
     let reader =
         Reader::open_readfile(path).map_err(|e| format!("Failed to open GeoIP database: {}", e))?;
@@ -47,7 +53,7 @@ pub fn haversine_distance(pos1: (f64, f64), pos2: (f64, f64)) -> f64 {
     EARTH_RADIUS_KM * c
 }
 
-pub fn do_lookup(ip: IpAddr) -> Option<(f64, f64)> {
+pub fn do_lookup(ip: IpAddr) -> Option<GeoInfo> {
     let reader = GEO_DB_READER.get()?;
 
     if ip.is_loopback() {
@@ -58,6 +64,10 @@ pub fn do_lookup(ip: IpAddr) -> Option<(f64, f64)> {
     let city = lookup.decode::<City>().ok()??;
     let latitude = city.location.latitude?;
     let longitude = city.location.longitude?;
+    let city_name = city.city.names.english.map(|cn| cn.to_string());
 
-    Some((latitude, longitude))
+    Some(GeoInfo {
+        coords: (latitude, longitude),
+        city_name,
+    })
 }
