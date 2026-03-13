@@ -30,23 +30,20 @@ jobs:
     needs: read_msrv
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: "stable, ${{ needs.read_msrv.outputs.msrv }}"
       - run: cargo build --verbose
       - run: cargo test
-
-  publish_artifacts:
-    name: Publish artifacts
-    if: github.event_name != 'pull_request' && github.branch == 'main'
-    needs: build_and_test
-    runs-on: ubuntu-latest
-    steps:
       - uses: actions/upload-artifact@v6
+        if: ${{ github.event_name != 'pull_request' && github.ref_name == 'main' }}
         with:
           name: build-artifacts-debug
-          path: target/debug/
+          path: |
+            target/debug/login
+            target/debug/shard
+          if-no-files-found: error
 
   # Check formatting with rustfmt
   formatting:
@@ -54,7 +51,7 @@ jobs:
     needs: read_msrv
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: "stable, ${{ needs.read_msrv.outputs.msrv }}"
