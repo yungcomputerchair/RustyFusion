@@ -3,7 +3,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use rand::{rngs::ThreadRng, thread_rng, Rng};
+use rand::{rngs::ThreadRng, Rng};
 
 use crate::{
     chunk::TickMode,
@@ -519,19 +519,19 @@ impl AINode for PatrolPoint {
         state: &mut ShardServerState,
         clients: &mut ClientMap,
         time: &SystemTime,
-        _rng: &mut ThreadRng,
+        rng: &mut ThreadRng,
     ) -> NodeStatus {
         match self.roam_state {
             RoamState::Idle => {
                 let (delay_min, delay_max) = self.roam_delay_range_ms;
-                let wait_time_ms = thread_rng().gen_range(delay_min..delay_max);
+                let wait_time_ms = rng.gen_range(delay_min..delay_max);
                 let wait_time = Duration::from_millis(wait_time_ms);
                 self.roam_state = RoamState::Waiting(*time + wait_time);
             }
             RoamState::Waiting(wait_time) => {
                 if *time > wait_time {
                     let (min_radius, max_radius) = self.roam_radius_range;
-                    let roam_radius = thread_rng().gen_range(min_radius..max_radius);
+                    let roam_radius = rng.gen_range(min_radius..max_radius);
                     let target_pos = self.home.get_random_around(roam_radius, roam_radius, 0);
                     let speed = tdata_get().get_npc_stats(npc.ty).unwrap().walk_speed;
                     let mut path = Path::new_single(target_pos, speed);
