@@ -1,7 +1,7 @@
 use std::{
     io::{Read, Write},
     mem::size_of,
-    net::{SocketAddr, TcpStream},
+    net::{IpAddr, SocketAddr, TcpStream},
     time::SystemTime,
 };
 
@@ -197,6 +197,10 @@ impl FFClient {
             should_dc: false,
             ignore_packets: false,
         }
+    }
+
+    pub fn get_ip(&self) -> IpAddr {
+        self.addr.ip()
     }
 
     pub fn should_dc(&self) -> bool {

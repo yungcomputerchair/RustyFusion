@@ -14,6 +14,7 @@ use rusty_fusion::{
         backlog_init, log, log_error, log_if_failed, logger_flush, logger_flush_scheduled,
         logger_init, panic_log, FFError, FFResult, Severity,
     },
+    geo::geo_init,
     monitor::{monitor_flush, monitor_init, monitor_queue, MonitorEvent},
     net::{
         packet::{
@@ -89,6 +90,16 @@ fn main() -> Result<()> {
             Box::new(move |_, _, st| send_monitor_update(st.as_login())),
             Duration::from_secs(monitor_interval),
             false,
+        );
+    }
+
+    let geo_db_path = config.login.geo_db_path.get();
+    if !geo_db_path.is_empty() {
+        log_if_failed(geo_init(&geo_db_path));
+    } else {
+        log(
+            Severity::Info,
+            "No GeoIP database configured. Geo-based shard routing disabled.",
         );
     }
 

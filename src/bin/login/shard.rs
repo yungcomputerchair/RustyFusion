@@ -10,6 +10,7 @@ use rusty_fusion::{
         codes::{BuddyWarpErr, PlayerSearchReqErr},
         log, log_if_failed, FFError, FFResult, Severity,
     },
+    geo,
     monitor::{monitor_queue, monitor_update_from_packet},
     net::{
         crypto::{self, AUTH_CHALLENGE_MAX_SIZE},
@@ -74,11 +75,15 @@ pub fn connect(
         ));
     }
 
+    let shard_ip = server.get_ip();
+    let geo = geo::do_lookup(shard_ip);
+
     if let Err(e) = state.register_shard(
         shard_id,
         num_channels as u8,
         max_channel_pop as usize,
         &server_name,
+        geo,
     ) {
         let resp = sP_LS2FE_REP_CONNECT_FAIL { iErrorCode: 2 };
         log_if_failed(server.send_packet(P_LS2FE_REP_CONNECT_FAIL, &resp));

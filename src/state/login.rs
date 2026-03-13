@@ -10,6 +10,7 @@ use crate::{
     entity::{Player, PlayerMetadata},
     enums::ShardChannelStatus,
     error::{log_if_failed, FFError, FFResult, Severity},
+    geo,
     net::{
         packet::{PacketID::*, *},
         ClientType, FFClient,
@@ -51,6 +52,7 @@ struct ShardServerInfo {
     max_channel_pop: usize,
     players: HashMap<i64, PlayerMetadata>,
     name: String,
+    geo: Option<(f64, f64)>,
 }
 impl ShardServerInfo {
     fn get_channel_population(&self, channel_num: u8) -> usize {
@@ -125,6 +127,41 @@ impl LoginServerState {
         ))
     }
 
+    fn get_lowest_pop_shard(&self) -> Option<i32> {
+        self.shards
+            .iter()
+            .min_by_key(|(_, shard)| shard.players.len())
+            .map(|(shard_id, _)| *shard_id)
+    }
+
+    fn get_nominal_shard_for_client(&self, client: &FFClient) -> Option<i32> {
+        if let Some(client_geo) = geo::do_lookup(client.get_ip()) {
+            // find shard with lowest haversine distance to client
+            let geo_shards: Vec<_> = self
+                .shards
+                .iter()
+                .filter_map(|(shard_id, shard)| shard.geo.map(|geo| (shard_id, geo)))
+                .collect();
+
+            if geo_shards.len() >= 2 {
+                let closest_shard_id = geo_shards
+                    .into_iter()
+                    .min_by_key(|(_, geo)| {
+                        // convert distance to an integer for min_by_key
+                        let dist = geo::haversine_distance(client_geo, *geo);
+                        (dist * 1000.0) as u64
+                    })
+                    .map(|(shard_id, _)| *shard_id);
+
+                if let Some(closest_shard_id) = closest_shard_id {
+                    return Some(closest_shard_id);
+                }
+            }
+        }
+
+        self.get_lowest_pop_shard()
+    }
+
     pub fn is_session_active(&self, acc_id: i64) -> bool {
         self.sessions.contains_key(&acc_id)
     }
@@ -185,13 +222,6 @@ impl LoginServerState {
         })
     }
 
-    pub fn get_lowest_pop_shard_id(&mut self) -> Option<i32> {
-        self.shards
-            .iter()
-            .min_by_key(|(_, shard)| shard.players.len())
-            .map(|(shard_id, _)| *shard_id)
-    }
-
     pub fn get_shard_name(&self, shard_id: i32) -> Option<&str> {
         self.shards.get(&shard_id).map(|shard| shard.name.as_str())
     }
@@ -202,6 +232,7 @@ impl LoginServerState {
         num_channels: u8,
         max_channel_pop: usize,
         name: &str,
+        geo: Option<(f64, f64)>,
     ) -> FFResult<()> {
         if self.shards.contains_key(&shard_id) {
             return Err(FFError::build(
@@ -224,6 +255,7 @@ impl LoginServerState {
                 max_channel_pop,
                 players: HashMap::new(),
                 name: name.to_string(),
+                geo,
             },
         );
         Ok(())
@@ -316,7 +348,6 @@ impl LoginServerState {
         clients: &mut HashMap<usize, FFClient>,
         time: SystemTime,
     ) {
-        let lowest_pop_shard_id = self.get_lowest_pop_shard_id();
         let client_keys = clients.keys().copied().collect::<Vec<_>>();
         for client_key in client_keys {
             let client = clients.get_mut(&client_key).unwrap();
@@ -324,18 +355,24 @@ impl LoginServerState {
             let Ok(acc_id) = client.get_account_id() else {
                 continue;
             };
+
             let Ok(serial_key) = client.get_serial_key() else {
                 continue;
             };
+
             let pc_uid = if let Some(session) = self.sessions.get(&acc_id) {
                 session.selected_player_uid
             } else {
                 continue;
             };
+
             let pc_uid = match pc_uid {
                 Some(uid) => uid,
                 None => continue,
             };
+
+            let nominal_shard_id = self.get_nominal_shard_for_client(client);
+
             let Some(session) = self.sessions.get_mut(&acc_id) else {
                 continue;
             };
@@ -358,7 +395,7 @@ impl LoginServerState {
                 Some(shard_id) => shard_id,
                 None => {
                     // no specific shard requested. if there's one online (lowest population) use it
-                    if let Some(shard_id) = lowest_pop_shard_id {
+                    if let Some(shard_id) = nominal_shard_id {
                         shard_id
                     } else {
                         continue;

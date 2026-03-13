@@ -4,7 +4,7 @@ use crate::defines::CN_ACCOUNT_LEVEL__USER;
 
 define_setting!(LogPathSetting, String, "login.log");
 define_setting!(ListenAddrSetting, String, "127.0.0.1:23000");
-define_setting!(GeoDbPathSetting, String, "GeoLite2-City.mmdb");
+define_setting!(GeoDbPathSetting, String, "");
 define_setting!(AllowPlaintextPasswordsSetting, bool, false);
 define_setting!(AutoCreateAccountsSetting, bool, true);
 define_setting!(DefaultAccountLevelSetting, u32, CN_ACCOUNT_LEVEL__USER);
