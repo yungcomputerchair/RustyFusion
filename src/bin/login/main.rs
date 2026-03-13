@@ -95,7 +95,20 @@ fn main() -> Result<()> {
 
     let geo_db_path = config.login.geo_db_path.get();
     if !geo_db_path.is_empty() {
-        log_if_failed(geo_init(&geo_db_path));
+        if let Err(e) = geo_init(&geo_db_path) {
+            log(
+                Severity::Warning,
+                &format!(
+                    "GeoIP initialization failed: {}. Geo-based shard routing disabled.",
+                    e
+                ),
+            );
+        } else {
+            log(
+                Severity::Info,
+                "GeoIP database loaded successfully. Geo-based shard routing enabled.",
+            );
+        }
     } else {
         log(
             Severity::Info,

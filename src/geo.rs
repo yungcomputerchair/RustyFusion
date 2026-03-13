@@ -2,8 +2,6 @@ use std::{net::IpAddr, sync::OnceLock};
 
 use maxminddb::{geoip2::City, Reader};
 
-use crate::error::{FFError, FFResult, Severity};
-
 static GEO_DB_READER: OnceLock<Reader<Vec<u8>>> = OnceLock::new();
 
 #[derive(Debug, Clone)]
@@ -20,18 +18,9 @@ fn load_geo_db(path: &str) -> Result<(), String> {
         .map_err(|_| "GeoIP database already initialized".to_string())
 }
 
-pub fn geo_init(geo_db_path: &str) -> FFResult<()> {
+pub fn geo_init(geo_db_path: &str) -> Result<(), String> {
     assert!(GEO_DB_READER.get().is_none());
-    if let Err(e) = load_geo_db(geo_db_path) {
-        return Err(FFError::build(
-            Severity::Warning,
-            format!(
-                "GeoIP initialization failed: {}. Geo-based shard routing disabled.",
-                e
-            ),
-        ));
-    }
-    Ok(())
+    load_geo_db(geo_db_path)
 }
 
 pub fn haversine_distance(pos1: (f64, f64), pos2: (f64, f64)) -> f64 {
