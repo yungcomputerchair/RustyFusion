@@ -34,7 +34,19 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: "stable, ${{ needs.read_msrv.outputs.msrv }}"
+      - run: cargo build --verbose
       - run: cargo test
+
+  publish_artifacts:
+    name: Publish artifacts
+    if: github.event_name != 'pull_request' && github.branch == 'main'
+    needs: build_and_test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/upload-artifact@v6
+        with:
+          name: build-artifacts-debug
+          path: target/debug/
 
   # Check formatting with rustfmt
   formatting:
