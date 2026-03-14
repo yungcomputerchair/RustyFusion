@@ -1,4 +1,4 @@
-#: Config definitions for RustyFusion.
+#: Config schema for RustyFusion.
 #: This file is used to generate the config struct.
 #: Config options can be easily added here.
 

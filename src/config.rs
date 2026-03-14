@@ -123,8 +123,8 @@ mod test {
     use super::*;
 
     #[test]
-    // Validates that the config definition file can be parsed.
-    fn test_config_definition() {
-        Config::load(CONFIG_DEFINITIONS_PATH).expect("Config definition file is invalid!");
+    // Validates that the config schema file can be parsed.
+    fn test_config_schema() {
+        Config::load(CONFIG_SCHEMA_PATH).expect("Config schema is invalid!");
     }
 }
