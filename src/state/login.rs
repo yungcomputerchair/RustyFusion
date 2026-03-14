@@ -273,7 +273,7 @@ impl LoginServerState {
                 players: HashMap::new(),
                 name: name.to_string(),
                 public_addr,
-                geo: None,
+                geo: geo::do_lookup(public_addr.ip()),
             },
         );
         Ok(())
