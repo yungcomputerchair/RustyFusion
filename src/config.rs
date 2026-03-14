@@ -117,3 +117,14 @@ macro_rules! define_setting {
     };
 }
 use define_setting;
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    // Validates that the config definition file can be parsed.
+    fn test_config_definition() {
+        Config::load(CONFIG_DEFINITIONS_PATH).expect("Config definition file is invalid!");
+    }
+}

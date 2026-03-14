@@ -147,6 +147,12 @@ fn generate_code(sections: &[Section]) -> String {
     .unwrap();
     writeln!(out).unwrap();
 
+    writeln!(
+        out,
+        "#[cfg(test)]\nconst CONFIG_DEFINITIONS_PATH: &str = \"{}\";",
+        CONFIG_DEFINITIONS_PATH
+    )
+    .unwrap();
     writeln!(out, "const CONFIG_PATH: &str = \"{}\";", CONFIG_PATH).unwrap();
     writeln!(out).unwrap();
 
