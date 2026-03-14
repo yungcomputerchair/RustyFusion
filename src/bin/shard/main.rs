@@ -38,12 +38,8 @@ fn main() -> Result<()> {
     let mut cleanup = Cleanup::default();
 
     let config = config_init();
-    let shard_id = config.shard.shard_id.get();
     logger_init(config.shard.log_path.get());
-    log(
-        Severity::Info,
-        &format!("Shard server #{} starting up...", shard_id),
-    );
+    log(Severity::Info, "Shard server starting up...");
     cleanup.db_thread_handle = Some(db_init());
     tdata_init();
 
@@ -58,7 +54,7 @@ fn main() -> Result<()> {
         Some(polling_interval),
     )?;
 
-    let mut state = ServerState::new_shard(shard_id);
+    let mut state = ServerState::new_shard();
 
     let mut timers = TimerMap::default();
 
@@ -257,7 +253,7 @@ fn handle_packet(
     let state = state.as_shard_mut();
     let mut clients = ClientMap::new(key, clients);
     match pkt_id {
-        P_LS2FE_REP_AUTH_CHALLENGE => login::login_connect_challenge(clients.get_self(), state),
+        P_LS2FE_REP_AUTH_CHALLENGE => login::login_connect_challenge(clients.get_self()),
         P_LS2FE_REP_CONNECT_SUCC => login::login_connect_succ(clients.get_self(), state),
         P_LS2FE_REP_CONNECT_FAIL => login::login_connect_fail(clients.get_self()),
         P_LS2FE_REQ_UPDATE_LOGIN_INFO => login::login_update_info(clients.get_self(), state),
@@ -578,7 +574,7 @@ fn shutdown_notify_clients(server: &mut FFServer, state: &mut ShardServerState) 
 
         let dc_pkt = sP_FE2CL_REP_PC_BUDDY_WARP_OTHER_SHARD_SUCC {
             iBuddyPCUID: unused!(),
-            iShardNum: state.shard_id as i8,
+            iShardNum: state.shard_id.unwrap() as i8,
             iChannelNum: channel_num.unwrap_or(0),
         };
         let _ = client.send_packet(P_FE2CL_REP_PC_BUDDY_WARP_OTHER_SHARD_SUCC, &dc_pkt);

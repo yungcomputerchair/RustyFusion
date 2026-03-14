@@ -45,7 +45,6 @@ pub fn connect(
     time: SystemTime,
 ) -> FFResult<()> {
     let pkt: &sP_FE2LS_REQ_CONNECT = server.get_packet(P_FE2LS_REQ_CONNECT)?;
-    let shard_id = pkt.iShardID;
     let num_channels = pkt.iNumChannels;
     let max_channel_pop = pkt.iMaxChannelPop;
     let public_addr = util::socket_addr_from_parts(pkt.uiPublicIp, pkt.uiPublicPort);
@@ -74,20 +73,19 @@ pub fn connect(
         ));
     }
 
-    if let Err(e) = state.register_shard(
-        shard_id,
-        num_channels as u8,
-        max_channel_pop as usize,
-        &server_name,
-        public_addr,
-    ) {
-        let resp = sP_LS2FE_REP_CONNECT_FAIL { iErrorCode: 2 };
-        log_if_failed(server.send_packet(P_LS2FE_REP_CONNECT_FAIL, &resp));
-        return Err(e);
-    };
+    let shard_id =
+        match state.register_shard(num_channels as u8, max_channel_pop as usize, public_addr) {
+            Ok(id) => id,
+            Err(e) => {
+                let resp = sP_LS2FE_REP_CONNECT_FAIL { iErrorCode: 2 };
+                log_if_failed(server.send_packet(P_LS2FE_REP_CONNECT_FAIL, &resp));
+                return Err(e);
+            }
+        };
 
     server.client_type = ClientType::ShardServer(shard_id);
     let resp = sP_LS2FE_REP_CONNECT_SUCC {
+        iShardID: shard_id,
         uiSvrTime: util::get_timestamp_ms(time),
         aLS_UID: state.server_id.to_bytes_le(),
     };
@@ -286,7 +284,7 @@ pub fn pc_location(
 
     // search all shards except the one that requested the search
     let search_shard_ids: HashSet<i32> = state
-        .get_shard_ids()
+        .get_connected_shard_ids()
         .into_iter()
         .filter(|id| *id != req_shard_id)
         .collect();

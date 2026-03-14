@@ -29,7 +29,7 @@ pub fn login_connect_req(server: &mut FFClient) {
     log_if_failed(server.send_packet(P_FE2LS_REQ_AUTH_CHALLENGE, &pkt));
 }
 
-pub fn login_connect_challenge(server: &mut FFClient, state: &ShardServerState) -> FFResult<()> {
+pub fn login_connect_challenge(server: &mut FFClient) -> FFResult<()> {
     let pkt: &sP_LS2FE_REP_AUTH_CHALLENGE = server.get_packet(P_LS2FE_REP_AUTH_CHALLENGE)?;
     let key = config_get().general.server_key.get().clone();
     let chall_encrypted: Vec<u8> = pkt.aChallenge[..pkt.uiChallengeLength as usize].to_vec();
@@ -43,7 +43,6 @@ pub fn login_connect_challenge(server: &mut FFClient, state: &ShardServerState) 
     let pkt = sP_FE2LS_REQ_CONNECT {
         uiChallengeSolvedLength: chall_decrypted.len() as u32,
         aChallengeSolved: chall_arr,
-        iShardID: state.shard_id,
         uiPublicIp: ip,
         uiPublicPort: port,
         iNumChannels: config_get().shard.num_channels.get() as i8,
@@ -57,17 +56,21 @@ pub fn login_connect_succ(server: &mut FFClient, state: &mut ShardServerState) -
     let login_server_id = Uuid::from_bytes_le(pkt.aLS_UID);
     let conn_time: u64 = pkt.uiSvrTime;
 
+    state.shard_id = Some(pkt.iShardID);
+    let shard_id = state.shard_id.unwrap();
+
     let iv1: i32 = pkt.aLS_UID.into_iter().reduce(|a, b| a ^ b).unwrap() as i32;
-    let iv2: i32 = state.shard_id + 1;
+    let iv2: i32 = shard_id + 1;
     server.e_key = crypto::gen_key(conn_time, iv1, iv2);
     state.login_server_conn_id = Some(login_server_id);
 
     log(
         Severity::Info,
         &format!(
-            "Connected to login server {} ({})",
+            "Connected to login server {} ({}) as shard {}",
             login_server_id,
             server.get_addr(),
+            shard_id,
         ),
     );
     Ok(())
@@ -164,7 +167,7 @@ pub fn login_pc_location(clients: &mut ClientMap, state: &mut ShardServerState) 
         let resp = sP_FE2CL_GM_REP_PC_LOCATION {
             iTargetPC_UID: player.get_uid(),
             iTargetPC_ID: pc_id,
-            iShardID: state.shard_id,
+            iShardID: state.shard_id.unwrap(),
             iMapType: if player.instance_id.instance_num.is_some() {
                 1 // instance
             } else {

@@ -88,18 +88,7 @@ impl Tui for LoginTui {
             .padding(Padding::horizontal(1))
             .title(title2);
 
-        let mut shard_ids = server_state.get_shard_ids();
-        // fill in any gaps
-        if !shard_ids.is_empty() {
-            let max = *shard_ids.iter().max().unwrap();
-            for sid in 1..=max {
-                if !shard_ids.contains(&sid) {
-                    shard_ids.push(sid);
-                }
-            }
-        } else {
-            shard_ids.push(1);
-        }
+        let mut shard_ids = server_state.get_reserved_shard_ids();
         shard_ids.sort();
 
         let gauges: Vec<Gauge> = shard_ids

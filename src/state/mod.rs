@@ -84,8 +84,8 @@ impl ServerState {
         Self::Login(Box::default())
     }
 
-    pub fn new_shard(shard_id: i32) -> Self {
-        Self::Shard(Box::new(ShardServerState::new(shard_id)))
+    pub fn new_shard() -> Self {
+        Self::Shard(Box::default())
     }
 
     pub fn as_login(&self) -> &LoginServerState {

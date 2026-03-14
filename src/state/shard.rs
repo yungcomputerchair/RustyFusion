@@ -25,7 +25,7 @@ use crate::{
 use super::FFReceiver;
 
 pub struct ShardServerState {
-    pub shard_id: i32,
+    pub shard_id: Option<i32>,
     pub login_server_conn_id: Option<Uuid>,
     pub login_data: HashMap<i64, LoginData>,
     pub save_rx: Option<FFReceiver<DbResult>>,
@@ -35,12 +35,11 @@ pub struct ShardServerState {
     pub groups: HashMap<Uuid, Group>,
     pub player_uid_to_id: HashMap<i64, i32>,
 }
-
-impl ShardServerState {
-    pub fn new(shard_id: i32) -> Self {
+impl Default for ShardServerState {
+    fn default() -> Self {
         let mut state = Self {
             login_server_conn_id: None,
-            shard_id,
+            shard_id: None,
             login_data: HashMap::new(),
             save_rx: None,
             entity_map: EntityMap::default(),
@@ -132,7 +131,8 @@ impl ShardServerState {
         }
         state
     }
-
+}
+impl ShardServerState {
     pub fn get_npc(&self, npc_id: i32) -> FFResult<&NPC> {
         let id = EntityID::NPC(npc_id);
         self.entity_map.get_entity(id).ok_or(FFError::build(

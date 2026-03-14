@@ -96,6 +96,8 @@ pub struct PlayerSearchRequest {
 pub struct LoginServerState {
     pub server_id: Uuid,
     sessions: HashMap<i64, LoginSession>,
+    next_shard_id: i32,
+    shard_id_reservations: HashMap<SocketAddr, i32>,
     shards: HashMap<i32, ShardServerInfo>,
     pub player_search_reqeusts: HashMap<(i32, i32), PlayerSearchRequest>,
     pub pending_channel_requests: HashMap<i64, u8>,
@@ -106,6 +108,8 @@ impl Default for LoginServerState {
         Self {
             server_id: Uuid::new_v4(),
             sessions: HashMap::new(),
+            next_shard_id: 1,
+            shard_id_reservations: HashMap::new(),
             shards: HashMap::new(),
             player_search_reqeusts: HashMap::new(),
             pending_channel_requests: HashMap::new(),
@@ -240,23 +244,30 @@ impl LoginServerState {
 
     pub fn register_shard(
         &mut self,
-        shard_id: i32,
         num_channels: u8,
         max_channel_pop: usize,
-        name: &str,
         public_addr: SocketAddr,
-    ) -> FFResult<()> {
-        if self.shards.contains_key(&shard_id) {
-            return Err(FFError::build(
-                Severity::Warning,
-                format!("Shard {} already registered", shard_id),
-            ));
-        }
+    ) -> FFResult<i32> {
+        let shard_id = match self.shard_id_reservations.get(&public_addr) {
+            Some(id) => *id,
+            None => {
+                let id = self.next_shard_id;
+                if id > MAX_NUM_SHARDS as i32 {
+                    return Err(FFError::build_dc(
+                        Severity::Warning,
+                        "Maximum number of shards reached".to_string(),
+                    ));
+                }
+                self.next_shard_id += 1;
+                self.shard_id_reservations.insert(public_addr, id);
+                id
+            }
+        };
 
-        if !(1..=MAX_NUM_SHARDS as i32).contains(&shard_id) {
-            return Err(FFError::build(
+        if self.shards.contains_key(&shard_id) {
+            return Err(FFError::build_dc(
                 Severity::Warning,
-                format!("Shard ID {} out of range", shard_id),
+                format!("Shard ID {} is already registered", shard_id),
             ));
         }
 
@@ -266,19 +277,22 @@ impl LoginServerState {
                 num_channels,
                 max_channel_pop,
                 players: HashMap::new(),
-                name: name.to_string(),
                 public_addr,
                 geo: geo::do_lookup(public_addr.ip()),
             },
         );
-        Ok(())
+        Ok(shard_id)
     }
 
     pub fn unregister_shard(&mut self, shard_id: i32) {
         self.shards.remove(&shard_id);
     }
 
-    pub fn get_shard_ids(&self) -> Vec<i32> {
+    pub fn get_reserved_shard_ids(&self) -> Vec<i32> {
+        self.shard_id_reservations.values().copied().collect()
+    }
+
+    pub fn get_connected_shard_ids(&self) -> Vec<i32> {
         self.shards.keys().copied().collect()
     }
 

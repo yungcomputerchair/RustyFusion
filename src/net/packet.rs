@@ -6555,6 +6555,7 @@ impl FFPacket for sP_LS2CL_REP_SHARD_LIST_INFO_SUCC {}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct sP_LS2FE_REP_CONNECT_SUCC {
+    pub iShardID: i32,
     pub uiSvrTime: u64,
     pub aLS_UID: [u8; 16],
 }
@@ -6680,7 +6681,6 @@ impl FFPacket for sP_LS2FE_REP_GET_BUDDY_STATE {}
 pub struct sP_FE2LS_REQ_CONNECT {
     pub uiChallengeSolvedLength: u32,
     pub aChallengeSolved: [u8; AUTH_CHALLENGE_MAX_SIZE],
-    pub iShardID: i32,
     pub uiPublicIp: u32,
     pub uiPublicPort: u16,
     pub iMaxChannelPop: i32,

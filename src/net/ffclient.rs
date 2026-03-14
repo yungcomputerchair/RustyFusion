@@ -408,6 +408,10 @@ impl FFClient {
     }
 
     pub fn send_packet<T: FFPacket>(&mut self, pkt_id: PacketID, pkt: &T) -> FFResult<()> {
+        log(
+            Severity::Debug,
+            &format!("Sending {:?} to {:?}", pkt_id, self.client_type),
+        );
         self.out_buf.queue_packet(pkt_id, pkt);
         self.flush()
     }
