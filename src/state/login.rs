@@ -52,7 +52,6 @@ struct ShardServerInfo {
     num_channels: u8,
     max_channel_pop: usize,
     players: HashMap<i64, PlayerMetadata>,
-    name: String,
     public_addr: SocketAddr,
     geo: Option<GeoInfo>,
 }
@@ -224,10 +223,6 @@ impl LoginServerState {
                 shard.num_channels as usize * shard.max_channel_pop,
             )
         })
-    }
-
-    pub fn get_shard_name(&self, shard_id: i32) -> Option<&str> {
-        self.shards.get(&shard_id).map(|shard| shard.name.as_str())
     }
 
     pub fn get_shard_public_addr(&self, shard_id: i32) -> Option<SocketAddr> {

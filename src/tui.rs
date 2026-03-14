@@ -136,7 +136,7 @@ impl Tui for LoginTui {
                 let mut block = Block::bordered().title(format!(
                     "[#{}] {} ",
                     sid,
-                    server_state.get_shard_name(*sid).unwrap_or("")
+                    server_state.get_shard_public_addr(*sid).unwrap()
                 ));
 
                 if let Some(city) = server_state.get_shard_city(*sid) {

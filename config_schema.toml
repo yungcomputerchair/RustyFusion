@@ -92,9 +92,6 @@ log_path = "shard.log" # path to log file, or blank for console logging only
 #: i32
 shard_id = 1 # shard identifier between 1 and 9 (inclusive)
 
-#: String
-shard_name = "My Shard" # advertised to the login server
-
 #: SocketAddr
 listen_addr = "127.0.0.1:23001" # address to bind to
 

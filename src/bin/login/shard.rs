@@ -48,7 +48,6 @@ pub fn connect(
     let shard_id = pkt.iShardID;
     let num_channels = pkt.iNumChannels;
     let max_channel_pop = pkt.iMaxChannelPop;
-    let server_name = util::parse_utf16(&pkt.szServerName)?;
     let public_addr = util::socket_addr_from_parts(pkt.uiPublicIp, pkt.uiPublicPort);
 
     let chall_decrypted = pkt.aChallengeSolved[..pkt.uiChallengeSolvedLength as usize].to_vec();
@@ -103,7 +102,7 @@ pub fn connect(
         &format!(
             "Connected to shard server #{}: {} ({}) [{} channel(s), {} players per channel]",
             shard_id,
-            server_name,
+            public_addr,
             server.get_addr(),
             num_channels,
             max_channel_pop
