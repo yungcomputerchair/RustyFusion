@@ -1,16 +1,10 @@
-use std::sync::OnceLock;
+use std::{net::SocketAddr, sync::OnceLock};
 
 use serde::Deserialize;
 
 use crate::error::*;
 
-mod general_settings;
-mod login_settings;
-mod shard_settings;
-
-pub use self::{
-    general_settings::GeneralConfig, login_settings::LoginConfig, shard_settings::ShardConfig,
-};
+include!(concat!(env!("OUT_DIR"), "/config_generated.rs"));
 
 static CONFIG: OnceLock<Config> = OnceLock::new();
 static CONFIG_DEFAULT: OnceLock<Config> = OnceLock::new();
@@ -56,7 +50,6 @@ impl Config {
 }
 
 pub fn config_init() -> &'static Config {
-    const CONFIG_PATH: &str = "config.toml";
     assert!(CONFIG.get().is_none());
 
     // Allow overriding config path via command line argument
@@ -81,6 +74,25 @@ pub fn config_get() -> &'static Config {
     }
 }
 
+pub trait SettingDefault<T> {
+    fn setting_default(self) -> T;
+}
+impl<T: Clone> SettingDefault<T> for T {
+    fn setting_default(self) -> T {
+        self
+    }
+}
+impl SettingDefault<String> for &str {
+    fn setting_default(self) -> String {
+        self.to_string()
+    }
+}
+impl SettingDefault<SocketAddr> for &str {
+    fn setting_default(self) -> SocketAddr {
+        self.parse().expect("Invalid default SocketAddr")
+    }
+}
+
 macro_rules! define_setting {
     ($name:ident, $ty:ty, $dv:expr) => {
         #[derive(Deserialize, Default)]
@@ -90,7 +102,7 @@ macro_rules! define_setting {
             pub fn get(&self) -> $ty {
                 match self.0 {
                     Some(ref v) => v.clone(),
-                    None => $dv.into(),
+                    None => SettingDefault::<$ty>::setting_default($dv),
                 }
             }
 
@@ -99,7 +111,7 @@ macro_rules! define_setting {
             }
 
             pub fn is_set_to_default(&self) -> bool {
-                self.0 == Some($dv.into())
+                self.0 == Some(SettingDefault::<$ty>::setting_default($dv))
             }
         }
     };

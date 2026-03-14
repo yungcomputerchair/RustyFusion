@@ -31,7 +31,7 @@ pub struct FFServer {
 
 impl FFServer {
     pub fn new(
-        addr: &str,
+        addr: SocketAddr,
         pkt_handler: PacketCallback,
         dc_handler: Option<DisconnectCallback>,
         live_check: Option<(Duration, LiveCheckCallback)>,
@@ -56,8 +56,7 @@ impl FFServer {
         Ok(server)
     }
 
-    pub fn connect(&mut self, addr: &str, cltype: ClientType) -> Option<&mut FFClient> {
-        let addr: SocketAddr = addr.parse().expect("Bad address");
+    pub fn connect(&mut self, addr: SocketAddr, cltype: ClientType) -> Option<&mut FFClient> {
         let stream = TcpStream::connect(addr);
         if let Ok(stream) = stream {
             let conn_data: (TcpStream, SocketAddr) = (stream, addr);

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, net::SocketAddr, time::SystemTime};
+use std::{collections::HashMap, time::SystemTime};
 
 use uuid::Uuid;
 
@@ -37,13 +37,7 @@ pub fn login_connect_challenge(server: &mut FFClient, state: &ShardServerState) 
     let mut chall_arr = [0u8; AUTH_CHALLENGE_MAX_SIZE];
     chall_arr[..chall_decrypted.len()].copy_from_slice(&chall_decrypted);
 
-    let public_addr_str = config_get().shard.external_addr.get();
-    let public_addr: SocketAddr = public_addr_str.parse().map_err(|e| {
-        FFError::build(
-            Severity::Warning,
-            format!("Invalid external address: {}", e),
-        )
-    })?;
+    let public_addr = config_get().shard.external_addr.get();
     let (ip, port) = util::socket_addr_to_parts(&public_addr)?;
 
     let pkt = sP_FE2LS_REQ_CONNECT {

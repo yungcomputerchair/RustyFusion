@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     io::Write as _,
-    net::TcpListener,
+    net::{SocketAddr, TcpListener},
     sync::{
         mpsc::{self, Receiver, Sender},
         OnceLock,
@@ -22,7 +22,7 @@ pub type MonitorEvent = Event;
 static FEED: OnceLock<Sender<MonitorEvent>> = OnceLock::new();
 static FLUSH_SIGNAL: OnceLock<Sender<()>> = OnceLock::new();
 
-pub fn monitor_init(addr: String) {
+pub fn monitor_init(addr: SocketAddr) {
     assert!(FEED.get().is_none());
     let (ftx, frx) = mpsc::channel();
     let (stx, srx) = mpsc::channel();
@@ -82,8 +82,8 @@ pub fn monitor_update_from_packet(pkt: &sP_FE2LS_UPDATE_MONITOR) -> FFResult<Mon
     Ok(update)
 }
 
-fn monitor_thread(frx: Receiver<MonitorEvent>, srx: Receiver<()>, addr: String) {
-    let listener = match TcpListener::bind(&addr) {
+fn monitor_thread(frx: Receiver<MonitorEvent>, srx: Receiver<()>, addr: SocketAddr) {
+    let listener = match TcpListener::bind(addr) {
         Ok(listener) => listener,
         Err(e) => {
             log(

@@ -51,7 +51,7 @@ fn main() -> Result<()> {
     let polling_interval = Duration::from_millis(50);
     let listen_addr = config_get().shard.listen_addr.get();
     let mut server = FFServer::new(
-        &listen_addr,
+        listen_addr,
         handle_packet,
         Some(handle_disconnect),
         Some((live_check_time, send_live_check)),
@@ -439,7 +439,7 @@ fn connect_to_login_server(
         Severity::Info,
         &format!("Connecting to login server at {}...", login_server_addr),
     );
-    let conn = shard_server.connect(&login_server_addr, ClientType::LoginServer);
+    let conn = shard_server.connect(login_server_addr, ClientType::LoginServer);
     if let Some(login_server) = conn {
         login::login_connect_req(login_server);
     }
