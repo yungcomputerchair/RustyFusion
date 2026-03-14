@@ -230,7 +230,7 @@ fn handle_packet(
     match pkt_id {
         P_FE2LS_REQ_AUTH_CHALLENGE => shard::auth_challenge(client),
         P_FE2LS_REQ_CONNECT => shard::connect(client, state, time),
-        P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC => shard::update_login_info_succ(key, clients),
+        P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC => shard::update_login_info_succ(key, clients, state),
         P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL => shard::update_login_info_fail(key, clients),
         P_FE2LS_REP_LIVE_CHECK => Ok(()),
         P_FE2LS_UPDATE_PC_STATUSES => shard::update_pc_statuses(client, state),

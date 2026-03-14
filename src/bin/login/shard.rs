@@ -10,7 +10,6 @@ use rusty_fusion::{
         codes::{BuddyWarpErr, PlayerSearchReqErr},
         log, log_if_failed, FFError, FFResult, Severity,
     },
-    geo,
     monitor::{monitor_queue, monitor_update_from_packet},
     net::{
         crypto::{self, AUTH_CHALLENGE_MAX_SIZE},
@@ -50,6 +49,7 @@ pub fn connect(
     let num_channels = pkt.iNumChannels;
     let max_channel_pop = pkt.iMaxChannelPop;
     let server_name = util::parse_utf16(&pkt.szServerName)?;
+    let public_addr = util::socket_addr_from_parts(pkt.uiPublicIp, pkt.uiPublicPort);
 
     let chall_decrypted = pkt.aChallengeSolved[..pkt.uiChallengeSolvedLength as usize].to_vec();
 
@@ -75,20 +75,18 @@ pub fn connect(
         ));
     }
 
-    let shard_ip = server.get_ip();
-    let geo = geo::do_lookup(shard_ip);
-
     if let Err(e) = state.register_shard(
         shard_id,
         num_channels as u8,
         max_channel_pop as usize,
         &server_name,
-        geo,
+        public_addr,
     ) {
         let resp = sP_LS2FE_REP_CONNECT_FAIL { iErrorCode: 2 };
         log_if_failed(server.send_packet(P_LS2FE_REP_CONNECT_FAIL, &resp));
         return Err(e);
     };
+
     server.client_type = ClientType::ShardServer(shard_id);
     let resp = sP_LS2FE_REP_CONNECT_SUCC {
         uiSvrTime: util::get_timestamp_ms(time),
@@ -126,14 +124,17 @@ pub fn shard_live_check(client: &mut FFClient) -> FFResult<()> {
 pub fn update_login_info_succ(
     shard_key: usize,
     clients: &mut HashMap<usize, FFClient>,
+    state: &LoginServerState,
 ) -> FFResult<()> {
     let server = clients.get_mut(&shard_key).unwrap();
+    let shard_id = server.get_shard_id()?;
     let pkt: &sP_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC =
         server.get_packet(P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC)?;
 
+    let shard_public_addr = state.get_shard_public_addr(shard_id).unwrap();
     let resp = sP_LS2CL_REP_SHARD_SELECT_SUCC {
-        g_FE_ServerIP: pkt.g_FE_ServerIP,
-        g_FE_ServerPort: pkt.g_FE_ServerPort,
+        g_FE_ServerIP: util::encode_utf8(shard_public_addr.ip().to_string().as_str())?,
+        g_FE_ServerPort: shard_public_addr.port() as i32,
         iEnterSerialKey: pkt.iEnterSerialKey,
     };
 

@@ -37,10 +37,21 @@ pub fn login_connect_challenge(server: &mut FFClient, state: &ShardServerState) 
     let mut chall_arr = [0u8; AUTH_CHALLENGE_MAX_SIZE];
     chall_arr[..chall_decrypted.len()].copy_from_slice(&chall_decrypted);
 
+    let public_addr_str = config_get().shard.external_addr.get();
+    let public_addr: SocketAddr = public_addr_str.parse().map_err(|e| {
+        FFError::build(
+            Severity::Warning,
+            format!("Invalid external address: {}", e),
+        )
+    })?;
+    let (ip, port) = util::socket_addr_to_parts(&public_addr)?;
+
     let pkt = sP_FE2LS_REQ_CONNECT {
         uiChallengeSolvedLength: chall_decrypted.len() as u32,
         aChallengeSolved: chall_arr,
         iShardID: state.shard_id,
+        uiPublicIp: ip,
+        uiPublicPort: port,
         szServerName: util::encode_utf16(&config_get().shard.shard_name.get())?,
         iNumChannels: config_get().shard.num_channels.get() as i8,
         iMaxChannelPop: config_get().shard.max_channel_pop.get() as i32,
@@ -80,22 +91,9 @@ pub fn login_connect_fail(server: &mut FFClient) -> FFResult<()> {
 }
 
 pub fn login_update_info(server: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
-    let public_addr: SocketAddr = config_get()
-        .shard
-        .external_addr
-        .get()
-        .parse()
-        .expect("Bad public address");
-    let mut ip_buf: [u8; 16] = [0; 16];
-    let ip_str: &str = &public_addr.ip().to_string();
-    let ip_bytes: &[u8] = ip_str.as_bytes();
-    ip_buf[..ip_bytes.len()].copy_from_slice(ip_bytes);
-
     let pkt: &sP_LS2FE_REQ_UPDATE_LOGIN_INFO = server.get_packet(P_LS2FE_REQ_UPDATE_LOGIN_INFO)?;
     let resp = sP_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC {
         iEnterSerialKey: pkt.iEnterSerialKey,
-        g_FE_ServerIP: ip_buf,
-        g_FE_ServerPort: public_addr.port() as i32,
     };
 
     let serial_key = resp.iEnterSerialKey;

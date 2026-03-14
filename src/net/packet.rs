@@ -6682,6 +6682,8 @@ pub struct sP_FE2LS_REQ_CONNECT {
     pub aChallengeSolved: [u8; AUTH_CHALLENGE_MAX_SIZE],
     pub iShardID: i32,
     pub szServerName: [u16; 32],
+    pub uiPublicIp: u32,
+    pub uiPublicPort: u16,
     pub iMaxChannelPop: i32,
     pub iNumChannels: i8,
 }
@@ -6700,8 +6702,6 @@ impl FFPacket for sP_FE2LS_REP_LIVE_CHECK {}
 #[derive(Debug, Copy, Clone)]
 pub struct sP_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC {
     pub iEnterSerialKey: i64,
-    pub g_FE_ServerIP: [u8; 16],
-    pub g_FE_ServerPort: i32,
 }
 impl FFPacket for sP_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC {}
 

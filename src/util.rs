@@ -1,5 +1,6 @@
 use std::{
     collections::VecDeque,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     ops::{BitAnd, BitAndAssign, BitOrAssign, Not, Shl, Shr},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -302,6 +303,22 @@ pub fn encode_utf16<const SIZE: usize>(chars: &str) -> FFResult<[u16; SIZE]> {
     Ok(str_vec.try_into().unwrap())
 }
 
+pub fn encode_utf8<const SIZE: usize>(chars: &str) -> FFResult<[u8; SIZE]> {
+    let mut str_vec: Vec<u8> = chars.as_bytes().to_vec();
+    str_vec.push(0);
+    if str_vec.len() > SIZE {
+        return Err(FFError::build(
+            Severity::Warning,
+            format!(
+                "String '{}' too long to encode in UTF-8 array of size {}",
+                chars, SIZE
+            ),
+        ));
+    }
+    str_vec.resize(SIZE, 0);
+    Ok(str_vec.try_into().unwrap())
+}
+
 pub fn get_timestamp_str(time: SystemTime) -> String {
     let date_time_local: DateTime<Local> = time.into();
     date_time_local.format("%Y-%m-%d %H:%M:%S").to_string()
@@ -446,6 +463,24 @@ pub fn get_text_file_contents(path: &str) -> FFResult<String> {
 pub fn is_ctrl_c(key_event: &KeyEvent) -> bool {
     (key_event.code == KeyCode::Char('c') || key_event.code == KeyCode::Char('C'))
         && key_event.modifiers.contains(KeyModifiers::CONTROL)
+}
+
+pub fn socket_addr_to_parts(addr: &SocketAddr) -> FFResult<(u32, u16)> {
+    let ip = match addr.ip() {
+        IpAddr::V4(ipv4) => ipv4,
+        IpAddr::V6(_) => {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("IPv6 addresses not supported: {}", addr),
+            ))
+        }
+    };
+    Ok((ip.to_bits(), addr.port()))
+}
+
+pub fn socket_addr_from_parts(ip: u32, port: u16) -> SocketAddr {
+    let ipv4 = Ipv4Addr::from(ip);
+    SocketAddr::new(IpAddr::V4(ipv4), port)
 }
 
 pub fn get_random_gumball() -> Item {

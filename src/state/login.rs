@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
+    net::SocketAddr,
     time::{Duration, SystemTime},
 };
 
@@ -52,6 +53,7 @@ struct ShardServerInfo {
     max_channel_pop: usize,
     players: HashMap<i64, PlayerMetadata>,
     name: String,
+    public_addr: SocketAddr,
     geo: Option<GeoInfo>,
 }
 impl ShardServerInfo {
@@ -228,6 +230,10 @@ impl LoginServerState {
         self.shards.get(&shard_id).map(|shard| shard.name.as_str())
     }
 
+    pub fn get_shard_public_addr(&self, shard_id: i32) -> Option<SocketAddr> {
+        self.shards.get(&shard_id).map(|shard| shard.public_addr)
+    }
+
     pub fn get_shard_city(&self, shard_id: i32) -> Option<&str> {
         let geo = self
             .shards
@@ -243,7 +249,7 @@ impl LoginServerState {
         num_channels: u8,
         max_channel_pop: usize,
         name: &str,
-        geo: Option<GeoInfo>,
+        public_addr: SocketAddr,
     ) -> FFResult<()> {
         if self.shards.contains_key(&shard_id) {
             return Err(FFError::build(
@@ -266,7 +272,8 @@ impl LoginServerState {
                 max_channel_pop,
                 players: HashMap::new(),
                 name: name.to_string(),
-                geo,
+                public_addr,
+                geo: None,
             },
         );
         Ok(())
