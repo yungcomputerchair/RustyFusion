@@ -148,7 +148,7 @@ mod tests {
         decrypt_payload(&mut buf, &key);
         assert_eq!(buf.as_slice(), bytes);
 
-        let pkt_dec: sP_LS2CL_REP_LOGIN_SUCC = unsafe { *bytes_to_struct(&buf) };
+        let pkt_dec: sP_LS2CL_REP_LOGIN_SUCC = *bytes_to_struct(&buf).unwrap();
         //dbg!(pkt_dec);
         assert_eq!({ pkt.uiSvrTime }, { pkt_dec.uiSvrTime });
     }

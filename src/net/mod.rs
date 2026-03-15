@@ -1,11 +1,13 @@
-use std::{collections::HashMap, mem::size_of, slice::from_raw_parts, time::SystemTime};
+use std::{
+    any::type_name, collections::HashMap, mem::size_of, slice::from_raw_parts, time::SystemTime,
+};
 
 use self::packet::{
     FFPacket,
     PacketID::{self, *},
 };
 use crate::{
-    error::{log, FFResult, Severity},
+    error::{log, FFError, FFResult, Severity},
     state::ServerState,
 };
 
@@ -66,10 +68,23 @@ pub struct LoginData {
     pub iBuddyWarpTime: u32,
 }
 
-unsafe fn bytes_to_struct<T: FFPacket>(bytes: &[u8]) -> &T {
-    // haters will call this "undefined behavior"
-    let struct_ptr: *const T = bytes.as_ptr().cast();
-    &*struct_ptr
+fn bytes_to_struct<T: FFPacket>(bytes: &[u8]) -> FFResult<&T> {
+    let ptr = bytes.as_ptr();
+    let misalignment = ptr.align_offset(align_of::<T>());
+    if misalignment != 0 {
+        return Err(FFError::build_dc(
+            Severity::Warning,
+            format!(
+                "Misaligned packet data for {}: align should be {}, misaligned by {}",
+                type_name::<T>(),
+                align_of::<T>(),
+                misalignment
+            ),
+        ));
+    }
+
+    // we're aligned, so this transmutation is sound
+    Ok(unsafe { &*ptr.cast::<T>() })
 }
 
 unsafe fn struct_to_bytes<T: FFPacket>(pkt: &T) -> &[u8] {

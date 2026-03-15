@@ -3,6 +3,7 @@ use std::{
     io::{Read, Write},
     mem::size_of,
     net::{IpAddr, SocketAddr, TcpStream},
+    ops::{Deref, DerefMut},
     time::SystemTime,
 };
 
@@ -52,9 +53,29 @@ impl Display for ClientType {
     }
 }
 
+#[derive(Clone, Copy)]
+#[repr(C, align(4))]
+struct AlignedBuf([u8; PACKET_BUFFER_SIZE]);
+impl Deref for AlignedBuf {
+    type Target = [u8; PACKET_BUFFER_SIZE];
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl DerefMut for AlignedBuf {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+impl Default for AlignedBuf {
+    fn default() -> Self {
+        Self([0; PACKET_BUFFER_SIZE])
+    }
+}
+
 #[derive(Clone)]
 pub struct PacketBuffer {
-    buf: [u8; PACKET_BUFFER_SIZE],
+    buf: AlignedBuf,
     ptr: usize,
     len: usize,
     fetched_packet_id: Option<PacketID>,
@@ -62,7 +83,7 @@ pub struct PacketBuffer {
 impl Default for PacketBuffer {
     fn default() -> Self {
         Self {
-            buf: [0; PACKET_BUFFER_SIZE],
+            buf: AlignedBuf::default(),
             ptr: 0,
             len: 0,
             fetched_packet_id: None,
@@ -137,7 +158,7 @@ impl PacketBuffer {
         }
 
         let buf: &[u8] = &self.buf[from..to];
-        let s = unsafe { bytes_to_struct(buf) };
+        let s = bytes_to_struct(buf)?;
         self.ptr += sz;
 
         if log_struct {
