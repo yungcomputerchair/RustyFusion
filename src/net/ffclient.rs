@@ -1,4 +1,5 @@
 use std::{
+    fmt::Display,
     io::{Read, Write},
     mem::size_of,
     net::{IpAddr, SocketAddr, TcpStream},
@@ -33,8 +34,22 @@ pub enum ClientType {
         pc_id: Option<i32>, // iPC_ID
     },
     LoginServer,
-    UnauthedShardServer(Vec<u8>),
-    ShardServer(i32),
+    UnauthedShardServer(Vec<u8>), // auth challenge
+    ShardServer(i32),             // shard ID
+}
+impl Display for ClientType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ClientType::Unknown => write!(f, "Unknown"),
+            ClientType::UnauthedClient { username, .. } => {
+                write!(f, "UnauthedClient({})", username)
+            }
+            ClientType::GameClient { account_id, .. } => write!(f, "GameClient({})", account_id),
+            ClientType::LoginServer => write!(f, "LoginServer"),
+            ClientType::UnauthedShardServer(_) => write!(f, "UnauthedShardServer"),
+            ClientType::ShardServer(shard_id) => write!(f, "ShardServer({})", shard_id),
+        }
+    }
 }
 
 #[derive(Clone)]

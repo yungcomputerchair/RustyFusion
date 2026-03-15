@@ -207,7 +207,7 @@ fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>, state: 
             log(
                 Severity::Warning,
                 &format!(
-                    "Unhandled disconnect for client {} (type {:?})",
+                    "Unhandled disconnect for client {} (type {})",
                     client.get_addr(),
                     client.client_type
                 ),
