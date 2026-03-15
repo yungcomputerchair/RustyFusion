@@ -107,12 +107,16 @@ pub fn gen_auth_challenge() -> Vec<u8> {
 }
 
 pub fn timing_safe_strcmp(a: &str, b: &str) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    let mut result: u8 = 0;
-    for (byte_a, byte_b) in a.bytes().zip(b.bytes()) {
-        result |= byte_a ^ byte_b;
+    const SALT: [u8; 16] = [
+        40, 164, 107, 74, 115, 2, 242, 155, 123, 246, 58, 223, 60, 179, 154, 25,
+    ];
+
+    let a_hashed = bcrypt::bcrypt(1, SALT, a.as_bytes());
+    let b_hashed = bcrypt::bcrypt(1, SALT, b.as_bytes());
+
+    let mut result = 0;
+    for (x, y) in a_hashed.iter().zip(b_hashed.iter()) {
+        result |= x ^ y;
     }
     result == 0
 }
