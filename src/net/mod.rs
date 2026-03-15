@@ -87,11 +87,13 @@ fn bytes_to_struct<T: FFPacket>(bytes: &[u8]) -> FFResult<&T> {
     Ok(unsafe { &*ptr.cast::<T>() })
 }
 
-unsafe fn struct_to_bytes<T: FFPacket>(pkt: &T) -> &[u8] {
+fn struct_to_bytes<T: FFPacket>(pkt: &T) -> &[u8] {
     let sz: usize = size_of::<T>();
     let struct_ptr: *const T = pkt;
     let buf_ptr: *const u8 = struct_ptr.cast();
-    from_raw_parts(buf_ptr, sz)
+
+    // always safe because T is always valid, aligned, and the size is correct
+    unsafe { from_raw_parts(buf_ptr, sz) }
 }
 
 pub struct ClientMap<'a> {
@@ -192,7 +194,7 @@ mod tests {
             iToSlotNum: 7,
         };
 
-        let bytes: &[u8] = unsafe { struct_to_bytes(&original) };
+        let bytes: &[u8] = struct_to_bytes(&original);
 
         // Copy into an aligned buffer (as AlignedBuf would provide)
         #[repr(C, align(4))]

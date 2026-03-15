@@ -178,7 +178,7 @@ impl PacketBuffer {
     }
 
     pub fn queue_struct<T: FFPacket>(&mut self, s: &T) {
-        let struct_buf = unsafe { struct_to_bytes(s) };
+        let struct_buf = struct_to_bytes(s);
         self.copy_to_buf(struct_buf);
     }
 

@@ -139,7 +139,7 @@ mod tests {
             szID: [6; 33],
             iOpenBetaFlag: 7,
         };
-        let bytes: &[u8] = unsafe { struct_to_bytes(&pkt) };
+        let bytes: &[u8] = struct_to_bytes(&pkt);
         let mut buf: Vec<u8> = bytes.to_vec();
 
         let key: [u8; CRYPTO_KEY_SIZE] = 4382366871217075016_u64.to_le_bytes();
