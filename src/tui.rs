@@ -8,7 +8,7 @@ use ratatui::{
 use crate::{
     config::config_get,
     error::{Severity, BACKLOG},
-    state::{ServerState, ShardServerState},
+    state::{LoginServerState, ServerState, ShardServerState},
     util,
 };
 
@@ -121,19 +121,30 @@ impl Tui for LoginTui {
         frame.render_widget(log_widget, layout[0]);
 
         let server_state = server_state.as_login();
+        let shard_list_widget = ShardListWidget {
+            login_state: server_state,
+        };
+        frame.render_widget(shard_list_widget, layout[1]);
+    }
+}
 
-        let title2 = Line::from(" Shards ").bold().centered();
-        let block2 = Block::bordered()
+struct ShardListWidget<'a> {
+    login_state: &'a LoginServerState,
+}
+impl<'a> Widget for ShardListWidget<'a> {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let title = Line::from(" Shards ").bold().centered();
+        let block = Block::bordered()
             .padding(Padding::horizontal(1))
-            .title(title2);
+            .title(title);
 
-        let mut shard_ids = server_state.get_reserved_shard_ids();
+        let mut shard_ids = self.login_state.get_reserved_shard_ids();
         shard_ids.sort();
 
         let gauges: Vec<Gauge> = shard_ids
             .iter()
             .map(|sid| {
-                let Some((current, max)) = server_state.get_current_and_max_pop_for_shard(*sid)
+                let Some((current, max)) = self.login_state.get_current_and_max_pop_for_shard(*sid)
                 else {
                     return Gauge::default()
                         .block(Block::bordered().title(format!("[#{}]", sid)))
@@ -164,10 +175,10 @@ impl Tui for LoginTui {
                 let mut block = Block::bordered().title(format!(
                     "[#{}] {} ",
                     sid,
-                    server_state.get_shard_public_addr(*sid).unwrap()
+                    self.login_state.get_shard_public_addr(*sid).unwrap()
                 ));
 
-                if let Some(city) = server_state.get_shard_city(*sid) {
+                if let Some(city) = self.login_state.get_shard_city(*sid) {
                     block = block.title(Line::from(format!(" {} ", city)).right_aligned());
                 }
 
@@ -183,19 +194,21 @@ impl Tui for LoginTui {
                     .label(format!("{} / {}", current, max))
             })
             .collect();
+
+        let areas = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(
+                shard_ids
+                    .iter()
+                    .map(|_| Constraint::Length(3))
+                    .collect::<Vec<Constraint>>(),
+            )
+            .split(block.inner(area));
+
         for (i, gauge) in gauges.iter().enumerate() {
-            let area = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints(
-                    shard_ids
-                        .iter()
-                        .map(|_| Constraint::Length(3))
-                        .collect::<Vec<Constraint>>(),
-                )
-                .split(block2.inner(layout[1]))[i];
-            frame.render_widget(gauge.clone(), area);
+            gauge.render(areas[i], buf);
         }
-        frame.render_widget(block2, layout[1]);
+        block.render(area, buf);
     }
 }
 
