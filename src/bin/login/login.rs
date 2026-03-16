@@ -53,9 +53,17 @@ Password must be 8-32 characters long and contain only letters, numbers, or spec
                 )
             })?;
 
-            if login_type == LoginType::Password
-                && !config_get().login.allow_plaintext_passwords.get()
-            {
+            let allow_plaintext_passwords = if cfg!(debug_assertions) {
+                // plaintext passwords are disabled by default for security,
+                // but dev environments are very unlikely to have an OFAPI
+                // instance set up. So just allow plaintext passwords always
+                // if we are in a debug build.
+                true
+            } else {
+                config_get().login.allow_plaintext_passwords.get()
+            };
+
+            if login_type == LoginType::Password && !allow_plaintext_passwords {
                 let announce = sP_FE2CL_GM_REP_PC_ANNOUNCE {
                     iAnnounceType: unused!(),
                     iDuringTime: 10,
