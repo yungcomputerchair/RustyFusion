@@ -89,6 +89,8 @@ struct RegistryEntry {
 
 struct ChunkMap {
     chunks: Box<[[Chunk; NCHUNKS]; NCHUNKS]>,
+    loaded_chunk_count: usize,
+    loaded_entity_count: usize,
 }
 impl ChunkMap {
     fn get_ids(&self) -> Vec<EntityID> {
@@ -465,11 +467,41 @@ impl EntityMap {
             .unwrap()
     }
 
+    pub fn get_num_instances(&self) -> usize {
+        self.chunk_maps.len()
+    }
+
+    pub fn get_num_base_instances(&self) -> usize {
+        self.chunk_maps
+            .keys()
+            .filter(|iid| iid.instance_num.is_none())
+            .count()
+    }
+
+    pub fn get_num_chunks(&self) -> usize {
+        self.chunk_maps.len() * NCHUNKS * NCHUNKS
+    }
+
+    pub fn get_num_loaded_chunks(&self) -> usize {
+        self.chunk_maps
+            .values()
+            .map(|cm| cm.loaded_chunk_count)
+            .sum()
+    }
+
+    pub fn get_num_loaded_entities(&self) -> usize {
+        self.chunk_maps
+            .values()
+            .map(|cm| cm.loaded_entity_count)
+            .sum()
+    }
+
     fn remove_from_chunk(&mut self, id: EntityID) -> HashSet<EntityID> {
         let mut affected = HashSet::new();
         let entry = self.registry.get_mut(&id).unwrap();
         if let Some(coords) = entry.chunk {
             entry.chunk = None;
+            let instance_id = coords.i;
             let chunk = self.get_chunk_mut(coords).unwrap();
             if !chunk.remove(id) {
                 panic_log(&format!(
@@ -477,15 +509,30 @@ impl EntityMap {
                     coords, id
                 ));
             }
+            let chunk_was_loaded = chunk.is_loaded();
+            let is_player = matches!(id, EntityID::Player(_));
+            let mut chunks_unloaded = 0;
+            let mut entities_in_unloaded = 0;
             let coords_around = Self::get_coords_around(coords, get_visibility_range());
             for coords in coords_around {
                 if let Some(chunk) = self.get_chunk_mut(coords) {
                     affected.extend(chunk.get_all());
-                    if matches!(id, EntityID::Player(_)) {
+                    if is_player {
+                        let was_loaded = chunk.is_loaded();
                         chunk.load_count -= 1;
+                        if was_loaded && chunk.load_count == 0 {
+                            chunks_unloaded += 1;
+                            entities_in_unloaded += chunk.tracked.len();
+                        }
                     }
                 }
             }
+            let cm = self.chunk_maps.get_mut(&instance_id).unwrap();
+            if chunk_was_loaded {
+                cm.loaded_entity_count -= 1;
+            }
+            cm.loaded_chunk_count -= chunks_unloaded;
+            cm.loaded_entity_count -= entities_in_unloaded;
         }
         affected
     }
@@ -497,6 +544,7 @@ impl EntityMap {
     ) -> HashSet<EntityID> {
         let mut affected = HashSet::new();
         if let Some(coords) = to_chunk {
+            let instance_id = coords.i;
             if let Some(chunk) = self.get_chunk_mut(coords) {
                 if !chunk.insert(id) {
                     panic_log(&format!(
@@ -504,18 +552,33 @@ impl EntityMap {
                         coords, id
                     ));
                 }
+                let chunk_already_loaded = chunk.is_loaded();
                 let entry = self.registry.get_mut(&id).unwrap();
                 entry.chunk = to_chunk;
+                let is_player = matches!(id, EntityID::Player(_));
+                let mut chunks_loaded = 0;
+                let mut entities_in_loaded = 0;
                 let coords_around = Self::get_coords_around(coords, get_visibility_range());
                 for coords in coords_around {
                     if let Some(chunk) = self.get_chunk_mut(coords) {
-                        affected.extend(chunk.get_all());
-                        if matches!(id, EntityID::Player(_)) {
+                        if is_player {
+                            let was_loaded = chunk.is_loaded();
                             chunk.load_count += 1;
+                            if !was_loaded {
+                                chunks_loaded += 1;
+                                entities_in_loaded += chunk.tracked.len();
+                            }
                         }
+                        affected.extend(chunk.get_all());
                     }
                 }
                 affected.remove(&id); // we don't want ourself in this
+                let cm = self.chunk_maps.get_mut(&instance_id).unwrap();
+                if chunk_already_loaded {
+                    cm.loaded_entity_count += 1;
+                }
+                cm.loaded_chunk_count += chunks_loaded;
+                cm.loaded_entity_count += entities_in_loaded;
             }
         }
         affected
@@ -568,7 +631,11 @@ impl EntityMap {
                 }
                 Box::from_raw(ptr)
             };
-            let chunk_map = ChunkMap { chunks };
+            let chunk_map = ChunkMap {
+                chunks,
+                loaded_chunk_count: 0,
+                loaded_entity_count: 0,
+            };
             log(
                 Severity::Debug,
                 &format!("Initialized instance {}", instance_id),
@@ -713,5 +780,326 @@ impl Chunk {
 
     fn remove(&mut self, id: EntityID) -> bool {
         self.tracked.remove(&id)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{any::Any, time::SystemTime};
+
+    use rand::rngs::ThreadRng;
+
+    use super::*;
+    use crate::{
+        entity::{Combatant, Entity, EntityID},
+        error::FFResult,
+        net::{ClientMap, FFClient},
+        state::ShardServerState,
+        Position,
+    };
+
+    /// Minimal mock entity for testing chunk operations.
+    struct MockEntity {
+        id: EntityID,
+        position: Position,
+        instance_id: InstanceID,
+    }
+    impl MockEntity {
+        fn new_player(pc_id: i32, pos: Position, instance_id: InstanceID) -> Self {
+            Self {
+                id: EntityID::Player(pc_id),
+                position: pos,
+                instance_id,
+            }
+        }
+
+        fn new_npc(npc_id: i32, pos: Position, instance_id: InstanceID) -> Self {
+            Self {
+                id: EntityID::NPC(npc_id),
+                position: pos,
+                instance_id,
+            }
+        }
+    }
+    impl Entity for MockEntity {
+        fn get_id(&self) -> EntityID {
+            self.id
+        }
+        fn get_client<'a>(&self, _: &'a mut ClientMap) -> Option<&'a mut FFClient> {
+            None
+        }
+        fn get_position(&self) -> Position {
+            self.position
+        }
+        fn get_rotation(&self) -> i32 {
+            0
+        }
+        fn get_speed(&self) -> i32 {
+            0
+        }
+        fn get_chunk_coords(&self) -> ChunkCoords {
+            ChunkCoords::from_pos_inst(self.position, self.instance_id)
+        }
+        fn set_position(&mut self, pos: Position) {
+            self.position = pos;
+        }
+        fn set_rotation(&mut self, _: i32) {}
+        fn send_enter(&self, _: &mut FFClient) -> FFResult<()> {
+            Ok(())
+        }
+        fn send_exit(&self, _: &mut FFClient) -> FFResult<()> {
+            Ok(())
+        }
+        fn tick(
+            &mut self,
+            _: &SystemTime,
+            _: &mut ClientMap,
+            _: &mut ShardServerState,
+            _: &mut ThreadRng,
+        ) {
+        }
+        fn cleanup(&mut self, _: &mut ClientMap, _: &mut ShardServerState) {}
+        fn as_combatant(&self) -> Option<&dyn Combatant> {
+            None
+        }
+        fn as_combatant_mut(&mut self) -> Option<&mut dyn Combatant> {
+            None
+        }
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+        fn as_any_mut(&mut self) -> &mut dyn Any {
+            self
+        }
+    }
+
+    /// Position that maps to chunk (x, y) in the grid.
+    /// Each chunk spans MAP_BOUNDS / NCHUNKS units.
+    fn pos_for_chunk(x: i32, y: i32) -> Position {
+        let chunk_size = MAP_BOUNDS / NCHUNKS as i32;
+        Position {
+            x: x * chunk_size + chunk_size / 2,
+            y: y * chunk_size + chunk_size / 2,
+            z: 0,
+        }
+    }
+
+    fn default_instance() -> InstanceID {
+        InstanceID::default()
+    }
+
+    /// Place an entity into the map and return its chunk coords.
+    fn place_entity(map: &mut EntityMap, entity: MockEntity) -> (EntityID, ChunkCoords) {
+        let id = entity.get_id();
+        let chunk = entity.get_chunk_coords();
+        map.track(Box::new(entity), TickMode::WhenLoaded);
+        map.update(id, Some(chunk), None);
+        (id, chunk)
+    }
+
+    #[test]
+    fn test_loaded_counts_zero_initially() {
+        let map = EntityMap::default();
+        assert_eq!(map.get_num_loaded_chunks(), 0);
+        assert_eq!(map.get_num_loaded_entities(), 0);
+    }
+
+    #[test]
+    fn test_player_loads_surrounding_chunks() {
+        let mut map = EntityMap::default();
+        let inst = default_instance();
+
+        // Place a player at chunk (64, 64) — safely in the middle
+        let pos = pos_for_chunk(64, 64);
+        let player = MockEntity::new_player(1, pos, inst);
+        place_entity(&mut map, player);
+
+        // With visibility_range=1, a player loads a 3x3 grid = 9 chunks
+        assert_eq!(map.get_num_loaded_chunks(), 9);
+        // The player itself is in a loaded chunk
+        assert_eq!(map.get_num_loaded_entities(), 1);
+    }
+
+    #[test]
+    fn test_npc_in_loaded_chunk_counted() {
+        let mut map = EntityMap::default();
+        let inst = default_instance();
+        let pos = pos_for_chunk(64, 64);
+
+        // Place an NPC first (chunk is unloaded, so not counted)
+        let npc = MockEntity::new_npc(1, pos, inst);
+        place_entity(&mut map, npc);
+        assert_eq!(map.get_num_loaded_chunks(), 0);
+        assert_eq!(map.get_num_loaded_entities(), 0);
+
+        // Now place a player at the same position — NPC's chunk becomes loaded
+        let player = MockEntity::new_player(1, pos, inst);
+        place_entity(&mut map, player);
+        assert_eq!(map.get_num_loaded_chunks(), 9);
+        // Both the player and the NPC are in loaded chunks
+        assert_eq!(map.get_num_loaded_entities(), 2);
+    }
+
+    #[test]
+    fn test_removing_player_unloads_chunks() {
+        let mut map = EntityMap::default();
+        let inst = default_instance();
+        let pos = pos_for_chunk(64, 64);
+
+        let player = MockEntity::new_player(1, pos, inst);
+        let (player_id, _) = place_entity(&mut map, player);
+
+        assert_eq!(map.get_num_loaded_chunks(), 9);
+        assert_eq!(map.get_num_loaded_entities(), 1);
+
+        // Remove player from the map
+        map.update(player_id, None, None);
+
+        assert_eq!(map.get_num_loaded_chunks(), 0);
+        assert_eq!(map.get_num_loaded_entities(), 0);
+    }
+
+    #[test]
+    fn test_two_players_overlapping_visibility() {
+        let mut map = EntityMap::default();
+        let inst = default_instance();
+
+        // Two players in the same chunk
+        let pos = pos_for_chunk(64, 64);
+        let p1 = MockEntity::new_player(1, pos, inst);
+        let p2 = MockEntity::new_player(2, pos, inst);
+        place_entity(&mut map, p1);
+        place_entity(&mut map, p2);
+
+        // Same 3x3 grid, but load_count=2 on each. Still 9 loaded chunks.
+        assert_eq!(map.get_num_loaded_chunks(), 9);
+        // Both players are in loaded chunks
+        assert_eq!(map.get_num_loaded_entities(), 2);
+    }
+
+    #[test]
+    fn test_removing_one_of_two_overlapping_players() {
+        let mut map = EntityMap::default();
+        let inst = default_instance();
+        let pos = pos_for_chunk(64, 64);
+
+        let p1 = MockEntity::new_player(1, pos, inst);
+        let p2 = MockEntity::new_player(2, pos, inst);
+        let (p1_id, _) = place_entity(&mut map, p1);
+        place_entity(&mut map, p2);
+
+        // Remove one player — chunks still loaded by the other
+        map.update(p1_id, None, None);
+        assert_eq!(map.get_num_loaded_chunks(), 9);
+        // Only p2 remains
+        assert_eq!(map.get_num_loaded_entities(), 1);
+    }
+
+    #[test]
+    fn test_npc_added_to_already_loaded_chunk() {
+        let mut map = EntityMap::default();
+        let inst = default_instance();
+        let pos = pos_for_chunk(64, 64);
+
+        // Player first
+        let player = MockEntity::new_player(1, pos, inst);
+        place_entity(&mut map, player);
+        assert_eq!(map.get_num_loaded_entities(), 1);
+
+        // Add NPC to the same loaded chunk
+        let npc = MockEntity::new_npc(1, pos, inst);
+        place_entity(&mut map, npc);
+        assert_eq!(map.get_num_loaded_entities(), 2);
+
+        // Add another NPC
+        let npc2 = MockEntity::new_npc(2, pos, inst);
+        place_entity(&mut map, npc2);
+        assert_eq!(map.get_num_loaded_entities(), 3);
+    }
+
+    #[test]
+    fn test_npc_removed_from_loaded_chunk() {
+        let mut map = EntityMap::default();
+        let inst = default_instance();
+        let pos = pos_for_chunk(64, 64);
+
+        let player = MockEntity::new_player(1, pos, inst);
+        let npc = MockEntity::new_npc(1, pos, inst);
+        place_entity(&mut map, player);
+        let (npc_id, _) = place_entity(&mut map, npc);
+        assert_eq!(map.get_num_loaded_entities(), 2);
+
+        // Remove NPC — player still loaded, count goes to 1
+        map.update(npc_id, None, None);
+        assert_eq!(map.get_num_loaded_entities(), 1);
+        assert_eq!(map.get_num_loaded_chunks(), 9);
+    }
+
+    #[test]
+    fn test_player_moving_between_chunks() {
+        let mut map = EntityMap::default();
+        let inst = default_instance();
+
+        let pos1 = pos_for_chunk(64, 64);
+        let player = MockEntity::new_player(1, pos1, inst);
+        let (player_id, _) = place_entity(&mut map, player);
+        assert_eq!(map.get_num_loaded_chunks(), 9);
+
+        // Move player to a distant chunk (no overlap with the old 3x3)
+        let pos2 = pos_for_chunk(80, 80);
+        let new_coords = ChunkCoords::from_pos_inst(pos2, inst);
+        map.update(player_id, Some(new_coords), None);
+
+        // Old chunks unloaded, new 3x3 loaded
+        assert_eq!(map.get_num_loaded_chunks(), 9);
+        assert_eq!(map.get_num_loaded_entities(), 1);
+    }
+
+    #[test]
+    fn test_npcs_in_chunk_counted_on_load_transition() {
+        let mut map = EntityMap::default();
+        let inst = default_instance();
+        let pos = pos_for_chunk(64, 64);
+
+        // Place several NPCs first (no player = unloaded)
+        for i in 1..=5 {
+            let npc = MockEntity::new_npc(i, pos, inst);
+            place_entity(&mut map, npc);
+        }
+        assert_eq!(map.get_num_loaded_entities(), 0);
+
+        // A player arrives — all 5 NPCs become loaded
+        let player = MockEntity::new_player(1, pos, inst);
+        place_entity(&mut map, player);
+        assert_eq!(map.get_num_loaded_entities(), 6); // 5 NPCs + 1 player
+
+        // Player leaves — all unloaded again
+        map.update(EntityID::Player(1), None, None);
+        assert_eq!(map.get_num_loaded_entities(), 0);
+        assert_eq!(map.get_num_loaded_chunks(), 0);
+    }
+
+    #[test]
+    fn test_entity_at_chunk_boundary() {
+        let mut map = EntityMap::default();
+        let inst = default_instance();
+
+        // Player at chunk (1, 1) — visibility includes (0,0) through (2,2)
+        let player_pos = pos_for_chunk(1, 1);
+        let player = MockEntity::new_player(1, player_pos, inst);
+        place_entity(&mut map, player);
+
+        // NPC at chunk (2, 2) — within the visibility of the player
+        let npc_pos = pos_for_chunk(2, 2);
+        let npc = MockEntity::new_npc(1, npc_pos, inst);
+        place_entity(&mut map, npc);
+        assert_eq!(map.get_num_loaded_entities(), 2);
+
+        // NPC at chunk (3, 3) — outside the player's 3x3 visibility
+        let far_npc_pos = pos_for_chunk(3, 3);
+        let far_npc = MockEntity::new_npc(2, far_npc_pos, inst);
+        place_entity(&mut map, far_npc);
+        // The far NPC is in an unloaded chunk, shouldn't be counted
+        assert_eq!(map.get_num_loaded_entities(), 2);
     }
 }
