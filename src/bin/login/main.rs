@@ -111,7 +111,7 @@ fn main() -> Result<()> {
         }
     } else {
         log(
-            Severity::Info,
+            Severity::Warning,
             "No GeoIP database configured. Geo-based shard routing disabled.",
         );
     }
