@@ -1,13 +1,53 @@
+use std::time::{Duration, Instant};
+
 use ratatui::{
     prelude::*,
     widgets::{Block, Gauge, Padding, Paragraph, Wrap},
 };
 
 use crate::{
+    config::config_get,
     error::{Severity, BACKLOG},
-    state::ServerState,
+    state::{ServerState, ShardServerState},
     util,
 };
+
+const STATS_CACHE_INTERVAL: Duration = Duration::from_secs(1);
+
+struct ShardStatsCache {
+    last_updated: Instant,
+    total_instance_count: usize,
+    base_instance_count: usize,
+    total_chunk_count: usize,
+    loaded_chunk_count: usize,
+    loaded_entity_count: usize,
+    tickable_entity_count: usize,
+}
+impl ShardStatsCache {
+    fn new() -> Self {
+        Self {
+            last_updated: Instant::now() - STATS_CACHE_INTERVAL,
+            total_instance_count: 0,
+            base_instance_count: 0,
+            total_chunk_count: 0,
+            loaded_chunk_count: 0,
+            loaded_entity_count: 0,
+            tickable_entity_count: 0,
+        }
+    }
+
+    fn refresh_if_needed(&mut self, shard_state: &ShardServerState) {
+        if self.last_updated.elapsed() >= STATS_CACHE_INTERVAL {
+            self.total_instance_count = shard_state.entity_map.get_num_instances();
+            self.base_instance_count = shard_state.entity_map.get_num_base_instances();
+            self.total_chunk_count = shard_state.entity_map.get_num_chunks();
+            self.loaded_chunk_count = shard_state.entity_map.get_num_loaded_chunks();
+            self.loaded_entity_count = shard_state.entity_map.get_num_loaded_entities();
+            self.tickable_entity_count = shard_state.entity_map.get_tickable_ids().count();
+            self.last_updated = Instant::now();
+        }
+    }
+}
 
 enum ScrollMode {
     Follow,
@@ -74,11 +114,10 @@ impl Tui for LoginTui {
     fn render(&mut self, frame: &mut Frame, server_state: &ServerState) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
+            .constraints([Constraint::Percentage(70), Constraint::Fill(1)].as_ref())
             .split(frame.area());
 
-        let area = frame.area();
-        let log_widget = get_log_widget(&self.state, area.width, area.height);
+        let log_widget = LogWidget { state: &self.state };
         frame.render_widget(log_widget, layout[0]);
 
         let server_state = server_state.as_login();
@@ -162,6 +201,7 @@ impl Tui for LoginTui {
 
 pub struct ShardTui {
     pub state: TuiState,
+    stats_cache: ShardStatsCache,
 }
 impl Default for ShardTui {
     fn default() -> Self {
@@ -170,102 +210,195 @@ impl Default for ShardTui {
                 " RustyFusion v{} Shard Server ",
                 env!("CARGO_PKG_VERSION")
             )),
+            stats_cache: ShardStatsCache::new(),
         }
     }
 }
 impl Tui for ShardTui {
     fn render(&mut self, frame: &mut Frame, server_state: &ServerState) {
-        let layout = Layout::default()
+        let outer_layout = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
+            .constraints([Constraint::Percentage(70), Constraint::Fill(1)].as_ref())
             .split(frame.area());
 
-        let area = frame.area();
-        let log_widget = get_log_widget(&self.state, area.width, area.height);
-        frame.render_widget(log_widget, layout[0]);
+        let inner_layout_left = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(75), Constraint::Fill(1)].as_ref())
+            .split(outer_layout[0]);
+
+        let log_widget = LogWidget { state: &self.state };
+        frame.render_widget(log_widget, inner_layout_left[0]);
 
         let server_state = server_state.as_shard();
+        let player_list_widget = PlayerListWidget {
+            shard_state: server_state,
+        };
+        frame.render_widget(player_list_widget, outer_layout[1]);
 
-        let title2 = Line::from(" Players ").bold().centered();
-        let block2 = Block::bordered()
-            .padding(Padding::horizontal(1))
-            .title(title2);
-
-        let player_ids = server_state
-            .entity_map
-            .get_player_ids()
-            .collect::<Vec<i32>>();
-        let player_names: Vec<Line> = player_ids
-            .iter()
-            .map(|pid| {
-                let player = server_state.get_player(*pid).unwrap();
-                Line::from(format!("{}", player))
-            })
-            .collect();
-        for (i, gauge) in player_names.iter().enumerate() {
-            let area = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints(
-                    player_ids
-                        .iter()
-                        .map(|_| Constraint::Length(3))
-                        .collect::<Vec<Constraint>>(),
-                )
-                .split(block2.inner(layout[1]))[i];
-            frame.render_widget(gauge.clone(), area);
-        }
-        frame.render_widget(block2, layout[1]);
+        self.stats_cache.refresh_if_needed(server_state);
+        let shard_stats_widget = ShardStatsWidget {
+            shard_state: server_state,
+            stats_cache: &self.stats_cache,
+        };
+        frame.render_widget(shard_stats_widget, inner_layout_left[1]);
     }
 }
 
-fn get_log_widget(state: &'_ TuiState, width: u16, height: u16) -> Paragraph<'_> {
-    let title = Line::from(state.title.as_str())
-        .light_red()
-        .bold()
-        .centered();
-    let footer = Line::from(" Press CTRL+C to stop the server ").centered();
-    let events = BACKLOG.get().unwrap().lock().unwrap();
-    let lines: Vec<Line> = events
-        .iter()
-        .map(|fe| {
-            let ts = util::get_timestamp_str(fe.get_timestamp());
-            let text = fe.get_msg().to_string();
-            let severity = fe.get_severity();
-            let sev_span = Span::from(format!("[{}] ", severity));
-            Line::from(vec![
-                Span::from(format!("[{}] ", ts)).dark_gray(),
-                match severity {
-                    Severity::Info => sev_span.green(),
-                    Severity::Warning => sev_span.yellow(),
-                    Severity::Fatal => sev_span.red(),
-                    Severity::Debug => sev_span.cyan(),
-                },
-                Span::from(text).white(),
-            ])
-        })
-        .collect();
-
-    let mut block = Block::bordered()
-        .padding(Padding::horizontal(1))
-        .title(title)
-        .title_bottom(footer);
-
-    if let ScrollMode::Scroll(offset) = state.scroll_mode {
-        let scroll_title = Line::from(format!(" Scrolling ({} / {}) ", offset, events.len()))
-            .yellow()
+struct LogWidget<'a> {
+    state: &'a TuiState,
+}
+impl<'a> Widget for LogWidget<'a> {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let title = Line::from(self.state.title.as_str())
+            .light_red()
             .bold()
-            .right_aligned();
-        block = block.title_top(scroll_title);
-    }
+            .centered();
 
-    let pg = Paragraph::new(lines)
-        .block(block)
-        .left_aligned()
-        .wrap(Wrap { trim: true });
-    let lines_to_scroll = pg
-        .line_count(width)
-        .saturating_sub(height as usize)
-        .saturating_sub(state.get_scroll_offset());
-    let pg = pg.scroll((lines_to_scroll as u16, 0));
-    pg
+        let footer = Line::from(" Press CTRL+C to stop the server ").centered();
+        let events = BACKLOG.get().unwrap().lock().unwrap();
+        let lines: Vec<Line> = events
+            .iter()
+            .map(|fe| {
+                let ts = util::get_timestamp_str(fe.get_timestamp());
+                let text = fe.get_msg().to_string();
+                let severity = fe.get_severity();
+                let sev_span = Span::from(format!("[{}] ", severity));
+                Line::from(vec![
+                    Span::from(format!("[{}] ", ts)).dark_gray(),
+                    match severity {
+                        Severity::Info => sev_span.green(),
+                        Severity::Warning => sev_span.yellow(),
+                        Severity::Fatal => sev_span.red(),
+                        Severity::Debug => sev_span.cyan(),
+                    },
+                    Span::from(text).white(),
+                ])
+            })
+            .collect();
+
+        let mut block = Block::bordered()
+            .padding(Padding::horizontal(1))
+            .title(title)
+            .title_bottom(footer);
+
+        if let ScrollMode::Scroll(offset) = self.state.scroll_mode {
+            let scroll_title = Line::from(format!(" Scrolling ({} / {}) ", offset, events.len()))
+                .yellow()
+                .bold()
+                .right_aligned();
+            block = block.title_top(scroll_title);
+        }
+
+        let pg = Paragraph::new(lines)
+            .block(block)
+            .left_aligned()
+            .wrap(Wrap { trim: true });
+
+        let lines_to_scroll = pg
+            .line_count(area.width)
+            .saturating_sub(area.height as usize)
+            .saturating_sub(self.state.get_scroll_offset());
+
+        let pg = pg.scroll((lines_to_scroll as u16, 0));
+        pg.render(area, buf);
+    }
+}
+
+struct PlayerListWidget<'a> {
+    shard_state: &'a ShardServerState,
+}
+impl<'a> Widget for PlayerListWidget<'a> {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let title = Line::from(" Players ").bold().centered();
+        let block = Block::bordered()
+            .padding(Padding::horizontal(1))
+            .title(title);
+
+        let player_ids = self
+            .shard_state
+            .entity_map
+            .get_player_ids()
+            .collect::<Vec<i32>>();
+
+        let player_names: Vec<Line> = player_ids
+            .iter()
+            .map(|pid| {
+                let player = self.shard_state.get_player(*pid).unwrap();
+                Line::from(format!("{}", player))
+            })
+            .collect();
+
+        let areas = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(
+                player_ids
+                    .iter()
+                    .map(|_| Constraint::Length(3))
+                    .collect::<Vec<Constraint>>(),
+            )
+            .split(block.inner(area));
+
+        for (i, line) in player_names.iter().enumerate() {
+            line.render(areas[i], buf);
+        }
+        block.render(area, buf);
+    }
+}
+
+struct ShardStatsWidget<'a> {
+    shard_state: &'a ShardServerState,
+    stats_cache: &'a ShardStatsCache,
+}
+impl<'a> Widget for ShardStatsWidget<'a> {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let footer = Line::from(" Stats ").bold().centered();
+        let block = Block::bordered()
+            .padding(Padding::horizontal(1))
+            .title_bottom(footer);
+
+        let config = config_get();
+
+        let current_pop = self.shard_state.entity_map.get_player_ids().count();
+        let max_pop = config.shard.max_channel_pop.get() * config.shard.num_channels.get() as usize;
+
+        let cache = self.stats_cache;
+
+        let stats_lines = [
+            if let Some(uuid) = self.shard_state.login_server_conn_id {
+                Line::from(format!("Login server connected ({})", uuid)).green()
+            } else {
+                Line::from("Login server disconnected").red()
+            },
+            Line::from(format!("Population: {} / {}", current_pop, max_pop)),
+            Line::from(format!(
+                "Instances: {} (base) + {} (transient)",
+                cache.base_instance_count,
+                cache.total_instance_count - cache.base_instance_count
+            )),
+            Line::from(format!(
+                "Chunks: {} loaded / {} total",
+                cache.loaded_chunk_count, cache.total_chunk_count
+            )),
+            Line::from(format!(
+                "Entities: {} ticking, {} chunk-loaded",
+                cache.tickable_entity_count, cache.loaded_entity_count
+            )),
+        ];
+
+        let inner = block.inner(area);
+        let areas = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(
+                stats_lines
+                    .iter()
+                    .map(|_| Constraint::Length(1))
+                    .collect::<Vec<Constraint>>(),
+            )
+            .split(inner);
+
+        for (i, line) in stats_lines.iter().enumerate() {
+            line.render(areas[i], buf);
+        }
+        block.render(area, buf);
+    }
 }
