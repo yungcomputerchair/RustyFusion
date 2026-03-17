@@ -510,7 +510,7 @@ mod commands {
 
     fn init_commands() -> HashMap<&'static str, Command> {
         #[rustfmt::skip]
-        let commands: [(&'static str, &'static str, CommandHandler); 9] = [
+        let commands: [(&'static str, &'static str, CommandHandler); 10] = [
             ("about", "Show information about the server", cmd_about),
             ("ban_a", "Ban an account", cmd_ban),
             ("ban_i", "Ban a player and their account", cmd_ban),
@@ -518,6 +518,7 @@ mod commands {
             ("followme", "Make the nearest NPC start following you", cmd_followme),
             ("unfollowme", "Stop the nearest NPC from following you", cmd_unfollowme),
             ("perms", "View or change a player's permissions level", cmd_perms),
+            ("ping", "View your current ping to the server", cmd_ping),
             ("refresh", "Reinsert the player into the current chunk", cmd_refresh),
             ("help", "Show this help message", cmd_help),
         ];
@@ -913,6 +914,20 @@ mod commands {
             };
         }
         Ok(())
+    }
+
+    fn cmd_ping(
+        _tokens: Vec<&str>,
+        clients: &mut ClientMap,
+        _state: &mut ShardServerState,
+    ) -> FFResult<()> {
+        let client = clients.get_self();
+        match client.ping {
+            Some(ping) => {
+                send_system_message(client, &format!("Your ping is {} ms", ping.as_millis()))
+            }
+            None => send_system_message(client, "Ping not available"),
+        }
     }
 
     fn cmd_refresh(

@@ -9,6 +9,7 @@ use crate::{
     config::config_get,
     entity::Entity,
     error::{Severity, BACKLOG},
+    net::ClientMap,
     state::{LoginServerState, ServerState, ShardServerState},
     tabledata::tdata_get,
     util,
@@ -96,7 +97,7 @@ impl TuiState {
 }
 
 pub trait Tui {
-    fn render(&mut self, frame: &mut Frame, server_state: &ServerState);
+    fn render(&mut self, frame: &mut Frame, server_state: &ServerState, clients: ClientMap);
 }
 
 pub struct LoginTui {
@@ -113,7 +114,7 @@ impl Default for LoginTui {
     }
 }
 impl Tui for LoginTui {
-    fn render(&mut self, frame: &mut Frame, server_state: &ServerState) {
+    fn render(&mut self, frame: &mut Frame, server_state: &ServerState, mut clients: ClientMap) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(70), Constraint::Fill(1)].as_ref())
@@ -125,15 +126,17 @@ impl Tui for LoginTui {
         let server_state = server_state.as_login();
         let shard_list_widget = ShardListWidget {
             login_state: server_state,
+            clients: &mut clients,
         };
         frame.render_widget(shard_list_widget, layout[1]);
     }
 }
 
-struct ShardListWidget<'a> {
+struct ShardListWidget<'a, 'b, 'c> {
     login_state: &'a LoginServerState,
+    clients: &'b mut ClientMap<'c>,
 }
-impl<'a> Widget for ShardListWidget<'a> {
+impl<'a, 'b, 'c> Widget for ShardListWidget<'a, 'b, 'c> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let title = Line::from(" Shards ").white().bold().centered();
         let block = Block::bordered()
@@ -160,13 +163,34 @@ impl<'a> Widget for ShardListWidget<'a> {
                         .label("offline");
                 };
 
+                let shard_client = self.clients.get_shard_server(*sid).unwrap();
+
+                let mut block = Block::bordered()
+                    .title(format!(
+                        "[#{}] {} ",
+                        sid,
+                        self.login_state.get_shard_public_addr(*sid).unwrap()
+                    ))
+                    .title_bottom(
+                        Line::from(match shard_client.ping {
+                            Some(ping) => format!(" {} ms ", ping.as_millis()),
+                            None => " ... ".to_string(),
+                        })
+                        .right_aligned()
+                        .fg(get_ping_color(shard_client.ping)),
+                    );
+
+                if let Some(city) = self.login_state.get_shard_city(*sid) {
+                    block = block.title(Line::from(format!(" {} ", city)).right_aligned());
+                }
+
                 let ratio = if max == 0 {
                     0.0
                 } else {
                     current as f64 / max as f64
                 };
 
-                let color = if ratio > 1.0 {
+                let bar_color = if ratio > 1.0 {
                     Color::Red
                 } else if ratio >= 0.5 {
                     Color::Yellow
@@ -174,22 +198,12 @@ impl<'a> Widget for ShardListWidget<'a> {
                     Color::Green
                 };
 
-                let mut block = Block::bordered().title(format!(
-                    "[#{}] {} ",
-                    sid,
-                    self.login_state.get_shard_public_addr(*sid).unwrap()
-                ));
-
-                if let Some(city) = self.login_state.get_shard_city(*sid) {
-                    block = block.title(Line::from(format!(" {} ", city)).right_aligned());
-                }
-
                 Gauge::default()
                     .block(block)
                     .gauge_style(
                         Style::default()
-                            .fg(color)
-                            .bg(Color::Black)
+                            .fg(bar_color)
+                            .bg(Color::DarkGray)
                             .add_modifier(Modifier::BOLD),
                     )
                     .ratio(if ratio > 1.0 { 1.0 } else { ratio })
@@ -230,7 +244,7 @@ impl Default for ShardTui {
     }
 }
 impl Tui for ShardTui {
-    fn render(&mut self, frame: &mut Frame, server_state: &ServerState) {
+    fn render(&mut self, frame: &mut Frame, server_state: &ServerState, mut clients: ClientMap) {
         let outer_layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(70), Constraint::Fill(1)].as_ref())
@@ -245,8 +259,10 @@ impl Tui for ShardTui {
         frame.render_widget(log_widget, inner_layout_left[0]);
 
         let server_state = server_state.as_shard();
+
         let player_list_widget = PlayerListWidget {
             shard_state: server_state,
+            clients: &mut clients,
         };
         frame.render_widget(player_list_widget, outer_layout[1]);
 
@@ -254,6 +270,7 @@ impl Tui for ShardTui {
         let shard_stats_widget = ShardStatsWidget {
             shard_state: server_state,
             stats_cache: &self.stats_cache,
+            clients: &mut clients,
         };
         frame.render_widget(shard_stats_widget, inner_layout_left[1]);
     }
@@ -319,10 +336,11 @@ impl<'a> Widget for LogWidget<'a> {
     }
 }
 
-struct PlayerListWidget<'a> {
+struct PlayerListWidget<'a, 'b, 'c> {
     shard_state: &'a ShardServerState,
+    clients: &'b mut ClientMap<'c>,
 }
-impl<'a> Widget for PlayerListWidget<'a> {
+impl<'a, 'b, 'c> Widget for PlayerListWidget<'a, 'b, 'c> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let title = Line::from(" Players ").white().bold().centered();
         let block = Block::bordered()
@@ -339,6 +357,7 @@ impl<'a> Widget for PlayerListWidget<'a> {
             .iter()
             .map(|pid| {
                 let player = self.shard_state.get_player(*pid).unwrap();
+                let player_client = player.get_client(self.clients).unwrap();
                 let chunk_coords = player.get_chunk_coords();
                 let world_data = tdata_get().get_world_name_data(chunk_coords);
 
@@ -349,7 +368,14 @@ impl<'a> Widget for PlayerListWidget<'a> {
                 };
 
                 let lines = vec![
-                    Line::from(format!("{}", player)).white().bold(),
+                    Line::from(vec![
+                        Span::from(player.to_string()).white().bold(),
+                        Span::from(match player_client.ping {
+                            Some(ping) => format!(" ({} ms)", ping.as_millis()),
+                            None => " (...)".to_string(),
+                        })
+                        .fg(get_ping_color(player_client.ping)),
+                    ]),
                     Line::from(location_info).dark_gray().italic(),
                 ];
 
@@ -374,11 +400,12 @@ impl<'a> Widget for PlayerListWidget<'a> {
     }
 }
 
-struct ShardStatsWidget<'a> {
+struct ShardStatsWidget<'a, 'b, 'c> {
     shard_state: &'a ShardServerState,
     stats_cache: &'a ShardStatsCache,
+    clients: &'b mut ClientMap<'c>,
 }
-impl<'a> Widget for ShardStatsWidget<'a> {
+impl<'a, 'b, 'c> Widget for ShardStatsWidget<'a, 'b, 'c> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let footer = Line::from(" Stats ").white().bold().centered();
         let block = Block::bordered()
@@ -394,7 +421,17 @@ impl<'a> Widget for ShardStatsWidget<'a> {
 
         let stats_lines = [
             if let Some(uuid) = self.shard_state.login_server_conn_id {
-                Line::from(format!("Login server connected ({})", uuid)).green()
+                Line::from(format!(
+                    "Login server connected ({}) | {} ms",
+                    uuid,
+                    self.clients
+                        .get_login_server()
+                        .unwrap()
+                        .ping
+                        .unwrap_or_default()
+                        .as_millis()
+                ))
+                .green()
             } else {
                 Line::from("Login server disconnected").red()
             },
@@ -429,5 +466,14 @@ impl<'a> Widget for ShardStatsWidget<'a> {
             line.render(areas[i], buf);
         }
         block.render(area, buf);
+    }
+}
+
+fn get_ping_color(ping: Option<Duration>) -> Color {
+    match ping {
+        Some(p) if p.as_millis() > 500 => Color::Red,
+        Some(p) if p.as_millis() > 250 => Color::Yellow,
+        Some(_) => Color::Green,
+        None => Color::DarkGray,
     }
 }
