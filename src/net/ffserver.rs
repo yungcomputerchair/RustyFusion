@@ -78,7 +78,8 @@ impl FFServer {
             if client.supports_live_check() {
                 if let Some((lc_interval, lc_callback)) = self.live_check {
                     match client.live_check_time {
-                        Some(dc_time) => {
+                        Some(live_check_time) => {
+                            let dc_time = live_check_time + lc_interval;
                             if dc_time < time_now {
                                 log(
                                     Severity::Info,
@@ -99,7 +100,7 @@ impl FFServer {
                                     &format!("Sending live check to client {}", client.get_addr()),
                                 );
                                 log_if_failed(lc_callback(client));
-                                client.live_check_time = Some(time_now + lc_interval);
+                                client.live_check_time = Some(time_now);
                             }
                         }
                     }
