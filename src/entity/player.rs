@@ -1826,7 +1826,7 @@ impl Display for Player {
 
         let title = acc_level_to_title(self.perms);
         let title = match title {
-            Some(title) => format!("({}) ", title),
+            Some(title) => format!("[{}] ", title),
             None => String::new(),
         };
         write!(
