@@ -91,11 +91,16 @@ fn struct_to_bytes<T: FFPacket>(pkt: &T) -> &[u8] {
 
 pub struct ClientMap<'a> {
     key: usize,
+    login_server_key: Option<usize>,
     clients: &'a mut HashMap<usize, FFClient>,
 }
 impl<'a> ClientMap<'a> {
     pub fn new(key: usize, clients: &'a mut HashMap<usize, FFClient>) -> Self {
-        Self { key, clients }
+        Self {
+            key,
+            login_server_key: None,
+            clients,
+        }
     }
 
     pub fn get(&mut self, key: usize) -> &mut FFClient {
@@ -112,15 +117,32 @@ impl<'a> ClientMap<'a> {
             .filter(|c| matches!(c.client_type, ClientType::GameClient { .. }))
     }
 
-    pub fn get_login_server(&mut self) -> Option<&mut FFClient> {
-        let login_server = self
-            .clients
+    pub fn get_shard_server(&mut self, shard_id: i32) -> Option<&mut FFClient> {
+        self.clients
             .values_mut()
-            .find(|c| matches!(c.client_type, ClientType::LoginServer));
-        if login_server.is_none() {
-            log(Severity::Warning, "No login server connected");
+            .find(|c| c.client_type == ClientType::ShardServer(shard_id))
+    }
+
+    pub fn get_login_server(&mut self) -> Option<&mut FFClient> {
+        let cache_valid = self
+            .login_server_key
+            .and_then(|key| self.clients.get(&key))
+            .is_some_and(|c| c.client_type == ClientType::LoginServer);
+
+        if !cache_valid {
+            self.login_server_key = self
+                .clients
+                .iter()
+                .find(|(_, c)| c.client_type == ClientType::LoginServer)
+                .map(|(k, _)| *k);
+
+            if self.login_server_key.is_none() {
+                log(Severity::Warning, "No login server connected");
+            }
         }
-        login_server
+
+        self.login_server_key
+            .and_then(|key| self.clients.get_mut(&key))
     }
 }
 

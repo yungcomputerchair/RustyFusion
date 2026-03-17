@@ -129,7 +129,7 @@ fn main() -> Result<()> {
                 }
             });
 
-        terminal.draw(|frame| tui.render(frame, &state))?;
+        terminal.draw(|frame| tui.render(frame, &state, server.get_client_map()))?;
 
         let mut key_events = Vec::new();
         while let Ok(true) = ce::poll(Duration::ZERO) {
@@ -232,7 +232,6 @@ fn handle_packet(
         P_FE2LS_REQ_CONNECT => shard::connect(client, state, time),
         P_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC => shard::update_login_info_succ(key, clients, state),
         P_FE2LS_REP_UPDATE_LOGIN_INFO_FAIL => shard::update_login_info_fail(key, clients),
-        P_FE2LS_REP_LIVE_CHECK => Ok(()),
         P_FE2LS_UPDATE_PC_STATUSES => shard::update_pc_statuses(client, state),
         P_FE2LS_UPDATE_MONITOR => shard::update_monitor(client),
         P_FE2LS_REQ_MOTD => shard::motd(client),
@@ -251,6 +250,10 @@ fn handle_packet(
         P_FE2LS_REQ_BUDDY_WARP => shard::buddy_warp(key, clients, state),
         P_FE2LS_REP_BUDDY_WARP_SUCC => shard::buddy_warp_succ(key, clients, state),
         P_FE2LS_REP_BUDDY_WARP_FAIL => shard::buddy_warp_fail(key, clients, state),
+        P_FE2LS_REP_LIVE_CHECK => {
+            client.clear_live_check();
+            Ok(())
+        }
         //
         P_CL2LS_REQ_LOGIN => login::login(client, state, time),
         P_CL2LS_REQ_PC_EXIT_DUPLICATE => login::pc_exit_duplicate(key, clients, state),
@@ -262,7 +265,10 @@ fn handle_packet(
         P_CL2LS_REQ_SAVE_CHAR_TUTOR => login::save_char_tutor(client, state),
         P_CL2LS_REQ_CHAR_SELECT => login::char_select(key, clients, state),
         P_CL2LS_REQ_SHARD_SELECT => login::shard_select(key, clients, state, time),
-        P_CL2LS_REP_LIVE_CHECK => Ok(()),
+        P_CL2LS_REP_LIVE_CHECK => {
+            client.clear_live_check();
+            Ok(())
+        }
         //
         _ => Err(FFError::build(
             Severity::Warning,
@@ -279,7 +285,7 @@ fn send_live_check(client: &mut FFClient) -> FFResult<()> {
             };
             client.send_packet(P_LS2CL_REQ_LIVE_CHECK, &pkt)
         }
-        ClientType::ShardServer(_) => {
+        ClientType::ShardServer(_) | ClientType::UnauthedShardServer(_) => {
             let pkt = sP_LS2FE_REQ_LIVE_CHECK {
                 iTempValue: unused!(),
             };

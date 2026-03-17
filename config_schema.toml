@@ -18,9 +18,9 @@ logging_level_file = 2    # ...and in the log files
 log_write_interval = 60 # how long (seconds) between log file writes
 
 #: u64
-live_check_time = 60 # how much network silence (seconds) before sending a live check.
+live_check_time = 5  # how long (seconds) between live check packet sends.
                      # if this amount of time passes *again* after sending a live check,
-                     # the client will be disconnected
+                     # that wasn't answered, the client will be disconnected
 
 #: String
 server_key = "myserverkey" # CHANGE ME; what password the login server and shard servers

@@ -133,7 +133,7 @@ fn main() -> Result<()> {
                 }
             });
 
-        terminal.draw(|frame| tui.render(frame, &state))?;
+        terminal.draw(|frame| tui.render(frame, &state, server.get_client_map()))?;
 
         let mut key_events = Vec::new();
         while let Ok(true) = ce::poll(Duration::ZERO) {
@@ -272,7 +272,10 @@ fn handle_packet(
         P_LS2FE_REQ_BUDDY_WARP => login::login_buddy_warp(&mut clients, state),
         P_LS2FE_REP_BUDDY_WARP_SUCC => login::login_buddy_warp_succ(&mut clients, state),
         P_LS2FE_REP_BUDDY_WARP_FAIL => login::login_buddy_warp_fail(&mut clients, state),
-        P_LS2FE_REP_LIVE_CHECK => Ok(()),
+        P_LS2FE_REP_LIVE_CHECK => {
+            clients.get_self().clear_live_check();
+            Ok(())
+        }
         //
         P_CL2LS_REQ_LOGIN => wrong_server(clients.get_self()),
         //
@@ -402,7 +405,10 @@ fn handle_packet(
         P_CL2FE_REQ_NPC_GROUP_INVITE => group::npc_group_invite(&mut clients, state),
         P_CL2FE_REQ_NPC_GROUP_KICK => group::npc_group_kick(&mut clients, state),
         //
-        P_CL2FE_REP_LIVE_CHECK => Ok(()),
+        P_CL2FE_REP_LIVE_CHECK => {
+            clients.get_self().clear_live_check();
+            Ok(())
+        }
         //
         _ => Err(FFError::build(
             Severity::Warning,

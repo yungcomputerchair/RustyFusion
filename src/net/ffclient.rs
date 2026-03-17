@@ -4,7 +4,7 @@ use std::{
     mem::size_of,
     net::{IpAddr, SocketAddr, TcpStream},
     ops::{Deref, DerefMut},
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use crate::{
@@ -22,7 +22,7 @@ use super::{
     UNKNOWN_CT_ALLOWED_PACKETS,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ClientType {
     Unknown,
     UnauthedClient {
@@ -209,8 +209,9 @@ pub struct FFClient {
     pub fe_key: [u8; CRYPTO_KEY_SIZE],
     pub enc_mode: EncryptionMode,
     pub client_type: ClientType,
-    pub last_heartbeat: Instant,
+    pub last_ping_time: Instant,
     pub live_check_time: Option<Instant>,
+    pub ping: Option<Duration>,
     should_dc: bool,
     ignore_packets: bool,
 }
@@ -228,8 +229,9 @@ impl FFClient {
             fe_key: default_key,
             enc_mode: EncryptionMode::EKey,
             client_type: ClientType::Unknown,
-            last_heartbeat: Instant::now(),
+            last_ping_time: Instant::now(),
             live_check_time: None,
+            ping: None,
             should_dc: false,
             ignore_packets: false,
         }
@@ -318,9 +320,19 @@ impl FFClient {
                 PACKET_MASK_CL2FE & pkt_id_raw != 0 || PACKET_MASK_CL2LS & pkt_id_raw != 0
             }
             ClientType::LoginServer => PACKET_MASK_LS2FE & pkt_id_raw != 0,
-            ClientType::UnauthedShardServer(_) => pkt_id == PacketID::P_FE2LS_REQ_CONNECT,
+            ClientType::UnauthedShardServer(_) => {
+                pkt_id == PacketID::P_FE2LS_REQ_CONNECT
+                    || pkt_id == PacketID::P_FE2LS_REQ_LIVE_CHECK
+            }
             ClientType::ShardServer(_) => PACKET_MASK_FE2LS & pkt_id_raw != 0,
         }
+    }
+
+    pub fn supports_live_check(&self) -> bool {
+        matches!(
+            self.client_type,
+            ClientType::GameClient { .. } | ClientType::ShardServer(_) | ClientType::LoginServer
+        )
     }
 
     pub fn set_ignore_packets(&mut self, ignore: bool) -> FFResult<()> {
@@ -350,10 +362,30 @@ impl FFClient {
         self.in_buf.get_struct()
     }
 
-    pub fn read_payload(&mut self) -> FFResult<()> {
-        self.last_heartbeat = Instant::now();
-        self.live_check_time = None;
+    pub fn clear_live_check(&mut self) {
+        let Some(lc_time) = self.live_check_time else {
+            // spurious live check; ignore
+            return;
+        };
 
+        let time_now = Instant::now();
+        let ping = time_now.duration_since(lc_time);
+
+        log(
+            Severity::Debug,
+            &format!(
+                "Client {} responded to live check in {} ms",
+                self.get_addr(),
+                ping.as_millis(),
+            ),
+        );
+
+        self.ping = Some(ping);
+        self.last_ping_time = time_now;
+        self.live_check_time = None;
+    }
+
+    pub fn read_payload(&mut self) -> FFResult<()> {
         if self.waiting_data_len.is_none() {
             // read the size
             let mut sz_buf: [u8; 4] = [0; 4];

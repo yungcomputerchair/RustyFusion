@@ -73,31 +73,34 @@ impl FFServer {
         let client_keys: Vec<usize> = self.clients.keys().copied().collect();
         for key in client_keys {
             let client = self.clients.get_mut(&key).unwrap();
+
             // live check
-            if let Some((lc_interval, lc_callback)) = self.live_check {
-                match client.live_check_time {
-                    Some(dc_time) => {
-                        if dc_time < time_now {
-                            log(
-                                Severity::Info,
-                                &format!(
-                                    "Client {} didn't respond to live check; disconnecting",
-                                    client.get_addr()
-                                ),
-                            );
-                            client.disconnect();
+            if client.supports_live_check() {
+                if let Some((lc_interval, lc_callback)) = self.live_check {
+                    match client.live_check_time {
+                        Some(dc_time) => {
+                            if dc_time < time_now {
+                                log(
+                                    Severity::Info,
+                                    &format!(
+                                        "Client {} didn't respond to live check; disconnecting",
+                                        client.get_addr()
+                                    ),
+                                );
+                                client.disconnect();
+                            }
                         }
-                    }
-                    None => {
-                        let time_since_last_heartbeat =
-                            time_now.duration_since(client.last_heartbeat);
-                        if time_since_last_heartbeat > lc_interval {
-                            log(
-                                Severity::Debug,
-                                &format!("Sending live check to client {}", client.get_addr()),
-                            );
-                            log_if_failed(lc_callback(client));
-                            client.live_check_time = Some(time_now + lc_interval);
+                        None => {
+                            let time_since_last_ping =
+                                time_now.duration_since(client.last_ping_time);
+                            if client.ping.is_none() || time_since_last_ping > lc_interval {
+                                log(
+                                    Severity::Debug,
+                                    &format!("Sending live check to client {}", client.get_addr()),
+                                );
+                                log_if_failed(lc_callback(client));
+                                client.live_check_time = Some(time_now + lc_interval);
+                            }
                         }
                     }
                 }
