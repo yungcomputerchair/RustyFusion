@@ -11,7 +11,7 @@ use std::{
 };
 
 use crate::{
-    chunk::{EntityMap, InstanceID},
+    chunk::{world_pos_to_chunk_pos, ChunkCoords, EntityMap, InstanceID, NCHUNKS},
     config::config_get,
     defines::*,
     entity::{Egg, EntityID, NPC},
@@ -128,6 +128,16 @@ pub struct WarpData {
 pub struct MapData {
     pub ep_id: Option<u32>,
     pub map_square: (i32, i32),
+}
+
+pub struct WorldNameData {
+    pub area_name: String,
+    pub zone_name: String,
+}
+
+struct WorldNameDataContainer {
+    world_name_data: HashMap<i32, WorldNameData>,
+    lookup_grid: [i32; NCHUNKS * NCHUNKS],
 }
 
 struct InstanceData {
@@ -287,6 +297,7 @@ struct PathData {
 
 pub struct TableData {
     xdt_data: XDTData,
+    world_name_data: WorldNameDataContainer,
     npcs: Vec<NPCSpawnData>,
     drop_data: DropData,
     path_data: PathData,
@@ -302,6 +313,8 @@ impl TableData {
     fn load() -> Result<Self, String> {
         Ok(Self {
             xdt_data: XDTData::load().map_err(|e| format!("Error loading XDT: {}", e))?,
+            world_name_data: load_world_name_data()
+                .map_err(|e| format!("Error loading world name data: {}", e))?,
             npcs: load_npcs().map_err(|e| format!("Error loading NPC data: {}", e))?,
             drop_data: load_drop_data().map_err(|e| format!("Error loading drop data: {}", e))?,
             path_data: load_path_data().map_err(|e| format!("Error loading path data: {}", e))?,
@@ -827,6 +840,25 @@ impl TableData {
                 let dy = p.y - pos.y;
                 dx.abs() + dy.abs()
             })
+    }
+
+    pub fn get_world_name_data(&self, chunk: ChunkCoords) -> FFResult<&WorldNameData> {
+        let chunk_idx = chunk.y as usize * NCHUNKS + chunk.x as usize;
+        let map_num = self
+            .world_name_data
+            .lookup_grid
+            .get(chunk_idx)
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("No world name data for chunk {:?}", chunk),
+            ))?;
+        self.world_name_data
+            .world_name_data
+            .get(map_num)
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("No world name data for map num {}", map_num),
+            ))
     }
 }
 
@@ -2195,5 +2227,66 @@ fn load_path_data() -> Result<PathData, String> {
         skyway_paths: load_skyway_paths(&paths_root)?,
         slider_path: load_slider_path(&paths_root)?,
         npc_paths: load_npc_paths(&paths_root)?,
+    })
+}
+
+fn load_world_name_data() -> Result<WorldNameDataContainer, String> {
+    const WORLD_NAME_TABLE_KEY: &str = "m_pWorldNameData";
+
+    #[derive(Deserialize)]
+    struct Area {
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+    }
+
+    #[derive(Deserialize)]
+    struct WorldNameDataEntry {
+        Area: Area,
+        DongName: String,
+        ZoneName: String,
+    }
+
+    let world_name_root = load_json("worldnames.json")?;
+    let world_name_table = get_object(&world_name_root, WORLD_NAME_TABLE_KEY)?;
+    let mut world_name_data = HashMap::new();
+    let mut lookup_grid = [0; NCHUNKS * NCHUNKS];
+    for (k, v) in world_name_table.iter().skip(1) {
+        let entry: WorldNameDataEntry = serde_json::from_value(v.clone())
+            .map_err(|e| format!("Malformed world name data entry: {} {}", e, v))?;
+
+        let id = k
+            .parse::<i32>()
+            .map_err(|e| format!("Invalid key: {}", e))?;
+        world_name_data.insert(
+            id,
+            WorldNameData {
+                area_name: entry.DongName,
+                zone_name: entry.ZoneName,
+            },
+        );
+
+        let pos1 = Position::from_client_coords(entry.Area.x, entry.Area.y, 0.0);
+        let (chunk1x, chunk1y) = world_pos_to_chunk_pos(pos1);
+
+        let pos2 = Position::from_client_coords(
+            entry.Area.x + entry.Area.width,
+            entry.Area.y + entry.Area.height,
+            0.0,
+        );
+        let (chunk2x, chunk2y) = world_pos_to_chunk_pos(pos2);
+
+        for x in chunk1x..=chunk2x {
+            for y in chunk1y..=chunk2y {
+                let idx = y as usize * NCHUNKS + x as usize;
+                lookup_grid[idx] = id;
+            }
+        }
+    }
+
+    Ok(WorldNameDataContainer {
+        world_name_data,
+        lookup_grid,
     })
 }

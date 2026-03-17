@@ -44,6 +44,19 @@ impl Display for InstanceID {
     }
 }
 
+pub const MAP_SQUARE_COUNT: i32 = 16; // how many map squares there are in each direction
+pub const NCHUNKS: usize = MAP_SQUARE_COUNT as usize * 8; // 16 map squares with side lengths of 8 chunks
+pub const MAP_SQUARE_SIZE: i32 = 51200;
+pub const MAP_SIZE: i32 = MAP_SQUARE_SIZE * MAP_SQUARE_COUNT; // top corner of (16, 16)
+pub const CHUNK_SIZE: usize = MAP_SIZE as usize / NCHUNKS;
+
+pub fn world_pos_to_chunk_pos(pos: Position) -> (i32, i32) {
+    (
+        (pos.x * NCHUNKS as i32) / MAP_SIZE,
+        (pos.y * NCHUNKS as i32) / MAP_SIZE,
+    )
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ChunkCoords {
     pub i: InstanceID,
@@ -52,9 +65,10 @@ pub struct ChunkCoords {
 }
 impl ChunkCoords {
     pub fn from_pos_inst(pos: Position, instance_id: InstanceID) -> Self {
+        let (x, y) = world_pos_to_chunk_pos(pos);
         Self {
-            x: (pos.x * NCHUNKS as i32) / MAP_BOUNDS,
-            y: (pos.y * NCHUNKS as i32) / MAP_BOUNDS,
+            x,
+            y,
             i: instance_id,
         }
     }
@@ -64,11 +78,6 @@ impl Display for ChunkCoords {
         write!(f, "({}, {}, {})", self.x, self.y, self.i)
     }
 }
-
-pub const MAP_SQUARE_COUNT: i32 = 16; // how many map squares there are in each direction
-pub const NCHUNKS: usize = MAP_SQUARE_COUNT as usize * 8; // 16 map squares with side lengths of 8 chunks
-pub const MAP_SQUARE_SIZE: i32 = 51200;
-pub const MAP_BOUNDS: i32 = MAP_SQUARE_SIZE * MAP_SQUARE_COUNT; // top corner of (16, 16)
 
 fn get_visibility_range() -> usize {
     config_get().shard.visibility_range.get()
@@ -874,9 +883,9 @@ mod tests {
     }
 
     /// Position that maps to chunk (x, y) in the grid.
-    /// Each chunk spans MAP_BOUNDS / NCHUNKS units.
+    /// Each chunk spans MAP_SIZE / NCHUNKS units.
     fn pos_for_chunk(x: i32, y: i32) -> Position {
-        let chunk_size = MAP_BOUNDS / NCHUNKS as i32;
+        let chunk_size = MAP_SIZE / NCHUNKS as i32;
         Position {
             x: x * chunk_size + chunk_size / 2,
             y: y * chunk_size + chunk_size / 2,

@@ -7,8 +7,10 @@ use ratatui::{
 
 use crate::{
     config::config_get,
+    entity::Entity,
     error::{Severity, BACKLOG},
     state::{LoginServerState, ServerState, ShardServerState},
+    tabledata::tdata_get,
     util,
 };
 
@@ -133,7 +135,7 @@ struct ShardListWidget<'a> {
 }
 impl<'a> Widget for ShardListWidget<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let title = Line::from(" Shards ").bold().centered();
+        let title = Line::from(" Shards ").white().bold().centered();
         let block = Block::bordered()
             .padding(Padding::horizontal(1))
             .title(title);
@@ -322,7 +324,7 @@ struct PlayerListWidget<'a> {
 }
 impl<'a> Widget for PlayerListWidget<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let title = Line::from(" Players ").bold().centered();
+        let title = Line::from(" Players ").white().bold().centered();
         let block = Block::bordered()
             .padding(Padding::horizontal(1))
             .title(title);
@@ -333,11 +335,25 @@ impl<'a> Widget for PlayerListWidget<'a> {
             .get_player_ids()
             .collect::<Vec<i32>>();
 
-        let player_names: Vec<Line> = player_ids
+        let player_names: Vec<Paragraph> = player_ids
             .iter()
             .map(|pid| {
                 let player = self.shard_state.get_player(*pid).unwrap();
-                Line::from(format!("{}", player))
+                let chunk_coords = player.get_chunk_coords();
+                let world_data = tdata_get().get_world_name_data(chunk_coords);
+
+                let location_info = if let Ok(world_data) = world_data {
+                    format!("  {}, {}", world_data.area_name, world_data.zone_name)
+                } else {
+                    "  Unknown".to_string()
+                };
+
+                let lines = vec![
+                    Line::from(format!("{}", player)).white().bold(),
+                    Line::from(location_info).dark_gray().italic(),
+                ];
+
+                Paragraph::new(lines).left_aligned()
             })
             .collect();
 
@@ -351,8 +367,8 @@ impl<'a> Widget for PlayerListWidget<'a> {
             )
             .split(block.inner(area));
 
-        for (i, line) in player_names.iter().enumerate() {
-            line.render(areas[i], buf);
+        for (i, player) in player_names.iter().enumerate() {
+            player.render(areas[i], buf);
         }
         block.render(area, buf);
     }
@@ -364,7 +380,7 @@ struct ShardStatsWidget<'a> {
 }
 impl<'a> Widget for ShardStatsWidget<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let footer = Line::from(" Stats ").bold().centered();
+        let footer = Line::from(" Stats ").white().bold().centered();
         let block = Block::bordered()
             .padding(Padding::horizontal(1))
             .title_bottom(footer);

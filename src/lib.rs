@@ -56,6 +56,15 @@ pub struct Position {
     pub z: i32,
 }
 impl Position {
+    pub fn from_client_coords(x: f32, y: f32, z: f32) -> Self {
+        const CLIENT_TO_SERVER_SCALE: f32 = 100.0;
+        Position {
+            x: (x * CLIENT_TO_SERVER_SCALE) as i32,
+            y: (y * CLIENT_TO_SERVER_SCALE) as i32,
+            z: (z * CLIENT_TO_SERVER_SCALE) as i32,
+        }
+    }
+
     pub fn distance_to_weighted(&self, other: &Position, weights: (f32, f32, f32)) -> u32 {
         // scaling down for the multiplication helps to avoid overflow here
         const DIST_MATH_SCALE: f32 = 100.0;
