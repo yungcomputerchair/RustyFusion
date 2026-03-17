@@ -4,7 +4,7 @@ use std::{
     collections::HashMap,
     io::{ErrorKind, Result},
     net::{SocketAddr, TcpListener, TcpStream},
-    time::{Duration, SystemTime},
+    time::{Duration, Instant},
 };
 
 use crate::{
@@ -69,7 +69,7 @@ impl FFServer {
     }
 
     pub fn poll(&mut self, state: &mut ServerState) -> Result<()> {
-        let time_now = SystemTime::now();
+        let time_now = Instant::now();
         let client_keys: Vec<usize> = self.clients.keys().copied().collect();
         for key in client_keys {
             let client = self.clients.get_mut(&key).unwrap();
@@ -90,7 +90,7 @@ impl FFServer {
                     }
                     None => {
                         let time_since_last_heartbeat =
-                            time_now.duration_since(client.last_heartbeat).unwrap();
+                            time_now.duration_since(client.last_heartbeat);
                         if time_since_last_heartbeat > lc_interval {
                             log(
                                 Severity::Debug,
@@ -139,7 +139,7 @@ impl FFServer {
                     let client = clients.get_mut(&ev.key).unwrap();
                     client.read_payload()?;
                     let pkt_id = client.peek_packet_id()?;
-                    (self.pkt_handler)(ev.key, clients, pkt_id, state, time_now).map_err(|e| {
+                    (self.pkt_handler)(ev.key, clients, pkt_id, state).map_err(|e| {
                         FFError::build(e.get_severity(), format!("<{:?}> {}", pkt_id, e.get_msg()))
                     })
                 })(&mut self.clients);

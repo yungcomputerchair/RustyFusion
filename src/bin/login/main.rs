@@ -223,8 +223,8 @@ fn handle_packet(
     clients: &mut HashMap<usize, FFClient>,
     pkt_id: PacketID,
     state: &mut ServerState,
-    time: SystemTime,
 ) -> FFResult<()> {
+    let time = SystemTime::now();
     let state = state.as_login_mut();
     let client = clients.get_mut(&key).unwrap();
     match pkt_id {

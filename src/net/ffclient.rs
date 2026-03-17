@@ -4,7 +4,7 @@ use std::{
     mem::size_of,
     net::{IpAddr, SocketAddr, TcpStream},
     ops::{Deref, DerefMut},
-    time::SystemTime,
+    time::Instant,
 };
 
 use crate::{
@@ -209,8 +209,8 @@ pub struct FFClient {
     pub fe_key: [u8; CRYPTO_KEY_SIZE],
     pub enc_mode: EncryptionMode,
     pub client_type: ClientType,
-    pub last_heartbeat: SystemTime,
-    pub live_check_time: Option<SystemTime>,
+    pub last_heartbeat: Instant,
+    pub live_check_time: Option<Instant>,
     should_dc: bool,
     ignore_packets: bool,
 }
@@ -228,7 +228,7 @@ impl FFClient {
             fe_key: default_key,
             enc_mode: EncryptionMode::EKey,
             client_type: ClientType::Unknown,
-            last_heartbeat: SystemTime::now(),
+            last_heartbeat: Instant::now(),
             live_check_time: None,
             should_dc: false,
             ignore_packets: false,
@@ -351,7 +351,7 @@ impl FFClient {
     }
 
     pub fn read_payload(&mut self) -> FFResult<()> {
-        self.last_heartbeat = SystemTime::now();
+        self.last_heartbeat = Instant::now();
         self.live_check_time = None;
 
         if self.waiting_data_len.is_none() {

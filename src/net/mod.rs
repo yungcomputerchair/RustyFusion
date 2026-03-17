@@ -1,6 +1,4 @@
-use std::{
-    any::type_name, collections::HashMap, mem::size_of, slice::from_raw_parts, time::SystemTime,
-};
+use std::{any::type_name, collections::HashMap, mem::size_of, slice::from_raw_parts};
 
 use self::packet::{
     FFPacket,
@@ -47,13 +45,8 @@ pub use ffserver::*;
 pub mod crypto;
 pub mod packet;
 
-pub type PacketCallback = fn(
-    usize,
-    &mut HashMap<usize, FFClient>,
-    PacketID,
-    &mut ServerState,
-    SystemTime,
-) -> FFResult<()>;
+pub type PacketCallback =
+    fn(usize, &mut HashMap<usize, FFClient>, PacketID, &mut ServerState) -> FFResult<()>;
 pub type DisconnectCallback = fn(usize, &mut HashMap<usize, FFClient>, &mut ServerState);
 pub type LiveCheckCallback = fn(&mut FFClient) -> FFResult<()>;
 

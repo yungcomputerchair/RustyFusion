@@ -248,8 +248,8 @@ fn handle_packet(
     clients: &mut HashMap<usize, FFClient>,
     pkt_id: PacketID,
     state: &mut ServerState,
-    time: SystemTime,
 ) -> FFResult<()> {
+    let time = SystemTime::now();
     let state = state.as_shard_mut();
     let mut clients = ClientMap::new(key, clients);
     match pkt_id {
