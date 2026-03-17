@@ -2290,3 +2290,13 @@ fn load_world_name_data() -> Result<WorldNameDataContainer, String> {
         lookup_grid,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_load() {
+        tdata_init();
+    }
+}
