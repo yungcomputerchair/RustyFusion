@@ -1,6 +1,6 @@
 use std::{
     fmt::Display,
-    io::{Read, Write},
+    io::{IoSlice, Read, Write},
     mem::size_of,
     net::{IpAddr, SocketAddr, TcpStream},
     ops::{Deref, DerefMut},
@@ -449,10 +449,8 @@ impl FFClient {
         // send the size
         assert!(sz <= PACKET_BUFFER_SIZE);
 
-        // send the size unencrypted
+        // prepare buffers
         let sz_buf: [u8; 4] = u32::to_le_bytes(sz as u32);
-        self.sock.write_all(&sz_buf).map_err(FFError::from_io_err)?;
-
         let send_buf = &mut self.out_buf.buf[..sz];
 
         // encrypt the payload (client decrypts with either E or FE key)
@@ -461,10 +459,24 @@ impl FFClient {
             EncryptionMode::FEKey => encrypt_payload(send_buf, &self.fe_key),
         }
 
-        // send the payload
-        self.sock
-            .write_all(send_buf)
-            .map_err(FFError::from_io_err)?;
+        // send size + payload in a single syscall (writev)
+        let mut slices: &mut [IoSlice] = &mut [IoSlice::new(&sz_buf), IoSlice::new(send_buf)];
+        let total = sz_buf.len() + sz;
+        let mut written = 0;
+        while written < total {
+            let n = self
+                .sock
+                .write_vectored(slices)
+                .map_err(FFError::from_io_err)?;
+            if n == 0 {
+                return Err(FFError::from_io_err(std::io::Error::new(
+                    std::io::ErrorKind::WriteZero,
+                    "write_vectored wrote 0 bytes",
+                )));
+            }
+            written += n;
+            IoSlice::advance_slices(&mut slices, n);
+        }
 
         self.out_buf.reset();
         Ok(())

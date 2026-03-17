@@ -186,6 +186,10 @@ impl FFServer {
     }
 
     fn register_client(&mut self, conn_data: (TcpStream, SocketAddr)) -> Result<usize> {
+        log_if_failed(conn_data.0.set_nodelay(true).map_err(|e| {
+            FFError::build(Severity::Debug, format!("Failed to set TCP_NODELAY: {}", e))
+        }));
+
         let key: usize = self.get_next_epoll_key();
         self.poller
             .add_with_mode(&conn_data.0, Event::readable(key), PollMode::Level)?;
