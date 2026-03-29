@@ -1,10 +1,13 @@
 #![allow(dead_code)]
 
 use std::any::Any;
-use std::collections::VecDeque;
-use std::sync::{Mutex, OnceLock};
-use std::thread::JoinHandle;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::OnceLock;
 use std::time::{Duration, SystemTime};
+
+use async_trait::async_trait;
+use tokio::sync::mpsc;
 
 use crate::config::*;
 use crate::entity::Player;
@@ -20,7 +23,7 @@ type Text = String;
 type Bytes = Vec<u8>;
 
 pub struct DbResult {
-    result: FFResult<Box<dyn Any>>,
+    result: FFResult<Box<dyn Any + Send>>,
     pub completed: SystemTime,
 }
 impl DbResult {
@@ -31,52 +34,48 @@ impl DbResult {
         })
     }
 }
-type DbOperation = dyn FnOnce(&mut dyn Database);
+type DbOperation = Box<
+    dyn for<'a> FnOnce(&'a mut dyn Database) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>>
+        + Send,
+>;
 
-struct DbManager {
-    db_impl: Box<dyn Database>,
-    op_queue: VecDeque<Box<DbOperation>>,
-    shutdown: bool,
-}
-unsafe impl Send for DbManager {}
-impl DbManager {
-    fn flush(&mut self) {
-        self.op_queue.drain(..).for_each(|op| {
-            op(&mut *self.db_impl);
-        });
-    }
-}
+static DB_TX: OnceLock<std::sync::Mutex<Option<mpsc::UnboundedSender<DbOperation>>>> =
+    OnceLock::new();
 
+#[async_trait]
 pub trait Database: Send + std::fmt::Debug {
-    fn find_account_from_username(&mut self, username: &Text) -> FFResult<Option<Account>>;
-    fn find_account_from_player(&mut self, pc_uid: BigInt) -> FFResult<Account>;
-    fn create_account(&mut self, username: &Text, password_hashed: &Text) -> FFResult<Account>;
-    fn change_account_level(&mut self, acc_id: BigInt, new_level: Int) -> FFResult<()>;
-    fn ban_account(
+    async fn find_account_from_username(&mut self, username: &Text) -> FFResult<Option<Account>>;
+    async fn find_account_from_player(&mut self, pc_uid: BigInt) -> FFResult<Account>;
+    async fn create_account(
+        &mut self,
+        username: &Text,
+        password_hashed: &Text,
+    ) -> FFResult<Account>;
+    async fn change_account_level(&mut self, acc_id: BigInt, new_level: Int) -> FFResult<()>;
+    async fn ban_account(
         &mut self,
         acc_id: BigInt,
         banned_until: SystemTime,
         ban_reason: Text,
     ) -> FFResult<()>;
-    fn unban_account(&mut self, acc_id: BigInt) -> FFResult<()>;
-    fn init_player(&mut self, acc_id: BigInt, player: &Player) -> FFResult<()>;
-    fn update_player_appearance(&mut self, player: &Player) -> FFResult<()>;
-    fn update_selected_player(&mut self, acc_id: BigInt, slot_num: Int) -> FFResult<()>;
-    fn save_player(&mut self, player: &Player) -> FFResult<()>;
-    fn save_players(&mut self, players: &[&Player]) -> FFResult<()>;
-    fn load_player(&mut self, acc_id: BigInt, pc_uid: BigInt) -> FFResult<Player>;
-    fn load_players(&mut self, acc_id: BigInt) -> FFResult<Vec<Player>>;
-    fn delete_player(&mut self, pc_uid: BigInt) -> FFResult<()>;
+    async fn unban_account(&mut self, acc_id: BigInt) -> FFResult<()>;
+    async fn init_player(&mut self, acc_id: BigInt, player: &Player) -> FFResult<()>;
+    async fn update_player_appearance(&mut self, player: &Player) -> FFResult<()>;
+    async fn update_selected_player(&mut self, acc_id: BigInt, slot_num: Int) -> FFResult<()>;
+    async fn save_player(&mut self, player: &Player) -> FFResult<()>;
+    async fn save_players(&mut self, players: &[&Player]) -> FFResult<()>;
+    async fn load_player(&mut self, acc_id: BigInt, pc_uid: BigInt) -> FFResult<Player>;
+    async fn load_players(&mut self, acc_id: BigInt) -> FFResult<Vec<Player>>;
+    async fn delete_player(&mut self, pc_uid: BigInt) -> FFResult<()>;
 }
 
 const DB_NAME: &str = "rustyfusion";
-static DB_MANAGER: OnceLock<Mutex<DbManager>> = OnceLock::new();
 
-fn db_connect(config: &GeneralConfig) -> FFResult<Box<dyn Database>> {
+async fn db_connect(config: &GeneralConfig) -> FFResult<Box<dyn Database>> {
     let _db_impl: Option<FFResult<Box<dyn Database>>> = None;
 
     #[cfg(feature = "postgres")]
-    let _db_impl = Some(postgresql::PostgresDatabase::connect(config));
+    let _db_impl = Some(postgresql::PostgresDatabase::connect(config).await);
 
     match _db_impl {
         Some(Ok(db)) => Ok(db),
@@ -91,50 +90,50 @@ fn db_connect(config: &GeneralConfig) -> FFResult<Box<dyn Database>> {
     }
 }
 
-pub fn db_init() -> JoinHandle<()> {
-    match DB_MANAGER.get() {
-        Some(_) => panic_log("Database already initialized"),
-        None => {
-            log(Severity::Info, "Connecting to database...");
-            let config = &config_get().general;
-            let db_impl = panic_if_failed(db_connect(config));
-            let _ = DB_MANAGER.set(Mutex::new(DbManager {
-                db_impl,
-                op_queue: VecDeque::new(),
-                shutdown: false,
-            }));
-            log(
-                Severity::Info,
-                &format!(
-                    "Connected to database ({}@{}:{})",
-                    config.db_username.get(),
-                    config.db_host.get(),
-                    config.db_port.get()
-                ),
-            );
-
-            std::thread::spawn(|| loop {
-                std::thread::sleep(Duration::from_millis(100));
-                let mut db_manager = DB_MANAGER.get().unwrap().lock().unwrap();
-                db_manager.flush();
-                if db_manager.shutdown {
-                    break;
-                }
-            })
-        }
+pub async fn db_init() {
+    if DB_TX.get().is_some() {
+        panic_log("Database already initialized");
     }
+
+    log(Severity::Info, "Connecting to database...");
+    let config = &config_get().general;
+    let db_impl = panic_if_failed(db_connect(config).await);
+    log(
+        Severity::Info,
+        &format!(
+            "Connected to database ({}@{}:{})",
+            config.db_username.get(),
+            config.db_host.get(),
+            config.db_port.get()
+        ),
+    );
+
+    let (tx, mut rx) = mpsc::unbounded_channel::<DbOperation>();
+    let _ = DB_TX.set(std::sync::Mutex::new(Some(tx)));
+
+    tokio::spawn(async move {
+        let mut db = db_impl;
+        while let Some(op) = rx.recv().await {
+            op(&mut *db).await;
+        }
+    });
 }
 
 pub fn db_shutdown() {
-    let mut db_manager = DB_MANAGER.get().unwrap().lock().unwrap();
-    db_manager.shutdown = true;
+    // Drop the sender to close the channel, which ends the spawned task
+    if let Some(lock) = DB_TX.get() {
+        lock.lock().unwrap().take();
+    }
 }
 
-// TODO migrate most DB operations to async
 pub fn db_run_sync<T, F>(f: F) -> FFResult<T>
 where
     T: Send + 'static,
-    F: FnOnce(&mut dyn Database) -> FFResult<T> + Send + 'static,
+    F: for<'a> FnOnce(
+            &'a mut dyn Database,
+        ) -> Pin<Box<dyn Future<Output = FFResult<T>> + Send + 'a>>
+        + Send
+        + 'static,
 {
     const TIMEOUT: Duration = Duration::from_secs(5);
     let rx = db_run_async(f);
@@ -144,24 +143,31 @@ where
 pub fn db_run_async<T, F>(f: F) -> FFReceiver<DbResult>
 where
     T: Send + Any,
-    F: FnOnce(&mut dyn Database) -> FFResult<T> + Send + 'static,
+    F: for<'a> FnOnce(
+            &'a mut dyn Database,
+        ) -> Pin<Box<dyn Future<Output = FFResult<T>> + Send + 'a>>
+        + Send
+        + 'static,
 {
-    match DB_MANAGER.get() {
-        Some(db_mgr_lock) => {
-            let mut db_mgr = db_mgr_lock.lock().unwrap();
-            let (tx, rx) = std::sync::mpsc::channel();
-            let start_time = SystemTime::now();
-            let f = move |db: &mut dyn Database| {
-                let result = f(db).map(|v| Box::new(v) as Box<dyn Any>);
-                let db_result = DbResult {
-                    result,
-                    completed: SystemTime::now(),
-                };
-                let _ = FFSender::new(tx).send(db_result);
+    let lock = DB_TX
+        .get()
+        .unwrap_or_else(|| panic_log("Database not initialized"));
+    let guard = lock.lock().unwrap();
+    let tx = guard
+        .as_ref()
+        .unwrap_or_else(|| panic_log("Database has been shut down"));
+    let (result_tx, result_rx) = std::sync::mpsc::channel();
+    let start_time = SystemTime::now();
+    let op: DbOperation = Box::new(move |db: &mut dyn Database| {
+        Box::pin(async move {
+            let result = f(db).await.map(|v| Box::new(v) as Box<dyn Any + Send>);
+            let db_result = DbResult {
+                result,
+                completed: SystemTime::now(),
             };
-            db_mgr.op_queue.push_back(Box::new(f));
-            FFReceiver::new(start_time, rx)
-        }
-        None => panic_log("Database not initialized"),
-    }
+            let _ = FFSender::new(result_tx).send(db_result);
+        })
+    });
+    let _ = tx.send(op);
+    FFReceiver::new(start_time, result_rx)
 }

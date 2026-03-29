@@ -29,18 +29,19 @@ use rusty_fusion::{
     unused, util,
 };
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     color_eyre::install().unwrap();
     let mut terminal = ratatui::init();
     backlog_init();
     let mut tui = ShardTui::default();
 
-    let mut cleanup = Cleanup::default();
+    let _cleanup = Cleanup {};
 
     let config = config_init();
     logger_init(config.shard.log_path.get());
     log(Severity::Info, "Shard server starting up...");
-    cleanup.db_thread_handle = Some(db_init());
+    db_init().await;
     tdata_init();
 
     let live_check_time = Duration::from_secs(config.general.live_check_time.get());
@@ -176,17 +177,11 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-#[derive(Default)]
-struct Cleanup {
-    db_thread_handle: Option<std::thread::JoinHandle<()>>,
-}
+struct Cleanup;
 impl Drop for Cleanup {
     fn drop(&mut self) {
         ratatui::restore();
-        if let Some(handle) = self.db_thread_handle.take() {
-            db_shutdown();
-            handle.join().unwrap();
-        }
+        db_shutdown();
         if let Err(e) = logger_flush() {
             println!("Could not flush log: {}", e);
         }
@@ -521,8 +516,10 @@ fn do_save(_time: SystemTime, state: &mut ShardServerState) -> FFResult<()> {
         .map(|pc_id| state.get_player(*pc_id).unwrap().clone())
         .collect();
     let rx = db_run_async(move |db| {
-        let player_refs: Vec<&Player> = players.iter().collect();
-        db.save_players(&player_refs)
+        Box::pin(async move {
+            let player_refs: Vec<&Player> = players.iter().collect();
+            db.save_players(&player_refs).await
+        })
     });
 
     state.save_rx = Some(rx);

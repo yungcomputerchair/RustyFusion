@@ -1,5 +1,8 @@
 use std::{sync::LazyLock, time::Duration};
 
+use async_trait::async_trait;
+use tokio_postgres as postgres;
+
 use postgres::{tls, types::ToSql, GenericClient, Row};
 use regex::Regex;
 
@@ -39,19 +42,27 @@ impl std::fmt::Debug for PostgresDatabase {
     }
 }
 impl PostgresDatabase {
-    pub fn connect(config: &GeneralConfig) -> FFResult<Box<dyn Database>> {
-        let mut db_config = postgres::Client::configure();
+    pub async fn connect(config: &GeneralConfig) -> FFResult<Box<dyn Database>> {
+        let mut db_config = postgres::Config::new();
         db_config
-            .host(&config.db_host.get())
+            .host(config.db_host.get())
             .port(config.db_port.get())
-            .user(&config.db_username.get())
+            .user(config.db_username.get())
             .password(config.db_password.get())
             .dbname(DB_NAME)
             .connect_timeout(Duration::from_secs(5));
-        let mut db_client = db_config.connect(tls::NoTls)?;
+        let (mut db_client, db_conn) = db_config.connect(tls::NoTls).await?;
+        tokio::spawn(async move {
+            if let Err(e) = db_conn.await {
+                log(
+                    Severity::Warning,
+                    &format!("Database connection error: {}", e),
+                );
+            }
+        });
 
         let meta_table_exists: bool =
-            Self::query(&mut db_client, "meta_table_exists", &[])?[0].get(0);
+            Self::query(&mut db_client, "meta_table_exists", &[]).await?[0].get(0);
         if !meta_table_exists {
             log(
                 Severity::Info,
@@ -61,7 +72,8 @@ impl PostgresDatabase {
                 &mut db_client,
                 "create_tables",
                 &[&PROTOCOL_VERSION, &DB_VERSION],
-            )?;
+            )
+            .await?;
         }
 
         Ok(Box::new(Self {
@@ -80,21 +92,24 @@ impl PostgresDatabase {
         }
     }
 
-    fn query(
+    async fn query(
         client: &mut impl GenericClient,
         name: &str,
         params: &[&(dyn ToSql + Sync)],
     ) -> FFResult<Vec<Row>> {
         let query = Self::read_sql(name);
-        client.query(&query, params).map_err(FFError::from_db_err)
+        client
+            .query(&query, params)
+            .await
+            .map_err(FFError::from_db_err)
     }
 
-    fn prep(client: &mut impl GenericClient, name: &str) -> FFResult<postgres::Statement> {
+    async fn prep(client: &mut impl GenericClient, name: &str) -> FFResult<postgres::Statement> {
         let query = Self::read_sql(name);
-        client.prepare(&query).map_err(FFError::from_db_err)
+        client.prepare(&query).await.map_err(FFError::from_db_err)
     }
 
-    fn exec(
+    async fn exec(
         client: &mut impl GenericClient,
         name: &str,
         mut params: &[&(dyn ToSql + Sync)],
@@ -114,7 +129,7 @@ impl PostgresDatabase {
         let queries: Vec<&str> = queries.split(';').collect();
 
         // implicit transaction
-        let mut tsct = client.transaction()?;
+        let tsct = client.transaction().await?;
 
         let mut num_updated = 0;
         for query in queries {
@@ -123,7 +138,7 @@ impl PostgresDatabase {
             }
             //println!("{}", query);
             let num_params = calc_num_params(query);
-            match tsct.execute(query, &params[..num_params]) {
+            match tsct.execute(query, &params[..num_params]).await {
                 Ok(r) => {
                     num_updated += r;
                     params = &params[num_params..];
@@ -134,17 +149,20 @@ impl PostgresDatabase {
             };
         }
 
-        tsct.commit()?;
+        tsct.commit().await?;
         Ok(num_updated)
     }
 
-    fn save_player_internal(client: &mut impl GenericClient, player: &Player) -> FFResult<()> {
-        let mut tsct = client.transaction()?;
+    async fn save_player_internal(
+        client: &mut impl GenericClient,
+        player: &Player,
+    ) -> FFResult<()> {
+        let mut tsct = client.transaction().await?;
         let client = &mut tsct;
-        let save_item = Self::prep(client, "save_item")?;
-        let save_quest_item = Self::prep(client, "save_quest_item")?;
-        let save_nano = Self::prep(client, "save_nano")?;
-        let save_running_quest = Self::prep(client, "save_running_quest")?;
+        let save_item = Self::prep(client, "save_item").await?;
+        let save_quest_item = Self::prep(client, "save_quest_item").await?;
+        let save_nano = Self::prep(client, "save_nano").await?;
+        let save_running_quest = Self::prep(client, "save_running_quest").await?;
         let pc_uid = player.get_uid();
 
         let position = if player.instance_id.instance_num.is_some() {
@@ -184,84 +202,93 @@ impl PostgresDatabase {
                     .to_bytes()
                     .as_slice(),
             ],
-        )?;
+        )
+        .await?;
 
-        Self::exec(client, "clear_nanos", &[&pc_uid])?;
+        Self::exec(client, "clear_nanos", &[&pc_uid]).await?;
         for nano in player.get_nano_iter() {
             let nano_raw: sNano = Some(nano.clone()).into();
-            client.execute(
-                &save_nano,
-                &[
-                    &pc_uid,
-                    &(nano_raw.iID as Int),
-                    &(nano_raw.iSkillID as Int),
-                    &(nano_raw.iStamina as Int),
-                ],
-            )?;
+            client
+                .execute(
+                    &save_nano,
+                    &[
+                        &pc_uid,
+                        &(nano_raw.iID as Int),
+                        &(nano_raw.iSkillID as Int),
+                        &(nano_raw.iStamina as Int),
+                    ],
+                )
+                .await?;
         }
 
-        Self::exec(client, "clear_items", &[&pc_uid])?;
+        Self::exec(client, "clear_items", &[&pc_uid]).await?;
         for (slot_num, item) in player.get_item_iter() {
             let item_raw: sItemBase = Some(*item).into();
-            client.execute(
-                &save_item,
-                &[
-                    &pc_uid,
-                    &(slot_num as Int),
-                    &(item_raw.iID as Int),
-                    &(item_raw.iType as Int),
-                    &item_raw.iOpt,
-                    &item_raw.iTimeLimit,
-                ],
-            )?;
+            client
+                .execute(
+                    &save_item,
+                    &[
+                        &pc_uid,
+                        &(slot_num as Int),
+                        &(item_raw.iID as Int),
+                        &(item_raw.iType as Int),
+                        &item_raw.iOpt,
+                        &item_raw.iTimeLimit,
+                    ],
+                )
+                .await?;
         }
 
-        Self::exec(client, "clear_quest_items", &[&pc_uid])?;
+        Self::exec(client, "clear_quest_items", &[&pc_uid]).await?;
         for (virtual_slot, (item_id, count)) in player.get_quest_item_iter().enumerate() {
-            client.execute(
-                &save_quest_item,
-                &[
-                    &pc_uid,
-                    &(item_id as Int),
-                    &(count as Int),
-                    &(virtual_slot as Int),
-                ],
-            )?;
+            client
+                .execute(
+                    &save_quest_item,
+                    &[
+                        &pc_uid,
+                        &(item_id as Int),
+                        &(count as Int),
+                        &(virtual_slot as Int),
+                    ],
+                )
+                .await?;
         }
 
-        Self::exec(client, "clear_running_quests", &[&pc_uid])?;
+        Self::exec(client, "clear_running_quests", &[&pc_uid]).await?;
         for task in player.mission_journal.get_running_quests() {
             if task.m_aCurrTaskID == 0 {
                 continue;
             }
 
-            client.execute(
-                &save_running_quest,
-                &[
-                    &pc_uid,
-                    &(task.m_aCurrTaskID as Int),
-                    &(task.m_aKillNPCCount[0] as Int),
-                    &(task.m_aKillNPCCount[1] as Int),
-                    &(task.m_aKillNPCCount[2] as Int),
-                ],
-            )?;
+            client
+                .execute(
+                    &save_running_quest,
+                    &[
+                        &pc_uid,
+                        &(task.m_aCurrTaskID as Int),
+                        &(task.m_aKillNPCCount[0] as Int),
+                        &(task.m_aKillNPCCount[1] as Int),
+                        &(task.m_aKillNPCCount[2] as Int),
+                    ],
+                )
+                .await?;
         }
 
-        Self::exec(client, "clear_buddies", &[&pc_uid])?;
+        Self::exec(client, "clear_buddies", &[&pc_uid]).await?;
         for buddy_uid in player.get_buddy_uids() {
-            Self::exec(client, "save_buddy", &[&pc_uid, &buddy_uid])?;
+            Self::exec(client, "save_buddy", &[&pc_uid, &buddy_uid]).await?;
         }
 
-        Self::exec(client, "clear_blocks", &[&pc_uid])?;
+        Self::exec(client, "clear_blocks", &[&pc_uid]).await?;
         for blocked_uid in player.get_blocked_uids() {
-            Self::exec(client, "save_block", &[&pc_uid, &blocked_uid])?;
+            Self::exec(client, "save_block", &[&pc_uid, &blocked_uid]).await?;
         }
 
-        tsct.commit()?;
+        tsct.commit().await?;
         Ok(())
     }
 
-    fn load_player_internal(
+    async fn load_player_internal(
         client: &mut impl GenericClient,
         row: &Row,
         load_buddies: bool,
@@ -310,7 +337,7 @@ impl PostgresDatabase {
             let nano_id = row.get::<_, Int>(col_name) as i16;
             player.change_nano(slot, if nano_id == 0 { None } else { Some(nano_id) })?;
         }
-        let nanos = Self::query(client, "load_nanos", &[&pc_uid])?;
+        let nanos = Self::query(client, "load_nanos", &[&pc_uid]).await?;
         for nano in nanos {
             let nano_raw = sNano {
                 iID: nano.get::<_, Int>("ID") as i16,
@@ -350,7 +377,7 @@ impl PostgresDatabase {
         player.mission_journal.completed_mission_flags =
             Bitfield::from_bytes(quest_bytes, SIZEOF_QUESTFLAG_NUMBER as usize)?;
 
-        let running_quests = Self::query(client, "load_running_quests", &[&pc_uid])?;
+        let running_quests = Self::query(client, "load_running_quests", &[&pc_uid]).await?;
         for quest in running_quests {
             let task_id: Int = quest.get("TaskID");
             let task_def = tdata_get().get_task_definition(task_id)?;
@@ -376,7 +403,7 @@ impl PostgresDatabase {
             );
         }
 
-        let items = Self::query(client, "load_items", &[&pc_uid])?;
+        let items = Self::query(client, "load_items", &[&pc_uid]).await?;
         for item in items {
             let slot_num = item.get::<_, Int>("Slot") as usize;
             let item_raw = sItemBase {
@@ -399,7 +426,7 @@ impl PostgresDatabase {
             player.set_item(loc, slot_num, item)?;
         }
 
-        let quest_items = Self::query(client, "load_quest_items", &[&pc_uid])?;
+        let quest_items = Self::query(client, "load_quest_items", &[&pc_uid]).await?;
         for quest_item in quest_items {
             let item_id: Int = quest_item.get("ID");
             let count: Int = quest_item.get("Opt");
@@ -407,8 +434,8 @@ impl PostgresDatabase {
         }
 
         if load_buddies {
-            log_if_failed(Self::load_buddies(client, &mut player));
-            log_if_failed(Self::load_blocks(client, &mut player));
+            log_if_failed(Self::load_buddies(client, &mut player).await);
+            log_if_failed(Self::load_blocks(client, &mut player).await);
         }
 
         let perms: Int = row.get("AccountLevel");
@@ -417,15 +444,16 @@ impl PostgresDatabase {
         Ok(player)
     }
 
-    fn load_buddies(client: &mut impl GenericClient, player: &mut Player) -> FFResult<()> {
-        let rows = Self::query(client, "load_buddy_ids", &[&player.get_uid()])?;
+    async fn load_buddies(client: &mut impl GenericClient, player: &mut Player) -> FFResult<()> {
+        let rows = Self::query(client, "load_buddy_ids", &[&player.get_uid()]).await?;
         for row in rows {
             let buddy_uid: BigInt = row.get("PlayerBId");
-            let buddy_load_result = Self::query(client, "load_player", &[&buddy_uid]);
+            let buddy_load_result = Self::query(client, "load_player", &[&buddy_uid]).await;
             match buddy_load_result {
                 Ok(buddy_rows) => {
                     if let Some(buddy_row) = buddy_rows.first() {
-                        let buddy = Self::load_player_internal(client, buddy_row, false)?;
+                        let buddy =
+                            Box::pin(Self::load_player_internal(client, buddy_row, false)).await?;
                         let buddy_info = BuddyListEntry::new(&buddy);
                         log_if_failed(player.add_buddy(buddy_info));
                     } else {
@@ -450,8 +478,8 @@ impl PostgresDatabase {
         Ok(())
     }
 
-    fn load_blocks(client: &mut impl GenericClient, player: &mut Player) -> FFResult<()> {
-        let rows = Self::query(client, "load_blocked_ids", &[&player.get_uid()])?;
+    async fn load_blocks(client: &mut impl GenericClient, player: &mut Player) -> FFResult<()> {
+        let rows = Self::query(client, "load_blocked_ids", &[&player.get_uid()]).await?;
         for row in rows {
             let blocked_uid: BigInt = row.get("BlockedPlayerId");
             log_if_failed(player.block_player(blocked_uid));
@@ -459,8 +487,9 @@ impl PostgresDatabase {
         Ok(())
     }
 }
+#[async_trait]
 impl Database for PostgresDatabase {
-    fn init_player(&mut self, acc_id: BigInt, player: &Player) -> FFResult<()> {
+    async fn init_player(&mut self, acc_id: BigInt, player: &Player) -> FFResult<()> {
         let client = &mut self.client;
         let updated = Self::exec(
             client,
@@ -487,12 +516,13 @@ impl Database for PostgresDatabase {
                 //
                 &player.get_uid(),
             ],
-        )?;
+        )
+        .await?;
         assert_eq!(updated, 1 + 1);
         Ok(())
     }
 
-    fn update_player_appearance(&mut self, player: &Player) -> FFResult<()> {
+    async fn update_player_appearance(&mut self, player: &Player) -> FFResult<()> {
         let client = &mut self.client;
         let style = player.style.unwrap_or_default();
         let apperance_flag: Int = if player.style.is_some() { 1 } else { 0 };
@@ -513,14 +543,15 @@ impl Database for PostgresDatabase {
                 &player.get_uid(),
                 &apperance_flag,
             ],
-        )?;
+        )
+        .await?;
         assert_eq!(updated, 1 + 1);
         Ok(())
     }
 
-    fn find_account_from_username(&mut self, username: &Text) -> FFResult<Option<Account>> {
+    async fn find_account_from_username(&mut self, username: &Text) -> FFResult<Option<Account>> {
         let client = &mut self.client;
-        let rows = Self::query(client, "find_account", &[username])?;
+        let rows = Self::query(client, "find_account", &[username]).await?;
         assert!(rows.len() <= 1);
 
         let row = match rows.first() {
@@ -550,17 +581,13 @@ impl Database for PostgresDatabase {
             ban_reason: row.get("BanReason"),
         };
 
-        log_if_failed(Self::exec(
-            client,
-            "invalidate_cookie_for_account",
-            &[&account.id],
-        ));
+        log_if_failed(Self::exec(client, "invalidate_cookie_for_account", &[&account.id]).await);
         Ok(Some(account))
     }
 
-    fn find_account_from_player(&mut self, pc_uid: BigInt) -> FFResult<Account> {
+    async fn find_account_from_player(&mut self, pc_uid: BigInt) -> FFResult<Account> {
         let client = &mut self.client;
-        let rows = Self::query(client, "find_account_from_player", &[&pc_uid])?;
+        let rows = Self::query(client, "find_account_from_player", &[&pc_uid]).await?;
         if rows.is_empty() {
             return Err(FFError::build(
                 Severity::Warning,
@@ -580,29 +607,36 @@ impl Database for PostgresDatabase {
         })
     }
 
-    fn create_account(&mut self, username: &Text, password_hashed: &Text) -> FFResult<Account> {
+    async fn create_account(
+        &mut self,
+        username: &Text,
+        password_hashed: &Text,
+    ) -> FFResult<Account> {
         let client = &mut self.client;
 
-        let acc_level =
-            if Self::query(client, "enum_account_ids", &[]).is_ok_and(|rows| rows.is_empty()) {
-                CN_ACCOUNT_LEVEL__MASTER
-            } else {
-                config_get().login.default_account_level.get()
-            } as Int;
+        let acc_level = if Self::query(client, "enum_account_ids", &[])
+            .await
+            .is_ok_and(|rows| rows.is_empty())
+        {
+            CN_ACCOUNT_LEVEL__MASTER
+        } else {
+            config_get().login.default_account_level.get()
+        } as Int;
 
         let updated = Self::exec(
             client,
             "create_account",
             &[username, password_hashed, &acc_level],
-        )?;
+        )
+        .await?;
         assert_eq!(updated, 1);
-        let new_acc = self.find_account_from_username(username)?.unwrap();
+        let new_acc = self.find_account_from_username(username).await?.unwrap();
         Ok(new_acc)
     }
 
-    fn change_account_level(&mut self, acc_id: BigInt, new_level: Int) -> FFResult<()> {
+    async fn change_account_level(&mut self, acc_id: BigInt, new_level: Int) -> FFResult<()> {
         let client = &mut self.client;
-        let updated = Self::exec(client, "change_account_level", &[&acc_id, &new_level])?;
+        let updated = Self::exec(client, "change_account_level", &[&acc_id, &new_level]).await?;
         if updated == 0 {
             return Err(FFError::build(
                 Severity::Warning,
@@ -615,7 +649,7 @@ impl Database for PostgresDatabase {
         Ok(())
     }
 
-    fn ban_account(
+    async fn ban_account(
         &mut self,
         acc_id: BigInt,
         banned_until: SystemTime,
@@ -628,7 +662,8 @@ impl Database for PostgresDatabase {
             client,
             "ban_account",
             &[&acc_id, &banned_since, &banned_until, &ban_reason],
-        )?;
+        )
+        .await?;
         if updated == 0 {
             return Err(FFError::build(
                 Severity::Warning,
@@ -638,9 +673,9 @@ impl Database for PostgresDatabase {
         Ok(())
     }
 
-    fn unban_account(&mut self, acc_id: BigInt) -> FFResult<()> {
+    async fn unban_account(&mut self, acc_id: BigInt) -> FFResult<()> {
         let client = &mut self.client;
-        let updated = Self::exec(client, "unban_account", &[&acc_id])?;
+        let updated = Self::exec(client, "unban_account", &[&acc_id]).await?;
         if updated == 0 {
             return Err(FFError::build(
                 Severity::Warning,
@@ -650,24 +685,25 @@ impl Database for PostgresDatabase {
         Ok(())
     }
 
-    fn update_selected_player(&mut self, acc_id: BigInt, slot_num: Int) -> FFResult<()> {
+    async fn update_selected_player(&mut self, acc_id: BigInt, slot_num: Int) -> FFResult<()> {
         let client = &mut self.client;
         let timestamp_now = util::get_timestamp_sec(SystemTime::now()) as Int;
         let updated = Self::exec(
             client,
             "update_selected",
             &[&acc_id, &slot_num, &timestamp_now],
-        )?;
+        )
+        .await?;
         assert_eq!(updated, 1);
         Ok(())
     }
 
-    fn load_player(&mut self, acc_id: BigInt, pc_uid: BigInt) -> FFResult<Player> {
+    async fn load_player(&mut self, acc_id: BigInt, pc_uid: BigInt) -> FFResult<Player> {
         let client = &mut self.client;
-        let rows = Self::query(client, "load_players", &[&acc_id])?;
+        let rows = Self::query(client, "load_players", &[&acc_id]).await?;
         for row in &rows {
             if row.get::<_, BigInt>("PlayerId") == pc_uid {
-                return Self::load_player_internal(client, row, true);
+                return Self::load_player_internal(client, row, true).await;
             }
         }
         Err(FFError::build(
@@ -679,12 +715,12 @@ impl Database for PostgresDatabase {
         ))
     }
 
-    fn load_players(&mut self, acc_id: BigInt) -> FFResult<Vec<Player>> {
+    async fn load_players(&mut self, acc_id: BigInt) -> FFResult<Vec<Player>> {
         let client = &mut self.client;
-        let chars = Self::query(client, "load_players", &[&acc_id])?;
+        let chars = Self::query(client, "load_players", &[&acc_id]).await?;
         let mut players = Vec::with_capacity(chars.len());
         for row in chars {
-            match Self::load_player_internal(client, &row, true) {
+            match Self::load_player_internal(client, &row, true).await {
                 Ok(p) => players.push(p),
                 Err(e) => {
                     let pc_uid: BigInt = row.get("PlayerId");
@@ -698,22 +734,22 @@ impl Database for PostgresDatabase {
         Ok(players)
     }
 
-    fn save_player(&mut self, player: &Player) -> FFResult<()> {
-        Self::save_player_internal(&mut self.client, player)
+    async fn save_player(&mut self, player: &Player) -> FFResult<()> {
+        Self::save_player_internal(&mut self.client, player).await
     }
 
-    fn save_players(&mut self, players: &[&Player]) -> FFResult<()> {
-        let mut tsct = self.client.transaction()?;
+    async fn save_players(&mut self, players: &[&Player]) -> FFResult<()> {
+        let mut tsct = self.client.transaction().await?;
         for player in players {
-            Self::save_player_internal(&mut tsct, player)?;
+            Self::save_player_internal(&mut tsct, player).await?;
         }
-        tsct.commit()?;
+        tsct.commit().await?;
         Ok(())
     }
 
-    fn delete_player(&mut self, pc_uid: BigInt) -> FFResult<()> {
+    async fn delete_player(&mut self, pc_uid: BigInt) -> FFResult<()> {
         let client = &mut self.client;
-        let updated: u64 = Self::exec(client, "delete_player", &[&pc_uid])?;
+        let updated: u64 = Self::exec(client, "delete_player", &[&pc_uid]).await?;
         assert_eq!(updated, 1);
         Ok(())
     }

@@ -1316,7 +1316,9 @@ impl Player {
             player, player.instance_id.channel_num
         );
         let player_saved = player.clone();
-        log_if_failed(db_run_sync(move |db| db.save_player(&player_saved)));
+        log_if_failed(db_run_sync(move |db| {
+            Box::pin(async move { db.save_player(&player_saved).await })
+        }));
         log(Severity::Info, &display_info);
 
         state.player_uid_to_id.remove(&uid);

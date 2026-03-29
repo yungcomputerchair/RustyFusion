@@ -630,9 +630,11 @@ mod commands {
                 return send_system_message(client, &format!("Player {} not found", pc_id));
             };
             let pc_uid = player.get_uid();
-            db_run_sync(move |db| db.find_account_from_player(pc_uid))
-                .unwrap()
-                .id
+            db_run_sync(move |db| {
+                Box::pin(async move { db.find_account_from_player(pc_uid).await })
+            })
+            .unwrap()
+            .id
         } else {
             let Ok(acc_id) = tokens[1].parse::<i64>() else {
                 return send_system_message(client, "Invalid account ID");
@@ -654,7 +656,9 @@ mod commands {
         };
 
         let ban_reason_clone = ban_reason.clone();
-        match db_run_sync(move |db| db.ban_account(acc_id, banned_until, ban_reason_clone)) {
+        match db_run_sync(move |db| {
+            Box::pin(async move { db.ban_account(acc_id, banned_until, ban_reason_clone).await })
+        }) {
             Ok(()) => {
                 let ban_msg = format!(
                     "Account {} banned for {}\n\
@@ -716,7 +720,7 @@ mod commands {
             return send_system_message(client, "Invalid account ID");
         };
 
-        match db_run_sync(move |db| db.unban_account(acc_id)) {
+        match db_run_sync(move |db| Box::pin(async move { db.unban_account(acc_id).await })) {
             Ok(()) => {
                 let unban_msg = format!("Account {} unbanned", acc_id);
                 log(
@@ -899,8 +903,10 @@ mod commands {
 
         if tokens.get(3).is_some_and(|arg| *arg == "save") {
             let saved = db_run_sync(move |db| {
-                let acc = db.find_account_from_player(target_uid).unwrap();
-                db.change_account_level(acc.id, new_perms as i32)
+                Box::pin(async move {
+                    let acc = db.find_account_from_player(target_uid).await.unwrap();
+                    db.change_account_level(acc.id, new_perms as i32).await
+                })
             });
             match saved {
                 Ok(()) => log_if_failed(send_system_message(
