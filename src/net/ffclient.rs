@@ -78,7 +78,6 @@ pub struct PacketBuffer {
     buf: AlignedBuf,
     ptr: usize,
     len: usize,
-    fetched_packet_id: Option<PacketID>,
 }
 impl Default for PacketBuffer {
     fn default() -> Self {
@@ -86,7 +85,6 @@ impl Default for PacketBuffer {
             buf: AlignedBuf::default(),
             ptr: 0,
             len: 0,
-            fetched_packet_id: None,
         }
     }
 }
@@ -100,25 +98,22 @@ impl PacketBuffer {
     // READ
 
     pub fn peek_packet_id(&self) -> FFResult<PacketID> {
-        let from = self.ptr;
-        let to = from + 4;
-        if to > self.len {
+        if self.len < 4 {
             return Err(FFError::build(
                 Severity::Warning,
                 format!(
-                    "Couldn't peek packet ID; not enough bytes came in: {} > {}",
-                    to, self.len
+                    "Couldn't peek packet ID; not enough bytes came in: {}",
+                    self.len
                 ),
             ));
         }
 
-        let id_ord = u32::from_le_bytes(self.buf[from..to].try_into().unwrap());
+        let id_ord = u32::from_le_bytes(self.buf[..4].try_into().unwrap());
         let id: FFResult<PacketID> = id_ord.try_into();
         id.map_err(|_| FFError::build(Severity::Warning, format!("Bad packet ID: {}", id_ord)))
     }
 
     pub fn get_packet<T: FFPacket>(&mut self, pkt_id: PacketID) -> FFResult<&T> {
-        self.fetched_packet_id = None;
         let buffered_pkt_id = self.peek_packet_id()?;
         if buffered_pkt_id != pkt_id {
             return Err(FFError::build(
@@ -129,16 +124,12 @@ impl PacketBuffer {
                 ),
             ));
         }
-        self.fetched_packet_id = Some(pkt_id);
         self.ptr += 4;
         self.get_struct()
     }
 
     pub fn get_struct<T: FFPacket>(&mut self) -> FFResult<&T> {
-        let pkt_id = self.fetched_packet_id.ok_or(FFError::build(
-            Severity::Warning,
-            "Tried to fetch struct without a packet ID".to_string(),
-        ))?;
+        let pkt_id = self.peek_packet_id()?;
         let log_struct = !SILENCED_PACKETS.contains(&pkt_id);
         self.get_struct_internal(log_struct)
     }
@@ -184,7 +175,7 @@ impl PacketBuffer {
 
     fn copy_to_buf(&mut self, dat: &[u8]) {
         let sz = dat.len();
-        let from = self.ptr;
+        let from = self.len;
         let to = from + sz;
         if to > self.buf.len() {
             panic_log(&format!(
@@ -195,7 +186,7 @@ impl PacketBuffer {
         }
 
         self.buf[from..to].copy_from_slice(dat);
-        self.ptr = to;
+        self.len = to;
     }
 }
 
@@ -441,7 +432,7 @@ impl FFClient {
     }
 
     pub fn flush(&mut self) -> FFResult<()> {
-        let sz: usize = self.out_buf.ptr; // everything buffered
+        let sz: usize = self.out_buf.len; // everything buffered
         self.flush_exact(sz)
     }
 
