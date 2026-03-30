@@ -6,7 +6,7 @@ use rand::random;
 use regex::Regex;
 use rusty_fusion::{
     config::config_get,
-    database::db_run_sync,
+    db_run_sync,
     defines::*,
     entity::{Combatant, Entity, Player},
     enums::{ItemLocation, ItemType, LoginType, PlayerNameStatus},
@@ -111,9 +111,9 @@ Password must be 8-32 characters long and contain only letters, numbers, or spec
             .to_owned();
 
             let lookup_username = username.clone();
-            let account = match db_run_sync(move |db| {
-                Box::pin(async move { db.find_account_from_username(&lookup_username).await })
-            })? {
+            let account = match db_run_sync!(db =>
+                db.find_account_from_username(&lookup_username)
+            )? {
                 Some(account) => account,
                 None => {
                     if config_get().login.auto_create_accounts.get()
@@ -122,11 +122,9 @@ Password must be 8-32 characters long and contain only letters, numbers, or spec
                         // automatically create the account with the supplied credentials
                         let new_username = username.clone();
                         let password_hashed = util::hash_password(&token)?;
-                        let new_acc = db_run_sync(move |db| {
-                            Box::pin(async move {
-                                db.create_account(&new_username, &password_hashed).await
-                            })
-                        })?;
+                        let new_acc = db_run_sync!(db =>
+                            db.create_account(&new_username, &password_hashed)
+                        )?;
                         log(
                             Severity::Info,
                             &format!(
@@ -198,8 +196,7 @@ Password must be 8-32 characters long and contain only letters, numbers, or spec
 
             let last_player_slot = account.selected_slot;
             let acc_id = account.id;
-            let players =
-                db_run_sync(move |db| Box::pin(async move { db.load_players(acc_id).await }))?;
+            let players = db_run_sync!(db => db.load_players(acc_id))?;
 
             /*
              * Check if this account is already logged in, meaning:
@@ -388,12 +385,10 @@ pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> FF
     player.flags.name_check = name_check;
 
     let player_saved = player.clone();
-    db_run_sync(move |db| {
-        Box::pin(async move {
-            db.init_player(acc_id, &player_saved).await?;
-            db.update_selected_player(acc_id, slot_num as i32).await?;
-            Ok(())
-        })
+    db_run_sync!(db => {
+        db.init_player(acc_id, &player_saved).await?;
+        db.update_selected_player(acc_id, slot_num as i32).await?;
+        Ok(())
     })?;
 
     let style = &player.get_style();
@@ -418,9 +413,7 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
     if let Some(player) = state.get_players_mut(acc_id)?.get_mut(&pc_uid) {
         player.style = Some(pkt.PCStyle.try_into()?);
         let player_saved = player.clone();
-        db_run_sync(move |db| {
-            Box::pin(async move { db.update_player_appearance(&player_saved).await })
-        })?;
+        db_run_sync!(db => db.update_player_appearance(&player_saved))?;
 
         player
             .set_item(
@@ -445,7 +438,7 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
             .unwrap();
 
         let player_saved = player.clone();
-        db_run_sync(move |db| Box::pin(async move { db.save_player(&player_saved).await }))?;
+        db_run_sync!(db => db.save_player(&player_saved))?;
 
         let resp = sP_LS2CL_REP_CHAR_CREATE_SUCC {
             iLevel: player.get_level(),
@@ -474,7 +467,7 @@ pub fn char_delete(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
             Severity::Warning,
             format!("Couldn't get player {}", pc_uid),
         ))?;
-    db_run_sync(move |db| Box::pin(async move { db.delete_player(pc_uid).await }))?;
+    db_run_sync!(db => db.delete_player(pc_uid))?;
     let resp = sP_LS2CL_REP_CHAR_DELETE_SUCC {
         iSlotNum: player.get_slot_num() as i8,
     };
@@ -495,7 +488,7 @@ pub fn save_char_tutor(client: &mut FFClient, state: &mut LoginServerState) -> F
     if pkt.iTutorialFlag == 1 {
         player.set_tutorial_done();
         let player_saved = player.clone();
-        db_run_sync(move |db| Box::pin(async move { db.save_player(&player_saved).await }))
+        db_run_sync!(db => db.save_player(&player_saved))
     } else {
         Err(FFError::build(
             Severity::Warning,
@@ -528,9 +521,9 @@ pub fn char_select(
         }
 
         log_if_failed(state.set_selected_player_id(account_id, pc_uid));
-        db_run_sync(move |db| {
-            Box::pin(async move { db.update_selected_player(account_id, slot_num as i32).await })
-        })?;
+        db_run_sync!(db =>
+            db.update_selected_player(account_id, slot_num as i32)
+        )?;
 
         let pkt = sP_LS2CL_REP_CHAR_SELECT_SUCC { UNUSED: unused!() };
         client.send_packet(P_LS2CL_REP_CHAR_SELECT_SUCC, &pkt)

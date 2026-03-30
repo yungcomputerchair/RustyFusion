@@ -8,7 +8,8 @@ use crossterm::event::{self as ce, KeyCode};
 
 use rusty_fusion::{
     config::{config_get, config_init},
-    database::{db_init, db_run_async, db_shutdown},
+    database::{db_init, db_shutdown},
+    db_run_async,
     defines::*,
     entity::{Entity, Player},
     error::{
@@ -515,11 +516,9 @@ fn do_save(_time: SystemTime, state: &mut ShardServerState) -> FFResult<()> {
         .iter()
         .map(|pc_id| state.get_player(*pc_id).unwrap().clone())
         .collect();
-    let rx = db_run_async(move |db| {
-        Box::pin(async move {
-            let player_refs: Vec<&Player> = players.iter().collect();
-            db.save_players(&player_refs).await
-        })
+    let rx = db_run_async!(db => {
+        let player_refs: Vec<&Player> = players.iter().collect();
+        db.save_players(&player_refs).await
     });
 
     state.save_rx = Some(rx);

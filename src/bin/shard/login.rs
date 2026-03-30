@@ -5,7 +5,7 @@ use uuid::Uuid;
 use rusty_fusion::{
     chunk::InstanceID,
     config::{self, config_get},
-    database::db_run_sync,
+    db_run_sync,
     defines::*,
     entity::{Entity, EntityID, PlayerSearchQuery},
     enums::*,
@@ -565,9 +565,7 @@ pub fn login_buddy_warp_succ(
                 Some(util::get_timestamp_sec(SystemTime::now()) + BUDDYWARP_INTERVAL);
 
             let player_saved = player.clone();
-            log_if_failed(db_run_sync(move |db| {
-                Box::pin(async move { db.save_player(&player_saved).await })
-            }));
+            log_if_failed(db_run_sync!(db => db.save_player(&player_saved)));
 
             state
                 .entity_map

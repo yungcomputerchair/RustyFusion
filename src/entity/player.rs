@@ -7,7 +7,6 @@ use std::{
 
 use crate::{
     chunk::{ChunkCoords, InstanceID},
-    database::db_run_sync,
     defines::*,
     entity::{Combatant, Entity, EntityID},
     enums::{
@@ -1316,9 +1315,7 @@ impl Player {
             player, player.instance_id.channel_num
         );
         let player_saved = player.clone();
-        log_if_failed(db_run_sync(move |db| {
-            Box::pin(async move { db.save_player(&player_saved).await })
-        }));
+        log_if_failed(db_run_sync!(db => db.save_player(&player_saved)));
         log(Severity::Info, &display_info);
 
         state.player_uid_to_id.remove(&uid);

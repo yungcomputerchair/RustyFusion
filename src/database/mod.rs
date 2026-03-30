@@ -126,7 +126,7 @@ pub fn db_shutdown() {
     }
 }
 
-pub fn db_run_sync<T, F>(f: F) -> FFResult<T>
+pub fn _db_run_sync<T, F>(f: F) -> FFResult<T>
 where
     T: Send + 'static,
     F: for<'a> FnOnce(
@@ -136,11 +136,11 @@ where
         + 'static,
 {
     const TIMEOUT: Duration = Duration::from_secs(5);
-    let rx = db_run_async(f);
+    let rx = _db_run_async(f);
     rx.recv(Some(TIMEOUT)).and_then(|res| res.get())
 }
 
-pub fn db_run_async<T, F>(f: F) -> FFReceiver<DbResult>
+pub fn _db_run_async<T, F>(f: F) -> FFReceiver<DbResult>
 where
     T: Send + Any,
     F: for<'a> FnOnce(
