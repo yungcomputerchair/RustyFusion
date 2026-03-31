@@ -9,7 +9,7 @@ use std::{
 
 use crate::{
     error::{log, panic_log, FFError, FFResult, Severity},
-    net::{struct_to_bytes, PACKET_BUFFER_SIZE, SILENCED_PACKETS},
+    net::{packet::Packet, PACKET_BUFFER_SIZE, SILENCED_PACKETS},
 };
 
 use super::{
@@ -55,7 +55,7 @@ impl Display for ClientType {
 
 #[derive(Clone, Copy)]
 #[repr(C, align(4))]
-struct AlignedBuf([u8; PACKET_BUFFER_SIZE]);
+pub struct AlignedBuf([u8; PACKET_BUFFER_SIZE]);
 impl Deref for AlignedBuf {
     type Target = [u8; PACKET_BUFFER_SIZE];
     fn deref(&self) -> &Self::Target {
@@ -73,8 +73,15 @@ impl Default for AlignedBuf {
     }
 }
 
+#[cfg(test)]
+impl AlignedBuf {
+    pub fn as_ptr(&self) -> *const u8 {
+        self.0.as_ptr()
+    }
+}
+
 #[derive(Clone)]
-pub struct PacketBuffer {
+struct PacketBuffer {
     buf: AlignedBuf,
     ptr: usize,
     len: usize,
@@ -160,18 +167,6 @@ impl PacketBuffer {
     }
 
     // WRITE
-
-    pub fn queue_packet<T: FFPacket>(&mut self, pkt_id: PacketID, pkt: &T) {
-        // add the packet ID and contents
-        let id_buf = (pkt_id as u32).to_le_bytes();
-        self.copy_to_buf(&id_buf);
-        self.queue_struct(pkt);
-    }
-
-    pub fn queue_struct<T: FFPacket>(&mut self, s: &T) {
-        let struct_buf = struct_to_bytes(s);
-        self.copy_to_buf(struct_buf);
-    }
 
     fn copy_to_buf(&mut self, dat: &[u8]) {
         let sz = dat.len();
@@ -431,12 +426,12 @@ impl FFClient {
         Ok(())
     }
 
-    pub fn flush(&mut self) -> FFResult<()> {
+    fn flush(&mut self) -> FFResult<()> {
         let sz: usize = self.out_buf.len; // everything buffered
         self.flush_exact(sz)
     }
 
-    pub fn flush_exact(&mut self, sz: usize) -> FFResult<()> {
+    fn flush_exact(&mut self, sz: usize) -> FFResult<()> {
         // send the size
         assert!(sz <= PACKET_BUFFER_SIZE);
 
@@ -473,8 +468,8 @@ impl FFClient {
         Ok(())
     }
 
-    pub fn send_payload(&mut self, payload: PacketBuffer) -> FFResult<()> {
-        self.out_buf = payload;
+    pub fn send_payload(&mut self, pkt: Packet) -> FFResult<()> {
+        self.out_buf.copy_to_buf(pkt.read_bytes());
         self.flush()
     }
 
@@ -483,15 +478,8 @@ impl FFClient {
             Severity::Debug,
             &format!("Sending {:?} to {:?}", pkt_id, self.client_type),
         );
-        self.out_buf.queue_packet(pkt_id, pkt);
+        let pkt = Packet::new(pkt_id, pkt)?;
+        self.out_buf.copy_to_buf(pkt.read_bytes());
         self.flush()
-    }
-
-    pub fn queue_packet<T: FFPacket>(&mut self, pkt_id: PacketID, pkt: &T) {
-        self.out_buf.queue_packet(pkt_id, pkt);
-    }
-
-    pub fn queue_struct<T: FFPacket>(&mut self, s: &T) {
-        self.out_buf.queue_struct(s);
     }
 }

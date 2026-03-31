@@ -275,25 +275,25 @@ pub fn item_chest_open(client: &mut FFClient, state: &mut ShardServerState) -> F
 
             player.set_item(location, pkt.iSlotNum as usize, Some(reward_item))?;
 
-            let reward_pkt = sP_FE2CL_REP_REWARD_ITEM {
-                m_iCandy: player.get_taros() as i32,
-                m_iFusionMatter: player.get_fusion_matter() as i32,
-                m_iBatteryN: player.get_nano_potions() as i32,
-                m_iBatteryW: player.get_weapon_boosts() as i32,
-                iItemCnt: 1,
-                iFatigue: 100,
-                iFatigue_Level: 1,
-                iNPC_TypeID: unused!(),
-                iTaskID: unused!(),
-            };
-            let reward_item_s = sItemReward {
-                sItem: Some(reward_item).into(),
-                eIL: location as i32,
-                iSlotNum: pkt.iSlotNum,
-            };
-            client.queue_packet(P_FE2CL_REP_REWARD_ITEM, &reward_pkt);
-            client.queue_struct(&reward_item_s);
-            client.flush()?;
+            let reward_pkt = PacketBuilder::new(P_FE2CL_REP_REWARD_ITEM)
+                .with(&sP_FE2CL_REP_REWARD_ITEM {
+                    m_iCandy: player.get_taros() as i32,
+                    m_iFusionMatter: player.get_fusion_matter() as i32,
+                    m_iBatteryN: player.get_nano_potions() as i32,
+                    m_iBatteryW: player.get_weapon_boosts() as i32,
+                    iItemCnt: 1,
+                    iFatigue: 100,
+                    iFatigue_Level: 1,
+                    iNPC_TypeID: unused!(),
+                    iTaskID: unused!(),
+                })
+                .with(&sItemReward {
+                    sItem: Some(reward_item).into(),
+                    eIL: location as i32,
+                    iSlotNum: pkt.iSlotNum,
+                })
+                .build()?;
+            client.send_payload(reward_pkt)?;
 
             let resp = sP_FE2CL_REP_ITEM_CHEST_OPEN_SUCC {
                 iSlotNum: pkt.iSlotNum,

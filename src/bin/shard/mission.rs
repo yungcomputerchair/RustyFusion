@@ -229,23 +229,24 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
 
             // grant qitems
             if !task_def.given_qitems.is_empty() {
-                let qitem_pkt = sP_FE2CL_REP_REWARD_ITEM {
-                    m_iCandy: player.get_taros() as i32,
-                    m_iFusionMatter: player.get_fusion_matter() as i32,
-                    m_iBatteryN: player.get_nano_potions() as i32,
-                    m_iBatteryW: player.get_weapon_boosts() as i32,
-                    iItemCnt: task_def.given_qitems.len() as i8,
-                    iFatigue: 100,
-                    iFatigue_Level: 1,
-                    iNPC_TypeID: 0,
-                    iTaskID: task_def.task_id,
-                };
-                client.queue_packet(P_FE2CL_REP_REWARD_ITEM, &qitem_pkt);
+                let mut qitem_pkt =
+                    PacketBuilder::new(P_FE2CL_REP_REWARD_ITEM).with(&sP_FE2CL_REP_REWARD_ITEM {
+                        m_iCandy: player.get_taros() as i32,
+                        m_iFusionMatter: player.get_fusion_matter() as i32,
+                        m_iBatteryN: player.get_nano_potions() as i32,
+                        m_iBatteryW: player.get_weapon_boosts() as i32,
+                        iItemCnt: task_def.given_qitems.len() as i8,
+                        iFatigue: 100,
+                        iFatigue_Level: 1,
+                        iNPC_TypeID: 0,
+                        iTaskID: task_def.task_id,
+                    });
+
                 for (qitem_id, qitem_count_mod) in &task_def.given_qitems {
                     let curr_count = player.get_quest_item_count(*qitem_id) as isize;
                     let new_count = (curr_count + *qitem_count_mod) as usize;
                     let qitem_slot = player.set_quest_item_count(*qitem_id, new_count).unwrap();
-                    let qitem_reward = sItemReward {
+                    qitem_pkt.push(&sItemReward {
                         sItem: sItemBase {
                             iType: ItemType::Quest as i16,
                             iID: *qitem_id,
@@ -254,10 +255,12 @@ pub fn task_start(client: &mut FFClient, state: &mut ShardServerState) -> FFResu
                         },
                         eIL: ItemLocation::QInven as i32,
                         iSlotNum: qitem_slot as i32,
-                    };
-                    client.queue_struct(&qitem_reward);
+                    });
                 }
-                log_if_failed(client.flush());
+
+                if let Some(qitem_pkt) = log_if_failed(qitem_pkt.build()) {
+                    log_if_failed(client.send_payload(qitem_pkt));
+                }
             }
 
             let resp = sP_FE2CL_REP_PC_TASK_START_SUCC {
@@ -467,25 +470,24 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
 
             // success qitem changes
             if !task_def.succ_qitems.is_empty() {
-                let qitem_pkt = sP_FE2CL_REP_REWARD_ITEM {
-                    m_iCandy: player.get_taros() as i32,
-                    m_iFusionMatter: player.get_fusion_matter() as i32,
-                    m_iBatteryN: player.get_nano_potions() as i32,
-                    m_iBatteryW: player.get_weapon_boosts() as i32,
-                    iItemCnt: task_def.succ_qitems.len() as i8,
-                    iFatigue: 100,
-                    iFatigue_Level: 1,
-                    iNPC_TypeID: 0,
-                    iTaskID: task_def.task_id,
-                };
-                clients
-                    .get_self()
-                    .queue_packet(P_FE2CL_REP_REWARD_ITEM, &qitem_pkt);
+                let mut qitem_pkt =
+                    PacketBuilder::new(P_FE2CL_REP_REWARD_ITEM).with(&sP_FE2CL_REP_REWARD_ITEM {
+                        m_iCandy: player.get_taros() as i32,
+                        m_iFusionMatter: player.get_fusion_matter() as i32,
+                        m_iBatteryN: player.get_nano_potions() as i32,
+                        m_iBatteryW: player.get_weapon_boosts() as i32,
+                        iItemCnt: task_def.succ_qitems.len() as i8,
+                        iFatigue: 100,
+                        iFatigue_Level: 1,
+                        iNPC_TypeID: 0,
+                        iTaskID: task_def.task_id,
+                    });
+
                 for (qitem_id, qitem_count_mod) in &task_def.succ_qitems {
                     let curr_count = player.get_quest_item_count(*qitem_id) as isize;
                     let new_count = (curr_count + *qitem_count_mod) as usize;
                     let qitem_slot = player.set_quest_item_count(*qitem_id, new_count).unwrap();
-                    let qitem_reward = sItemReward {
+                    qitem_pkt.push(&sItemReward {
                         sItem: sItemBase {
                             iType: ItemType::Quest as i16,
                             iID: *qitem_id,
@@ -494,10 +496,12 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
                         },
                         eIL: ItemLocation::QInven as i32,
                         iSlotNum: qitem_slot as i32,
-                    };
-                    clients.get_self().queue_struct(&qitem_reward);
+                    });
                 }
-                log_if_failed(clients.get_self().flush());
+
+                if let Some(qitem_pkt) = log_if_failed(qitem_pkt.build()) {
+                    log_if_failed(clients.get_self().send_payload(qitem_pkt));
+                }
             }
 
             if let Some(reward_id) = task_def.succ_reward {
@@ -509,34 +513,37 @@ pub fn task_end(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
                     Ok(reward) => {
                         let taros_new = player.get_taros() + reward.taros;
                         let fm_new = player.get_fusion_matter() + reward.fusion_matter;
-                        let reward_pkt = sP_FE2CL_REP_REWARD_ITEM {
-                            m_iCandy: player.set_taros(taros_new) as i32,
-                            m_iFusionMatter: player.set_fusion_matter(fm_new, Some(clients)) as i32,
-                            m_iBatteryN: player.get_nano_potions() as i32,
-                            m_iBatteryW: player.get_weapon_boosts() as i32,
-                            iItemCnt: reward.items.len() as i8,
-                            iFatigue: 100,
-                            iFatigue_Level: 1,
-                            iNPC_TypeID: unused!(),
-                            iTaskID: task_def.task_id,
-                        };
-                        clients
-                            .get_self()
-                            .queue_packet(P_FE2CL_REP_REWARD_ITEM, &reward_pkt);
+                        let mut reward_pkt = PacketBuilder::new(P_FE2CL_REP_REWARD_ITEM).with(
+                            &sP_FE2CL_REP_REWARD_ITEM {
+                                m_iCandy: player.set_taros(taros_new) as i32,
+                                m_iFusionMatter: player.set_fusion_matter(fm_new, Some(clients))
+                                    as i32,
+                                m_iBatteryN: player.get_nano_potions() as i32,
+                                m_iBatteryW: player.get_weapon_boosts() as i32,
+                                iItemCnt: reward.items.len() as i8,
+                                iFatigue: 100,
+                                iFatigue_Level: 1,
+                                iNPC_TypeID: unused!(),
+                                iTaskID: task_def.task_id,
+                            },
+                        );
+
                         for item in &reward.items {
                             let slot_num = player.find_free_slot(ItemLocation::Inven).unwrap();
                             let item_reward = *item;
                             player
                                 .set_item(ItemLocation::Inven, slot_num, Some(item_reward))
                                 .unwrap();
-                            let item_reward = sItemReward {
+                            reward_pkt.push(&sItemReward {
                                 sItem: Some(item_reward).into(),
                                 eIL: ItemLocation::Inven as i32,
                                 iSlotNum: slot_num as i32,
-                            };
-                            clients.get_self().queue_struct(&item_reward);
+                            });
                         }
-                        log_if_failed(clients.get_self().flush());
+
+                        if let Some(reward_pkt) = log_if_failed(reward_pkt.build()) {
+                            log_if_failed(clients.get_self().send_payload(reward_pkt));
+                        }
                     }
                 }
             }

@@ -2,15 +2,83 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
+use bytes::Bytes;
 use num_enum::TryFromPrimitive;
 
 use crate::{
-    error::FFError,
+    error::{FFError, FFResult, Severity},
     net::{
         crypto::{AES128_NONCE_SIZE, AUTH_CHALLENGE_MAX_SIZE},
-        PACKET_BODY_SIZE,
+        struct_to_bytes, PACKET_BODY_SIZE, PACKET_ID_SIZE,
     },
 };
+
+#[derive(Clone)]
+pub struct Packet {
+    data: Bytes, // includes the Packet ID and payload, but NOT the size
+}
+impl Packet {
+    fn _new(data: Vec<u8>) -> Self {
+        Self { data: data.into() }
+    }
+
+    pub fn new<T: FFPacket>(id: PacketID, pkt: &T) -> FFResult<Self> {
+        let packet_size = PACKET_ID_SIZE + size_of::<T>();
+        PacketBuilder::_new(id, packet_size).with(pkt).build()
+    }
+
+    pub fn id(&self) -> PacketID {
+        let id_bytes = &self.data[0..4];
+        let id = u32::from_le_bytes(id_bytes.try_into().unwrap());
+        PacketID::try_from(id).unwrap() // guaranteed to have valid id
+    }
+
+    pub fn read_bytes(&self) -> &[u8] {
+        &self.data
+    }
+}
+
+pub struct PacketBuilder {
+    data: Vec<u8>,
+}
+impl PacketBuilder {
+    fn _new(id: PacketID, capacity: usize) -> Self {
+        let mut data = Vec::with_capacity(capacity);
+        let id_bytes = u32::to_le_bytes(id as u32);
+        data.extend_from_slice(&id_bytes);
+        Self { data }
+    }
+
+    pub fn new(id: PacketID) -> Self {
+        // The 64 here is totally arbitrary. Just seems reasonable
+        // for most packets. TODO check the average packet size and optimize?
+        Self::_new(id, 64)
+    }
+
+    pub fn push<T: FFPacket>(&mut self, pkt: &T) {
+        self.data.extend_from_slice(struct_to_bytes(pkt));
+    }
+
+    pub fn with<T: FFPacket>(mut self, pkt: &T) -> Self {
+        self.push(pkt);
+        self
+    }
+
+    pub fn build(self) -> FFResult<Packet> {
+        if self.data.len() > PACKET_ID_SIZE + PACKET_BODY_SIZE {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Packet body size {} exceeds maximum of {}",
+                    self.data.len() - PACKET_ID_SIZE,
+                    PACKET_BODY_SIZE
+                ),
+            ));
+        }
+
+        Ok(Packet::_new(self.data))
+    }
+}
 
 pub const PACKET_MASK_CL2LS: u32 = 0x12000000;
 pub const PACKET_MASK_LS2CL: u32 = 0x21000000;

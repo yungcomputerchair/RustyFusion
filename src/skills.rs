@@ -7,7 +7,7 @@ use crate::{
     error::*,
     net::{
         packet::{PacketID::*, *},
-        ClientMap, PacketBuffer,
+        ClientMap,
     },
     state::ShardServerState,
 };
@@ -71,112 +71,120 @@ pub fn do_basic_attack(
         }
     }
 
-    let pc_attack_count = pc_attack_results.len();
-    let npc_attack_count = npc_attack_results.len();
-    if pc_attack_count == 0 && npc_attack_count == 0 {
+    let pc_count = pc_attack_results.len();
+    let npc_count = npc_attack_results.len();
+    if pc_count == 0 && npc_count == 0 {
         return Ok(());
     }
 
-    // PC targets
-    let pc_payload = if pc_attack_count > 0 {
-        let mut payload = PacketBuffer::default();
-        match attacker_id {
-            EntityID::Player(pc_id) => {
-                // response packet
-                let player = state.get_player(pc_id).unwrap();
-                let resp = sP_FE2CL_PC_ATTACK_CHARs_SUCC {
-                    iBatteryW: player.get_weapon_boosts() as i32,
-                    iTargetCnt: pc_attack_count as i32,
-                };
-                if let Some(client) = &mut attacker_client {
-                    client.queue_packet(P_FE2CL_PC_ATTACK_CHARs_SUCC, &resp);
-                }
+    let battery_w = if let EntityID::Player(pc_id) = attacker_id {
+        Some(state.get_player(pc_id).unwrap().get_weapon_boosts() as i32)
+    } else {
+        None
+    };
 
-                // broadcast packet
-                let pkt = sP_FE2CL_PC_ATTACK_CHARs {
+    // PC targets
+    let pc_bcast = if pc_count > 0 {
+        // attacker response (PC attackers only)
+        if let (EntityID::Player(_), Some(bw), Some(client)) =
+            (attacker_id, battery_w, attacker_client.as_mut())
+        {
+            let mut resp = PacketBuilder::new(P_FE2CL_PC_ATTACK_CHARs_SUCC).with(
+                &sP_FE2CL_PC_ATTACK_CHARs_SUCC {
+                    iBatteryW: bw,
+                    iTargetCnt: pc_count as i32,
+                },
+            );
+
+            for r in &pc_attack_results {
+                resp.push(r);
+            }
+
+            if let Some(resp) = log_if_failed(resp.build()) {
+                log_if_failed(client.send_payload(resp));
+            }
+        }
+
+        // broadcast
+        let mut bcast = match attacker_id {
+            EntityID::Player(pc_id) => {
+                PacketBuilder::new(P_FE2CL_PC_ATTACK_CHARs).with(&sP_FE2CL_PC_ATTACK_CHARs {
                     iPC_ID: pc_id,
-                    iTargetCnt: pc_attack_count as i32,
-                };
-                payload.queue_packet(P_FE2CL_PC_ATTACK_CHARs, &pkt);
+                    iTargetCnt: pc_count as i32,
+                })
             }
             EntityID::NPC(npc_id) => {
-                let pkt = sP_FE2CL_NPC_ATTACK_PCs {
+                PacketBuilder::new(P_FE2CL_NPC_ATTACK_PCs).with(&sP_FE2CL_NPC_ATTACK_PCs {
                     iNPC_ID: npc_id,
-                    iPCCnt: pc_attack_count as i32,
-                };
-                payload.queue_packet(P_FE2CL_NPC_ATTACK_PCs, &pkt);
+                    iPCCnt: pc_count as i32,
+                })
             }
             _ => unreachable!(),
+        };
+
+        for r in &pc_attack_results {
+            bcast.push(r);
         }
 
-        for result in &pc_attack_results {
-            if let Some(client) = &mut attacker_client {
-                client.queue_struct(result);
-            }
-            payload.queue_struct(result);
-        }
-
-        if let Some(client) = &mut attacker_client {
-            log_if_failed(client.flush());
-        }
-        Some(payload)
+        Some(bcast.build()?)
     } else {
         None
     };
 
     // NPC targets
-    let npc_payload = if npc_attack_count > 0 {
-        let mut payload = PacketBuffer::default();
-        match attacker_id {
-            EntityID::Player(pc_id) => {
-                // response packet
-                let player = state.get_player(pc_id).unwrap();
-                let resp = sP_FE2CL_PC_ATTACK_NPCs_SUCC {
-                    iBatteryW: player.get_weapon_boosts() as i32,
-                    iNPCCnt: npc_attack_count as i32,
-                };
-                if let Some(client) = &mut attacker_client {
-                    client.queue_packet(P_FE2CL_PC_ATTACK_NPCs_SUCC, &resp);
-                }
+    let npc_bcast = if npc_count > 0 {
+        // attacker response (PC attackers only)
+        if let (EntityID::Player(_), Some(bw), Some(client)) =
+            (attacker_id, battery_w, attacker_client.as_mut())
+        {
+            let mut resp = PacketBuilder::new(P_FE2CL_PC_ATTACK_NPCs_SUCC).with(
+                &sP_FE2CL_PC_ATTACK_NPCs_SUCC {
+                    iBatteryW: bw,
+                    iNPCCnt: npc_count as i32,
+                },
+            );
 
-                // broadcast packet
-                let pkt = sP_FE2CL_PC_ATTACK_NPCs {
+            for r in &npc_attack_results {
+                resp.push(r);
+            }
+
+            if let Some(resp) = log_if_failed(resp.build()) {
+                log_if_failed(client.send_payload(resp));
+            }
+        }
+
+        // broadcast
+        let mut bcast = match attacker_id {
+            EntityID::Player(pc_id) => {
+                PacketBuilder::new(P_FE2CL_PC_ATTACK_NPCs).with(&sP_FE2CL_PC_ATTACK_NPCs {
                     iPC_ID: pc_id,
-                    iNPCCnt: npc_attack_count as i32,
-                };
-                payload.queue_packet(P_FE2CL_PC_ATTACK_NPCs, &pkt);
+                    iNPCCnt: npc_count as i32,
+                })
             }
             EntityID::NPC(npc_id) => {
-                let pkt = sP_FE2CL_NPC_ATTACK_CHARs {
+                PacketBuilder::new(P_FE2CL_NPC_ATTACK_CHARs).with(&sP_FE2CL_NPC_ATTACK_CHARs {
                     iNPC_ID: npc_id,
-                    iTargetCnt: npc_attack_count as i32,
-                };
-                payload.queue_packet(P_FE2CL_NPC_ATTACK_CHARs, &pkt);
+                    iTargetCnt: npc_count as i32,
+                })
             }
             _ => unreachable!(),
+        };
+
+        for r in &npc_attack_results {
+            bcast.push(r);
         }
 
-        for result in &npc_attack_results {
-            if let Some(client) = &mut attacker_client {
-                client.queue_struct(result);
-            }
-            payload.queue_struct(result);
-        }
-
-        if let Some(client) = &mut attacker_client {
-            log_if_failed(client.flush());
-        }
-        Some(payload)
+        Some(bcast.build()?)
     } else {
         None
     };
 
     state.entity_map.for_each_around(attacker_id, clients, |c| {
-        if let Some(pc_payload) = pc_payload.as_ref() {
-            c.send_payload(pc_payload.clone())?;
+        if let Some(pkt) = &pc_bcast {
+            c.send_payload(pkt.clone())?;
         }
-        if let Some(npc_payload) = npc_payload.as_ref() {
-            c.send_payload(npc_payload.clone())?;
+        if let Some(pkt) = &npc_bcast {
+            c.send_payload(pkt.clone())?;
         }
         Ok(())
     });

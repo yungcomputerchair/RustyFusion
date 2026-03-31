@@ -252,14 +252,17 @@ impl ShardServerState {
                         }
 
                         // delete
-                        let pkt = sP_FE2CL_PC_DELETE_TIME_LIMIT_ITEM { iItemListCount: 1 };
-                        let dat = sTimeLimitItemDeleteInfo2CL {
-                            eIL: location as i32,
-                            iSlotNum: slot_num as i32,
-                        };
-                        client.queue_packet(P_FE2CL_PC_DELETE_TIME_LIMIT_ITEM, &pkt);
-                        client.queue_struct(&dat);
-                        log_if_failed(client.flush());
+                        if let Some(pkt) = log_if_failed(
+                            PacketBuilder::new(P_FE2CL_PC_DELETE_TIME_LIMIT_ITEM)
+                                .with(&sP_FE2CL_PC_DELETE_TIME_LIMIT_ITEM { iItemListCount: 1 })
+                                .with(&sTimeLimitItemDeleteInfo2CL {
+                                    eIL: location as i32,
+                                    iSlotNum: slot_num as i32,
+                                })
+                                .build(),
+                        ) {
+                            log_if_failed(client.send_payload(pkt));
+                        }
                     }
                 }
             }
@@ -289,22 +292,27 @@ impl ShardServerState {
     pub fn tick_groups(&mut self, clients: &mut ClientMap) {
         for group in self.groups.values() {
             let (pc_group_data, npc_group_data) = group.get_member_data(self);
-            let pkt = sP_FE2CL_PC_GROUP_MEMBER_INFO {
-                iID: unused!(),
-                iMemberPCCnt: pc_group_data.len() as i32,
-                iMemberNPCCnt: npc_group_data.len() as i32,
-            };
-            for eid in group.get_member_ids() {
-                let entity = self.entity_map.get_entity_raw(*eid).unwrap();
-                if let Some(client) = entity.get_client(clients) {
-                    client.queue_packet(P_FE2CL_PC_GROUP_JOIN_SUCC, &pkt);
-                    for pc_data in &pc_group_data {
-                        client.queue_struct(pc_data);
+            let mut pkt = PacketBuilder::new(P_FE2CL_PC_GROUP_JOIN_SUCC).with(
+                &sP_FE2CL_PC_GROUP_MEMBER_INFO {
+                    iID: unused!(),
+                    iMemberPCCnt: pc_group_data.len() as i32,
+                    iMemberNPCCnt: npc_group_data.len() as i32,
+                },
+            );
+
+            for pc_data in &pc_group_data {
+                pkt.push(pc_data);
+            }
+            for npc_data in &npc_group_data {
+                pkt.push(npc_data);
+            }
+
+            if let Some(pkt) = log_if_failed(pkt.build()) {
+                for eid in group.get_member_ids() {
+                    let entity = self.entity_map.get_entity_raw(*eid).unwrap();
+                    if let Some(client) = entity.get_client(clients) {
+                        log_if_failed(client.send_payload(pkt.clone()));
                     }
-                    for npc_data in &npc_group_data {
-                        client.queue_struct(npc_data);
-                    }
-                    log_if_failed(client.flush());
                 }
             }
         }

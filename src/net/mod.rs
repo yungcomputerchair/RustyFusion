@@ -9,8 +9,11 @@ use crate::{
     state::ServerState,
 };
 
-const PACKET_BUFFER_SIZE: usize = 4096;
-const PACKET_BODY_SIZE: usize = PACKET_BUFFER_SIZE - size_of::<u32>() - size_of::<u32>(); // total - size - id
+const PACKET_BUFFER_SIZE: usize = 4096; // entire buffer size, including header with length and ID
+const PACKET_LENGTH_SIZE: usize = size_of::<u32>(); // not encrypted
+const PACKET_ID_SIZE: usize = size_of::<u32>(); // encrypted
+const PACKET_BODY_SIZE: usize = PACKET_BUFFER_SIZE - PACKET_LENGTH_SIZE - PACKET_ID_SIZE;
+
 const UNKNOWN_CT_ALLOWED_PACKETS: [PacketID; 3] = [
     P_FE2LS_REQ_AUTH_CHALLENGE,
     P_CL2LS_REQ_LOGIN,

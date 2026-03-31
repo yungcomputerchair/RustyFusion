@@ -200,18 +200,21 @@ pub fn pc_loading_complete(clients: &mut ClientMap, state: &mut ShardServerState
             let player = state.get_player_mut(pc_id).unwrap();
             if !player.buddy_list_synced {
                 let buddy_info = player.get_all_buddy_info();
-                let buddy_list_pkt = sP_FE2CL_REP_PC_BUDDYLIST_INFO_SUCC {
-                    iID: unused!(),
-                    iPCUID: unused!(),
-                    iListNum: 0, // we don't need to chunk the buddy list
-                    iBuddyCnt: buddy_info.len() as i8,
-                };
-                client.queue_packet(P_FE2CL_REP_PC_BUDDYLIST_INFO_SUCC, &buddy_list_pkt);
+                let mut buddy_list_pkt = PacketBuilder::new(P_FE2CL_REP_PC_BUDDYLIST_INFO_SUCC)
+                    .with(&sP_FE2CL_REP_PC_BUDDYLIST_INFO_SUCC {
+                        iID: unused!(),
+                        iPCUID: unused!(),
+                        iListNum: 0, // we don't need to chunk the buddy list
+                        iBuddyCnt: buddy_info.len() as i8,
+                    });
+
                 for entry in buddy_info {
                     let buddy_pkt: sBuddyBaseInfo = entry.into();
-                    client.queue_struct(&buddy_pkt);
+                    buddy_list_pkt.push(&buddy_pkt);
                 }
-                client.flush()?;
+
+                let buddy_list_pkt = buddy_list_pkt.build()?;
+                client.send_payload(buddy_list_pkt)?;
                 player.buddy_list_synced = true;
             }
 
@@ -746,19 +749,20 @@ pub fn pc_channel_info(client: &mut FFClient, state: &mut ShardServerState) -> F
     let player = state.get_player(client.get_player_id()?)?;
     let channel_num = player.instance_id.channel_num;
     let num_channels = config_get().shard.num_channels.get();
-    let resp = sP_FE2CL_REP_CHANNEL_INFO {
+    let mut resp = PacketBuilder::new(P_FE2CL_REP_CHANNEL_INFO).with(&sP_FE2CL_REP_CHANNEL_INFO {
         iCurrChannelNum: channel_num as i32,
         iChannelCnt: num_channels as i32,
-    };
-    client.queue_packet(P_FE2CL_REP_CHANNEL_INFO, &resp);
+    });
+
     for channel_num in 1..=num_channels {
-        let channel_info = sChannelInfo {
+        resp.push(&sChannelInfo {
             iChannelNum: channel_num as i32,
             iCurrentUserCnt: state.entity_map.get_channel_population(channel_num) as i32,
-        };
-        client.queue_struct(&channel_info); // will panic if you have more than 127 channels :)
+        });
     }
-    client.flush()
+
+    let pkt = resp.build()?;
+    client.send_payload(pkt)
 }
 
 pub fn pc_warp_channel(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {

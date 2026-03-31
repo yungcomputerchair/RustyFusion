@@ -463,14 +463,15 @@ fn send_status_to_login_server(
     };
 
     let pc_ids: Vec<i32> = state.entity_map.get_player_ids().collect();
-    let pkt = sP_FE2LS_UPDATE_PC_STATUSES {
-        iCnt: pc_ids.len() as u32,
-    };
-    client.queue_packet(P_FE2LS_UPDATE_PC_STATUSES, &pkt);
+    let mut pkt =
+        PacketBuilder::new(P_FE2LS_UPDATE_PC_STATUSES).with(&sP_FE2LS_UPDATE_PC_STATUSES {
+            iCnt: pc_ids.len() as u32,
+        });
+
     for pc_id in pc_ids {
         let player = state.get_player(pc_id).unwrap();
         let pos = player.get_position();
-        let data = sPlayerMetadata {
+        pkt.push(&sPlayerMetadata {
             iPC_UID: player.get_uid(),
             szFirstName: util::encode_utf16(&player.first_name).unwrap(),
             szLastName: util::encode_utf16(&player.last_name).unwrap(),
@@ -478,10 +479,11 @@ fn send_status_to_login_server(
             iY: pos.y,
             iZ: pos.z,
             iChannelNum: player.instance_id.channel_num as i8,
-        };
-        client.queue_struct(&data);
+        });
     }
-    client.flush()
+
+    let pkt = pkt.build()?;
+    client.send_payload(pkt)
 }
 
 fn send_live_check(client: &mut FFClient) -> FFResult<()> {

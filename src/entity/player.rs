@@ -1489,7 +1489,9 @@ impl Player {
                         iNPC_TypeID: 0,
                         iTaskID: task_def.task_id,
                     };
-                    client.queue_packet(P_FE2CL_REP_REWARD_ITEM, &qitem_pkt);
+
+                    let mut pkt = PacketBuilder::new(P_FE2CL_REP_REWARD_ITEM).with(&qitem_pkt);
+
                     for (qitem_id, qitem_count_mod) in &task_def.succ_qitems {
                         let curr_count = self.get_quest_item_count(*qitem_id) as isize;
                         let new_count = (curr_count + *qitem_count_mod) as usize;
@@ -1504,9 +1506,12 @@ impl Player {
                             eIL: ItemLocation::QInven as i32,
                             iSlotNum: qitem_slot as i32,
                         };
-                        client.queue_struct(&qitem_reward);
+                        pkt.push(&qitem_reward);
                     }
-                    log_if_failed(client.flush());
+
+                    if let Some(pkt) = log_if_failed(pkt.build()) {
+                        log_if_failed(client.send_payload(pkt));
+                    }
                 }
 
                 let pkt = sP_FE2CL_REP_PC_TASK_END_FAIL {
@@ -1525,23 +1530,26 @@ impl Player {
                     &format!("Detected desync on task {}; repairing...", task_def.task_id),
                 );
                 self.mission_journal.repair_task(task_def.task_id).unwrap();
-                let reward_pkt = sP_FE2CL_REP_REWARD_ITEM {
-                    m_iCandy: self.get_taros() as i32,
-                    m_iFusionMatter: self.get_fusion_matter() as i32,
-                    m_iBatteryN: self.get_nano_potions() as i32,
-                    m_iBatteryW: self.get_weapon_boosts() as i32,
-                    iItemCnt: 1,
-                    iFatigue: 100,
-                    iFatigue_Level: 1,
-                    iNPC_TypeID: 0,
-                    iTaskID: task_def.task_id,
-                };
-                client.queue_packet(P_FE2CL_REP_REWARD_ITEM, &reward_pkt);
+
+                let mut reward_pkt =
+                    PacketBuilder::new(P_FE2CL_REP_REWARD_ITEM).with(&sP_FE2CL_REP_REWARD_ITEM {
+                        m_iCandy: self.get_taros() as i32,
+                        m_iFusionMatter: self.get_fusion_matter() as i32,
+                        m_iBatteryN: self.get_nano_potions() as i32,
+                        m_iBatteryW: self.get_weapon_boosts() as i32,
+                        iItemCnt: 1,
+                        iFatigue: 100,
+                        iFatigue_Level: 1,
+                        iNPC_TypeID: 0,
+                        iTaskID: task_def.task_id,
+                    });
+
                 let qitem_amt = self.get_quest_item_count(repair_qitem_id);
                 let qitem_slot = self
                     .set_quest_item_count(repair_qitem_id, qitem_amt)
                     .unwrap(); // no-op
-                let qitem_reward = sItemReward {
+
+                reward_pkt.push(&sItemReward {
                     sItem: sItemBase {
                         iType: ItemType::Quest as i16,
                         iID: repair_qitem_id,
@@ -1550,9 +1558,11 @@ impl Player {
                     },
                     eIL: ItemLocation::QInven as i32,
                     iSlotNum: qitem_slot as i32,
-                };
-                client.queue_struct(&qitem_reward);
-                log_if_failed(client.flush());
+                });
+
+                if let Some(reward_pkt) = log_if_failed(reward_pkt.build()) {
+                    log_if_failed(client.send_payload(reward_pkt));
+                }
             }
         }
     }

@@ -111,22 +111,26 @@ pub fn pc_group_join(clients: &mut ClientMap, state: &mut ShardServerState) -> F
             group.add_member(EntityID::Player(pc_id))?;
 
             let (pc_group_data, npc_group_data) = group.get_member_data(state);
-            let pkt = sP_FE2CL_PC_GROUP_JOIN_SUCC {
-                iID_NewMember: pc_id,
-                iMemberPCCnt: pc_group_data.len() as i32,
-                iMemberNPCCnt: npc_group_data.len() as i32,
-            };
-            for eid in group.get_member_ids() {
-                let entity = state.entity_map.get_entity_raw(*eid).unwrap();
-                if let Some(client) = entity.get_client(clients) {
-                    client.queue_packet(P_FE2CL_PC_GROUP_JOIN_SUCC, &pkt);
-                    for pc_data in &pc_group_data {
-                        client.queue_struct(pc_data);
+            let mut pkt =
+                PacketBuilder::new(P_FE2CL_PC_GROUP_JOIN_SUCC).with(&sP_FE2CL_PC_GROUP_JOIN_SUCC {
+                    iID_NewMember: pc_id,
+                    iMemberPCCnt: pc_group_data.len() as i32,
+                    iMemberNPCCnt: npc_group_data.len() as i32,
+                });
+
+            for pc_data in &pc_group_data {
+                pkt.push(pc_data);
+            }
+            for npc_data in &npc_group_data {
+                pkt.push(npc_data);
+            }
+
+            if let Some(pkt) = log_if_failed(pkt.build()) {
+                for eid in group.get_member_ids() {
+                    let entity = state.entity_map.get_entity_raw(*eid).unwrap();
+                    if let Some(client) = entity.get_client(clients) {
+                        log_if_failed(client.send_payload(pkt.clone()));
                     }
-                    for npc_data in &npc_group_data {
-                        client.queue_struct(npc_data);
-                    }
-                    log_if_failed(client.flush());
                 }
             }
 
@@ -210,23 +214,28 @@ pub fn npc_group_invite(clients: &mut ClientMap, state: &mut ShardServerState) -
     group.add_member(EntityID::NPC(target_npc_id))?;
 
     let (pc_group_data, npc_group_data) = group.get_member_data(state);
-    let pkt = sP_FE2CL_REP_NPC_GROUP_INVITE_SUCC {
-        iPC_ID: unused!(),
-        iNPC_ID: target_npc_id,
-        iMemberPCCnt: pc_group_data.len() as i32,
-        iMemberNPCCnt: npc_group_data.len() as i32,
-    };
-    for eid in group.get_member_ids() {
-        let entity = state.entity_map.get_entity_raw(*eid).unwrap();
-        if let Some(client) = entity.get_client(clients) {
-            client.queue_packet(P_FE2CL_REP_NPC_GROUP_INVITE_SUCC, &pkt);
-            for pc_data in &pc_group_data {
-                client.queue_struct(pc_data);
+    let mut pkt = PacketBuilder::new(P_FE2CL_REP_NPC_GROUP_INVITE_SUCC).with(
+        &sP_FE2CL_REP_NPC_GROUP_INVITE_SUCC {
+            iPC_ID: unused!(),
+            iNPC_ID: target_npc_id,
+            iMemberPCCnt: pc_group_data.len() as i32,
+            iMemberNPCCnt: npc_group_data.len() as i32,
+        },
+    );
+
+    for pc_data in &pc_group_data {
+        pkt.push(pc_data);
+    }
+    for npc_data in &npc_group_data {
+        pkt.push(npc_data);
+    }
+
+    if let Some(pkt) = log_if_failed(pkt.build()) {
+        for eid in group.get_member_ids() {
+            let entity = state.entity_map.get_entity_raw(*eid).unwrap();
+            if let Some(client) = entity.get_client(clients) {
+                log_if_failed(client.send_payload(pkt.clone()));
             }
-            for npc_data in &npc_group_data {
-                client.queue_struct(npc_data);
-            }
-            log_if_failed(client.flush());
         }
     }
 

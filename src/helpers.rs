@@ -106,43 +106,52 @@ pub fn remove_group_member(
     let (pc_group_data, npc_group_data) = group.get_member_data(state);
     match leaver_id {
         EntityID::Player(leaver_pc_id) => {
-            let update_pkt = sP_FE2CL_PC_GROUP_LEAVE {
-                iID_LeaveMember: leaver_pc_id,
-                iMemberPCCnt: pc_group_data.len() as i32,
-                iMemberNPCCnt: npc_group_data.len() as i32,
-            };
-            for eid in group.get_member_ids() {
-                let entity = state.entity_map.get_entity_raw(*eid).unwrap();
-                if let Some(client) = entity.get_client(clients) {
-                    client.queue_packet(P_FE2CL_PC_GROUP_LEAVE, &update_pkt);
-                    for pc_data in &pc_group_data {
-                        client.queue_struct(pc_data);
+            let mut update_pkt =
+                PacketBuilder::new(P_FE2CL_PC_GROUP_LEAVE).with(&sP_FE2CL_PC_GROUP_LEAVE {
+                    iID_LeaveMember: leaver_pc_id,
+                    iMemberPCCnt: pc_group_data.len() as i32,
+                    iMemberNPCCnt: npc_group_data.len() as i32,
+                });
+
+            for pc_data in &pc_group_data {
+                update_pkt.push(pc_data);
+            }
+            for npc_data in &npc_group_data {
+                update_pkt.push(npc_data);
+            }
+
+            if let Some(update_pkt) = log_if_failed(update_pkt.build()) {
+                for eid in group.get_member_ids() {
+                    let entity = state.entity_map.get_entity_raw(*eid).unwrap();
+                    if let Some(client) = entity.get_client(clients) {
+                        log_if_failed(client.send_payload(update_pkt.clone()));
                     }
-                    for npc_data in &npc_group_data {
-                        client.queue_struct(npc_data);
-                    }
-                    log_if_failed(client.flush());
                 }
             }
         }
         EntityID::NPC(leaver_npc_id) => {
-            let update_pkt = sP_FE2CL_REP_NPC_GROUP_KICK_SUCC {
-                iPC_ID: unused!(),
-                iNPC_ID: leaver_npc_id,
-                iMemberPCCnt: pc_group_data.len() as i32,
-                iMemberNPCCnt: npc_group_data.len() as i32,
-            };
-            for eid in group.get_member_ids() {
-                let entity = state.entity_map.get_entity_raw(*eid).unwrap();
-                if let Some(client) = entity.get_client(clients) {
-                    client.queue_packet(P_FE2CL_REP_NPC_GROUP_KICK_SUCC, &update_pkt);
-                    for pc_data in &pc_group_data {
-                        client.queue_struct(pc_data);
+            let mut update_pkt = PacketBuilder::new(P_FE2CL_REP_NPC_GROUP_KICK_SUCC).with(
+                &sP_FE2CL_REP_NPC_GROUP_KICK_SUCC {
+                    iPC_ID: unused!(),
+                    iNPC_ID: leaver_npc_id,
+                    iMemberPCCnt: pc_group_data.len() as i32,
+                    iMemberNPCCnt: npc_group_data.len() as i32,
+                },
+            );
+
+            for pc_data in &pc_group_data {
+                update_pkt.push(pc_data);
+            }
+            for npc_data in &npc_group_data {
+                update_pkt.push(npc_data);
+            }
+
+            if let Some(update_pkt) = log_if_failed(update_pkt.build()) {
+                for eid in group.get_member_ids() {
+                    let entity = state.entity_map.get_entity_raw(*eid).unwrap();
+                    if let Some(client) = entity.get_client(clients) {
+                        log_if_failed(client.send_payload(update_pkt.clone()));
                     }
-                    for npc_data in &npc_group_data {
-                        client.queue_struct(npc_data);
-                    }
-                    log_if_failed(client.flush());
                 }
             }
         }
@@ -276,23 +285,28 @@ pub fn give_defeat_rewards(
         Err(e) => log_error(e),
     }
 
-    let reward_pkt = sP_FE2CL_REP_REWARD_ITEM {
-        m_iCandy: player.set_taros(player.get_taros() + gained_taros) as i32,
-        m_iFusionMatter: player
-            .set_fusion_matter(player.get_fusion_matter() + gained_fm, Some(clients))
-            as i32,
-        m_iBatteryN: player.set_nano_potions(player.get_nano_potions() + gained_potions) as i32,
-        m_iBatteryW: player.set_weapon_boosts(player.get_weapon_boosts() + gained_boosts) as i32,
-        iItemCnt: item_rewards.len() as i8,
-        iFatigue: 100,
-        iFatigue_Level: 1,
-        iNPC_TypeID: defeated_type,
-        iTaskID: active_task_id,
-    };
-    let client = player.get_client(clients).unwrap();
-    client.queue_packet(P_FE2CL_REP_REWARD_ITEM, &reward_pkt);
+    let mut reward_pkt =
+        PacketBuilder::new(P_FE2CL_REP_REWARD_ITEM).with(&sP_FE2CL_REP_REWARD_ITEM {
+            m_iCandy: player.set_taros(player.get_taros() + gained_taros) as i32,
+            m_iFusionMatter: player
+                .set_fusion_matter(player.get_fusion_matter() + gained_fm, Some(clients))
+                as i32,
+            m_iBatteryN: player.set_nano_potions(player.get_nano_potions() + gained_potions) as i32,
+            m_iBatteryW: player.set_weapon_boosts(player.get_weapon_boosts() + gained_boosts)
+                as i32,
+            iItemCnt: item_rewards.len() as i8,
+            iFatigue: 100,
+            iFatigue_Level: 1,
+            iNPC_TypeID: defeated_type,
+            iTaskID: active_task_id,
+        });
+
     for item in &item_rewards {
-        client.queue_struct(item);
+        reward_pkt.push(item);
     }
-    log_if_failed(client.flush());
+
+    if let Some(reward_pkt) = log_if_failed(reward_pkt.build()) {
+        let client = player.get_client(clients).unwrap();
+        log_if_failed(client.send_payload(reward_pkt));
+    }
 }
