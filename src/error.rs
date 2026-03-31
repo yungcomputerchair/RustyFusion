@@ -72,6 +72,34 @@ pub struct FFError {
     timestamp: SystemTime,
     parent: Option<Box<FFError>>,
 }
+impl From<std::io::Error> for FFError {
+    fn from(error: std::io::Error) -> Self {
+        let severity = match error.kind() {
+            ErrorKind::UnexpectedEof => Severity::Debug,
+            ErrorKind::BrokenPipe => Severity::Debug,
+            ErrorKind::ConnectionReset => Severity::Debug,
+            ErrorKind::ConnectionAborted => Severity::Debug,
+            ErrorKind::WouldBlock => Severity::Debug,
+            _ => Severity::Warning,
+        };
+        let should_dc =
+            error.kind() != ErrorKind::WouldBlock && error.kind() != ErrorKind::TimedOut;
+        Self::new(
+            severity,
+            format!("I/O error ({:?})", error.kind()),
+            should_dc,
+        )
+    }
+}
+impl From<bcrypt::BcryptError> for FFError {
+    fn from(error: bcrypt::BcryptError) -> Self {
+        Self::new(
+            Severity::Warning,
+            format!("BCrypt error ({:?})", error),
+            false,
+        )
+    }
+}
 impl FFError {
     fn new(severity: Severity, msg: String, should_dc: bool) -> Self {
         Self {
@@ -89,32 +117,6 @@ impl FFError {
 
     pub fn build_dc(severity: Severity, msg: String) -> Self {
         Self::new(severity, msg, true)
-    }
-
-    pub fn from_bcrypt_err(error: bcrypt::BcryptError) -> Self {
-        Self::new(
-            Severity::Warning,
-            format!("BCrypt error ({:?})", error),
-            false,
-        )
-    }
-
-    pub fn from_io_err(error: std::io::Error) -> Self {
-        let severity = match error.kind() {
-            ErrorKind::UnexpectedEof => Severity::Debug,
-            ErrorKind::BrokenPipe => Severity::Debug,
-            ErrorKind::ConnectionReset => Severity::Debug,
-            ErrorKind::ConnectionAborted => Severity::Debug,
-            ErrorKind::WouldBlock => Severity::Debug,
-            _ => Severity::Warning,
-        };
-        let should_dc =
-            error.kind() != ErrorKind::WouldBlock && error.kind() != ErrorKind::TimedOut;
-        Self::new(
-            severity,
-            format!("I/O error ({:?})", error.kind()),
-            should_dc,
-        )
     }
 
     pub fn from_enum_err<T: std::fmt::Debug>(val: T) -> Self {
@@ -212,17 +214,14 @@ pub fn logger_init(log_path: String) {
     }
 }
 
-pub fn logger_flush() -> std::io::Result<()> {
+pub fn logger_flush() -> FFResult<()> {
     if let Some(logger) = LOGGER.get() {
         let mut logger = logger.lock().unwrap();
-        logger.flush()
+        logger.flush()?;
+        Ok(())
     } else {
         Ok(())
     }
-}
-
-pub fn logger_flush_scheduled() -> FFResult<()> {
-    logger_flush().map_err(FFError::from_io_err)
 }
 
 pub fn log(severity: Severity, msg: &str) {

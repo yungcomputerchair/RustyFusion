@@ -345,11 +345,13 @@ pub fn get_systime_from_sec(timestamp_sec: u64) -> SystemTime {
 }
 
 pub fn hash_password(password: &str) -> FFResult<String> {
-    bcrypt::hash(password, bcrypt::DEFAULT_COST).map_err(FFError::from_bcrypt_err)
+    let hashed = bcrypt::hash(password, bcrypt::DEFAULT_COST)?;
+    Ok(hashed)
 }
 
 pub fn check_password(password: &str, hash: &str) -> FFResult<bool> {
-    bcrypt::verify(password, hash).map_err(FFError::from_bcrypt_err)
+    let verified = bcrypt::verify(password, hash)?;
+    Ok(verified)
 }
 
 pub fn make_duration(days: u64, hours: u64, mins: u64, secs: u64) -> Duration {
