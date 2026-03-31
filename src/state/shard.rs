@@ -22,13 +22,13 @@ use crate::{
     trade::TradeContext,
 };
 
-use super::FFReceiver;
+use tokio::sync::oneshot;
 
 pub struct ShardServerState {
     pub shard_id: Option<i32>,
     pub login_server_conn_id: Option<Uuid>,
     pub login_data: HashMap<i64, LoginData>,
-    pub save_rx: Option<FFReceiver<DbResult>>,
+    pub save_rx: Option<oneshot::Receiver<DbResult>>,
     pub entity_map: EntityMap,
     pub buyback_lists: HashMap<i32, Vec<Item>>,
     pub ongoing_trades: HashMap<Uuid, TradeContext>,
@@ -342,10 +342,9 @@ impl ShardServerState {
     }
 
     pub fn check_receivers(&mut self) -> bool {
-        if let Some(receiver) = &self.save_rx {
+        if let Some(receiver) = &mut self.save_rx {
             match receiver.try_recv() {
-                None => (), // in progress
-                Some(Ok(res)) => {
+                Ok(res) => {
                     let elapsed = res.completed.elapsed().unwrap_or_default();
                     log(
                         Severity::Info,
@@ -353,8 +352,9 @@ impl ShardServerState {
                     );
                     self.save_rx = None;
                 }
-                Some(Err(e)) => {
-                    log(Severity::Warning, &format!("Save failed: {}", e.get_msg()));
+                Err(oneshot::error::TryRecvError::Empty) => (), // in progress
+                Err(oneshot::error::TryRecvError::Closed) => {
+                    log(Severity::Warning, "Save failed: sender dropped");
                     self.save_rx = None;
                 }
             }

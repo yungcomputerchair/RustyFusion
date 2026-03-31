@@ -7,12 +7,12 @@ use std::sync::OnceLock;
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 
 use crate::config::*;
 use crate::entity::Player;
 use crate::error::*;
-use crate::state::{Account, FFReceiver, FFSender};
+use crate::state::Account;
 
 #[cfg(feature = "postgres")]
 mod postgresql;
@@ -137,10 +137,28 @@ where
 {
     const TIMEOUT: Duration = Duration::from_secs(5);
     let rx = _db_run_async(f);
-    rx.recv(Some(TIMEOUT)).and_then(|res| res.get())
+    tokio::task::block_in_place(|| {
+        tokio::runtime::Handle::current().block_on(async {
+            tokio::time::timeout(TIMEOUT, rx)
+                .await
+                .map_err(|_| {
+                    FFError::build(
+                        Severity::Warning,
+                        "DB operation failed: timed out".to_string(),
+                    )
+                })?
+                .map_err(|_| {
+                    FFError::build(
+                        Severity::Warning,
+                        "DB operation failed: sender dropped".to_string(),
+                    )
+                })
+                .and_then(|res| res.get())
+        })
+    })
 }
 
-pub fn _db_run_async<T, F>(f: F) -> FFReceiver<DbResult>
+pub fn _db_run_async<T, F>(f: F) -> oneshot::Receiver<DbResult>
 where
     T: Send + Any,
     F: for<'a> FnOnce(
@@ -156,8 +174,7 @@ where
     let tx = guard
         .as_ref()
         .unwrap_or_else(|| panic_log("Database has been shut down"));
-    let (result_tx, result_rx) = std::sync::mpsc::channel();
-    let start_time = SystemTime::now();
+    let (result_tx, result_rx) = oneshot::channel();
     let op: DbOperation = Box::new(move |db: &mut dyn Database| {
         Box::pin(async move {
             let result = f(db).await.map(|v| Box::new(v) as Box<dyn Any + Send>);
@@ -165,9 +182,9 @@ where
                 result,
                 completed: SystemTime::now(),
             };
-            let _ = FFSender::new(result_tx).send(db_result);
+            let _ = result_tx.send(db_result);
         })
     });
     let _ = tx.send(op);
-    FFReceiver::new(start_time, result_rx)
+    result_rx
 }
