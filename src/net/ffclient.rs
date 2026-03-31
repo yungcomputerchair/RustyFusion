@@ -7,8 +7,10 @@ use std::{
     time::{Duration, Instant},
 };
 
+use tokio::sync::mpsc;
+
 use crate::{
-    error::{log, panic_log, FFError, FFResult, Severity},
+    error::{log, log_error, log_if_failed, panic_log, FFError, FFResult, Severity},
     net::{packet::Packet, PACKET_BUFFER_SIZE, SILENCED_PACKETS},
 };
 
@@ -50,6 +52,37 @@ impl Display for ClientType {
             ClientType::UnauthedShardServer(_) => write!(f, "UnauthedShardServer"),
             ClientType::ShardServer(shard_id) => write!(f, "ShardServer({})", shard_id),
         }
+    }
+}
+
+pub enum ClientMessage {
+    Packet(Packet),
+    Shutdown,
+}
+
+#[derive(Clone)]
+pub struct FFClientHandle {
+    tx: mpsc::UnboundedSender<ClientMessage>,
+}
+impl FFClientHandle {
+    pub fn new(tx: mpsc::UnboundedSender<ClientMessage>) -> Self {
+        Self { tx }
+    }
+
+    pub fn send_packet<T: FFPacket>(&self, pkt_id: PacketID, pkt: &T) -> FFResult<()> {
+        let pkt = Packet::new(pkt_id, pkt)?;
+        self.send_payload(pkt)
+    }
+
+    // TODO block on flush to confirm the packet was sent
+    pub fn send_payload(&self, pkt: Packet) -> FFResult<()> {
+        self.tx
+            .send(ClientMessage::Packet(pkt))
+            .map_err(|_| FFError::build(Severity::Warning, "Client channel closed".to_string()))
+    }
+
+    pub fn disconnect(&self) {
+        let _ = self.tx.send(ClientMessage::Shutdown);
     }
 }
 
@@ -191,6 +224,7 @@ pub struct FFClient {
     waiting_data_len: Option<usize>,
     in_buf: PacketBuffer,
     out_buf: PacketBuffer,
+    msg_rx: mpsc::UnboundedReceiver<ClientMessage>,
     pub e_key: [u8; CRYPTO_KEY_SIZE],
     pub fe_key: [u8; CRYPTO_KEY_SIZE],
     pub enc_mode: EncryptionMode,
@@ -203,7 +237,10 @@ pub struct FFClient {
 }
 
 impl FFClient {
-    pub fn new(conn_data: (TcpStream, SocketAddr)) -> Self {
+    pub fn new(
+        conn_data: (TcpStream, SocketAddr),
+        msg_rx: mpsc::UnboundedReceiver<ClientMessage>,
+    ) -> Self {
         let default_key: [u8; CRYPTO_KEY_SIZE] = DEFAULT_KEY.try_into().unwrap();
         Self {
             sock: conn_data.0,
@@ -211,6 +248,7 @@ impl FFClient {
             waiting_data_len: None,
             in_buf: PacketBuffer::default(),
             out_buf: PacketBuffer::default(),
+            msg_rx,
             e_key: default_key,
             fe_key: default_key,
             enc_mode: EncryptionMode::EKey,
@@ -481,5 +519,22 @@ impl FFClient {
         let pkt = Packet::new(pkt_id, pkt)?;
         self.out_buf.copy_to_buf(pkt.read_bytes());
         self.flush()
+    }
+
+    pub fn drain_messages(&mut self) {
+        while let Ok(msg) = self.msg_rx.try_recv() {
+            match msg {
+                ClientMessage::Packet(pkt) => {
+                    if let Err(e) = self.send_payload(pkt) {
+                        log_error(e);
+                        self.disconnect();
+                    }
+                }
+                ClientMessage::Shutdown => {
+                    self.disconnect();
+                    return;
+                }
+            }
+        }
     }
 }

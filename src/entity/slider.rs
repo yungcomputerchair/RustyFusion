@@ -13,7 +13,7 @@ use crate::{
             sP_FE2CL_TRANSPORTATION_ENTER, sP_FE2CL_TRANSPORTATION_EXIT,
             sP_FE2CL_TRANSPORTATION_MOVE, sTransportationAppearanceData, PacketID::*,
         },
-        ClientMap, FFClient,
+        ClientMap, FFClient, FFClientHandle,
     },
     path::Path,
     state::ShardServerState,
@@ -66,7 +66,7 @@ impl Entity for Slider {
         EntityID::Slider(self.id)
     }
 
-    fn get_client<'a>(&self, _client_map: &'a mut ClientMap) -> Option<&'a mut FFClient> {
+    fn get_client(&self, _client_map: &ClientMap) -> Option<FFClientHandle> {
         None
     }
 
@@ -98,14 +98,14 @@ impl Entity for Slider {
         self.rotation = rotation.rem_euclid(360);
     }
 
-    fn send_enter(&self, client: &mut FFClient) -> FFResult<()> {
+    fn send_enter(&self, client: &FFClientHandle) -> FFResult<()> {
         let pkt = sP_FE2CL_TRANSPORTATION_ENTER {
             AppearanceData: self.get_appearance_data(),
         };
         client.send_packet(P_FE2CL_TRANSPORTATION_ENTER, &pkt)
     }
 
-    fn send_exit(&self, client: &mut FFClient) -> FFResult<()> {
+    fn send_exit(&self, client: &FFClientHandle) -> FFResult<()> {
         let pkt = sP_FE2CL_TRANSPORTATION_EXIT {
             eTT: TransportationType::Bus as i32,
             iT_ID: self.id,

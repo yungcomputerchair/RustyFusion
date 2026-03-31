@@ -21,7 +21,7 @@ use rusty_fusion::{
             PacketID::{self, *},
             *,
         },
-        ClientType, FFClient, FFServer,
+        ClientType, FFClient, FFClientHandle, FFServer,
     },
     state::{LoginServerState, ServerState},
     tabledata::tdata_init,
@@ -170,7 +170,12 @@ impl Drop for Cleanup {
     }
 }
 
-fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>, state: &mut ServerState) {
+fn handle_disconnect(
+    key: usize,
+    clients: &mut HashMap<usize, FFClient>,
+    _handles: &HashMap<usize, FFClientHandle>,
+    state: &mut ServerState,
+) {
     let state = state.as_login_mut();
     let client = clients.get_mut(&key).unwrap();
     match client.client_type {
@@ -216,6 +221,7 @@ mod shard;
 fn handle_packet(
     key: usize,
     clients: &mut HashMap<usize, FFClient>,
+    _handles: &HashMap<usize, FFClientHandle>,
     pkt_id: PacketID,
     state: &mut ServerState,
 ) -> FFResult<()> {

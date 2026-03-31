@@ -357,7 +357,10 @@ impl<'a, 'b, 'c> Widget for PlayerListWidget<'a, 'b, 'c> {
             .iter()
             .map(|pid| {
                 let player = self.shard_state.get_player(*pid).unwrap();
-                let player_client = player.get_client(self.clients).unwrap();
+                let ping = player
+                    .get_client_id()
+                    .map(|cid| self.clients.get(cid))
+                    .and_then(|c| c.ping);
                 let chunk_coords = player.get_chunk_coords();
                 let world_data = tdata_get().get_world_name_data(chunk_coords);
 
@@ -370,11 +373,11 @@ impl<'a, 'b, 'c> Widget for PlayerListWidget<'a, 'b, 'c> {
                 let lines = vec![
                     Line::from(vec![
                         Span::from(player.to_string()).white().bold(),
-                        Span::from(match player_client.ping {
+                        Span::from(match ping {
                             Some(ping) => format!(" ({} ms)", ping.as_millis()),
                             None => " (...)".to_string(),
                         })
-                        .fg(get_ping_color(player_client.ping)),
+                        .fg(get_ping_color(ping)),
                     ]),
                     Line::from(location_info).dark_gray().italic(),
                 ];

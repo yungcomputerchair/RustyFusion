@@ -21,7 +21,7 @@ use rusty_fusion::{
             PacketID::{self, *},
             *,
         },
-        ClientMap, ClientType, FFClient, FFServer,
+        ClientMap, ClientType, FFClient, FFClientHandle, FFServer,
     },
     state::{ServerState, ShardServerState},
     tabledata::tdata_init,
@@ -189,9 +189,14 @@ impl Drop for Cleanup {
     }
 }
 
-fn handle_disconnect(key: usize, clients: &mut HashMap<usize, FFClient>, state: &mut ServerState) {
+fn handle_disconnect(
+    key: usize,
+    clients: &mut HashMap<usize, FFClient>,
+    handles: &HashMap<usize, FFClientHandle>,
+    state: &mut ServerState,
+) {
     let state = state.as_shard_mut();
-    let mut clients = ClientMap::new(key, clients);
+    let mut clients = ClientMap::new(key, clients, handles);
     let client = clients.get_self();
     match client.client_type {
         ClientType::LoginServer => {
@@ -242,12 +247,13 @@ mod transport;
 fn handle_packet(
     key: usize,
     clients: &mut HashMap<usize, FFClient>,
+    handles: &HashMap<usize, FFClientHandle>,
     pkt_id: PacketID,
     state: &mut ServerState,
 ) -> FFResult<()> {
     let time = SystemTime::now();
     let state = state.as_shard_mut();
-    let mut clients = ClientMap::new(key, clients);
+    let mut clients = ClientMap::new(key, clients, handles);
     match pkt_id {
         P_LS2FE_REP_AUTH_CHALLENGE => login::login_connect_challenge(clients.get_self()),
         P_LS2FE_REP_CONNECT_SUCC => login::login_connect_succ(clients.get_self(), state),

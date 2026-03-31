@@ -48,9 +48,15 @@ pub use ffserver::*;
 pub mod crypto;
 pub mod packet;
 
-pub type PacketCallback =
-    fn(usize, &mut HashMap<usize, FFClient>, PacketID, &mut ServerState) -> FFResult<()>;
-pub type DisconnectCallback = fn(usize, &mut HashMap<usize, FFClient>, &mut ServerState);
+pub type PacketCallback = fn(
+    usize,
+    &mut HashMap<usize, FFClient>,
+    &HashMap<usize, FFClientHandle>,
+    PacketID,
+    &mut ServerState,
+) -> FFResult<()>;
+pub type DisconnectCallback =
+    fn(usize, &mut HashMap<usize, FFClient>, &HashMap<usize, FFClientHandle>, &mut ServerState);
 pub type LiveCheckCallback = fn(&mut FFClient) -> FFResult<()>;
 
 #[allow(non_snake_case)]
@@ -96,13 +102,19 @@ pub struct ClientMap<'a> {
     key: usize,
     login_server_key: Option<usize>,
     clients: &'a mut HashMap<usize, FFClient>,
+    handles: &'a HashMap<usize, FFClientHandle>,
 }
 impl<'a> ClientMap<'a> {
-    pub fn new(key: usize, clients: &'a mut HashMap<usize, FFClient>) -> Self {
+    pub fn new(
+        key: usize,
+        clients: &'a mut HashMap<usize, FFClient>,
+        handles: &'a HashMap<usize, FFClientHandle>,
+    ) -> Self {
         Self {
             key,
             login_server_key: None,
             clients,
+            handles,
         }
     }
 
@@ -112,6 +124,14 @@ impl<'a> ClientMap<'a> {
 
     pub fn get_self(&mut self) -> &mut FFClient {
         self.clients.get_mut(&self.key).unwrap()
+    }
+
+    pub fn get_handles(&self) -> &'a HashMap<usize, FFClientHandle> {
+        self.handles
+    }
+
+    pub fn get_handle(&self, key: usize) -> Option<&'a FFClientHandle> {
+        self.handles.get(&key)
     }
 
     pub fn get_all_gameclient(&mut self) -> impl Iterator<Item = &mut FFClient> {

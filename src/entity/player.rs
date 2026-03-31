@@ -22,7 +22,7 @@ use crate::{
             PacketID::{self, *},
             *,
         },
-        ClientMap, ClientType, FFClient,
+        ClientMap, ClientType, FFClient, FFClientHandle,
     },
     path::Path,
     state::ShardServerState,
@@ -478,6 +478,10 @@ impl Player {
 
     pub fn set_client_id(&mut self, client_id: usize) {
         self.client_id = Some(client_id);
+    }
+
+    pub fn get_client_id(&self) -> Option<usize> {
+        self.client_id
     }
 
     pub fn get_style(&self) -> sPCStyle {
@@ -1310,6 +1314,7 @@ impl Player {
     pub fn disconnect(pc_id: i32, state: &mut ShardServerState, clients: &mut ClientMap) {
         let player = state.get_player(pc_id).unwrap();
         let uid = player.get_uid();
+        let client_id = player.get_client_id().unwrap();
         let display_info = format!(
             "{} left (channel {})",
             player, player.instance_id.channel_num
@@ -1325,7 +1330,8 @@ impl Player {
         entity_map.update(id, None, Some(clients));
         let mut player = entity_map.untrack(id);
         player.cleanup(clients, state);
-        let client = player.get_client(clients).unwrap();
+
+        let client = clients.get(client_id);
         client.client_type = ClientType::Unknown;
         client.disconnect();
     }
@@ -1689,8 +1695,9 @@ impl Combatant for Player {
     }
 }
 impl Entity for Player {
-    fn get_client<'a>(&self, client_map: &'a mut ClientMap) -> Option<&'a mut FFClient> {
-        self.client_id.map(|key| client_map.get(key))
+    fn get_client(&self, client_map: &ClientMap) -> Option<FFClientHandle> {
+        self.client_id
+            .and_then(|key| client_map.get_handle(key).cloned())
     }
 
     fn get_id(&self) -> EntityID {
@@ -1725,14 +1732,14 @@ impl Entity for Player {
         self.rotation = rotation.rem_euclid(360);
     }
 
-    fn send_enter(&self, client: &mut FFClient) -> FFResult<()> {
+    fn send_enter(&self, client: &FFClientHandle) -> FFResult<()> {
         let pkt = sP_FE2CL_PC_NEW {
             PCAppearanceData: self.get_appearance_data(),
         };
         client.send_packet(PacketID::P_FE2CL_PC_NEW, &pkt)
     }
 
-    fn send_exit(&self, client: &mut FFClient) -> FFResult<()> {
+    fn send_exit(&self, client: &FFClientHandle) -> FFResult<()> {
         let pkt = sP_FE2CL_PC_EXIT {
             iID: self.get_player_id(),
             iExitType: unused!(),

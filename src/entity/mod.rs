@@ -7,7 +7,7 @@ use crate::{
     error::{FFError, FFResult, Severity},
     net::{
         packet::{sNPCGroupMemberInfo, sPCGroupMemberInfo},
-        ClientMap, FFClient,
+        ClientMap, FFClient, FFClientHandle,
     },
     state::ShardServerState,
     Position,
@@ -37,15 +37,15 @@ pub enum EntityID {
 
 pub trait Entity {
     fn get_id(&self) -> EntityID;
-    fn get_client<'a>(&self, client_map: &'a mut ClientMap) -> Option<&'a mut FFClient>;
+    fn get_client(&self, client_map: &ClientMap) -> Option<FFClientHandle>;
     fn get_position(&self) -> Position;
     fn get_rotation(&self) -> i32;
     fn get_speed(&self) -> i32;
     fn get_chunk_coords(&self) -> ChunkCoords;
     fn set_position(&mut self, pos: Position);
     fn set_rotation(&mut self, rotation: i32);
-    fn send_enter(&self, client: &mut FFClient) -> FFResult<()>;
-    fn send_exit(&self, client: &mut FFClient) -> FFResult<()>;
+    fn send_enter(&self, client: &FFClientHandle) -> FFResult<()>;
+    fn send_exit(&self, client: &FFClientHandle) -> FFResult<()>;
 
     fn tick(
         &mut self,

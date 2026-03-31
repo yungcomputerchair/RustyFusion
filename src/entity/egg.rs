@@ -8,7 +8,7 @@ use crate::{
     error::FFResult,
     net::{
         packet::{sP_FE2CL_SHINY_ENTER, sP_FE2CL_SHINY_EXIT, sShinyAppearanceData, PacketID::*},
-        ClientMap, FFClient,
+        ClientMap, FFClient, FFClientHandle,
     },
     state::ShardServerState,
     Position,
@@ -56,7 +56,7 @@ impl Entity for Egg {
         EntityID::Egg(self.id)
     }
 
-    fn get_client<'a>(&self, _: &'a mut ClientMap) -> Option<&'a mut FFClient> {
+    fn get_client(&self, _: &ClientMap) -> Option<FFClientHandle> {
         None
     }
 
@@ -82,7 +82,7 @@ impl Entity for Egg {
 
     fn set_rotation(&mut self, _: i32) {}
 
-    fn send_enter(&self, client: &mut FFClient) -> FFResult<()> {
+    fn send_enter(&self, client: &FFClientHandle) -> FFResult<()> {
         let pkt = sP_FE2CL_SHINY_ENTER {
             ShinyAppearanceData: sShinyAppearanceData {
                 iShiny_ID: self.id,
@@ -96,7 +96,7 @@ impl Entity for Egg {
         client.send_packet(P_FE2CL_SHINY_ENTER, &pkt)
     }
 
-    fn send_exit(&self, client: &mut FFClient) -> FFResult<()> {
+    fn send_exit(&self, client: &FFClientHandle) -> FFResult<()> {
         let pkt = sP_FE2CL_SHINY_EXIT { iShinyID: self.id };
         client.send_packet(P_FE2CL_SHINY_EXIT, &pkt)
     }

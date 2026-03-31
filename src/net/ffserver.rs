@@ -13,7 +13,8 @@ use crate::{
 };
 
 use super::{
-    ClientMap, ClientType, DisconnectCallback, FFClient, LiveCheckCallback, PacketCallback,
+    ClientMap, ClientType, DisconnectCallback, FFClient, FFClientHandle, LiveCheckCallback,
+    PacketCallback,
 };
 
 const EPOLL_KEY_SELF: usize = 0;
@@ -27,6 +28,7 @@ pub struct FFServer {
     dc_handler: Option<DisconnectCallback>,
     live_check: Option<(Duration, LiveCheckCallback)>,
     clients: HashMap<usize, FFClient>,
+    handles: HashMap<usize, FFClientHandle>,
 }
 
 impl FFServer {
@@ -46,6 +48,7 @@ impl FFServer {
             dc_handler,
             live_check,
             clients: HashMap::new(),
+            handles: HashMap::new(),
         };
         server.sock.set_nonblocking(true)?;
         server.poller.add_with_mode(
@@ -139,14 +142,16 @@ impl FFServer {
                 };
                 let addr = client.get_addr();
 
-                let res = (|clients: &mut HashMap<usize, FFClient>| {
+                let pkt_handler = self.pkt_handler;
+                let res = (|clients: &mut HashMap<usize, FFClient>,
+                            handles: &HashMap<usize, FFClientHandle>| {
                     let client = clients.get_mut(&ev.key).unwrap();
                     client.read_payload()?;
                     let pkt_id = client.peek_packet_id()?;
-                    (self.pkt_handler)(ev.key, clients, pkt_id, state).map_err(|e| {
+                    pkt_handler(ev.key, clients, handles, pkt_id, state).map_err(|e| {
                         FFError::build(e.get_severity(), format!("<{:?}> {}", pkt_id, e.get_msg()))
                     })
-                })(&mut self.clients);
+                })(&mut self.clients, &self.handles);
 
                 if let Err(e) = res {
                     log(e.get_severity(), &format!("{} ({})", e.get_msg(), addr));
@@ -155,6 +160,11 @@ impl FFServer {
                     }
                 }
             }
+        }
+
+        // Drain pending channel messages for all clients
+        for client in self.clients.values_mut() {
+            client.drain_messages();
         }
 
         Ok(())
@@ -168,13 +178,17 @@ impl FFServer {
         &mut self.clients
     }
 
+    pub fn get_handles(&self) -> &HashMap<usize, FFClientHandle> {
+        &self.handles
+    }
+
     pub fn get_client_map(&mut self) -> ClientMap<'_> {
-        ClientMap::new(0, &mut self.clients)
+        ClientMap::new(0, &mut self.clients, &self.handles)
     }
 
     pub fn disconnect_client(&mut self, client_key: usize, state: &mut ServerState) -> Result<()> {
         if let Some(callback) = self.dc_handler {
-            callback(client_key, &mut self.clients, state);
+            callback(client_key, &mut self.clients, &self.handles, state);
         };
         self.unregister_client(client_key)
     }
@@ -193,12 +207,15 @@ impl FFServer {
         let key: usize = self.get_next_epoll_key();
         self.poller
             .add_with_mode(&conn_data.0, Event::readable(key), PollMode::Level)?;
-        self.clients.insert(key, FFClient::new(conn_data));
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        self.clients.insert(key, FFClient::new(conn_data, rx));
+        self.handles.insert(key, FFClientHandle::new(tx));
         Ok(key)
     }
 
     fn unregister_client(&mut self, key: usize) -> Result<()> {
         let client = self.clients.remove(&key).unwrap();
+        self.handles.remove(&key);
         self.poller.delete(&client.sock)?;
         Ok(()) // client is dropped
     }
