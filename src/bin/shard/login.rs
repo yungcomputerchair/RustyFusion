@@ -373,7 +373,7 @@ pub fn login_buddy_freechat(clients: &mut ClientMap, state: &mut ShardServerStat
 }
 
 pub fn buddy_freechat_succ(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
-    let login_server = clients.get_login_server().unwrap();
+    let login_server = clients.get_self();
     let pkt: sP_LS2FE_REP_SEND_BUDDY_FREECHAT_SUCC =
         *login_server.get_packet(P_LS2FE_REP_SEND_BUDDY_FREECHAT_SUCC)?;
 
