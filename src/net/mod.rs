@@ -180,17 +180,8 @@ mod tests {
     fn test_aligned_buf_is_always_aligned() {
         // Verify that AlignedBuf's pointer is always 4-aligned,
         // which is the invariant that makes our bytes_to_struct sound.
-        use crate::net::ffclient::PacketBuffer;
-
-        let _buf = PacketBuffer::default();
-        // PacketBuffer exposes peek_packet_id etc. which internally
-        // call bytes_to_struct. If AlignedBuf weren't aligned, those
-        // would return alignment errors. We verify the guarantee here:
-        let aligned_buf = [0u8; PACKET_BUFFER_SIZE];
-        #[repr(C, align(4))]
-        struct AlignedCheck([u8; PACKET_BUFFER_SIZE]);
-        let check = AlignedCheck(aligned_buf);
-        let ptr = check.0.as_ptr();
+        let buf = AlignedBuf::default();
+        let ptr = buf.as_ptr();
         assert_eq!(
             ptr.align_offset(4),
             0,
