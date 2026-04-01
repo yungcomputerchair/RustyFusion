@@ -72,6 +72,12 @@ pub struct FFError {
     timestamp: SystemTime,
     parent: Option<Box<FFError>>,
 }
+impl std::error::Error for FFError {}
+impl Display for FFError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.get_formatted(false, false))
+    }
+}
 impl From<std::io::Error> for FFError {
     fn from(error: std::io::Error) -> Self {
         let severity = match error.kind() {
@@ -218,6 +224,7 @@ pub fn logger_flush() -> FFResult<()> {
     if let Some(logger) = LOGGER.get() {
         let mut logger = logger.lock().unwrap();
         logger.flush()?;
+        log(Severity::Debug, "Log flushed");
         Ok(())
     } else {
         Ok(())

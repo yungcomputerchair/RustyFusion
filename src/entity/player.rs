@@ -22,7 +22,7 @@ use crate::{
             PacketID::{self, *},
             *,
         },
-        ClientMap, ClientType, FFClient, FFClientHandle,
+        ClientMap, ClientType, FFClientHandle,
     },
     path::Path,
     state::ShardServerState,

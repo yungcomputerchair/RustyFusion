@@ -13,7 +13,7 @@ use crate::{
             sP_FE2CL_TRANSPORTATION_ENTER, sP_FE2CL_TRANSPORTATION_EXIT,
             sP_FE2CL_TRANSPORTATION_MOVE, sTransportationAppearanceData, PacketID::*,
         },
-        ClientMap, FFClient, FFClientHandle,
+        ClientMap, FFClientHandle,
     },
     path::Path,
     state::ShardServerState,

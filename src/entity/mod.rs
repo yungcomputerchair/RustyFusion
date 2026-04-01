@@ -7,7 +7,7 @@ use crate::{
     error::{FFError, FFResult, Severity},
     net::{
         packet::{sNPCGroupMemberInfo, sPCGroupMemberInfo},
-        ClientMap, FFClient, FFClientHandle,
+        ClientMap, FFClientHandle,
     },
     state::ShardServerState,
     Position,

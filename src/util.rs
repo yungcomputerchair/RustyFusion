@@ -495,6 +495,17 @@ pub fn get_random_gumball() -> Item {
     gumballs[choice]
 }
 
+pub fn make_timer(dur: Duration, prime: bool) -> tokio::time::Interval {
+    let start = if prime {
+        tokio::time::Instant::now()
+    } else {
+        tokio::time::Instant::now() + dur
+    };
+    let mut iv = tokio::time::interval_at(start, dur);
+    iv.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    iv
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

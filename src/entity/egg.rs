@@ -8,7 +8,7 @@ use crate::{
     error::FFResult,
     net::{
         packet::{sP_FE2CL_SHINY_ENTER, sP_FE2CL_SHINY_EXIT, sShinyAppearanceData, PacketID::*},
-        ClientMap, FFClient, FFClientHandle,
+        ClientMap, FFClientHandle,
     },
     state::ShardServerState,
     Position,

@@ -13,8 +13,7 @@ use rusty_fusion::{
     defines::*,
     entity::{Entity, Player},
     error::{
-        backlog_init, log, log_error, log_if_failed, logger_flush, logger_flush_scheduled,
-        logger_init, panic_log, FFError, FFResult, Severity,
+        backlog_init, log, log_if_failed, logger_flush, logger_init, FFError, FFResult, Severity,
     },
     net::{
         packet::{
@@ -25,7 +24,6 @@ use rusty_fusion::{
     },
     state::{ServerState, ShardServerState},
     tabledata::tdata_init,
-    timer::TimerMap,
     tui::{ShardTui, Tui as _},
     unused, util,
 };
@@ -58,64 +56,28 @@ async fn main() -> Result<()> {
 
     let mut state = ServerState::new_shard();
 
-    let mut timers = TimerMap::default();
-
-    // Special timers
-    timers.register_timer(
-        Box::new(|_, _, _| logger_flush_scheduled()),
+    let mut logger_timer = util::make_timer(
         Duration::from_secs(config.general.log_write_interval.get()),
         false,
     );
-    timers.register_timer(
-        Box::new(|_, srv, st| connect_to_login_server(srv, st.as_shard_mut())),
+    let mut login_conn_timer = util::make_timer(
         Duration::from_secs(config.shard.login_server_conn_interval.get()),
         true,
     );
-    timers.register_timer(
-        Box::new(|t, _, st| do_save(t, st.as_shard_mut())),
+    let mut save_timer = util::make_timer(
         Duration::from_secs(config.shard.autosave_interval.get() * 60),
         false,
     );
-    timers.register_timer(
-        Box::new(|_, srv, st| send_status_to_login_server(srv, st.as_shard())),
+    let mut status_timer = util::make_timer(
         Duration::from_secs(config.shard.login_server_update_interval.get()),
         false,
     );
-
-    // Per-minute timer
-    timers.register_timer(
-        Box::new(|t, srv, st| {
-            st.as_shard_mut()
-                .check_for_expired_vehicles(t, &mut srv.get_client_map());
-            Ok(())
-        }),
-        Duration::from_secs(60),
-        false,
-    );
-
-    // Per-tick "fast" timer
-    timers.register_timer(
-        Box::new(|t, srv, st| {
-            st.as_shard_mut()
-                .tick_entities(t, &mut srv.get_client_map());
-            Ok(())
-        }),
+    let mut vehicle_timer = util::make_timer(Duration::from_secs(60), false);
+    let mut entity_timer = util::make_timer(
         Duration::from_millis(1000 / SHARD_TICKS_PER_SECOND as u64),
         false,
     );
-
-    // Per-second "slow" timer
-    timers.register_timer(
-        Box::new(|_, srv, st| {
-            let state = st.as_shard_mut();
-            state.tick_garbage_collection(&mut srv.get_client_map());
-            state.tick_groups(&mut srv.get_client_map());
-            state.check_receivers();
-            Ok(())
-        }),
-        Duration::from_secs(1),
-        false,
-    );
+    let mut slow_timer = util::make_timer(Duration::from_secs(1), false);
 
     log(
         Severity::Info,
@@ -125,37 +87,50 @@ async fn main() -> Result<()> {
     let mut running = true;
     while running {
         server.poll(&mut state)?;
-        timers
-            .check_all(&mut server, &mut state)
-            .unwrap_or_else(|e| {
-                if e.should_dc() {
-                    panic_log(e.get_msg());
-                } else {
-                    log_error(e);
-                }
-            });
-
         terminal.draw(|frame| tui.render(frame, &state, server.get_client_map()))?;
-
-        let mut key_events = Vec::new();
         while let Ok(true) = ce::poll(Duration::ZERO) {
             if let ce::Event::Key(key_event) = ce::read().unwrap() {
-                key_events.push(key_event);
+                if util::is_ctrl_c(&key_event) {
+                    running = false;
+                }
+                match key_event.code {
+                    KeyCode::Up => tui.state.scroll(1),
+                    KeyCode::Down => tui.state.scroll(-1),
+                    KeyCode::PageUp => tui.state.scroll(10),
+                    KeyCode::PageDown => tui.state.scroll(-10),
+                    KeyCode::Esc => tui.state.reset_scroll(),
+                    _ => {}
+                }
             }
         }
 
-        for key_event in key_events {
-            if util::is_ctrl_c(&key_event) {
-                running = false;
+        // Check timers
+        tokio::select! {
+            _ = entity_timer.tick() => {
+                state.as_shard_mut()
+                    .tick_entities(SystemTime::now(), &mut server.get_client_map());
             }
-
-            match key_event.code {
-                KeyCode::Up => tui.state.scroll(1),
-                KeyCode::Down => tui.state.scroll(-1),
-                KeyCode::PageUp => tui.state.scroll(10),
-                KeyCode::PageDown => tui.state.scroll(-10),
-                KeyCode::Esc => tui.state.reset_scroll(),
-                _ => {}
+            _ = slow_timer.tick() => {
+                let shard = state.as_shard_mut();
+                shard.tick_garbage_collection(&mut server.get_client_map());
+                shard.tick_groups(&mut server.get_client_map());
+                shard.check_receivers();
+            }
+            _ = vehicle_timer.tick() => {
+                state.as_shard_mut()
+                    .check_for_expired_vehicles(SystemTime::now(), &mut server.get_client_map());
+            }
+            _ = login_conn_timer.tick() => {
+                log_if_failed(connect_to_login_server(&mut server, state.as_shard_mut()));
+            }
+            _ = status_timer.tick() => {
+                log_if_failed(send_status_to_login_server(&mut server, state.as_shard()));
+            }
+            _ = save_timer.tick() => {
+                log_if_failed(do_save(SystemTime::now(), state.as_shard_mut()));
+            }
+            _ = logger_timer.tick() => {
+                log_if_failed(logger_flush());
             }
         }
     }

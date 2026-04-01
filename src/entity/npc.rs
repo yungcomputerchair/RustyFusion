@@ -19,7 +19,7 @@ use crate::{
             sNPCAppearanceData, sNPCGroupMemberInfo, sP_FE2CL_NPC_ENTER, sP_FE2CL_NPC_EXIT,
             sP_FE2CL_NPC_MOVE, PacketID,
         },
-        ClientMap, FFClient, FFClientHandle,
+        ClientMap, FFClientHandle,
     },
     path::Path,
     state::ShardServerState,

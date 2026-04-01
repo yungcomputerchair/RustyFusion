@@ -10,7 +10,7 @@ use std::{
 use tokio::sync::mpsc;
 
 use crate::{
-    error::{log, log_error, log_if_failed, panic_log, FFError, FFResult, Severity},
+    error::{log, log_error, panic_log, FFError, FFResult, Severity},
     net::{packet::Packet, PACKET_BUFFER_SIZE, SILENCED_PACKETS},
 };
 
@@ -413,9 +413,7 @@ impl FFClient {
         if self.waiting_data_len.is_none() {
             // read the size
             let mut sz_buf: [u8; 4] = [0; 4];
-            self.sock
-                .read_exact(&mut sz_buf)
-                .map_err(FFError::from_io_err)?;
+            self.sock.read_exact(&mut sz_buf)?;
             let sz: usize = u32::from_le_bytes(sz_buf) as usize;
             self.waiting_data_len = Some(sz);
         }
@@ -433,7 +431,7 @@ impl FFClient {
 
         // read the packet
         let buf: &mut [u8] = &mut self.in_buf.buf[..sz];
-        self.sock.read_exact(buf).map_err(FFError::from_io_err)?;
+        self.sock.read_exact(buf)?;
         self.waiting_data_len = None;
         self.in_buf.ptr = 0;
         self.in_buf.len = sz;
@@ -488,12 +486,9 @@ impl FFClient {
         let total = sz_buf.len() + sz;
         let mut written = 0;
         while written < total {
-            let n = self
-                .sock
-                .write_vectored(slices)
-                .map_err(FFError::from_io_err)?;
+            let n = self.sock.write_vectored(slices)?;
             if n == 0 {
-                return Err(FFError::from_io_err(std::io::Error::new(
+                return Err(FFError::from(std::io::Error::new(
                     std::io::ErrorKind::WriteZero,
                     "write_vectored wrote 0 bytes",
                 )));

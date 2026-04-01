@@ -11,7 +11,7 @@ use crate::{
     defines::ID_OVERWORLD,
     entity::{Entity, EntityID, Player, NPC},
     error::{log, log_if_failed, panic_log, FFError, FFResult, Severity},
-    net::{ClientMap, FFClient, FFClientHandle},
+    net::{ClientMap, FFClientHandle},
     Position,
 };
 
@@ -802,7 +802,7 @@ mod tests {
     use crate::{
         entity::{Combatant, Entity, EntityID},
         error::FFResult,
-        net::{ClientMap, FFClient, FFClientHandle},
+        net::{ClientMap, FFClientHandle},
         state::ShardServerState,
         Position,
     };

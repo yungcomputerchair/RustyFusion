@@ -11,8 +11,7 @@ use rusty_fusion::{
     config::config_init,
     database::{db_init, db_shutdown},
     error::{
-        backlog_init, log, log_error, log_if_failed, logger_flush, logger_flush_scheduled,
-        logger_init, panic_log, FFError, FFResult, Severity,
+        backlog_init, log, log_if_failed, logger_flush, logger_init, FFError, FFResult, Severity,
     },
     geo::geo_init,
     monitor::{monitor_flush, monitor_init, monitor_queue, MonitorEvent},
@@ -25,7 +24,6 @@ use rusty_fusion::{
     },
     state::{LoginServerState, ServerState},
     tabledata::tdata_init,
-    timer::TimerMap,
     tui::{LoginTui, Tui as _},
     unused, util,
 };
@@ -57,19 +55,13 @@ async fn main() -> Result<()> {
 
     let mut state = ServerState::new_login();
 
-    let mut timers = TimerMap::default();
-    timers.register_timer(
-        Box::new(|_, _, _| logger_flush_scheduled()),
+    let mut logger_timer = util::make_timer(
         Duration::from_secs(config.general.log_write_interval.get()),
         false,
     );
-    timers.register_timer(
-        Box::new(|t, srv, st| {
-            st.as_login_mut()
-                .process_shard_connection_requests(srv.get_clients(), t);
-            Ok(())
-        }),
-        Duration::from_millis(250),
+    let mut shard_conn_timer = util::make_timer(Duration::from_millis(250), false);
+    let mut monitor_timer = util::make_timer(
+        Duration::from_secs(config.login.monitor_interval.get()),
         false,
     );
 
@@ -82,16 +74,10 @@ async fn main() -> Result<()> {
         ),
     );
 
-    if config.login.monitor_enabled.get() {
+    let monitor_enabled = config.login.monitor_enabled.get();
+    if monitor_enabled {
         let monitor_addr = config.login.monitor_addr.get();
         monitor_init(monitor_addr);
-
-        let monitor_interval = config.login.monitor_interval.get();
-        timers.register_timer(
-            Box::new(move |_, _, st| send_monitor_update(st.as_login())),
-            Duration::from_secs(monitor_interval),
-            false,
-        );
     }
 
     let geo_db_path = config.login.geo_db_path.get();
@@ -120,37 +106,36 @@ async fn main() -> Result<()> {
     let mut running = true;
     while running {
         server.poll(&mut state)?;
-        timers
-            .check_all(&mut server, &mut state)
-            .unwrap_or_else(|e| {
-                if e.should_dc() {
-                    panic_log(e.get_msg());
-                } else {
-                    log_error(e);
-                }
-            });
-
         terminal.draw(|frame| tui.render(frame, &state, server.get_client_map()))?;
-
-        let mut key_events = Vec::new();
         while let Ok(true) = ce::poll(Duration::ZERO) {
             if let ce::Event::Key(key_event) = ce::read().unwrap() {
-                key_events.push(key_event);
+                if util::is_ctrl_c(&key_event) {
+                    running = false;
+                }
+                match key_event.code {
+                    KeyCode::Up => tui.state.scroll(1),
+                    KeyCode::Down => tui.state.scroll(-1),
+                    KeyCode::PageUp => tui.state.scroll(10),
+                    KeyCode::PageDown => tui.state.scroll(-10),
+                    KeyCode::Esc => tui.state.reset_scroll(),
+                    _ => {}
+                }
             }
         }
 
-        for key_event in key_events {
-            if util::is_ctrl_c(&key_event) {
-                running = false;
+        // Check timers
+        tokio::select! {
+            _ = shard_conn_timer.tick() => {
+                state.as_login_mut()
+                    .process_shard_connection_requests(server.get_clients(), SystemTime::now());
             }
-
-            match key_event.code {
-                KeyCode::Up => tui.state.scroll(1),
-                KeyCode::Down => tui.state.scroll(-1),
-                KeyCode::PageUp => tui.state.scroll(10),
-                KeyCode::PageDown => tui.state.scroll(-10),
-                KeyCode::Esc => tui.state.reset_scroll(),
-                _ => {}
+            _ = monitor_timer.tick() => {
+                if monitor_enabled {
+                    log_if_failed(send_monitor_update(state.as_login()));
+                }
+            }
+            _ = logger_timer.tick() => {
+                log_if_failed(logger_flush());
             }
         }
     }
