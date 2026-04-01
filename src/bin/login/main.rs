@@ -45,16 +45,16 @@ async fn main() -> Result<()> {
     tdata_init();
 
     let live_check_time = Duration::from_secs(config.general.live_check_time.get());
-    let polling_interval = Duration::from_millis(50);
     let listen_addr = config.login.listen_addr.get();
     let mut server = FFServer::new(
         listen_addr,
         handle_packet,
         Some(handle_disconnect),
         Some((live_check_time, send_live_check)),
-        Some(polling_interval),
     )?;
 
+    let mut poll_timer = util::make_timer(Duration::from_millis(10), true);
+    let mut tui_timer = util::make_timer(Duration::from_millis(100), true);
     let mut logger_timer = util::make_timer(
         Duration::from_secs(config.general.log_write_interval.get()),
         false,
@@ -107,45 +107,48 @@ async fn main() -> Result<()> {
     let state = Arc::new(Mutex::new(state));
     let mut running = true;
     while running {
-        if let Err(e) = server.poll(&state).await {
-            log(Severity::Fatal, &format!("Error during server poll: {}", e));
-            break;
-        }
-
-        let mut state = state.lock().await;
-
-        if let Err(e) = terminal.draw(|frame| tui.render(frame, &state, server.get_client_map())) {
-            log(
-                Severity::Warning,
-                &format!("Failed to draw TUI; skipping this frame: {}", e),
-            );
-        }
-
-        while let Ok(true) = ce::poll(Duration::ZERO) {
-            if let ce::Event::Key(key_event) = ce::read().unwrap() {
-                if util::is_ctrl_c(&key_event) {
-                    running = false;
-                }
-                match key_event.code {
-                    KeyCode::Up => tui.state.scroll(1),
-                    KeyCode::Down => tui.state.scroll(-1),
-                    KeyCode::PageUp => tui.state.scroll(10),
-                    KeyCode::PageDown => tui.state.scroll(-10),
-                    KeyCode::Esc => tui.state.reset_scroll(),
-                    _ => {}
-                }
-            }
-        }
-
         // Check timers
         tokio::select! {
+            _ = poll_timer.tick() => {
+                if let Err(e) = server.poll(&state).await {
+                    log(Severity::Fatal, &format!("Error during server poll: {}", e));
+                    break;
+                }
+            }
+            _ = tui_timer.tick() => {
+                // process events
+                while let Ok(true) = ce::poll(Duration::ZERO) {
+                    if let ce::Event::Key(key_event) = ce::read().unwrap() {
+                        if util::is_ctrl_c(&key_event) {
+                            running = false;
+                        }
+                        match key_event.code {
+                            KeyCode::Up => tui.state.scroll(1),
+                            KeyCode::Down => tui.state.scroll(-1),
+                            KeyCode::PageUp => tui.state.scroll(10),
+                            KeyCode::PageDown => tui.state.scroll(-10),
+                            KeyCode::Esc => tui.state.reset_scroll(),
+                            _ => {}
+                        }
+                    }
+                }
+
+                // render
+                let state = state.lock().await;
+                if let Err(e) = terminal.draw(|frame| tui.render(frame, &state, server.get_client_map())) {
+                    log(
+                        Severity::Warning,
+                        &format!("Failed to draw TUI; skipping this frame: {}", e),
+                    );
+                }
+            }
             _ = shard_conn_timer.tick() => {
-                state.as_login_mut()
+                state.lock().await.as_login_mut()
                     .process_shard_connection_requests(server.get_clients(), SystemTime::now());
             }
             _ = monitor_timer.tick() => {
                 if monitor_enabled {
-                    log_if_failed(send_monitor_update(state.as_login()));
+                    log_if_failed(send_monitor_update(state.lock().await.as_login()));
                 }
             }
             _ = logger_timer.tick() => {

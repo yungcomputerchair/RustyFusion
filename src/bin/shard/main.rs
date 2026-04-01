@@ -46,16 +46,16 @@ async fn main() -> Result<()> {
     tdata_init();
 
     let live_check_time = Duration::from_secs(config.general.live_check_time.get());
-    let polling_interval = Duration::from_millis(50);
     let listen_addr = config_get().shard.listen_addr.get();
     let mut server = FFServer::new(
         listen_addr,
         handle_packet,
         Some(handle_disconnect),
         Some((live_check_time, send_live_check)),
-        Some(polling_interval),
     )?;
 
+    let mut poll_timer = util::make_timer(Duration::from_millis(10), true);
+    let mut tui_timer = util::make_timer(Duration::from_millis(100), true);
     let mut logger_timer = util::make_timer(
         Duration::from_secs(config.general.log_write_interval.get()),
         false,
@@ -92,60 +92,64 @@ async fn main() -> Result<()> {
     let state = Arc::new(Mutex::new(ServerState::new_shard()));
     let mut running = true;
     while running {
-        if let Err(e) = server.poll(&state).await {
-            log(Severity::Fatal, &format!("Error during server poll: {}", e));
-            break;
-        }
-
-        let mut state = state.lock().await;
-
-        if let Err(e) = terminal.draw(|frame| tui.render(frame, &state, server.get_client_map())) {
-            log(
-                Severity::Warning,
-                &format!("Failed to draw TUI; skipping this frame: {}", e),
-            );
-        }
-
-        while let Ok(true) = ce::poll(Duration::ZERO) {
-            if let ce::Event::Key(key_event) = ce::read().unwrap() {
-                if util::is_ctrl_c(&key_event) {
-                    running = false;
-                }
-                match key_event.code {
-                    KeyCode::Up => tui.state.scroll(1),
-                    KeyCode::Down => tui.state.scroll(-1),
-                    KeyCode::PageUp => tui.state.scroll(10),
-                    KeyCode::PageDown => tui.state.scroll(-10),
-                    KeyCode::Esc => tui.state.reset_scroll(),
-                    _ => {}
-                }
-            }
-        }
-
         // Check timers
         tokio::select! {
+            _ = poll_timer.tick() => {
+                if let Err(e) = server.poll(&state).await {
+                    log(Severity::Fatal, &format!("Error during server poll: {}", e));
+                    break;
+                }
+            }
+            _ = tui_timer.tick() => {
+                // process events
+                while let Ok(true) = ce::poll(Duration::ZERO) {
+                    if let ce::Event::Key(key_event) = ce::read().unwrap() {
+                        if util::is_ctrl_c(&key_event) {
+                            running = false;
+                        }
+                        match key_event.code {
+                            KeyCode::Up => tui.state.scroll(1),
+                            KeyCode::Down => tui.state.scroll(-1),
+                            KeyCode::PageUp => tui.state.scroll(10),
+                            KeyCode::PageDown => tui.state.scroll(-10),
+                            KeyCode::Esc => tui.state.reset_scroll(),
+                            _ => {}
+                        }
+                    }
+                }
+
+                // render
+                let state = state.lock().await;
+                if let Err(e) = terminal.draw(|frame| tui.render(frame, &state, server.get_client_map())) {
+                    log(
+                        Severity::Warning,
+                        &format!("Failed to draw TUI; skipping this frame: {}", e),
+                    );
+                }
+            }
             _ = entity_timer.tick() => {
-                state.as_shard_mut()
+                state.lock().await.as_shard_mut()
                     .tick_entities(SystemTime::now(), &mut server.get_client_map());
             }
             _ = slow_timer.tick() => {
+                let mut state = state.lock().await;
                 let shard = state.as_shard_mut();
                 shard.tick_garbage_collection(&mut server.get_client_map());
                 shard.tick_groups(&mut server.get_client_map());
                 shard.check_receivers();
             }
             _ = vehicle_timer.tick() => {
-                state.as_shard_mut()
+                state.lock().await.as_shard_mut()
                     .check_for_expired_vehicles(SystemTime::now(), &mut server.get_client_map());
             }
             _ = login_conn_timer.tick() => {
-                log_if_failed(connect_to_login_server(&mut server, state.as_shard_mut()));
+                log_if_failed(connect_to_login_server(&mut server, state.lock().await.as_shard_mut()));
             }
             _ = status_timer.tick() => {
-                log_if_failed(send_status_to_login_server(&mut server, state.as_shard()));
+                log_if_failed(send_status_to_login_server(&mut server, state.lock().await.as_shard()));
             }
             _ = save_timer.tick() => {
-                log_if_failed(do_save(SystemTime::now(), state.as_shard_mut()));
+                log_if_failed(do_save(SystemTime::now(), state.lock().await.as_shard_mut()));
             }
             _ = logger_timer.tick() => {
                 log_if_failed(logger_flush());

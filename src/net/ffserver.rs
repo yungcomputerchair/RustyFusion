@@ -22,7 +22,6 @@ use super::{
 const EPOLL_KEY_SELF: usize = 0;
 
 pub struct FFServer {
-    poll_timeout: Option<Duration>,
     sock: TcpListener,
     poller: Poller,
     next_epoll_key: usize,
@@ -39,10 +38,8 @@ impl FFServer {
         pkt_handler: PacketCallback,
         dc_handler: Option<DisconnectCallback>,
         live_check: Option<(Duration, LiveCheckCallback)>,
-        poll_timeout: Option<Duration>,
     ) -> Result<Self> {
         let server: Self = Self {
-            poll_timeout,
             sock: TcpListener::bind(addr)?,
             poller: Poller::new()?,
             next_epoll_key: EPOLL_KEY_SELF + 1,
@@ -119,7 +116,9 @@ impl FFServer {
         }
 
         let mut events: Vec<Event> = Vec::new();
-        if let Err(e) = self.poller.wait(&mut events, self.poll_timeout) {
+
+        // We use a timeout of zero so that we are totally non-blocking.
+        if let Err(e) = self.poller.wait(&mut events, Some(Duration::ZERO)) {
             match e.kind() {
                 ErrorKind::Interrupted => return Ok(()), // this is fine
                 _ => {
