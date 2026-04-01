@@ -21,7 +21,7 @@ use crate::{
     Position,
 };
 
-trait AINode: std::fmt::Debug {
+trait AINode: std::fmt::Debug + Send {
     fn clone_node(&self) -> Box<dyn AINode>;
     fn tick(
         &mut self,

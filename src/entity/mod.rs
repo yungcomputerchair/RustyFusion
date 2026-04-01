@@ -35,7 +35,7 @@ pub enum EntityID {
     Egg(i32),
 }
 
-pub trait Entity {
+pub trait Entity: Send {
     fn get_id(&self) -> EntityID;
     fn get_client(&self, client_map: &ClientMap) -> Option<FFClientHandle>;
     fn get_position(&self) -> Position;

@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     io::Result,
+    sync::Arc,
     time::{Duration, SystemTime},
 };
 
@@ -27,6 +28,7 @@ use rusty_fusion::{
     tui::{LoginTui, Tui as _},
     unused, util,
 };
+use tokio::sync::Mutex;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -53,8 +55,6 @@ async fn main() -> Result<()> {
         Some(polling_interval),
     )?;
 
-    let mut state = ServerState::new_login();
-
     let mut logger_timer = util::make_timer(
         Duration::from_secs(config.general.log_write_interval.get()),
         false,
@@ -65,6 +65,7 @@ async fn main() -> Result<()> {
         false,
     );
 
+    let state = ServerState::new_login();
     log(
         Severity::Info,
         &format!(
@@ -103,10 +104,23 @@ async fn main() -> Result<()> {
         );
     }
 
+    let state = Arc::new(Mutex::new(state));
     let mut running = true;
     while running {
-        server.poll(&mut state)?;
-        terminal.draw(|frame| tui.render(frame, &state, server.get_client_map()))?;
+        if let Err(e) = server.poll(&state).await {
+            log(Severity::Fatal, &format!("Error during server poll: {}", e));
+            break;
+        }
+
+        let mut state = state.lock().await;
+
+        if let Err(e) = terminal.draw(|frame| tui.render(frame, &state, server.get_client_map())) {
+            log(
+                Severity::Warning,
+                &format!("Failed to draw TUI; skipping this frame: {}", e),
+            );
+        }
+
         while let Ok(true) = ce::poll(Duration::ZERO) {
             if let ce::Event::Key(key_event) = ce::read().unwrap() {
                 if util::is_ctrl_c(&key_event) {

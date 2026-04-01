@@ -1,9 +1,11 @@
 use polling::{Event, PollMode, Poller};
+use tokio::sync::Mutex;
 
 use std::{
     collections::HashMap,
     io::{ErrorKind, Result},
     net::{SocketAddr, TcpListener, TcpStream},
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -71,7 +73,7 @@ impl FFServer {
         None
     }
 
-    pub fn poll(&mut self, state: &mut ServerState) -> Result<()> {
+    pub async fn poll(&mut self, state: &Arc<Mutex<ServerState>>) -> Result<()> {
         let time_now = Instant::now();
         let client_keys: Vec<usize> = self.clients.keys().copied().collect();
         for key in client_keys {
@@ -111,7 +113,8 @@ impl FFServer {
             }
 
             if client.should_dc() {
-                self.disconnect_client(key, state)?;
+                let mut state = state.lock().await;
+                self.disconnect_client(key, &mut state)?;
             }
         }
 
@@ -134,6 +137,7 @@ impl FFServer {
                 );
                 self.register_client(conn_data)?;
             } else {
+                let mut state = state.lock().await;
                 let client = match self.clients.get_mut(&ev.key) {
                     Some(client) => client,
                     None => {
@@ -144,19 +148,20 @@ impl FFServer {
 
                 let pkt_handler = self.pkt_handler;
                 let res = (|clients: &mut HashMap<usize, FFClient>,
-                            handles: &HashMap<usize, FFClientHandle>| {
+                            handles: &HashMap<usize, FFClientHandle>,
+                            state: &mut ServerState| {
                     let client = clients.get_mut(&ev.key).unwrap();
                     client.read_payload()?;
                     let pkt_id = client.peek_packet_id()?;
                     pkt_handler(ev.key, clients, handles, pkt_id, state).map_err(|e| {
                         FFError::build(e.get_severity(), format!("<{:?}> {}", pkt_id, e.get_msg()))
                     })
-                })(&mut self.clients, &self.handles);
+                })(&mut self.clients, &self.handles, &mut state);
 
                 if let Err(e) = res {
                     log(e.get_severity(), &format!("{} ({})", e.get_msg(), addr));
                     if e.should_dc() {
-                        self.disconnect_client(ev.key, state)?;
+                        self.disconnect_client(ev.key, &mut state)?;
                     }
                 }
             }
