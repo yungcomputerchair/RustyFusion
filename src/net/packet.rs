@@ -24,7 +24,15 @@ impl Packet {
 
     pub fn new<T: FFPacket>(id: PacketID, pkt: &T) -> FFResult<Self> {
         let packet_size = PACKET_ID_SIZE + size_of::<T>();
-        PacketBuilder::_new(id, packet_size).with(pkt).build()
+        PacketBuilder::_new(id, packet_size)
+            .with(pkt)
+            .build()
+            .map_err(|e| {
+                FFError::build(
+                    e.get_severity(),
+                    format!("Failed to build packet {:?}: {}", id, e.get_msg()),
+                )
+            })
     }
 
     pub fn id(&self) -> PacketID {

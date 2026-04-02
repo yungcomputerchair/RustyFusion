@@ -44,8 +44,8 @@ pub trait Entity: Send {
     fn get_chunk_coords(&self) -> ChunkCoords;
     fn set_position(&mut self, pos: Position);
     fn set_rotation(&mut self, rotation: i32);
-    fn send_enter(&self, client: &FFClientHandle) -> FFResult<()>;
-    fn send_exit(&self, client: &FFClientHandle) -> FFResult<()>;
+    fn send_enter(&self, client: &FFClientHandle);
+    fn send_exit(&self, client: &FFClientHandle);
 
     fn tick(
         &mut self,

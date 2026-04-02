@@ -5,7 +5,6 @@ use rand::rngs::ThreadRng;
 use crate::{
     chunk::{ChunkCoords, InstanceID},
     entity::{Entity, EntityID},
-    error::FFResult,
     net::{
         packet::{sP_FE2CL_SHINY_ENTER, sP_FE2CL_SHINY_EXIT, sShinyAppearanceData, PacketID::*},
         ClientMap, FFClientHandle,
@@ -82,7 +81,7 @@ impl Entity for Egg {
 
     fn set_rotation(&mut self, _: i32) {}
 
-    fn send_enter(&self, client: &FFClientHandle) -> FFResult<()> {
+    fn send_enter(&self, client: &FFClientHandle) {
         let pkt = sP_FE2CL_SHINY_ENTER {
             ShinyAppearanceData: sShinyAppearanceData {
                 iShiny_ID: self.id,
@@ -93,12 +92,12 @@ impl Entity for Egg {
                 iZ: self.position.z,
             },
         };
-        client.send_packet(P_FE2CL_SHINY_ENTER, &pkt)
+        client.send_packet(P_FE2CL_SHINY_ENTER, &pkt);
     }
 
-    fn send_exit(&self, client: &FFClientHandle) -> FFResult<()> {
+    fn send_exit(&self, client: &FFClientHandle) {
         let pkt = sP_FE2CL_SHINY_EXIT { iShinyID: self.id };
-        client.send_packet(P_FE2CL_SHINY_EXIT, &pkt)
+        client.send_packet(P_FE2CL_SHINY_EXIT, &pkt);
     }
 
     fn tick(

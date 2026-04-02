@@ -101,7 +101,7 @@ pub fn do_basic_attack(
             }
 
             if let Some(resp) = log_if_failed(resp.build()) {
-                log_if_failed(client.send_payload(resp));
+                client.send_payload(resp)
             }
         }
 
@@ -149,7 +149,7 @@ pub fn do_basic_attack(
             }
 
             if let Some(resp) = log_if_failed(resp.build()) {
-                log_if_failed(client.send_payload(resp));
+                client.send_payload(resp);
             }
         }
 
@@ -181,12 +181,11 @@ pub fn do_basic_attack(
 
     state.entity_map.for_each_around(attacker_id, clients, |c| {
         if let Some(pkt) = &pc_bcast {
-            c.send_payload(pkt.clone())?;
+            c.send_payload(pkt.clone());
         }
         if let Some(pkt) = &npc_bcast {
-            c.send_payload(pkt.clone())?;
+            c.send_payload(pkt.clone());
         }
-        Ok(())
     });
 
     Ok(())

@@ -205,16 +205,16 @@ impl Entity for NPC {
         self.rotation = rotation.rem_euclid(360);
     }
 
-    fn send_enter(&self, client: &FFClientHandle) -> FFResult<()> {
+    fn send_enter(&self, client: &FFClientHandle) {
         let pkt = sP_FE2CL_NPC_ENTER {
             NPCAppearanceData: self.get_appearance_data(),
         };
-        client.send_packet(PacketID::P_FE2CL_NPC_ENTER, &pkt)
+        client.send_packet(PacketID::P_FE2CL_NPC_ENTER, &pkt);
     }
 
-    fn send_exit(&self, client: &FFClientHandle) -> FFResult<()> {
+    fn send_exit(&self, client: &FFClientHandle) {
         let pkt = sP_FE2CL_NPC_EXIT { iNPC_ID: self.id };
-        client.send_packet(PacketID::P_FE2CL_NPC_EXIT, &pkt)
+        client.send_packet(PacketID::P_FE2CL_NPC_EXIT, &pkt);
     }
 
     fn tick(

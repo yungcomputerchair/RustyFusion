@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    io::Result,
     sync::Arc,
     time::{Duration, SystemTime},
 };
@@ -31,7 +30,7 @@ use rusty_fusion::{
 use tokio::sync::Mutex;
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> FFResult<()> {
     color_eyre::install().unwrap();
     let mut terminal = ratatui::init();
     backlog_init();

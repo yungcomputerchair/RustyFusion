@@ -37,7 +37,7 @@ pub fn pc_group_invite(clients: &mut ClientMap, state: &mut ShardServerState) ->
 
             let target_client = target_player.get_client(clients).unwrap();
             let pkt = sP_FE2CL_PC_GROUP_INVITE { iHostID: pc_id };
-            log_if_failed(target_client.send_packet(P_FE2CL_PC_GROUP_INVITE, &pkt));
+            target_client.send_packet(P_FE2CL_PC_GROUP_INVITE, &pkt);
             Ok(())
         })(),
         || {
@@ -71,7 +71,7 @@ pub fn pc_group_invite_refuse(
 
     let host_client = host_player.get_client(clients).unwrap();
     let pkt = sP_FE2CL_PC_GROUP_INVITE_REFUSE { iID_To: pc_id };
-    log_if_failed(host_client.send_packet(P_FE2CL_PC_GROUP_INVITE_REFUSE, &pkt));
+    host_client.send_packet(P_FE2CL_PC_GROUP_INVITE_REFUSE, &pkt);
     host_player.group_offered_to = None;
     Ok(())
 }
@@ -129,7 +129,7 @@ pub fn pc_group_join(clients: &mut ClientMap, state: &mut ShardServerState) -> F
                 for eid in group.get_member_ids() {
                     let entity = state.entity_map.get_entity_raw(*eid).unwrap();
                     if let Some(client) = entity.get_client(clients) {
-                        log_if_failed(client.send_payload(pkt.clone()));
+                        client.send_payload(pkt.clone());
                     }
                 }
             }
@@ -234,7 +234,7 @@ pub fn npc_group_invite(clients: &mut ClientMap, state: &mut ShardServerState) -
         for eid in group.get_member_ids() {
             let entity = state.entity_map.get_entity_raw(*eid).unwrap();
             if let Some(client) = entity.get_client(clients) {
-                log_if_failed(client.send_payload(pkt.clone()));
+                client.send_payload(pkt.clone());
             }
         }
     }

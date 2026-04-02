@@ -1199,11 +1199,10 @@ impl Player {
                         .map(|d| d.as_secs() as i32)
                         .unwrap_or(unused!()),
                 };
-                log_if_failed(
-                    self.get_client(clients)
-                        .unwrap()
-                        .send_packet(P_FE2CL_REP_PC_TASK_START_SUCC, &pkt),
-                );
+
+                self.get_client(clients)
+                    .unwrap()
+                    .send_packet(P_FE2CL_REP_PC_TASK_START_SUCC, &pkt);
             }
         }
 
@@ -1516,7 +1515,7 @@ impl Player {
                     }
 
                     if let Some(pkt) = log_if_failed(pkt.build()) {
-                        log_if_failed(client.send_payload(pkt));
+                        client.send_payload(pkt);
                     }
                 }
 
@@ -1524,7 +1523,7 @@ impl Player {
                     iTaskNum: task.get_task_id(),
                     iErrorCode: fail_code as i32,
                 };
-                log_if_failed(client.send_packet(P_FE2CL_REP_PC_TASK_END_FAIL, &pkt));
+                client.send_packet(P_FE2CL_REP_PC_TASK_END_FAIL, &pkt);
                 continue;
             }
 
@@ -1567,7 +1566,7 @@ impl Player {
                 });
 
                 if let Some(reward_pkt) = log_if_failed(reward_pkt.build()) {
-                    log_if_failed(client.send_payload(reward_pkt));
+                    client.send_payload(reward_pkt);
                 }
             }
         }
@@ -1732,19 +1731,19 @@ impl Entity for Player {
         self.rotation = rotation.rem_euclid(360);
     }
 
-    fn send_enter(&self, client: &FFClientHandle) -> FFResult<()> {
+    fn send_enter(&self, client: &FFClientHandle) {
         let pkt = sP_FE2CL_PC_NEW {
             PCAppearanceData: self.get_appearance_data(),
         };
-        client.send_packet(PacketID::P_FE2CL_PC_NEW, &pkt)
+        client.send_packet(PacketID::P_FE2CL_PC_NEW, &pkt);
     }
 
-    fn send_exit(&self, client: &FFClientHandle) -> FFResult<()> {
+    fn send_exit(&self, client: &FFClientHandle) {
         let pkt = sP_FE2CL_PC_EXIT {
             iID: self.get_player_id(),
             iExitType: unused!(),
         };
-        client.send_packet(PacketID::P_FE2CL_PC_EXIT, &pkt)
+        client.send_packet(PacketID::P_FE2CL_PC_EXIT, &pkt);
     }
 
     fn cleanup(&mut self, clients: &mut ClientMap, state: &mut ShardServerState) {
@@ -1767,9 +1766,8 @@ impl Entity for Player {
                 iID_From: trade.get_id_from(),
                 iID_To: trade.get_id_to(),
             };
-            log_if_failed(
-                client_other.send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL, &pkt_cancel),
-            );
+
+            client_other.send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL, &pkt_cancel);
         }
 
         // cleanup group
@@ -1804,11 +1802,10 @@ impl Entity for Player {
             iBatteryN: self.nano_potions as i32,
             bResetMissionFlag: unused!(),
         };
-        log_if_failed(
-            self.get_client(clients)
-                .unwrap()
-                .send_packet(P_FE2CL_REP_PC_TICK, &pkt),
-        );
+
+        self.get_client(clients)
+            .unwrap()
+            .send_packet(P_FE2CL_REP_PC_TICK, &pkt);
     }
 
     fn as_combatant(&self) -> Option<&dyn Combatant> {

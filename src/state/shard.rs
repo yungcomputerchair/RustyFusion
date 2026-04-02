@@ -247,7 +247,7 @@ impl ShardServerState {
                         if player.vehicle_speed.is_some() {
                             player.vehicle_speed = None;
                             let pkt = sP_FE2CL_PC_VEHICLE_OFF_SUCC { UNUSED: unused!() };
-                            log_if_failed(client.send_packet(P_FE2CL_PC_VEHICLE_OFF_SUCC, &pkt));
+                            client.send_packet(P_FE2CL_PC_VEHICLE_OFF_SUCC, &pkt);
                             pc_ids_dismounted.push(pc_id);
                         }
 
@@ -261,7 +261,7 @@ impl ShardServerState {
                                 })
                                 .build(),
                         ) {
-                            log_if_failed(client.send_payload(pkt));
+                            client.send_payload(pkt);
                         }
                     }
                 }
@@ -311,7 +311,7 @@ impl ShardServerState {
                 for eid in group.get_member_ids() {
                     let entity = self.entity_map.get_entity_raw(*eid).unwrap();
                     if let Some(client) = entity.get_client(clients) {
-                        log_if_failed(client.send_payload(pkt.clone()));
+                        client.send_payload(pkt.clone());
                     }
                 }
             }

@@ -302,7 +302,7 @@ pub fn gm_pc_announce(clients: &mut ClientMap, state: &mut ShardServerState) -> 
             .for_each(|pc_id| {
                 let player = state.get_player(*pc_id).unwrap();
                 let client = player.get_client(clients).unwrap();
-                log_if_failed(client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt));
+                client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
             }),
         AreaType::Shard => state
             .entity_map
@@ -311,11 +311,11 @@ pub fn gm_pc_announce(clients: &mut ClientMap, state: &mut ShardServerState) -> 
             .for_each(|pc_id| {
                 let player = state.get_player(*pc_id).unwrap();
                 let client = player.get_client(clients).unwrap();
-                log_if_failed(client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt));
+                client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
             }),
         AreaType::Global => {
             if let Some(login_server) = clients.get_login_server() {
-                log_if_failed(login_server.send_packet(P_FE2LS_ANNOUNCE_MSG, &pkt));
+                login_server.send_packet(P_FE2LS_ANNOUNCE_MSG, &pkt)?;
             } else {
                 log(
                     Severity::Warning,
@@ -537,13 +537,15 @@ pub fn gm_target_pc_teleport(
         Item: unused!(),
         iCandy: player.get_taros() as i32,
     };
+
     let client = player.get_client(clients).unwrap();
-    log_if_failed(client.send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp));
+    client.send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp);
 
     // see transport::helpers::do_warp to see why we use None for the chunk here
     state
         .entity_map
         .update(EntityID::Player(target_pc_id), None, Some(clients));
+
     Ok(())
 }
 
@@ -560,19 +562,23 @@ pub fn gm_kick_player(clients: &mut ClientMap, state: &mut ShardServerState) -> 
         ),
         TargetSearchBy::PlayerUID => PlayerSearchQuery::ByUID(pkt.iTargetPC_UID),
     };
+
     let pc_id = search_query
         .execute(state)
         .ok_or_else(|| helpers::send_search_fail(clients.get_self(), search_query))?;
+
     let client = state
         .get_player(pc_id)
         .unwrap()
         .get_client(clients)
         .unwrap();
+
     let pkt = sP_FE2CL_REP_PC_EXIT_SUCC {
         iID: pc_id,
         iExitCode: EXIT_CODE_REQ_BY_GM as i32,
     };
-    log_if_failed(client.send_packet(P_FE2CL_REP_PC_EXIT_SUCC, &pkt));
+
+    client.send_packet(P_FE2CL_REP_PC_EXIT_SUCC, &pkt);
     client.disconnect();
     Ok(())
 }

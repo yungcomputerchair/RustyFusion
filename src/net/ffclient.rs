@@ -10,7 +10,7 @@ use std::{
 use tokio::sync::mpsc;
 
 use crate::{
-    error::{log, log_error, panic_log, FFError, FFResult, Severity},
+    error::{log, log_error, panic_if_failed, panic_log, FFError, FFResult, Severity},
     net::{packet::Packet, PACKET_BUFFER_SIZE, SILENCED_PACKETS},
 };
 
@@ -69,16 +69,17 @@ impl FFClientHandle {
         Self { tx }
     }
 
-    pub fn send_packet<T: FFPacket>(&self, pkt_id: PacketID, pkt: &T) -> FFResult<()> {
-        let pkt = Packet::new(pkt_id, pkt)?;
-        self.send_payload(pkt)
+    pub fn send_packet<T: FFPacket>(&self, pkt_id: PacketID, pkt: &T) {
+        // It should be impossible for a single packet struct to be
+        // bigger than the packet buffer, so fail fast if that happens.
+        let pkt = panic_if_failed(Packet::new(pkt_id, pkt));
+        self.send_payload(pkt);
     }
 
-    // TODO block on flush to confirm the packet was sent
-    pub fn send_payload(&self, pkt: Packet) -> FFResult<()> {
-        self.tx
-            .send(ClientMessage::Packet(pkt))
-            .map_err(|_| FFError::build(Severity::Warning, "Client channel closed".to_string()))
+    pub fn send_payload(&self, pkt: Packet) {
+        // it's okay to silently fail; if the channel is closed,
+        // the client has already disconnected
+        let _ = self.tx.send(ClientMessage::Packet(pkt));
     }
 
     pub fn disconnect(&self) {

@@ -10,7 +10,7 @@ use crate::{
     config::config_get,
     defines::ID_OVERWORLD,
     entity::{Entity, EntityID, Player, NPC},
-    error::{log, log_if_failed, panic_log, FFError, FFResult, Severity},
+    error::{log, panic_log, FFError, FFResult, Severity},
     net::{ClientMap, FFClientHandle},
     Position,
 };
@@ -396,7 +396,7 @@ impl EntityMap {
             if let Some(from_client) = from.get_client(client_map) {
                 // possible for the ID to be unregistered if the instance was cleaned up
                 if let Some(to) = self.get_entity_raw(*e) {
-                    log_if_failed(to.send_exit(&from_client));
+                    to.send_exit(&from_client);
                 }
             }
 
@@ -405,7 +405,7 @@ impl EntityMap {
             if let Some(from) = self.get_entity_raw(*e) {
                 if let Some(from_client) = from.get_client(client_map) {
                     let to = self.get_entity_raw(id).unwrap();
-                    log_if_failed(to.send_exit(&from_client));
+                    to.send_exit(&from_client);
                 }
             }
         }
@@ -416,14 +416,14 @@ impl EntityMap {
             let from = self.get_entity_raw(id).unwrap();
             if let Some(from_client) = from.get_client(client_map) {
                 let to = self.get_entity_raw(*e).unwrap();
-                log_if_failed(to.send_enter(&from_client));
+                to.send_enter(&from_client);
             }
 
             // them to us
             let from = self.get_entity_raw(*e).unwrap();
             if let Some(from_client) = from.get_client(client_map) {
                 let to = self.get_entity_raw(id).unwrap();
-                log_if_failed(to.send_enter(&from_client));
+                to.send_enter(&from_client);
             }
         }
 
@@ -451,12 +451,12 @@ impl EntityMap {
         &mut self,
         id: EntityID,
         clients: &ClientMap,
-        mut f: impl FnMut(&FFClientHandle) -> FFResult<()>,
+        mut f: impl FnMut(&FFClientHandle),
     ) {
         for eid in self.get_around_entity(id).iter() {
             let e = self.registry.get(eid).unwrap().entity.as_ref();
             if let Some(client) = e.get_client(clients) {
-                log_if_failed(f(&client));
+                f(&client);
             }
         }
     }
@@ -801,7 +801,6 @@ mod tests {
     use super::*;
     use crate::{
         entity::{Combatant, Entity, EntityID},
-        error::FFResult,
         net::{ClientMap, FFClientHandle},
         state::ShardServerState,
         Position,
@@ -853,12 +852,8 @@ mod tests {
             self.position = pos;
         }
         fn set_rotation(&mut self, _: i32) {}
-        fn send_enter(&self, _: &FFClientHandle) -> FFResult<()> {
-            Ok(())
-        }
-        fn send_exit(&self, _: &FFClientHandle) -> FFResult<()> {
-            Ok(())
-        }
+        fn send_enter(&self, _: &FFClientHandle) {}
+        fn send_exit(&self, _: &FFClientHandle) {}
         fn tick(
             &mut self,
             _: &SystemTime,

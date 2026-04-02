@@ -221,9 +221,7 @@ pub fn send_group_freechat_message(
         for eid in group.get_member_ids() {
             let entity = state.entity_map.get_entity_raw(*eid).unwrap();
             if let Some(client) = entity.get_client(clients) {
-                log_if_failed(
-                    client.send_packet(P_FE2CL_REP_SEND_ALL_GROUP_FREECHAT_MESSAGE_SUCC, &pkt),
-                );
+                client.send_packet(P_FE2CL_REP_SEND_ALL_GROUP_FREECHAT_MESSAGE_SUCC, &pkt);
             }
         }
     }
@@ -277,9 +275,7 @@ pub fn send_group_menuchat_message(
         for eid in group.get_member_ids() {
             let entity = state.entity_map.get_entity_raw(*eid).unwrap();
             if let Some(client) = entity.get_client(clients) {
-                log_if_failed(
-                    client.send_packet(P_FE2CL_REP_SEND_ALL_GROUP_MENUCHAT_MESSAGE_SUCC, &pkt),
-                );
+                client.send_packet(P_FE2CL_REP_SEND_ALL_GROUP_MENUCHAT_MESSAGE_SUCC, &pkt);
             }
         }
     }
@@ -342,10 +338,7 @@ pub fn send_buddy_freechat_message(
         }
 
         if let Some(buddy_client) = buddy.get_client(clients) {
-            log_if_failed(
-                buddy_client
-                    .send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &response_pkt),
-            );
+            buddy_client.send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &response_pkt);
         }
         return clients
             .get_self()
@@ -431,10 +424,7 @@ pub fn send_buddy_menuchat_message(
         }
 
         if let Some(buddy_client) = buddy.get_client(clients) {
-            log_if_failed(
-                buddy_client
-                    .send_packet(P_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC, &response_pkt),
-            );
+            buddy_client.send_packet(P_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC, &response_pkt);
         }
         return clients
             .get_self()
@@ -683,7 +673,8 @@ mod commands {
                 iID: pc_id,
                 iExitCode: EXIT_CODE_REQ_BY_GM as i32,
             };
-            log_if_failed(banned_client.send_packet(P_FE2CL_REP_PC_EXIT_SUCC, &pkt));
+
+            banned_client.send_packet(P_FE2CL_REP_PC_EXIT_SUCC, &pkt);
             banned_client.disconnect();
 
             let client = clients.get_self();

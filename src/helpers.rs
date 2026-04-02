@@ -27,7 +27,7 @@ pub fn broadcast_state(
     state
         .entity_map
         .for_each_around(EntityID::Player(pc_id), clients, |client| {
-            client.send_packet(P_FE2CL_PC_STATE_CHANGE, &bcast)
+            client.send_packet(P_FE2CL_PC_STATE_CHANGE, &bcast);
         });
 }
 
@@ -58,13 +58,13 @@ pub fn broadcast_monkey(
     };
 
     let client = player.get_client(clients).unwrap();
-    log_if_failed(client.send_packet(P_FE2CL_REP_PC_RIDING_SUCC, &pkt_monkey));
-    log_if_failed(client.send_packet(P_FE2CL_REP_NANO_ACTIVE_SUCC, &pkt_nano));
+    client.send_packet(P_FE2CL_REP_PC_RIDING_SUCC, &pkt_monkey);
+    client.send_packet(P_FE2CL_REP_NANO_ACTIVE_SUCC, &pkt_nano);
     state
         .entity_map
         .for_each_around(EntityID::Player(pc_id), clients, |c| {
-            c.send_packet(P_FE2CL_PC_RIDING, &pkt_monkey)?;
-            c.send_packet(P_FE2CL_NANO_ACTIVE, &pkt_nano_bcast)
+            c.send_packet(P_FE2CL_PC_RIDING, &pkt_monkey);
+            c.send_packet(P_FE2CL_NANO_ACTIVE, &pkt_nano_bcast);
         });
 }
 
@@ -84,7 +84,7 @@ pub fn remove_group_member(
         for eid in group.get_member_ids() {
             let entity = state.entity_map.get_entity_raw(*eid).unwrap();
             if let Some(client) = entity.get_client(clients) {
-                log_if_failed(client.send_packet(P_FE2CL_PC_GROUP_LEAVE_SUCC, &leaver_pkt));
+                client.send_packet(P_FE2CL_PC_GROUP_LEAVE_SUCC, &leaver_pkt);
             }
             match eid {
                 EntityID::Player(pc_id) => {
@@ -124,7 +124,7 @@ pub fn remove_group_member(
                 for eid in group.get_member_ids() {
                     let entity = state.entity_map.get_entity_raw(*eid).unwrap();
                     if let Some(client) = entity.get_client(clients) {
-                        log_if_failed(client.send_payload(update_pkt.clone()));
+                        client.send_payload(update_pkt.clone());
                     }
                 }
             }
@@ -150,7 +150,7 @@ pub fn remove_group_member(
                 for eid in group.get_member_ids() {
                     let entity = state.entity_map.get_entity_raw(*eid).unwrap();
                     if let Some(client) = entity.get_client(clients) {
-                        log_if_failed(client.send_payload(update_pkt.clone()));
+                        client.send_payload(update_pkt.clone());
                     }
                 }
             }
@@ -187,7 +187,7 @@ pub fn give_defeat_rewards(
         let kill_pkt = sP_FE2CL_REP_PC_KILL_QUEST_NPCs_SUCC {
             iNPCID: defeated_type,
         };
-        log_if_failed(client.send_packet(P_FE2CL_REP_PC_KILL_QUEST_NPCs_SUCC, &kill_pkt));
+        client.send_packet(P_FE2CL_REP_PC_KILL_QUEST_NPCs_SUCC, &kill_pkt);
     }
 
     // go through each task that has this enemy as a target and drop quest items
@@ -307,6 +307,6 @@ pub fn give_defeat_rewards(
 
     if let Some(reward_pkt) = log_if_failed(reward_pkt.build()) {
         let client = player.get_client(clients).unwrap();
-        log_if_failed(client.send_payload(reward_pkt));
+        client.send_payload(reward_pkt);
     }
 }

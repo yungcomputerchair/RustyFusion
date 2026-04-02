@@ -512,11 +512,11 @@ mod helpers {
                             eIL: ItemLocation::QInven as i32,
                             iSlotNum: qitem_slot as i32,
                         };
-                        log_if_failed(client.send_packet(P_FE2CL_REP_PC_ITEM_DELETE_SUCC, &pkt));
+                        client.send_packet(P_FE2CL_REP_PC_ITEM_DELETE_SUCC, &pkt);
                     }
 
                     let resp = sP_FE2CL_REP_PC_TASK_STOP_SUCC { iTaskNum: task_id };
-                    log_if_failed(client.send_packet(P_FE2CL_REP_PC_TASK_STOP_SUCC, &resp));
+                    client.send_packet(P_FE2CL_REP_PC_TASK_STOP_SUCC, &resp);
                 }
             }
 
@@ -532,7 +532,7 @@ mod helpers {
                     Item: None.into(),
                     iCandy: player.get_taros() as i32,
                 };
-                log_if_failed(client.send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp));
+                client.send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp);
             }
 
             rusty_fusion::helpers::broadcast_state(

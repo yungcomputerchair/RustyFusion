@@ -57,7 +57,7 @@ pub fn pc_enter(
         let pkt = sP_FE2CL_REP_PC_EXIT_DUPLICATE {
             iErrorCode: unused!(),
         };
-        log_if_failed(existing_client.send_packet(P_FE2CL_REP_PC_EXIT_DUPLICATE, &pkt));
+        existing_client.send_packet(P_FE2CL_REP_PC_EXIT_DUPLICATE, &pkt);
         Player::disconnect(existing_pc_id, state, clients); // saves to DB synchronously
     }
 

@@ -3,14 +3,14 @@ use tokio::sync::Mutex;
 
 use std::{
     collections::HashMap,
-    io::{ErrorKind, Result},
+    io::ErrorKind,
     net::{SocketAddr, TcpListener, TcpStream},
     sync::Arc,
     time::{Duration, Instant},
 };
 
 use crate::{
-    error::{log, log_if_failed, FFError, Severity},
+    error::{log, log_if_failed, FFError, FFResult, Severity},
     state::ServerState,
 };
 
@@ -38,7 +38,7 @@ impl FFServer {
         pkt_handler: PacketCallback,
         dc_handler: Option<DisconnectCallback>,
         live_check: Option<(Duration, LiveCheckCallback)>,
-    ) -> Result<Self> {
+    ) -> FFResult<Self> {
         let server: Self = Self {
             sock: TcpListener::bind(addr)?,
             poller: Poller::new()?,
@@ -70,7 +70,7 @@ impl FFServer {
         None
     }
 
-    pub async fn poll(&mut self, state: &Arc<Mutex<ServerState>>) -> Result<()> {
+    pub async fn poll(&mut self, state: &Arc<Mutex<ServerState>>) -> FFResult<()> {
         let time_now = Instant::now();
         let client_keys: Vec<usize> = self.clients.keys().copied().collect();
         for key in client_keys {
@@ -122,7 +122,7 @@ impl FFServer {
             match e.kind() {
                 ErrorKind::Interrupted => return Ok(()), // this is fine
                 _ => {
-                    return Err(e);
+                    return Err(FFError::from(e));
                 }
             }
         }
@@ -190,7 +190,11 @@ impl FFServer {
         ClientMap::new(0, &mut self.clients, &self.handles)
     }
 
-    pub fn disconnect_client(&mut self, client_key: usize, state: &mut ServerState) -> Result<()> {
+    pub fn disconnect_client(
+        &mut self,
+        client_key: usize,
+        state: &mut ServerState,
+    ) -> FFResult<()> {
         if let Some(callback) = self.dc_handler {
             callback(client_key, &mut self.clients, &self.handles, state);
         };
@@ -203,7 +207,7 @@ impl FFServer {
         key
     }
 
-    fn register_client(&mut self, conn_data: (TcpStream, SocketAddr)) -> Result<usize> {
+    fn register_client(&mut self, conn_data: (TcpStream, SocketAddr)) -> FFResult<usize> {
         log_if_failed(conn_data.0.set_nodelay(true).map_err(|e| {
             FFError::build(Severity::Debug, format!("Failed to set TCP_NODELAY: {}", e))
         }));
@@ -217,7 +221,7 @@ impl FFServer {
         Ok(key)
     }
 
-    fn unregister_client(&mut self, key: usize) -> Result<()> {
+    fn unregister_client(&mut self, key: usize) -> FFResult<()> {
         let client = self.clients.remove(&key).unwrap();
         self.handles.remove(&key);
         self.poller.delete(&client.sock)?;

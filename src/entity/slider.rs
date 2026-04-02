@@ -7,7 +7,6 @@ use crate::{
     defines::TYPE_SLIDER,
     entity::{Entity, EntityID},
     enums::TransportationType,
-    error::FFResult,
     net::{
         packet::{
             sP_FE2CL_TRANSPORTATION_ENTER, sP_FE2CL_TRANSPORTATION_EXIT,
@@ -98,19 +97,19 @@ impl Entity for Slider {
         self.rotation = rotation.rem_euclid(360);
     }
 
-    fn send_enter(&self, client: &FFClientHandle) -> FFResult<()> {
+    fn send_enter(&self, client: &FFClientHandle) {
         let pkt = sP_FE2CL_TRANSPORTATION_ENTER {
             AppearanceData: self.get_appearance_data(),
         };
-        client.send_packet(P_FE2CL_TRANSPORTATION_ENTER, &pkt)
+        client.send_packet(P_FE2CL_TRANSPORTATION_ENTER, &pkt);
     }
 
-    fn send_exit(&self, client: &FFClientHandle) -> FFResult<()> {
+    fn send_exit(&self, client: &FFClientHandle) {
         let pkt = sP_FE2CL_TRANSPORTATION_EXIT {
             eTT: TransportationType::Bus as i32,
             iT_ID: self.id,
         };
-        client.send_packet(P_FE2CL_TRANSPORTATION_EXIT, &pkt)
+        client.send_packet(P_FE2CL_TRANSPORTATION_EXIT, &pkt);
     }
 
     fn tick(

@@ -99,13 +99,10 @@ pub fn request_make_buddy(clients: &mut ClientMap, state: &mut ShardServerState)
     }
 
     let buddy_client = buddy.get_client(clients).unwrap();
-    if buddy_client
-        .send_packet(P_FE2CL_REP_REQUEST_MAKE_BUDDY_SUCC_TO_ACCEPTER, &req_pkt)
-        .is_ok()
-    {
-        let player = state.get_player_mut(pc_id).unwrap();
-        player.buddy_offered_to = Some(buddy_uid);
-    }
+    buddy_client.send_packet(P_FE2CL_REP_REQUEST_MAKE_BUDDY_SUCC_TO_ACCEPTER, &req_pkt);
+
+    let player = state.get_player_mut(pc_id).unwrap();
+    player.buddy_offered_to = Some(buddy_uid);
 
     Ok(())
 }
@@ -165,7 +162,7 @@ pub fn find_name_make_buddy(clients: &mut ClientMap, state: &mut ShardServerStat
         iPCUID: pc_uid,
         iNameCheckFlag: player.flags.name_check as i8,
     };
-    log_if_failed(buddy_client.send_packet(P_FE2CL_REP_PC_FIND_NAME_MAKE_BUDDY_SUCC, &req_pkt));
+    buddy_client.send_packet(P_FE2CL_REP_PC_FIND_NAME_MAKE_BUDDY_SUCC, &req_pkt);
     Ok(())
 }
 
@@ -206,12 +203,11 @@ pub fn accept_make_buddy(clients: &mut ClientMap, state: &mut ShardServerState) 
                 iBuddySlot: buddy.add_buddy(player_buddy_info.clone())? as i8,
                 BuddyInfo: player_buddy_info.into(),
             };
-            log_if_failed(
-                buddy
-                    .get_client(clients)
-                    .unwrap()
-                    .send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC, &pkt_buddy),
-            );
+
+            buddy
+                .get_client(clients)
+                .unwrap()
+                .send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC, &pkt_buddy);
 
             // buddy -> player
             let buddy_buddy_info = BuddyListEntry::new(buddy);
@@ -241,8 +237,9 @@ pub fn accept_make_buddy(clients: &mut ClientMap, state: &mut ShardServerState) 
                 iBuddyPCUID: pc_uid,
                 iErrorCode: ERROR_CODE_BUDDY_DENY,
             };
+
             let buddy_client = buddy.get_client(clients).unwrap();
-            log_if_failed(buddy_client.send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_FAIL, &deny_pkt));
+            buddy_client.send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_FAIL, &deny_pkt);
             Ok(())
         },
     )
@@ -302,12 +299,11 @@ pub fn find_name_accept_buddy(
                 iBuddySlot: buddy.add_buddy(player_buddy_info.clone())? as i8,
                 BuddyInfo: player_buddy_info.into(),
             };
-            log_if_failed(
-                buddy
-                    .get_client(clients)
-                    .unwrap()
-                    .send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC, &pkt_buddy),
-            );
+
+            buddy
+                .get_client(clients)
+                .unwrap()
+                .send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC, &pkt_buddy);
 
             // buddy -> player
             let buddy_buddy_info = BuddyListEntry::new(buddy);
@@ -337,8 +333,9 @@ pub fn find_name_accept_buddy(
                 iBuddyPCUID: pc_uid,
                 iErrorCode: ERROR_CODE_BUDDY_DENY,
             };
+
             let buddy_client = buddy.get_client(clients).unwrap();
-            log_if_failed(buddy_client.send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_FAIL, &deny_pkt));
+            buddy_client.send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_FAIL, &deny_pkt);
             Ok(())
         },
     )
