@@ -5,13 +5,10 @@ use rand::{rngs::OsRng, thread_rng, Rng};
 
 use crate::error::{FFError, FFResult, Severity};
 
-pub const DEFAULT_KEY: &[u8] = b"m@rQn~W#";
-pub const CRYPTO_KEY_SIZE: usize = DEFAULT_KEY.len();
+pub const DEFAULT_KEY: u64 = u64::from_le_bytes(*b"m@rQn~W#");
 pub const AES128_NONCE_SIZE: usize = 12;
 pub const AUTH_CHALLENGE_BASE_SIZE: usize = 16;
 pub const AUTH_CHALLENGE_MAX_SIZE: usize = 32;
-
-pub type CryptoKey = [u8; CRYPTO_KEY_SIZE];
 
 pub enum EncryptionMode {
     EKey,
@@ -44,27 +41,28 @@ fn byte_swap(er_size: usize, buf: &mut [u8], size: usize) -> usize {
     num + num2
 }
 
-pub fn decrypt_payload(buf: &mut [u8], key: &[u8]) {
+pub fn decrypt_payload(buf: &mut [u8], key: u64) {
+    let key = key.to_le_bytes();
     let key_size = key.len();
     let er_size: usize = buf.len() % (key_size / 2 + 1) * 2 + key_size;
     let xor_size: usize = byte_swap(er_size, buf, buf.len());
-    xor(buf, key, xor_size);
+    xor(buf, &key, xor_size);
 }
 
-pub fn encrypt_payload(buf: &mut [u8], key: &[u8]) {
+pub fn encrypt_payload(buf: &mut [u8], key: u64) {
+    let key = key.to_le_bytes();
     let key_size = key.len();
     let er_size: usize = buf.len() % (key_size / 2 + 1) * 2 + key_size;
-    xor(buf, key, buf.len());
+    xor(buf, &key, buf.len());
     byte_swap(er_size, buf, buf.len());
 }
 
-pub fn gen_key(time: u64, iv1: i32, iv2: i32) -> CryptoKey {
+pub fn gen_key(time: u64, iv1: i32, iv2: i32) -> u64 {
     let time = Wrapping(time);
     let num = Wrapping((iv1 + 1) as u64);
     let num2 = Wrapping((iv2 + 1) as u64);
-    let default_key = Wrapping(u64::from_le_bytes(DEFAULT_KEY.try_into().unwrap()));
-    let result: u64 = (default_key * (time * num * num2)).0;
-    result.to_le_bytes()
+    let default_key = Wrapping(DEFAULT_KEY);
+    (default_key * (time * num * num2)).0
 }
 
 /// Key derivation using bcrypt to produce a 128-bit AES key from a password
@@ -130,7 +128,7 @@ mod tests {
     use crate::net::struct_to_bytes;
     use crate::util;
 
-    use super::{decrypt_payload, encrypt_payload, CRYPTO_KEY_SIZE};
+    use super::{decrypt_payload, encrypt_payload};
 
     #[test]
     fn test_enc_dec() {
@@ -146,10 +144,10 @@ mod tests {
         let bytes: &[u8] = struct_to_bytes(&pkt);
         let mut buf: Vec<u8> = bytes.to_vec();
 
-        let key: [u8; CRYPTO_KEY_SIZE] = 4382366871217075016_u64.to_le_bytes();
-        encrypt_payload(&mut buf, &key);
+        let key: u64 = 382366871217075016;
+        encrypt_payload(&mut buf, key);
         assert_ne!(buf.as_slice(), bytes);
-        decrypt_payload(&mut buf, &key);
+        decrypt_payload(&mut buf, key);
         assert_eq!(buf.as_slice(), bytes);
 
         let pkt_dec: sP_LS2CL_REP_LOGIN_SUCC = *bytes_to_struct(&buf).unwrap();

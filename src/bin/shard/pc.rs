@@ -96,7 +96,7 @@ pub fn pc_enter(
     let iv1: i32 = resp.iID + 1;
     let iv2: i32 = resp.PCLoadData2CL.iFusionMatter + 1;
     client.e_key = crypto::gen_key(resp.uiSvrTime, iv1, iv2);
-    client.fe_key = login_data.uiFEKey.to_le_bytes();
+    client.fe_key = login_data.uiFEKey;
     client.enc_mode = EncryptionMode::FEKey;
 
     let pkt_motd = sP_FE2LS_REQ_MOTD { iPC_ID: pc_id };

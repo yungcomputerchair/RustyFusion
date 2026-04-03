@@ -238,10 +238,11 @@ Password must be 8-32 characters long and contain only letters, numbers, or spec
                 iPaymentFlag: 1,  // all accounts have a subscription
                 iOpenBetaFlag: 0, // and we're not in open beta
             };
+
             let e_base: u64 = resp.uiSvrTime;
             let e_iv1: i32 = (resp.iCharCount + 1) as i32;
             let e_iv2: i32 = (resp.iSlotNum + 1) as i32;
-            let fe_base: u64 = u64::from_le_bytes(crypto::DEFAULT_KEY.try_into().unwrap());
+            let fe_base: u64 = crypto::DEFAULT_KEY;
             let fe_iv1: i32 = pkt.iClientVerC;
             let fe_iv2: i32 = 1;
 

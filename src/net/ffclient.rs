@@ -16,7 +16,7 @@ use crate::{
 
 use super::{
     bytes_to_struct,
-    crypto::{decrypt_payload, encrypt_payload, EncryptionMode, CRYPTO_KEY_SIZE, DEFAULT_KEY},
+    crypto::{decrypt_payload, encrypt_payload, EncryptionMode, DEFAULT_KEY},
     packet::{
         FFPacket, PacketID, PACKET_MASK_CL2FE, PACKET_MASK_CL2LS, PACKET_MASK_FE2LS,
         PACKET_MASK_LS2FE,
@@ -226,8 +226,8 @@ pub struct FFClient {
     in_buf: PacketBuffer,
     out_buf: PacketBuffer,
     msg_rx: mpsc::UnboundedReceiver<ClientMessage>,
-    pub e_key: [u8; CRYPTO_KEY_SIZE],
-    pub fe_key: [u8; CRYPTO_KEY_SIZE],
+    pub e_key: u64,
+    pub fe_key: u64,
     pub enc_mode: EncryptionMode,
     pub client_type: ClientType,
     pub last_ping_time: Instant,
@@ -242,7 +242,6 @@ impl FFClient {
         conn_data: (TcpStream, SocketAddr),
         msg_rx: mpsc::UnboundedReceiver<ClientMessage>,
     ) -> Self {
-        let default_key: [u8; CRYPTO_KEY_SIZE] = DEFAULT_KEY.try_into().unwrap();
         Self {
             sock: conn_data.0,
             addr: conn_data.1,
@@ -250,8 +249,8 @@ impl FFClient {
             in_buf: PacketBuffer::default(),
             out_buf: PacketBuffer::default(),
             msg_rx,
-            e_key: default_key,
-            fe_key: default_key,
+            e_key: DEFAULT_KEY,
+            fe_key: DEFAULT_KEY,
             enc_mode: EncryptionMode::EKey,
             client_type: ClientType::Unknown,
             last_ping_time: Instant::now(),
@@ -279,7 +278,7 @@ impl FFClient {
     }
 
     pub fn get_fe_key_uint(&self) -> u64 {
-        u64::from_le_bytes(self.fe_key)
+        self.fe_key
     }
 
     pub fn get_account_id(&self) -> FFResult<i64> {
@@ -438,7 +437,7 @@ impl FFClient {
         self.in_buf.len = sz;
 
         // decrypt the packet (client always encrypts with E key)
-        decrypt_payload(buf, &self.e_key);
+        decrypt_payload(buf, self.e_key);
 
         let id = self.peek_packet_id()?;
 
@@ -478,8 +477,8 @@ impl FFClient {
 
         // encrypt the payload (client decrypts with either E or FE key)
         match self.enc_mode {
-            EncryptionMode::EKey => encrypt_payload(send_buf, &self.e_key),
-            EncryptionMode::FEKey => encrypt_payload(send_buf, &self.fe_key),
+            EncryptionMode::EKey => encrypt_payload(send_buf, self.e_key),
+            EncryptionMode::FEKey => encrypt_payload(send_buf, self.fe_key),
         }
 
         // send size + payload in a single syscall (writev)
