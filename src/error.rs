@@ -13,17 +13,17 @@ use crate::{
 };
 
 pub type FFResult<T> = std::result::Result<T, FFError>;
-pub fn catch_fail<T>(
-    result: FFResult<T>,
-    mut on_fail: impl FnMut() -> FFResult<()>,
-) -> FFResult<T> {
-    if let Err(e) = &result {
-        let fail_result = on_fail();
-        if let Err(ee) = fail_result {
-            return Err(ee.chain(e.clone()));
+pub trait CatchFail<T> {
+    fn catch_fail(self, on_fail: impl FnOnce()) -> Self;
+}
+impl<T> CatchFail<T> for FFResult<T> {
+    fn catch_fail(self, on_fail: impl FnOnce()) -> Self {
+        if let Err(e) = &self {
+            log_error(e.clone());
+            on_fail();
         }
+        self
     }
-    result
 }
 
 #[repr(usize)]
