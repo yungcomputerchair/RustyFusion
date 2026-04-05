@@ -1,4 +1,11 @@
-use std::{any::type_name, collections::HashMap, mem::size_of, slice::from_raw_parts};
+use std::{
+    any::type_name,
+    cell::Cell,
+    collections::HashMap,
+    mem::size_of,
+    ops::{Deref, DerefMut},
+    slice::from_raw_parts,
+};
 
 use self::packet::{
     FFPacket,
@@ -6,13 +13,14 @@ use self::packet::{
 };
 use crate::{
     error::{log, FFError, FFResult, Severity},
+    net::packet::Packet,
     state::ServerState,
 };
 
-const PACKET_BUFFER_SIZE: usize = 4096; // entire buffer size, including header with length and ID
+const PACKET_BUFFER_SIZE: usize = 4096; // payload buffer size; includes ID, but not length
 const PACKET_LENGTH_SIZE: usize = size_of::<u32>(); // not encrypted
 const PACKET_ID_SIZE: usize = size_of::<u32>(); // encrypted
-const PACKET_BODY_SIZE: usize = PACKET_BUFFER_SIZE - PACKET_LENGTH_SIZE - PACKET_ID_SIZE;
+const PACKET_BODY_SIZE: usize = PACKET_BUFFER_SIZE - PACKET_ID_SIZE;
 
 const UNKNOWN_CT_ALLOWED_PACKETS: [PacketID; 3] = [
     P_FE2LS_REQ_AUTH_CHALLENGE,
@@ -42,22 +50,108 @@ const SILENCED_PACKETS: [PacketID; 15] = [
 mod ffclient;
 pub use ffclient::*;
 
+mod ffconnection;
+pub use ffconnection::*;
+
 mod ffserver;
 pub use ffserver::*;
 
 pub mod crypto;
 pub mod packet;
 
-pub type PacketCallback = fn(
-    usize,
-    &mut HashMap<usize, FFClient>,
-    &HashMap<usize, FFClientHandle>,
-    PacketID,
-    &mut ServerState,
-) -> FFResult<()>;
-pub type DisconnectCallback =
-    fn(usize, &mut HashMap<usize, FFClient>, &HashMap<usize, FFClientHandle>, &mut ServerState);
-pub type LiveCheckCallback = fn(&mut FFClient) -> FFResult<()>;
+pub type PacketCallback =
+    fn(Packet, usize, &HashMap<usize, FFClient>, &mut ServerState) -> FFResult<()>;
+pub type DisconnectCallback = fn(usize, &HashMap<usize, FFClient>, &mut ServerState);
+pub type LiveCheckCallback = fn(&FFClient);
+
+#[derive(Clone, Copy)]
+#[repr(C, align(4))]
+pub struct AlignedBuf([u8; PACKET_BUFFER_SIZE]);
+impl Deref for AlignedBuf {
+    type Target = [u8; PACKET_BUFFER_SIZE];
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl DerefMut for AlignedBuf {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+impl Default for AlignedBuf {
+    fn default() -> Self {
+        Self([0; PACKET_BUFFER_SIZE])
+    }
+}
+
+#[cfg(test)]
+impl AlignedBuf {
+    pub fn as_ptr(&self) -> *const u8 {
+        self.0.as_ptr()
+    }
+}
+
+#[derive(Clone)]
+struct PacketBuffer {
+    buf: AlignedBuf,
+    cursor: usize,
+}
+impl Default for PacketBuffer {
+    fn default() -> Self {
+        Self {
+            buf: AlignedBuf::default(),
+            cursor: 0,
+        }
+    }
+}
+impl PacketBuffer {
+    fn reset(&mut self) {
+        self.cursor = 0;
+    }
+
+    fn len(&self) -> usize {
+        self.cursor
+    }
+
+    fn peek_packet_id(&self) -> FFResult<PacketID> {
+        if self.cursor < PACKET_ID_SIZE {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Couldn't peek packet ID; not enough bytes came in: {}",
+                    self.cursor
+                ),
+            ));
+        }
+
+        let id_ord = u32::from_le_bytes(self.buf[..4].try_into().unwrap());
+        let id: FFResult<PacketID> = id_ord.try_into();
+        id.map_err(|_| FFError::build(Severity::Warning, format!("Bad packet ID: {}", id_ord)))
+    }
+
+    fn push_bytes(&mut self, bytes: &[u8]) -> FFResult<()> {
+        let new_len = self.cursor + bytes.len();
+        if new_len > self.buf.len() {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Packet buffer overflow: current length {}, incoming bytes {}, would be {}",
+                    self.cursor,
+                    bytes.len(),
+                    new_len
+                ),
+            ));
+        }
+
+        self.buf[self.cursor..new_len].copy_from_slice(bytes);
+        self.cursor = new_len;
+        Ok(())
+    }
+
+    fn get_bytes(&self) -> &[u8] {
+        &self.buf[..self.cursor]
+    }
+}
 
 #[allow(non_snake_case)]
 #[derive(Debug, Clone)]
@@ -100,72 +194,75 @@ fn struct_to_bytes<T: FFPacket>(pkt: &T) -> &[u8] {
 
 pub struct ClientMap<'a> {
     key: usize,
-    login_server_key: Option<usize>,
-    clients: &'a mut HashMap<usize, FFClient>,
-    handles: &'a HashMap<usize, FFClientHandle>,
+    login_server_key: Cell<Option<usize>>,
+    clients: &'a HashMap<usize, FFClient>,
 }
 impl<'a> ClientMap<'a> {
-    pub fn new(
-        key: usize,
-        clients: &'a mut HashMap<usize, FFClient>,
-        handles: &'a HashMap<usize, FFClientHandle>,
-    ) -> Self {
+    pub fn new(key: usize, clients: &'a HashMap<usize, FFClient>) -> Self {
         Self {
             key,
-            login_server_key: None,
+            login_server_key: Cell::new(None),
             clients,
-            handles,
         }
     }
 
-    pub fn get(&mut self, key: usize) -> &mut FFClient {
-        self.clients.get_mut(&key).unwrap()
+    pub fn get(&self, key: usize) -> Option<&FFClient> {
+        self.clients.get(&key)
     }
 
-    pub fn get_self(&mut self) -> &mut FFClient {
-        self.clients.get_mut(&self.key).unwrap()
+    pub fn get_self(&self) -> &FFClient {
+        self.clients.get(&self.key).unwrap()
     }
 
-    pub fn get_handles(&self) -> &'a HashMap<usize, FFClientHandle> {
-        self.handles
-    }
-
-    pub fn get_handle(&self, key: usize) -> Option<&'a FFClientHandle> {
-        self.handles.get(&key)
-    }
-
-    pub fn get_all_gameclient(&mut self) -> impl Iterator<Item = &mut FFClient> {
+    pub fn get_all_gameclient(&self) -> Vec<&FFClient> {
         self.clients
-            .values_mut()
-            .filter(|c| matches!(c.client_type, ClientType::GameClient { .. }))
+            .values()
+            .filter(|c| {
+                // TODO make async
+                let meta = c.meta.blocking_read();
+                matches!(meta.client_type, ClientType::GameClient { .. })
+            })
+            .collect()
     }
 
-    pub fn get_shard_server(&mut self, shard_id: i32) -> Option<&mut FFClient> {
-        self.clients
-            .values_mut()
-            .find(|c| c.client_type == ClientType::ShardServer(shard_id))
+    pub fn get_shard_server(&self, shard_id: i32) -> Option<&FFClient> {
+        self.clients.values().find(|c| {
+            // TODO make async
+            let meta = c.meta.blocking_read();
+            meta.client_type == ClientType::ShardServer(shard_id)
+        })
     }
 
-    pub fn get_login_server(&mut self) -> Option<&mut FFClient> {
-        let cache_valid = self
-            .login_server_key
+    pub fn get_login_server(&self) -> Option<&FFClient> {
+        let cached_key = self.login_server_key.get();
+        let cache_valid = cached_key
             .and_then(|key| self.clients.get(&key))
-            .is_some_and(|c| c.client_type == ClientType::LoginServer);
+            .is_some_and(|c| {
+                // TODO make async
+                let meta = c.meta.blocking_read();
+                meta.client_type == ClientType::LoginServer
+            });
 
         if !cache_valid {
-            self.login_server_key = self
+            let found_key = self
                 .clients
                 .iter()
-                .find(|(_, c)| c.client_type == ClientType::LoginServer)
+                .find(|(_, c)| {
+                    let meta = c.meta.blocking_read();
+                    meta.client_type == ClientType::LoginServer
+                })
                 .map(|(k, _)| *k);
 
-            if self.login_server_key.is_none() {
+            if found_key.is_none() {
                 log(Severity::Warning, "No login server connected");
             }
+
+            self.login_server_key.set(found_key);
         }
 
         self.login_server_key
-            .and_then(|key| self.clients.get_mut(&key))
+            .get()
+            .and_then(|key| self.clients.get(&key))
     }
 }
 

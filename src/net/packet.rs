@@ -2,69 +2,112 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
-use bytes::Bytes;
+use std::{
+    fmt::{Debug, Display},
+    sync::Arc,
+};
+
 use num_enum::TryFromPrimitive;
 
 use crate::{
-    error::{FFError, FFResult, Severity},
+    error::{log, FFError, FFResult, Severity},
     net::{
+        self,
         crypto::{AES128_NONCE_SIZE, AUTH_CHALLENGE_MAX_SIZE},
-        struct_to_bytes, PACKET_BODY_SIZE, PACKET_ID_SIZE,
+        struct_to_bytes, PacketBuffer, PACKET_BODY_SIZE, PACKET_ID_SIZE, SILENCED_PACKETS,
     },
 };
 
 #[derive(Clone)]
 pub struct Packet {
-    data: Bytes, // includes the Packet ID and payload, but NOT the size
+    buf: Arc<PacketBuffer>,
 }
 impl Packet {
-    fn _new(data: Vec<u8>) -> Self {
-        Self { data: data.into() }
+    fn _new(buf: PacketBuffer) -> Self {
+        Self::_from_arc(Arc::new(buf))
+    }
+
+    pub(super) fn _from_arc(buf: Arc<PacketBuffer>) -> Self {
+        Self { buf }
     }
 
     pub fn new<T: FFPacket>(id: PacketID, pkt: &T) -> FFResult<Self> {
-        let packet_size = PACKET_ID_SIZE + size_of::<T>();
-        PacketBuilder::_new(id, packet_size)
-            .with(pkt)
-            .build()
-            .map_err(|e| {
-                FFError::build(
-                    e.get_severity(),
-                    format!("Failed to build packet {:?}: {}", id, e.get_msg()),
-                )
-            })
+        PacketBuilder::_new(id).with(pkt).build().map_err(|e| {
+            FFError::build(
+                e.get_severity(),
+                format!("Failed to build packet {:?}: {}", id, e.get_msg()),
+            )
+        })
+    }
+
+    pub fn get<T: FFPacket>(&self, pkt_id: PacketID) -> FFResult<&T> {
+        if self.id() != pkt_id {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Packet ID mismatch: expected {:?}, got {:?}",
+                    pkt_id,
+                    self.id()
+                ),
+            ));
+        }
+
+        PacketReader::new(self).get_struct()
     }
 
     pub fn id(&self) -> PacketID {
-        let id_bytes = &self.data[0..4];
-        let id = u32::from_le_bytes(id_bytes.try_into().unwrap());
-        PacketID::try_from(id).unwrap() // guaranteed to have valid id
+        self.buf
+            .peek_packet_id()
+            .expect("Guaranteed to be a valid Packet ID")
     }
 
     pub fn read_bytes(&self) -> &[u8] {
-        &self.data
+        self.buf.get_bytes()
+    }
+}
+impl Display for Packet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Packet({:?}, {})", self.id(), self.read_bytes().len())
+    }
+}
+impl Debug for Packet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
     }
 }
 
 pub struct PacketBuilder {
-    data: Vec<u8>,
+    buf: PacketBuffer,
+    err: Option<FFError>,
 }
 impl PacketBuilder {
-    fn _new(id: PacketID, capacity: usize) -> Self {
-        let mut data = Vec::with_capacity(capacity);
+    fn _new(id: PacketID) -> Self {
+        let mut data = PacketBuffer::default();
         let id_bytes = u32::to_le_bytes(id as u32);
-        data.extend_from_slice(&id_bytes);
-        Self { data }
+        data.push_bytes(&id_bytes).unwrap();
+        Self {
+            buf: data,
+            err: None,
+        }
     }
 
     pub fn new(id: PacketID) -> Self {
-        // The 64 here is totally arbitrary. Just seems reasonable
-        // for most packets. TODO check the average packet size and optimize?
-        Self::_new(id, 64)
+        Self::_new(id)
     }
 
     pub fn push<T: FFPacket>(&mut self, pkt: &T) {
-        self.data.extend_from_slice(struct_to_bytes(pkt));
+        if self.err.is_some() {
+            return;
+        }
+
+        let bytes = struct_to_bytes(pkt);
+        if let Err(e) = self.buf.push_bytes(bytes) {
+            log(
+                Severity::Warning,
+                &format!("Failed to push struct {:?} to packet: {}", pkt, e.get_msg()),
+            );
+            self.err = Some(e);
+        }
     }
 
     pub fn with<T: FFPacket>(mut self, pkt: &T) -> Self {
@@ -73,18 +116,61 @@ impl PacketBuilder {
     }
 
     pub fn build(self) -> FFResult<Packet> {
-        if self.data.len() > PACKET_ID_SIZE + PACKET_BODY_SIZE {
+        if let Some(e) = self.err {
+            return Err(e);
+        }
+        Ok(Packet::_new(self.buf))
+    }
+}
+
+pub struct PacketReader<'a> {
+    data: &'a [u8],
+    cursor: usize,
+}
+impl<'a> PacketReader<'a> {
+    pub fn new(pkt: &'a Packet) -> Self {
+        Self {
+            data: pkt.read_bytes(),
+            cursor: PACKET_ID_SIZE,
+        }
+    }
+
+    fn get_id(&self) -> PacketID {
+        let id_bytes = &self.data[..PACKET_ID_SIZE];
+        let id = u32::from_le_bytes(id_bytes.try_into().unwrap());
+        PacketID::try_from(id).unwrap() // guaranteed to have valid id
+    }
+
+    pub fn get_struct<T: FFPacket>(&mut self) -> FFResult<&'a T> {
+        let pkt_id = self.get_id();
+        let log_struct = !SILENCED_PACKETS.contains(&pkt_id);
+        self._get_struct(log_struct)
+    }
+
+    fn _get_struct<T: FFPacket>(&mut self, log_struct: bool) -> FFResult<&'a T> {
+        let sz: usize = size_of::<T>();
+        let from = self.cursor;
+        let to = from + sz;
+        if to > self.data.len() {
             return Err(FFError::build(
                 Severity::Warning,
                 format!(
-                    "Packet body size {} exceeds maximum of {}",
-                    self.data.len() - PACKET_ID_SIZE,
-                    PACKET_BODY_SIZE
+                    "Bad struct read; not enough bytes came in: {} < {}",
+                    self.data.len(),
+                    to
                 ),
             ));
         }
 
-        Ok(Packet::_new(self.data))
+        let buf: &'a [u8] = &self.data[from..to];
+        let s = net::bytes_to_struct(buf).unwrap();
+        self.cursor += sz;
+
+        if log_struct {
+            log(Severity::Debug, &format!("{:#?}", s));
+        }
+
+        Ok(s)
     }
 }
 
