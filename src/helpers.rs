@@ -17,7 +17,7 @@ use crate::{
 pub fn broadcast_state(
     pc_id: i32,
     player_sbf: i8,
-    clients: &mut ClientMap,
+    clients: &ClientMap,
     state: &mut ShardServerState,
 ) {
     let bcast = sP_FE2CL_PC_STATE_CHANGE {
@@ -34,7 +34,7 @@ pub fn broadcast_state(
 pub fn broadcast_monkey(
     pc_id: i32,
     ride_type: RideType,
-    clients: &mut ClientMap,
+    clients: &ClientMap,
     state: &mut ShardServerState,
 ) {
     let player = state.get_player(pc_id).unwrap();
@@ -72,7 +72,7 @@ pub fn remove_group_member(
     leaver_id: EntityID,
     group_id: Uuid,
     state: &mut ShardServerState,
-    clients: &mut ClientMap,
+    clients: &ClientMap,
 ) -> FFResult<()> {
     let mut group = state.groups.get(&group_id).unwrap().clone();
     group.remove_member(leaver_id)?;
@@ -163,18 +163,19 @@ pub fn remove_group_member(
     Ok(())
 }
 
-pub fn send_system_message(client: &mut FFClient, msg: &str) -> FFResult<()> {
+pub fn send_system_message(client: &FFClient, msg: &str) -> FFResult<()> {
     let resp = sP_FE2CL_PC_MOTD_LOGIN {
         iType: unused!(),
         szSystemMsg: util::encode_utf16(msg)?,
     };
-    client.send_packet(P_FE2CL_PC_MOTD_LOGIN, &resp)
+    client.send_packet(P_FE2CL_PC_MOTD_LOGIN, &resp);
+    Ok(())
 }
 
 pub fn give_defeat_rewards(
     player: &mut Player,
     defeated_type: i32,
-    clients: &mut ClientMap,
+    clients: &ClientMap,
     rng: &mut ThreadRng,
 ) {
     let active_task_id = player.mission_journal.get_active_task_id().unwrap_or(0);

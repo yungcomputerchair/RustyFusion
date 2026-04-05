@@ -11,7 +11,7 @@ use crate::{
     defines::ID_OVERWORLD,
     entity::{Entity, EntityID, Player, NPC},
     error::{log, panic_log, FFError, FFResult, Severity},
-    net::{ClientMap, FFClientHandle},
+    net::{ClientMap, FFClient},
     Position,
 };
 
@@ -365,7 +365,7 @@ impl EntityMap {
         &mut self,
         id: EntityID,
         to_chunk: Option<ChunkCoords>,
-        client_map: Option<&mut ClientMap>,
+        client_map: Option<&ClientMap>,
     ) {
         let entry = self.registry.get_mut(&id).unwrap_or_else(|| {
             panic_log(&format!("Entity with id {:?} untracked", id));
@@ -396,7 +396,7 @@ impl EntityMap {
             if let Some(from_client) = from.get_client(client_map) {
                 // possible for the ID to be unregistered if the instance was cleaned up
                 if let Some(to) = self.get_entity_raw(*e) {
-                    to.send_exit(&from_client);
+                    to.send_exit(from_client);
                 }
             }
 
@@ -405,7 +405,7 @@ impl EntityMap {
             if let Some(from) = self.get_entity_raw(*e) {
                 if let Some(from_client) = from.get_client(client_map) {
                     let to = self.get_entity_raw(id).unwrap();
-                    to.send_exit(&from_client);
+                    to.send_exit(from_client);
                 }
             }
         }
@@ -416,14 +416,14 @@ impl EntityMap {
             let from = self.get_entity_raw(id).unwrap();
             if let Some(from_client) = from.get_client(client_map) {
                 let to = self.get_entity_raw(*e).unwrap();
-                to.send_enter(&from_client);
+                to.send_enter(from_client);
             }
 
             // them to us
             let from = self.get_entity_raw(*e).unwrap();
             if let Some(from_client) = from.get_client(client_map) {
                 let to = self.get_entity_raw(id).unwrap();
-                to.send_enter(&from_client);
+                to.send_enter(from_client);
             }
         }
 
@@ -451,12 +451,12 @@ impl EntityMap {
         &mut self,
         id: EntityID,
         clients: &ClientMap,
-        mut f: impl FnMut(&FFClientHandle),
+        mut f: impl FnMut(&FFClient),
     ) {
         for eid in self.get_around_entity(id).iter() {
             let e = self.registry.get(eid).unwrap().entity.as_ref();
             if let Some(client) = e.get_client(clients) {
-                f(&client);
+                f(client);
             }
         }
     }
@@ -801,7 +801,7 @@ mod tests {
     use super::*;
     use crate::{
         entity::{Combatant, Entity, EntityID},
-        net::{ClientMap, FFClientHandle},
+        net::{ClientMap, FFClient},
         state::ShardServerState,
         Position,
     };
@@ -833,7 +833,7 @@ mod tests {
         fn get_id(&self) -> EntityID {
             self.id
         }
-        fn get_client(&self, _: &ClientMap) -> Option<FFClientHandle> {
+        fn get_client<'a>(&self, _: &'a ClientMap) -> Option<&'a FFClient> {
             None
         }
         fn get_position(&self) -> Position {
@@ -852,17 +852,17 @@ mod tests {
             self.position = pos;
         }
         fn set_rotation(&mut self, _: i32) {}
-        fn send_enter(&self, _: &FFClientHandle) {}
-        fn send_exit(&self, _: &FFClientHandle) {}
+        fn send_enter(&self, _: &FFClient) {}
+        fn send_exit(&self, _: &FFClient) {}
         fn tick(
             &mut self,
             _: &SystemTime,
-            _: &mut ClientMap,
+            _: &ClientMap,
             _: &mut ShardServerState,
             _: &mut ThreadRng,
         ) {
         }
-        fn cleanup(&mut self, _: &mut ClientMap, _: &mut ShardServerState) {}
+        fn cleanup(&mut self, _: &ClientMap, _: &mut ShardServerState) {}
         fn as_combatant(&self) -> Option<&dyn Combatant> {
             None
         }

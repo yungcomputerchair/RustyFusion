@@ -22,7 +22,7 @@ use crate::{
             PacketID::{self, *},
             *,
         },
-        ClientMap, ClientType, FFClientHandle,
+        ClientMap, FFClient,
     },
     path::Path,
     state::ShardServerState,
@@ -1150,7 +1150,7 @@ impl Player {
     pub fn set_fusion_matter(
         &mut self,
         fusion_matter: u32,
-        clients: Option<&mut ClientMap>,
+        clients: Option<&ClientMap>,
     ) -> u32 {
         let player_stats = tdata_get().get_player_stats(self.level).unwrap();
         let fm_max = if self.perms <= CN_ACCOUNT_LEVEL__DEVELOPER as i16 {
@@ -1310,10 +1310,10 @@ impl Player {
             .is_some_and(|available_at| util::get_timestamp_sec(SystemTime::now()) < available_at)
     }
 
-    pub fn disconnect(pc_id: i32, state: &mut ShardServerState, clients: &mut ClientMap) {
+    pub fn disconnect(pc_id: i32, state: &mut ShardServerState, clients: &ClientMap) {
         let player = state.get_player(pc_id).unwrap();
         let uid = player.get_uid();
-        let client_id = player.get_client_id().unwrap();
+        let client = player.get_client(clients).unwrap().clone();
         let display_info = format!(
             "{} left (channel {})",
             player, player.instance_id.channel_num
@@ -1330,15 +1330,13 @@ impl Player {
         let mut player = entity_map.untrack(id);
         player.cleanup(clients, state);
 
-        let client = clients.get(client_id);
-        client.client_type = ClientType::Unknown;
         client.disconnect();
     }
 
     fn tick_skyway_ride(
         &mut self,
         time: &SystemTime,
-        clients: &mut ClientMap,
+        clients: &ClientMap,
         state: &mut ShardServerState,
     ) {
         let pc_id = self.id.unwrap();
@@ -1408,7 +1406,7 @@ impl Player {
     fn tick_missions(
         &mut self,
         time: &SystemTime,
-        clients: &mut ClientMap,
+        clients: &ClientMap,
         state: &mut ShardServerState,
     ) {
         let check_task_failure = |player: &Player, task: &Task, task_def: &TaskDefinition| {
@@ -1694,9 +1692,8 @@ impl Combatant for Player {
     }
 }
 impl Entity for Player {
-    fn get_client(&self, client_map: &ClientMap) -> Option<FFClientHandle> {
-        self.client_id
-            .and_then(|key| client_map.get_handle(key).cloned())
+    fn get_client<'a>(&self, client_map: &'a ClientMap) -> Option<&'a FFClient> {
+        self.client_id.and_then(|key| client_map.get(key))
     }
 
     fn get_id(&self) -> EntityID {
@@ -1731,14 +1728,14 @@ impl Entity for Player {
         self.rotation = rotation.rem_euclid(360);
     }
 
-    fn send_enter(&self, client: &FFClientHandle) {
+    fn send_enter(&self, client: &FFClient) {
         let pkt = sP_FE2CL_PC_NEW {
             PCAppearanceData: self.get_appearance_data(),
         };
         client.send_packet(PacketID::P_FE2CL_PC_NEW, &pkt);
     }
 
-    fn send_exit(&self, client: &FFClientHandle) {
+    fn send_exit(&self, client: &FFClient) {
         let pkt = sP_FE2CL_PC_EXIT {
             iID: self.get_player_id(),
             iExitType: unused!(),
@@ -1746,7 +1743,7 @@ impl Entity for Player {
         client.send_packet(PacketID::P_FE2CL_PC_EXIT, &pkt);
     }
 
-    fn cleanup(&mut self, clients: &mut ClientMap, state: &mut ShardServerState) {
+    fn cleanup(&mut self, clients: &ClientMap, state: &mut ShardServerState) {
         let pc_id = self.get_player_id();
 
         // cleanup the buyback list
@@ -1780,7 +1777,7 @@ impl Entity for Player {
     fn tick(
         &mut self,
         time: &SystemTime,
-        clients: &mut ClientMap,
+        clients: &ClientMap,
         state: &mut ShardServerState,
         _rng: &mut ThreadRng,
     ) {

@@ -27,7 +27,7 @@ trait AINode: std::fmt::Debug + Send {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        clients: &mut ClientMap,
+        clients: &ClientMap,
         time: &SystemTime,
         rng: &mut ThreadRng,
     ) -> NodeStatus;
@@ -207,7 +207,7 @@ impl AI {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        clients: &mut ClientMap,
+        clients: &ClientMap,
         time: &SystemTime,
         rng: &mut ThreadRng,
     ) {
@@ -245,7 +245,7 @@ impl AINode for SequenceNode {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        clients: &mut ClientMap,
+        clients: &ClientMap,
         time: &SystemTime,
         rng: &mut ThreadRng,
     ) -> NodeStatus {
@@ -291,7 +291,7 @@ impl AINode for SelectorNode {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        clients: &mut ClientMap,
+        clients: &ClientMap,
         time: &SystemTime,
         rng: &mut ThreadRng,
     ) -> NodeStatus {
@@ -331,7 +331,7 @@ impl AINode for FollowAssignedPath {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        clients: &mut ClientMap,
+        clients: &ClientMap,
         _time: &SystemTime,
         _rng: &mut ThreadRng,
     ) -> NodeStatus {
@@ -384,7 +384,7 @@ impl AINode for FollowEntityLoose {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        clients: &mut ClientMap,
+        clients: &ClientMap,
         _time: &SystemTime,
         _rng: &mut ThreadRng,
     ) -> NodeStatus {
@@ -448,7 +448,7 @@ impl AINode for FollowEntityTight {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        clients: &mut ClientMap,
+        clients: &ClientMap,
         _time: &SystemTime,
         _rng: &mut ThreadRng,
     ) -> NodeStatus {
@@ -517,7 +517,7 @@ impl AINode for PatrolPoint {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        clients: &mut ClientMap,
+        clients: &ClientMap,
         time: &SystemTime,
         rng: &mut ThreadRng,
     ) -> NodeStatus {
@@ -589,7 +589,7 @@ impl AINode for CheckDead {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        clients: &mut ClientMap,
+        clients: &ClientMap,
         time: &SystemTime,
         rng: &mut ThreadRng,
     ) -> NodeStatus {
@@ -666,7 +666,7 @@ impl AINode for CheckLeaderRetreat {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        _clients: &mut ClientMap,
+        _clients: &ClientMap,
         _time: &SystemTime,
         _rng: &mut ThreadRng,
     ) -> NodeStatus {
@@ -719,7 +719,7 @@ impl AINode for SyncPlayerTarget {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        _clients: &mut ClientMap,
+        _clients: &ClientMap,
         _time: &SystemTime,
         _rng: &mut ThreadRng,
     ) -> NodeStatus {
@@ -765,7 +765,7 @@ impl AINode for SyncPackLeaderTarget {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        _clients: &mut ClientMap,
+        _clients: &ClientMap,
         _time: &SystemTime,
         _rng: &mut ThreadRng,
     ) -> NodeStatus {
@@ -854,7 +854,7 @@ impl AINode for ScanForTargets {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        _clients: &mut ClientMap,
+        _clients: &ClientMap,
         _time: &SystemTime,
         _rng: &mut ThreadRng,
     ) -> NodeStatus {
@@ -957,7 +957,7 @@ impl AINode for CheckRetreat {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        clients: &mut ClientMap,
+        clients: &ClientMap,
         _time: &SystemTime,
         _rng: &mut ThreadRng,
     ) -> NodeStatus {
@@ -1045,7 +1045,7 @@ impl AINode for CheckAttack {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        clients: &mut ClientMap,
+        clients: &ClientMap,
         time: &SystemTime,
         _rng: &mut ThreadRng,
     ) -> NodeStatus {
@@ -1122,7 +1122,7 @@ fn on_mob_defeated(
     npc_id: i32,
     defeater_id: EntityID,
     state: &mut ShardServerState,
-    clients: &mut ClientMap,
+    clients: &ClientMap,
     rng: &mut ThreadRng,
 ) -> FFResult<()> {
     let defeated_type = state.get_npc(npc_id).unwrap().ty;

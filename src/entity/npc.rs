@@ -19,7 +19,7 @@ use crate::{
             sNPCAppearanceData, sNPCGroupMemberInfo, sP_FE2CL_NPC_ENTER, sP_FE2CL_NPC_EXIT,
             sP_FE2CL_NPC_MOVE, PacketID,
         },
-        ClientMap, FFClientHandle,
+        ClientMap, FFClient,
     },
     path::Path,
     state::ShardServerState,
@@ -116,7 +116,7 @@ impl NPC {
     pub fn tick_movement_along_path(
         &mut self,
         path: &mut Path,
-        clients: &mut ClientMap,
+        clients: &ClientMap,
         state: &mut ShardServerState,
     ) {
         let speed = path.get_speed();
@@ -172,7 +172,7 @@ impl Entity for NPC {
         EntityID::NPC(self.id)
     }
 
-    fn get_client(&self, _client_map: &ClientMap) -> Option<FFClientHandle> {
+    fn get_client<'a>(&self, _client_map: &'a ClientMap) -> Option<&'a FFClient> {
         None
     }
 
@@ -205,14 +205,14 @@ impl Entity for NPC {
         self.rotation = rotation.rem_euclid(360);
     }
 
-    fn send_enter(&self, client: &FFClientHandle) {
+    fn send_enter(&self, client: &FFClient) {
         let pkt = sP_FE2CL_NPC_ENTER {
             NPCAppearanceData: self.get_appearance_data(),
         };
         client.send_packet(PacketID::P_FE2CL_NPC_ENTER, &pkt);
     }
 
-    fn send_exit(&self, client: &FFClientHandle) {
+    fn send_exit(&self, client: &FFClient) {
         let pkt = sP_FE2CL_NPC_EXIT { iNPC_ID: self.id };
         client.send_packet(PacketID::P_FE2CL_NPC_EXIT, &pkt);
     }
@@ -220,7 +220,7 @@ impl Entity for NPC {
     fn tick(
         &mut self,
         time: &SystemTime,
-        clients: &mut ClientMap,
+        clients: &ClientMap,
         state: &mut ShardServerState,
         rng: &mut ThreadRng,
     ) {
@@ -244,7 +244,7 @@ impl Entity for NPC {
         }
     }
 
-    fn cleanup(&mut self, clients: &mut ClientMap, state: &mut ShardServerState) {
+    fn cleanup(&mut self, clients: &ClientMap, state: &mut ShardServerState) {
         // cleanup group
         if let Some(group_id) = self.group_id {
             crate::helpers::remove_group_member(self.get_id(), group_id, state, clients).unwrap();

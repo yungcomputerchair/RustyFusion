@@ -12,7 +12,7 @@ use crate::{
             sP_FE2CL_TRANSPORTATION_ENTER, sP_FE2CL_TRANSPORTATION_EXIT,
             sP_FE2CL_TRANSPORTATION_MOVE, sTransportationAppearanceData, PacketID::*,
         },
-        ClientMap, FFClientHandle,
+        ClientMap, FFClient,
     },
     path::Path,
     state::ShardServerState,
@@ -65,7 +65,7 @@ impl Entity for Slider {
         EntityID::Slider(self.id)
     }
 
-    fn get_client(&self, _client_map: &ClientMap) -> Option<FFClientHandle> {
+    fn get_client<'a>(&self, _client_map: &'a ClientMap) -> Option<&'a FFClient> {
         None
     }
 
@@ -97,14 +97,14 @@ impl Entity for Slider {
         self.rotation = rotation.rem_euclid(360);
     }
 
-    fn send_enter(&self, client: &FFClientHandle) {
+    fn send_enter(&self, client: &FFClient) {
         let pkt = sP_FE2CL_TRANSPORTATION_ENTER {
             AppearanceData: self.get_appearance_data(),
         };
         client.send_packet(P_FE2CL_TRANSPORTATION_ENTER, &pkt);
     }
 
-    fn send_exit(&self, client: &FFClientHandle) {
+    fn send_exit(&self, client: &FFClient) {
         let pkt = sP_FE2CL_TRANSPORTATION_EXIT {
             eTT: TransportationType::Bus as i32,
             iT_ID: self.id,
@@ -115,7 +115,7 @@ impl Entity for Slider {
     fn tick(
         &mut self,
         _time: &SystemTime,
-        clients: &mut ClientMap,
+        clients: &ClientMap,
         state: &mut ShardServerState,
         _rng: &mut ThreadRng,
     ) {
@@ -144,7 +144,7 @@ impl Entity for Slider {
         }
     }
 
-    fn cleanup(&mut self, _clients: &mut ClientMap, _state: &mut ShardServerState) {}
+    fn cleanup(&mut self, _clients: &ClientMap, _state: &mut ShardServerState) {}
 
     fn as_combatant(&self) -> Option<&dyn Combatant> {
         None

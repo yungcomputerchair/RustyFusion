@@ -24,7 +24,7 @@ pub fn do_basic_attack(
     target_ids: &[EntityID],
     charged: bool,
     state: &mut ShardServerState,
-    clients: &mut ClientMap,
+    clients: &ClientMap,
 ) -> FFResult<()> {
     const CRIT_CHANCE: f32 = 0.05;
 

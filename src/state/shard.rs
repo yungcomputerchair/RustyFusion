@@ -230,7 +230,7 @@ impl ShardServerState {
         ))
     }
 
-    pub fn check_for_expired_vehicles(&mut self, time: SystemTime, clients: &mut ClientMap) {
+    pub fn check_for_expired_vehicles(&mut self, time: SystemTime, clients: &ClientMap) {
         log(Severity::Debug, "Checking for expired vehicles");
         let pc_ids: Vec<i32> = self.entity_map.get_player_ids().collect();
         let mut pc_ids_dismounted = Vec::with_capacity(pc_ids.len());
@@ -274,7 +274,7 @@ impl ShardServerState {
         }
     }
 
-    pub fn tick_garbage_collection(&mut self, clients: &mut ClientMap) {
+    pub fn tick_garbage_collection(&mut self, clients: &ClientMap) {
         let mut removed_entities = self.entity_map.garbage_collect_instances();
         removed_entities.extend(self.entity_map.garbage_collect_entities());
         for entity in removed_entities.iter_mut() {
@@ -289,7 +289,7 @@ impl ShardServerState {
         }
     }
 
-    pub fn tick_groups(&mut self, clients: &mut ClientMap) {
+    pub fn tick_groups(&mut self, clients: &ClientMap) {
         for group in self.groups.values() {
             let (pc_group_data, npc_group_data) = group.get_member_data(self);
             let mut pkt = PacketBuilder::new(P_FE2CL_PC_GROUP_JOIN_SUCC).with(
@@ -318,7 +318,7 @@ impl ShardServerState {
         }
     }
 
-    pub fn tick_entities(&mut self, time: SystemTime, clients: &mut ClientMap) {
+    pub fn tick_entities(&mut self, time: SystemTime, clients: &ClientMap) {
         let mut rng = thread_rng();
         let eids: Vec<EntityID> = self.entity_map.get_tickable_ids().collect();
         for eid in eids {

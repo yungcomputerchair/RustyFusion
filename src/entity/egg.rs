@@ -7,7 +7,7 @@ use crate::{
     entity::{Entity, EntityID},
     net::{
         packet::{sP_FE2CL_SHINY_ENTER, sP_FE2CL_SHINY_EXIT, sShinyAppearanceData, PacketID::*},
-        ClientMap, FFClientHandle,
+        ClientMap, FFClient,
     },
     state::ShardServerState,
     Position,
@@ -55,7 +55,7 @@ impl Entity for Egg {
         EntityID::Egg(self.id)
     }
 
-    fn get_client(&self, _: &ClientMap) -> Option<FFClientHandle> {
+    fn get_client<'a>(&self, _: &'a ClientMap) -> Option<&'a FFClient> {
         None
     }
 
@@ -81,7 +81,7 @@ impl Entity for Egg {
 
     fn set_rotation(&mut self, _: i32) {}
 
-    fn send_enter(&self, client: &FFClientHandle) {
+    fn send_enter(&self, client: &FFClient) {
         let pkt = sP_FE2CL_SHINY_ENTER {
             ShinyAppearanceData: sShinyAppearanceData {
                 iShiny_ID: self.id,
@@ -95,7 +95,7 @@ impl Entity for Egg {
         client.send_packet(P_FE2CL_SHINY_ENTER, &pkt);
     }
 
-    fn send_exit(&self, client: &FFClientHandle) {
+    fn send_exit(&self, client: &FFClient) {
         let pkt = sP_FE2CL_SHINY_EXIT { iShinyID: self.id };
         client.send_packet(P_FE2CL_SHINY_EXIT, &pkt);
     }
@@ -103,7 +103,7 @@ impl Entity for Egg {
     fn tick(
         &mut self,
         time: &SystemTime,
-        clients: &mut ClientMap,
+        clients: &ClientMap,
         state: &mut ShardServerState,
         _rng: &mut ThreadRng,
     ) {
@@ -119,7 +119,7 @@ impl Entity for Egg {
         }
     }
 
-    fn cleanup(&mut self, _: &mut ClientMap, _: &mut ShardServerState) {}
+    fn cleanup(&mut self, _: &ClientMap, _: &mut ShardServerState) {}
 
     fn as_combatant(&self) -> Option<&dyn Combatant> {
         None
