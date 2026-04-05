@@ -10,7 +10,7 @@ use crate::{
     defines::*,
     entity::{Player, PlayerMetadata},
     enums::ShardChannelStatus,
-    error::{log_if_failed, FFError, FFResult, Severity},
+    error::{FFError, FFResult, Severity},
     geo::{self, GeoInfo},
     net::{
         packet::{PacketID::*, *},
@@ -46,6 +46,7 @@ struct LoginSession {
     players: HashMap<i64, Player>,
     selected_player_uid: Option<i64>,
     shard_connection_request: Option<ShardConnectionRequest>,
+    handoff_fe_key: u64,
 }
 
 struct ShardServerInfo {
@@ -173,7 +174,12 @@ impl LoginServerState {
         self.sessions.contains_key(&acc_id)
     }
 
-    pub fn start_session(&mut self, account: Account, player_it: impl Iterator<Item = Player>) {
+    pub fn start_session(
+        &mut self,
+        account: Account,
+        player_it: impl Iterator<Item = Player>,
+        handoff_fe_key: u64,
+    ) {
         let mut players = HashMap::new();
         for player in player_it {
             players.insert(player.get_uid(), player);
@@ -185,6 +191,7 @@ impl LoginServerState {
                 players,
                 selected_player_uid: None,
                 shard_connection_request: None,
+                handoff_fe_key,
             },
         );
     }
@@ -372,13 +379,12 @@ impl LoginServerState {
 
     pub fn process_shard_connection_requests(
         &mut self,
-        clients: &mut HashMap<usize, FFClient>,
+        clients: &HashMap<usize, FFClient>,
         time: SystemTime,
     ) {
         let client_keys = clients.keys().copied().collect::<Vec<_>>();
         for client_key in client_keys {
-            let client = clients.get_mut(&client_key).unwrap();
-            let fe_key = client.get_fe_key_uint();
+            let client = clients.get(&client_key).unwrap();
             let Ok(acc_id) = client.get_account_id() else {
                 continue;
             };
@@ -403,6 +409,8 @@ impl LoginServerState {
             let Some(session) = self.sessions.get_mut(&acc_id) else {
                 continue;
             };
+            let fe_key = session.handoff_fe_key;
+
             let Some(request) = &session.shard_connection_request else {
                 continue;
             };
@@ -413,7 +421,7 @@ impl LoginServerState {
                 let resp = sP_LS2CL_REP_SHARD_SELECT_FAIL {
                     iErrorCode: 1, // "Shard connection error"
                 };
-                log_if_failed(client.send_packet(P_LS2CL_REP_SHARD_SELECT_FAIL, &resp));
+                client.send_packet(P_LS2CL_REP_SHARD_SELECT_FAIL, &resp);
                 session.shard_connection_request = None;
                 continue;
             }
@@ -430,10 +438,11 @@ impl LoginServerState {
                 }
             };
 
-            let Some(shard) = clients
-                .values_mut()
-                .find(|c| matches!(c.client_type, ClientType::ShardServer(sid) if sid == shard_id))
-            else {
+            let Some(shard) = clients.values().find(|c| {
+                // TODO make async
+                let meta = c.meta.blocking_read();
+                meta.client_type == ClientType::ShardServer(shard_id)
+            }) else {
                 continue;
             };
 
@@ -447,16 +456,7 @@ impl LoginServerState {
                 iBuddyWarpTime: self.buddy_warp_times.get(&pc_uid).copied().unwrap_or(0),
             };
 
-            if shard
-                .send_packet(P_LS2FE_REQ_UPDATE_LOGIN_INFO, &login_info)
-                .is_err()
-            {
-                let resp = sP_LS2CL_REP_SHARD_SELECT_FAIL {
-                    iErrorCode: 1, // "Shard connection error"
-                };
-                let client = clients.get_mut(&client_key).unwrap();
-                log_if_failed(client.send_packet(P_LS2CL_REP_SHARD_SELECT_FAIL, &resp));
-            }
+            shard.send_packet(P_LS2FE_REQ_UPDATE_LOGIN_INFO, &login_info);
             session.shard_connection_request = None;
         }
     }
