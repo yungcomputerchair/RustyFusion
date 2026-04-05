@@ -1147,11 +1147,7 @@ impl Player {
         Ok(self.level)
     }
 
-    pub fn set_fusion_matter(
-        &mut self,
-        fusion_matter: u32,
-        clients: Option<&ClientMap>,
-    ) -> u32 {
+    pub fn set_fusion_matter(&mut self, fusion_matter: u32, clients: Option<&ClientMap>) -> u32 {
         let player_stats = tdata_get().get_player_stats(self.level).unwrap();
         let fm_max = if self.perms <= CN_ACCOUNT_LEVEL__DEVELOPER as i16 {
             PC_FUSIONMATTER_MAX

@@ -7,6 +7,7 @@ use std::sync::OnceLock;
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
+use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::config::*;
@@ -39,8 +40,7 @@ type DbOperation = Box<
         + Send,
 >;
 
-static DB_TX: OnceLock<std::sync::Mutex<Option<mpsc::UnboundedSender<DbOperation>>>> =
-    OnceLock::new();
+static DB_TX: OnceLock<std::sync::Mutex<Option<UnboundedSender<DbOperation>>>> = OnceLock::new();
 
 #[async_trait]
 pub trait Database: Send + std::fmt::Debug {

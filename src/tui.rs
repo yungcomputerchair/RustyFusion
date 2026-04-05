@@ -1,4 +1,7 @@
-use std::time::{Duration, Instant};
+use std::{
+    sync::atomic::Ordering,
+    time::{Duration, Instant},
+};
 
 use ratatui::{
     prelude::*,
@@ -97,7 +100,7 @@ impl TuiState {
 }
 
 pub trait Tui {
-    fn render(&mut self, frame: &mut Frame, server_state: &ServerState, clients: ClientMap);
+    fn render(&mut self, frame: &mut Frame, server_state: &ServerState, clients: &ClientMap);
 }
 
 pub struct LoginTui {
@@ -114,7 +117,7 @@ impl Default for LoginTui {
     }
 }
 impl Tui for LoginTui {
-    fn render(&mut self, frame: &mut Frame, server_state: &ServerState, mut clients: ClientMap) {
+    fn render(&mut self, frame: &mut Frame, server_state: &ServerState, clients: &ClientMap) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(70), Constraint::Fill(1)].as_ref())
@@ -126,7 +129,7 @@ impl Tui for LoginTui {
         let server_state = server_state.as_login();
         let shard_list_widget = ShardListWidget {
             login_state: server_state,
-            clients: &mut clients,
+            clients,
         };
         frame.render_widget(shard_list_widget, layout[1]);
     }
@@ -134,7 +137,7 @@ impl Tui for LoginTui {
 
 struct ShardListWidget<'a, 'b, 'c> {
     login_state: &'a LoginServerState,
-    clients: &'b mut ClientMap<'c>,
+    clients: &'b ClientMap<'c>,
 }
 impl<'a, 'b, 'c> Widget for ShardListWidget<'a, 'b, 'c> {
     fn render(self, area: Rect, buf: &mut Buffer) {
@@ -163,7 +166,9 @@ impl<'a, 'b, 'c> Widget for ShardListWidget<'a, 'b, 'c> {
                         .label("offline");
                 };
 
-                let shard_client = self.clients.get_shard_server(*sid).unwrap();
+                let shard = self.clients.get_shard_server(*sid).unwrap();
+                let meta = shard.meta.blocking_read();
+                let ping = meta.ping_ms.as_ref().map(|p| p.load(Ordering::Relaxed));
 
                 let mut block = Block::bordered()
                     .title(format!(
@@ -172,14 +177,13 @@ impl<'a, 'b, 'c> Widget for ShardListWidget<'a, 'b, 'c> {
                         self.login_state.get_shard_public_addr(*sid).unwrap()
                     ))
                     .title_bottom(
-                        Line::from(match shard_client.ping {
-                            Some(ping) => format!(" {} ms ", ping.as_millis()),
+                        Line::from(match ping {
+                            Some(ping) => format!(" {} ms ", ping),
                             None => " ... ".to_string(),
                         })
                         .right_aligned()
-                        .fg(get_ping_color(shard_client.ping)),
+                        .fg(get_ping_color(ping)),
                     );
-
                 if let Some(city) = self.login_state.get_shard_city(*sid) {
                     block = block.title(Line::from(format!(" {} ", city)).right_aligned());
                 }
@@ -244,7 +248,7 @@ impl Default for ShardTui {
     }
 }
 impl Tui for ShardTui {
-    fn render(&mut self, frame: &mut Frame, server_state: &ServerState, mut clients: ClientMap) {
+    fn render(&mut self, frame: &mut Frame, server_state: &ServerState, clients: &ClientMap) {
         let outer_layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(70), Constraint::Fill(1)].as_ref())
@@ -262,7 +266,7 @@ impl Tui for ShardTui {
 
         let player_list_widget = PlayerListWidget {
             shard_state: server_state,
-            clients: &mut clients,
+            clients,
         };
         frame.render_widget(player_list_widget, outer_layout[1]);
 
@@ -270,7 +274,7 @@ impl Tui for ShardTui {
         let shard_stats_widget = ShardStatsWidget {
             shard_state: server_state,
             stats_cache: &self.stats_cache,
-            clients: &mut clients,
+            clients,
         };
         frame.render_widget(shard_stats_widget, inner_layout_left[1]);
     }
@@ -338,7 +342,7 @@ impl<'a> Widget for LogWidget<'a> {
 
 struct PlayerListWidget<'a, 'b, 'c> {
     shard_state: &'a ShardServerState,
-    clients: &'b mut ClientMap<'c>,
+    clients: &'b ClientMap<'c>,
 }
 impl<'a, 'b, 'c> Widget for PlayerListWidget<'a, 'b, 'c> {
     fn render(self, area: Rect, buf: &mut Buffer) {
@@ -357,10 +361,14 @@ impl<'a, 'b, 'c> Widget for PlayerListWidget<'a, 'b, 'c> {
             .iter()
             .map(|pid| {
                 let player = self.shard_state.get_player(*pid).unwrap();
-                let ping = player
-                    .get_client_id()
-                    .map(|cid| self.clients.get(cid))
-                    .and_then(|c| c.ping);
+                let client = player.get_client(self.clients).unwrap();
+                let ping = client
+                    .meta
+                    .blocking_read()
+                    .ping_ms
+                    .as_ref()
+                    .map(|p| p.load(Ordering::Relaxed));
+
                 let chunk_coords = player.get_chunk_coords();
                 let world_data = tdata_get().get_world_name_data(chunk_coords);
 
@@ -374,7 +382,7 @@ impl<'a, 'b, 'c> Widget for PlayerListWidget<'a, 'b, 'c> {
                     Line::from(vec![
                         Span::from(player.to_string()).white().bold(),
                         Span::from(match ping {
-                            Some(ping) => format!(" ({} ms)", ping.as_millis()),
+                            Some(ping) => format!(" ({} ms)", ping),
                             None => " (...)".to_string(),
                         })
                         .fg(get_ping_color(ping)),
@@ -406,7 +414,7 @@ impl<'a, 'b, 'c> Widget for PlayerListWidget<'a, 'b, 'c> {
 struct ShardStatsWidget<'a, 'b, 'c> {
     shard_state: &'a ShardServerState,
     stats_cache: &'a ShardStatsCache,
-    clients: &'b mut ClientMap<'c>,
+    clients: &'b ClientMap<'c>,
 }
 impl<'a, 'b, 'c> Widget for ShardStatsWidget<'a, 'b, 'c> {
     fn render(self, area: Rect, buf: &mut Buffer) {
@@ -424,16 +432,13 @@ impl<'a, 'b, 'c> Widget for ShardStatsWidget<'a, 'b, 'c> {
 
         let stats_lines = [
             if let Some(uuid) = self.shard_state.login_server_conn_id {
-                Line::from(format!(
-                    "Login server connected ({}) | {} ms",
-                    uuid,
-                    self.clients
-                        .get_login_server()
-                        .unwrap()
-                        .ping
-                        .unwrap_or_default()
-                        .as_millis()
-                ))
+                let ls = self.clients.get_login_server().unwrap();
+                let meta = ls.meta.blocking_read();
+                let ping = meta.ping_ms.as_ref().map(|p| p.load(Ordering::Relaxed));
+                Line::from(match ping {
+                    Some(ping) => format!("Login server connected | {} | {} ms", uuid, ping),
+                    None => format!("Login server connected | {} | ... ms", uuid),
+                })
                 .green()
             } else {
                 Line::from("Login server disconnected").red()
@@ -472,10 +477,10 @@ impl<'a, 'b, 'c> Widget for ShardStatsWidget<'a, 'b, 'c> {
     }
 }
 
-fn get_ping_color(ping: Option<Duration>) -> Color {
+fn get_ping_color(ping: Option<u64>) -> Color {
     match ping {
-        Some(p) if p.as_millis() > 500 => Color::Red,
-        Some(p) if p.as_millis() > 250 => Color::Yellow,
+        Some(p) if p > 500 => Color::Red,
+        Some(p) if p > 250 => Color::Yellow,
         Some(_) => Color::Green,
         None => Color::DarkGray,
     }
