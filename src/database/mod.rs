@@ -1,14 +1,9 @@
 #![allow(dead_code)]
 
-use std::any::Any;
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::OnceLock;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 use async_trait::async_trait;
-use tokio::sync::mpsc::UnboundedSender;
-use tokio::sync::{mpsc, oneshot};
 
 use crate::config::*;
 use crate::entity::Player;
@@ -23,27 +18,10 @@ type BigInt = i64;
 type Text = String;
 type Bytes = Vec<u8>;
 
-pub struct DbResult {
-    result: FFResult<Box<dyn Any + Send>>,
-    pub completed: SystemTime,
-}
-impl DbResult {
-    pub fn get<T: 'static>(self) -> FFResult<T> {
-        self.result.map(|v| {
-            *v.downcast::<T>()
-                .unwrap_or_else(|_| panic_log("Bad DbResult cast"))
-        })
-    }
-}
-type DbOperation = Box<
-    dyn for<'a> FnOnce(&'a mut dyn Database) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>>
-        + Send,
->;
-
-static DB_TX: OnceLock<std::sync::Mutex<Option<UnboundedSender<DbOperation>>>> = OnceLock::new();
+static DB: OnceLock<Box<dyn Database + Sync>> = OnceLock::new();
 
 #[async_trait]
-pub trait Database: Send + std::fmt::Debug {
+pub trait Database: Send + Sync + std::fmt::Debug {
     async fn find_account_from_username(&self, username: &Text) -> FFResult<Option<Account>>;
     async fn find_account_from_player(&self, pc_uid: BigInt) -> FFResult<Account>;
     async fn create_account(&self, username: &Text, password_hashed: &Text) -> FFResult<Account>;
@@ -67,8 +45,8 @@ pub trait Database: Send + std::fmt::Debug {
 
 const DB_NAME: &str = "rustyfusion";
 
-async fn db_connect(config: &GeneralConfig) -> FFResult<Box<dyn Database>> {
-    let _db_impl: Option<FFResult<Box<dyn Database>>> = None;
+async fn db_connect(config: &GeneralConfig) -> FFResult<Box<dyn Database + Sync>> {
+    let _db_impl: Option<FFResult<Box<dyn Database + Sync>>> = None;
 
     #[cfg(feature = "postgres")]
     let _db_impl = Some(postgresql::PostgresDatabase::connect(config).await);
@@ -87,7 +65,7 @@ async fn db_connect(config: &GeneralConfig) -> FFResult<Box<dyn Database>> {
 }
 
 pub async fn db_init() {
-    if DB_TX.get().is_some() {
+    if DB.get().is_some() {
         panic_log("Database already initialized");
     }
 
@@ -104,83 +82,11 @@ pub async fn db_init() {
         ),
     );
 
-    let (tx, mut rx) = mpsc::unbounded_channel::<DbOperation>();
-    let _ = DB_TX.set(std::sync::Mutex::new(Some(tx)));
-
-    tokio::spawn(async move {
-        let mut db = db_impl;
-        while let Some(op) = rx.recv().await {
-            op(&mut *db).await;
-        }
-    });
+    let _ = DB.set(db_impl);
 }
 
-pub fn db_shutdown() {
-    // Drop the sender to close the channel, which ends the spawned task
-    if let Some(lock) = DB_TX.get() {
-        lock.lock().unwrap().take();
-    }
-}
-
-pub fn _db_run_sync<T, F>(f: F) -> FFResult<T>
-where
-    T: Send + 'static,
-    F: for<'a> FnOnce(
-            &'a mut dyn Database,
-        ) -> Pin<Box<dyn Future<Output = FFResult<T>> + Send + 'a>>
-        + Send
-        + 'static,
-{
-    const TIMEOUT: Duration = Duration::from_secs(5);
-    let rx = _db_run_async(f);
-    tokio::task::block_in_place(|| {
-        tokio::runtime::Handle::current().block_on(async {
-            tokio::time::timeout(TIMEOUT, rx)
-                .await
-                .map_err(|_| {
-                    FFError::build(
-                        Severity::Warning,
-                        "DB operation failed: timed out".to_string(),
-                    )
-                })?
-                .map_err(|_| {
-                    FFError::build(
-                        Severity::Warning,
-                        "DB operation failed: sender dropped".to_string(),
-                    )
-                })
-                .and_then(|res| res.get())
-        })
-    })
-}
-
-pub fn _db_run_async<T, F>(f: F) -> oneshot::Receiver<DbResult>
-where
-    T: Send + Any,
-    F: for<'a> FnOnce(
-            &'a mut dyn Database,
-        ) -> Pin<Box<dyn Future<Output = FFResult<T>> + Send + 'a>>
-        + Send
-        + 'static,
-{
-    let lock = DB_TX
-        .get()
-        .unwrap_or_else(|| panic_log("Database not initialized"));
-    let guard = lock.lock().unwrap();
-    let tx = guard
+pub fn db_get() -> &'static (dyn Database + Sync) {
+    DB.get()
+        .unwrap_or_else(|| panic_log("Database not initialized"))
         .as_ref()
-        .unwrap_or_else(|| panic_log("Database has been shut down"));
-    let (result_tx, result_rx) = oneshot::channel();
-    let op: DbOperation = Box::new(move |db: &mut dyn Database| {
-        Box::pin(async move {
-            let result = f(db).await.map(|v| Box::new(v) as Box<dyn Any + Send>);
-            let db_result = DbResult {
-                result,
-                completed: SystemTime::now(),
-            };
-            let _ = result_tx.send(db_result);
-        })
-    });
-    let _ = tx.send(op);
-    result_rx
 }

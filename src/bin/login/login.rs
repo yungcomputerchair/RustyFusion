@@ -6,7 +6,7 @@ use rand::random;
 use regex::Regex;
 use rusty_fusion::{
     config::config_get,
-    db_run_sync,
+    database::db_get,
     defines::*,
     entity::{Combatant, Entity, Player},
     enums::{ItemLocation, ItemType, LoginType, PlayerNameStatus},
@@ -28,7 +28,7 @@ static USERNAME_REGEX: LazyLock<Regex> =
 static PASSWORD_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"[a-zA-Z0-9!@#$%^&*()_+]{8,32}").unwrap());
 
-pub fn login(
+pub async fn login(
     pkt: Packet,
     client: &FFClient,
     state: &mut LoginServerState,
@@ -45,7 +45,7 @@ Password must be 8-32 characters long and contain only letters, numbers, or spec
 
     let pkt: sP_CL2LS_REQ_LOGIN = *pkt.get(P_CL2LS_REQ_LOGIN)?;
     let mut error_code = LoginError::LoginError;
-    (|| -> FFResult<()> {
+    (async {
         let login_type = LoginType::try_from(pkt.iLoginType).map_err(|_| {
             FFError::build(
                 Severity::Warning,
@@ -113,9 +113,8 @@ Password must be 8-32 characters long and contain only letters, numbers, or spec
         .to_owned();
 
         let lookup_username = username.clone();
-        let account = match db_run_sync!(db =>
-            db.find_account_from_username(&lookup_username)
-        )? {
+        let db = db_get();
+        let account = match db.find_account_from_username(&lookup_username).await? {
             Some(account) => account,
             None => {
                 if config_get().login.auto_create_accounts.get()
@@ -124,9 +123,7 @@ Password must be 8-32 characters long and contain only letters, numbers, or spec
                     // automatically create the account with the supplied credentials
                     let new_username = username.clone();
                     let password_hashed = util::hash_password(&token)?;
-                    let new_acc = db_run_sync!(db =>
-                        db.create_account(&new_username, &password_hashed)
-                    )?;
+                    let new_acc = db.create_account(&new_username, &password_hashed).await?;
                     log(
                         Severity::Info,
                         &format!(
@@ -199,7 +196,7 @@ Password must be 8-32 characters long and contain only letters, numbers, or spec
 
         let last_player_slot = account.selected_slot;
         let acc_id = account.id;
-        let players = db_run_sync!(db => db.load_players(acc_id))?;
+        let players = db.load_players(acc_id).await?;
 
         /*
          * Check if this account is already logged in, meaning:
@@ -279,7 +276,8 @@ Password must be 8-32 characters long and contain only letters, numbers, or spec
             client.send_packet(P_LS2CL_REP_CHAR_INFO, &pkt);
         });
         Ok(())
-    })()
+    })
+    .await
     .catch_fail(|| {
         let resp = sP_LS2CL_REP_LOGIN_FAIL {
             iErrorCode: error_code as i32,
@@ -356,7 +354,7 @@ pub fn check_char_name(pkt: Packet, client: &FFClient) -> FFResult<()> {
     Ok(())
 }
 
-pub fn save_char_name(
+pub async fn save_char_name(
     pkt: Packet,
     client: &FFClient,
     state: &mut LoginServerState,
@@ -396,11 +394,9 @@ pub fn save_char_name(
     player.flags.name_check = name_check;
 
     let player_saved = player.clone();
-    db_run_sync!(db => {
-        db.init_player(acc_id, &player_saved).await?;
-        db.update_selected_player(acc_id, slot_num as i32).await?;
-        Ok(())
-    })?;
+    let db = db_get();
+    db.init_player(acc_id, &player_saved).await?;
+    db.update_selected_player(acc_id, slot_num as i32).await?;
 
     let style = &player.get_style();
     let resp = sP_LS2CL_REP_SAVE_CHAR_NAME_SUCC {
@@ -416,7 +412,11 @@ pub fn save_char_name(
     Ok(())
 }
 
-pub fn char_create(pkt: Packet, client: &FFClient, state: &mut LoginServerState) -> FFResult<()> {
+pub async fn char_create(
+    pkt: Packet,
+    client: &FFClient,
+    state: &mut LoginServerState,
+) -> FFResult<()> {
     let acc_id = client.get_account_id()?;
     let pkt: &sP_CL2LS_REQ_CHAR_CREATE = pkt.get(P_CL2LS_REQ_CHAR_CREATE)?;
 
@@ -424,7 +424,8 @@ pub fn char_create(pkt: Packet, client: &FFClient, state: &mut LoginServerState)
     if let Some(player) = state.get_players_mut(acc_id)?.get_mut(&pc_uid) {
         player.style = Some(pkt.PCStyle.try_into()?);
         let player_saved = player.clone();
-        db_run_sync!(db => db.update_player_appearance(&player_saved))?;
+        let db = db_get();
+        db.update_player_appearance(&player_saved).await?;
 
         player
             .set_item(
@@ -449,7 +450,7 @@ pub fn char_create(pkt: Packet, client: &FFClient, state: &mut LoginServerState)
             .unwrap();
 
         let player_saved = player.clone();
-        db_run_sync!(db => db.save_player(&player_saved))?;
+        db.save_player(&player_saved).await?;
 
         let resp = sP_LS2CL_REP_CHAR_CREATE_SUCC {
             iLevel: player.get_level(),
@@ -468,7 +469,11 @@ pub fn char_create(pkt: Packet, client: &FFClient, state: &mut LoginServerState)
     }
 }
 
-pub fn char_delete(pkt: Packet, client: &FFClient, state: &mut LoginServerState) -> FFResult<()> {
+pub async fn char_delete(
+    pkt: Packet,
+    client: &FFClient,
+    state: &mut LoginServerState,
+) -> FFResult<()> {
     let acc_id = client.get_account_id()?;
     let pkt: &sP_CL2LS_REQ_CHAR_DELETE = pkt.get(P_CL2LS_REQ_CHAR_DELETE)?;
     let pc_uid = pkt.iPC_UID;
@@ -479,7 +484,7 @@ pub fn char_delete(pkt: Packet, client: &FFClient, state: &mut LoginServerState)
             Severity::Warning,
             format!("Couldn't get player {}", pc_uid),
         ))?;
-    db_run_sync!(db => db.delete_player(pc_uid))?;
+    db_get().delete_player(pc_uid).await?;
     let resp = sP_LS2CL_REP_CHAR_DELETE_SUCC {
         iSlotNum: player.get_slot_num() as i8,
     };
@@ -487,7 +492,7 @@ pub fn char_delete(pkt: Packet, client: &FFClient, state: &mut LoginServerState)
     Ok(())
 }
 
-pub fn save_char_tutor(
+pub async fn save_char_tutor(
     pkt: Packet,
     client: &FFClient,
     state: &mut LoginServerState,
@@ -506,7 +511,7 @@ pub fn save_char_tutor(
     if pkt.iTutorialFlag == 1 {
         player.set_tutorial_done();
         let player_saved = player.clone();
-        db_run_sync!(db => db.save_player(&player_saved))
+        db_get().save_player(&player_saved).await
     } else {
         Err(FFError::build(
             Severity::Warning,
@@ -515,7 +520,7 @@ pub fn save_char_tutor(
     }
 }
 
-pub fn char_select(
+pub async fn char_select(
     pkt: Packet,
     client_key: usize,
     clients: &HashMap<usize, FFClient>,
@@ -540,9 +545,9 @@ pub fn char_select(
         }
 
         log_if_failed(state.set_selected_player_id(account_id, pc_uid));
-        db_run_sync!(db =>
-            db.update_selected_player(account_id, slot_num as i32)
-        )?;
+        db_get()
+            .update_selected_player(account_id, slot_num as i32)
+            .await?;
 
         let pkt = sP_LS2CL_REP_CHAR_SELECT_SUCC { UNUSED: unused!() };
         client.send_packet(P_LS2CL_REP_CHAR_SELECT_SUCC, &pkt);

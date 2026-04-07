@@ -11,7 +11,7 @@ use ffmonitor::PlayerEvent;
 
 use rusty_fusion::{
     config::config_init,
-    database::{db_init, db_shutdown},
+    database::db_init,
     error::{log, log_if_failed, log_init, FFError, FFResult, Logger, Severity},
     geo::geo_init,
     monitor::{monitor_flush, monitor_init, monitor_queue, MonitorEvent},
@@ -184,7 +184,6 @@ struct Cleanup;
 impl Drop for Cleanup {
     fn drop(&mut self) {
         ratatui::restore();
-        db_shutdown();
     }
 }
 
@@ -266,15 +265,15 @@ fn handle_packet<'a>(
                 Ok(())
             }
             //
-            P_CL2LS_REQ_LOGIN => login::login(pkt, client, state, time),
+            P_CL2LS_REQ_LOGIN => login::login(pkt, client, state, time).await,
             P_CL2LS_REQ_PC_EXIT_DUPLICATE => login::pc_exit_duplicate(key, clients, state),
             P_CL2LS_REQ_SHARD_LIST_INFO => login::shard_list_info(client, state),
             P_CL2LS_REQ_CHECK_CHAR_NAME => login::check_char_name(pkt, client),
-            P_CL2LS_REQ_SAVE_CHAR_NAME => login::save_char_name(pkt, client, state),
-            P_CL2LS_REQ_CHAR_CREATE => login::char_create(pkt, client, state),
-            P_CL2LS_REQ_CHAR_DELETE => login::char_delete(pkt, client, state),
-            P_CL2LS_REQ_SAVE_CHAR_TUTOR => login::save_char_tutor(pkt, client, state),
-            P_CL2LS_REQ_CHAR_SELECT => login::char_select(pkt, key, clients, state),
+            P_CL2LS_REQ_SAVE_CHAR_NAME => login::save_char_name(pkt, client, state).await,
+            P_CL2LS_REQ_CHAR_CREATE => login::char_create(pkt, client, state).await,
+            P_CL2LS_REQ_CHAR_DELETE => login::char_delete(pkt, client, state).await,
+            P_CL2LS_REQ_SAVE_CHAR_TUTOR => login::save_char_tutor(pkt, client, state).await,
+            P_CL2LS_REQ_CHAR_SELECT => login::char_select(pkt, key, clients, state).await,
             P_CL2LS_REQ_SHARD_SELECT => login::shard_select(pkt, key, clients, state, time),
             P_CL2LS_REP_LIVE_CHECK => {
                 client.clear_live_check();

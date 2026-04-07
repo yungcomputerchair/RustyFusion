@@ -23,30 +23,6 @@ macro_rules! placeholder {
     }};
 }
 
-#[macro_export]
-macro_rules! db_run_sync {
-    // Block passed in; awaiting is managed by caller
-    ($db:ident => { $($body:tt)* }) => {
-        $crate::database::_db_run_sync(move |$db| ::std::boxed::Box::pin(async move { $($body)* }))
-    };
-
-    // Single expression passed in; automatically await
-    ($db:ident => $body:expr) => {
-        $crate::database::_db_run_sync(move |$db| ::std::boxed::Box::pin(async move { ($body).await }))
-    };
-}
-
-#[macro_export]
-macro_rules! db_run_async {
-    // same pattern as db_run_sync, but for the async version that returns a receiver
-    ($db:ident => { $($body:tt)* }) => {
-        $crate::database::_db_run_async(move |$db| ::std::boxed::Box::pin(async move { $($body)* }))
-    };
-    ($db:ident => $body:expr) => {
-        $crate::database::_db_run_async(move |$db| ::std::boxed::Box::pin(async move { ($body).await }))
-    };
-}
-
 pub mod defines;
 pub mod enums;
 pub mod error;

@@ -7,7 +7,6 @@ use crate::{
     ai::AI,
     chunk::{EntityMap, InstanceID, TickMode},
     config::config_get,
-    database::DbResult,
     defines::*,
     entity::{Combatant, Egg, Entity, EntityID, Group, Player, Slider, NPC},
     enums::ItemType,
@@ -22,13 +21,10 @@ use crate::{
     trade::TradeContext,
 };
 
-use tokio::sync::oneshot;
-
 pub struct ShardServerState {
     pub shard_id: Option<i32>,
     pub login_server_conn_id: Option<Uuid>,
     pub login_data: HashMap<i64, LoginData>,
-    pub save_rx: Option<oneshot::Receiver<DbResult>>,
     pub entity_map: EntityMap,
     pub buyback_lists: HashMap<i32, Vec<Item>>,
     pub ongoing_trades: HashMap<Uuid, TradeContext>,
@@ -41,7 +37,6 @@ impl Default for ShardServerState {
             login_server_conn_id: None,
             shard_id: None,
             login_data: HashMap::new(),
-            save_rx: None,
             entity_map: EntityMap::default(),
             buyback_lists: HashMap::new(),
             ongoing_trades: HashMap::new(),
@@ -347,27 +342,5 @@ impl ShardServerState {
                 }
             }
         }
-    }
-
-    pub fn check_receivers(&mut self) -> bool {
-        if let Some(receiver) = &mut self.save_rx {
-            match receiver.try_recv() {
-                Ok(res) => {
-                    let elapsed = res.completed.elapsed().unwrap_or_default();
-                    log(
-                        Severity::Info,
-                        &format!("Save complete ({:.2}s)", elapsed.as_secs_f32()),
-                    );
-                    self.save_rx = None;
-                }
-                Err(oneshot::error::TryRecvError::Empty) => (), // in progress
-                Err(oneshot::error::TryRecvError::Closed) => {
-                    log(Severity::Warning, "Save failed: sender dropped");
-                    self.save_rx = None;
-                }
-            }
-        }
-
-        self.save_rx.is_some()
     }
 }

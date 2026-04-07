@@ -1306,17 +1306,19 @@ impl Player {
             .is_some_and(|available_at| util::get_timestamp_sec(SystemTime::now()) < available_at)
     }
 
-    pub fn disconnect(pc_id: i32, state: &mut ShardServerState, clients: &ClientMap) {
+    pub fn disconnect(pc_id: i32, state: &mut ShardServerState, clients: &ClientMap) -> Player {
         let player = state.get_player(pc_id).unwrap();
+        log(
+            Severity::Info,
+            &format!(
+                "{} left (channel {})",
+                player, player.instance_id.channel_num
+            ),
+        );
+
         let uid = player.get_uid();
         let client = player.get_client(clients).unwrap().clone();
-        let display_info = format!(
-            "{} left (channel {})",
-            player, player.instance_id.channel_num
-        );
         let player_saved = player.clone();
-        log_if_failed(db_run_sync!(db => db.save_player(&player_saved)));
-        log(Severity::Info, &display_info);
 
         state.player_uid_to_id.remove(&uid);
 
@@ -1327,6 +1329,7 @@ impl Player {
         player.cleanup(clients, state);
 
         client.disconnect();
+        player_saved
     }
 
     fn tick_skyway_ride(
