@@ -44,29 +44,25 @@ static DB_TX: OnceLock<std::sync::Mutex<Option<UnboundedSender<DbOperation>>>> =
 
 #[async_trait]
 pub trait Database: Send + std::fmt::Debug {
-    async fn find_account_from_username(&mut self, username: &Text) -> FFResult<Option<Account>>;
-    async fn find_account_from_player(&mut self, pc_uid: BigInt) -> FFResult<Account>;
-    async fn create_account(
-        &mut self,
-        username: &Text,
-        password_hashed: &Text,
-    ) -> FFResult<Account>;
-    async fn change_account_level(&mut self, acc_id: BigInt, new_level: Int) -> FFResult<()>;
+    async fn find_account_from_username(&self, username: &Text) -> FFResult<Option<Account>>;
+    async fn find_account_from_player(&self, pc_uid: BigInt) -> FFResult<Account>;
+    async fn create_account(&self, username: &Text, password_hashed: &Text) -> FFResult<Account>;
+    async fn change_account_level(&self, acc_id: BigInt, new_level: Int) -> FFResult<()>;
     async fn ban_account(
-        &mut self,
+        &self,
         acc_id: BigInt,
         banned_until: SystemTime,
         ban_reason: Text,
     ) -> FFResult<()>;
-    async fn unban_account(&mut self, acc_id: BigInt) -> FFResult<()>;
-    async fn init_player(&mut self, acc_id: BigInt, player: &Player) -> FFResult<()>;
-    async fn update_player_appearance(&mut self, player: &Player) -> FFResult<()>;
-    async fn update_selected_player(&mut self, acc_id: BigInt, slot_num: Int) -> FFResult<()>;
-    async fn save_player(&mut self, player: &Player) -> FFResult<()>;
-    async fn save_players(&mut self, players: &[&Player]) -> FFResult<()>;
-    async fn load_player(&mut self, acc_id: BigInt, pc_uid: BigInt) -> FFResult<Player>;
-    async fn load_players(&mut self, acc_id: BigInt) -> FFResult<Vec<Player>>;
-    async fn delete_player(&mut self, pc_uid: BigInt) -> FFResult<()>;
+    async fn unban_account(&self, acc_id: BigInt) -> FFResult<()>;
+    async fn init_player(&self, acc_id: BigInt, player: &Player) -> FFResult<()>;
+    async fn update_player_appearance(&self, player: &Player) -> FFResult<()>;
+    async fn update_selected_player(&self, acc_id: BigInt, slot_num: Int) -> FFResult<()>;
+    async fn save_player(&self, player: &Player) -> FFResult<()>;
+    async fn save_players(&self, players: &[&Player]) -> FFResult<()>;
+    async fn load_player(&self, acc_id: BigInt, pc_uid: BigInt) -> FFResult<Player>;
+    async fn load_players(&self, acc_id: BigInt) -> FFResult<Vec<Player>>;
+    async fn delete_player(&self, pc_uid: BigInt) -> FFResult<()>;
 }
 
 const DB_NAME: &str = "rustyfusion";

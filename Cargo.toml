@@ -15,6 +15,7 @@ toml = "0.8.8"
 uuid = { version = "1.6.1", features = ['v4', 'fast-rng']}
 vecmath = "1.0.0"
 tokio-postgres = { version = "0.7.16", optional = true }
+deadpool-postgres = { version = "0.14.1", optional = true }
 num_enum = "0.7.2"
 regex = "1.11.1"
 bcrypt = "0.15.0"
@@ -33,7 +34,7 @@ futures = "0.3.32"
 
 [features]
 default = ["postgres"]
-postgres = ["dep:tokio-postgres"]
+postgres = ["dep:tokio-postgres", "dep:deadpool-postgres"]
 
 [profile.dev.package.backtrace]
 opt-level = 3
