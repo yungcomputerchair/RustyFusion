@@ -2,8 +2,10 @@ use std::{
     any::type_name,
     cell::Cell,
     collections::HashMap,
+    future::Future,
     mem::size_of,
     ops::{Deref, DerefMut},
+    pin::Pin,
     slice::from_raw_parts,
 };
 
@@ -59,8 +61,12 @@ pub use ffserver::*;
 pub mod crypto;
 pub mod packet;
 
-pub type PacketCallback =
-    fn(Packet, usize, &HashMap<usize, FFClient>, &mut ServerState) -> FFResult<()>;
+pub type PacketCallback = for<'a> fn(
+    Packet,
+    usize,
+    &'a HashMap<usize, FFClient>,
+    &'a mut ServerState,
+) -> Pin<Box<dyn Future<Output = FFResult<()>> + Send + 'a>>;
 pub type DisconnectCallback = fn(usize, &HashMap<usize, FFClient>, &mut ServerState);
 pub type LiveCheckCallback = fn(&FFClient);
 
