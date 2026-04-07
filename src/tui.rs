@@ -12,11 +12,11 @@ use ratatui::{
 use crate::{
     config::config_get,
     entity::Entity,
-    error::{Severity, BACKLOG},
+    error::{FFError, Severity},
     net::{ClientMap, FFClient},
     state::{LoginServerState, ServerState, ShardServerState},
     tabledata::tdata_get,
-    util,
+    util::{self, RingBuffer},
 };
 
 const STATS_CACHE_INTERVAL: Duration = Duration::from_secs(1);
@@ -106,6 +106,7 @@ pub trait Tui {
         frame: &mut Frame,
         server_state: &ServerState,
         clients: &HashMap<usize, FFClient>,
+        log_buffer: &RingBuffer<FFError>,
     );
 }
 
@@ -128,13 +129,17 @@ impl Tui for LoginTui {
         frame: &mut Frame,
         server_state: &ServerState,
         clients: &HashMap<usize, FFClient>,
+        log_buffer: &RingBuffer<FFError>,
     ) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(70), Constraint::Fill(1)].as_ref())
             .split(frame.area());
 
-        let log_widget = LogWidget { state: &self.state };
+        let log_widget = LogWidget {
+            state: &self.state,
+            log_buffer,
+        };
         frame.render_widget(log_widget, layout[0]);
 
         let clients = ClientMap::new(0, clients);
@@ -267,6 +272,7 @@ impl Tui for ShardTui {
         frame: &mut Frame,
         server_state: &ServerState,
         clients: &HashMap<usize, FFClient>,
+        log_buffer: &RingBuffer<FFError>,
     ) {
         let outer_layout = Layout::default()
             .direction(Direction::Horizontal)
@@ -278,7 +284,10 @@ impl Tui for ShardTui {
             .constraints([Constraint::Percentage(75), Constraint::Fill(1)].as_ref())
             .split(outer_layout[0]);
 
-        let log_widget = LogWidget { state: &self.state };
+        let log_widget = LogWidget {
+            state: &self.state,
+            log_buffer,
+        };
         frame.render_widget(log_widget, inner_layout_left[0]);
 
         let server_state = server_state.as_shard();
@@ -302,6 +311,7 @@ impl Tui for ShardTui {
 
 struct LogWidget<'a> {
     state: &'a TuiState,
+    log_buffer: &'a RingBuffer<FFError>,
 }
 impl<'a> Widget for LogWidget<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
@@ -311,7 +321,7 @@ impl<'a> Widget for LogWidget<'a> {
             .centered();
 
         let footer = Line::from(" Press CTRL+C to stop the server ").centered();
-        let events = BACKLOG.get().unwrap().lock().unwrap();
+        let events = self.log_buffer;
         let lines: Vec<Line> = events
             .iter()
             .map(|fe| {

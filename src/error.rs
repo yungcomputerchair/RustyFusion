@@ -3,9 +3,11 @@ use std::{
     fmt::Display,
     fs::File,
     io::{BufWriter, ErrorKind, Write},
-    sync::{Mutex, OnceLock},
+    sync::OnceLock,
     time::SystemTime,
 };
+
+use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
 use crate::{
     config::config_get,
@@ -188,46 +190,14 @@ impl FFError {
     }
 }
 
-static LOGGER: OnceLock<Mutex<BufWriter<File>>> = OnceLock::new();
-pub static BACKLOG: OnceLock<Mutex<RingBuffer<FFError>>> = OnceLock::new();
-const BACKLOG_SIZE: usize = 100;
+static LOG_TX: OnceLock<UnboundedSender<FFError>> = OnceLock::new();
+const LOG_BUFFER_SIZE: usize = 1000;
 
-pub fn backlog_init() {
-    assert!(BACKLOG.get().is_none());
-    BACKLOG
-        .set(Mutex::new(RingBuffer::new(BACKLOG_SIZE)))
-        .unwrap();
-}
-
-pub fn logger_init(log_path: String) {
-    assert!(LOGGER.get().is_none());
-    if log_path.is_empty() {
-        return;
-    }
-
-    let log_create = File::create(log_path.clone());
-    match log_create {
-        Ok(log_file) => {
-            let logger = BufWriter::new(log_file);
-            LOGGER.set(Mutex::new(logger)).unwrap();
-        }
-        Err(e) => {
-            log(
-                Severity::Warning,
-                &format!("Couldn't create log file {}: {}", log_path, e),
-            );
-        }
-    }
-}
-
-pub fn logger_flush() -> FFResult<()> {
-    if let Some(logger) = LOGGER.get() {
-        let mut logger = logger.lock().unwrap();
-        logger.flush()?;
-        Ok(())
-    } else {
-        Ok(())
-    }
+pub fn log_init() -> UnboundedReceiver<FFError> {
+    assert!(LOG_TX.get().is_none());
+    let (tx, rx) = mpsc::unbounded_channel();
+    LOG_TX.set(tx).unwrap();
+    rx
 }
 
 pub fn log(severity: Severity, msg: &str) {
@@ -236,32 +206,79 @@ pub fn log(severity: Severity, msg: &str) {
 }
 
 pub fn log_error(err: FFError) {
-    let severity = err.get_severity();
+    if let Some(tx) = LOG_TX.get() {
+        let _ = tx.send(err);
+    } else {
+        // Before log_init, fall back to stdout
+        let msg = err.get_formatted(true, true);
+        println!("{}", msg);
+    }
+}
 
-    let config = &config_get().general;
-    let threshold_console = config.logging_level_console.get();
-    let threshold_file = config.logging_level_file.get();
+pub struct Logger {
+    rx: UnboundedReceiver<FFError>,
+    buffer: RingBuffer<FFError>,
+    file_writer: Option<BufWriter<File>>,
+}
+impl Logger {
+    pub fn new(rx: UnboundedReceiver<FFError>, log_path: &str) -> Self {
+        let file_writer = if log_path.is_empty() {
+            None
+        } else {
+            match File::create(log_path) {
+                Ok(f) => Some(BufWriter::new(f)),
+                Err(e) => {
+                    log(
+                        Severity::Warning,
+                        &format!("Couldn't create log file {}: {}", log_path, e),
+                    );
+                    None
+                }
+            }
+        };
+        Self {
+            rx,
+            buffer: RingBuffer::new(LOG_BUFFER_SIZE),
+            file_writer,
+        }
+    }
 
-    if severity as usize <= threshold_file {
-        // Log to file
-        let msg = err.get_formatted(false, true);
-        if let Some(logger) = LOGGER.get() {
-            let mut logger = logger.lock().unwrap();
-            if writeln!(logger, "{}", msg).is_err() {
-                println!("Couldn't write to log file!");
+    pub fn drain(&mut self) {
+        let config = &config_get().general;
+        let threshold_console = config.logging_level_console.get();
+        let threshold_file = config.logging_level_file.get();
+        while let Ok(err) = self.rx.try_recv() {
+            let severity = err.get_severity();
+
+            // queue for file writing
+            if severity as usize <= threshold_file {
+                if let Some(writer) = &mut self.file_writer {
+                    let msg = err.get_formatted(false, true);
+                    let _ = writeln!(writer, "{}", msg);
+                }
+            }
+
+            // store in console buffer
+            if severity as usize <= threshold_console {
+                self.buffer.push(err);
             }
         }
     }
 
-    if severity as usize <= threshold_console {
-        // Log to console, colored output
-        let msg = err.get_formatted(true, true);
-        if let Some(backlog) = BACKLOG.get() {
-            let mut backlog = backlog.lock().unwrap();
-            backlog.push(err);
-        } else {
-            println!("{}", msg);
+    pub fn flush(&mut self) {
+        if let Some(writer) = &mut self.file_writer {
+            let _ = writer.flush();
         }
+    }
+
+    pub fn buffer(&self) -> &RingBuffer<FFError> {
+        &self.buffer
+    }
+}
+impl Drop for Logger {
+    fn drop(&mut self) {
+        self.drain();
+        self.flush();
     }
 }
 

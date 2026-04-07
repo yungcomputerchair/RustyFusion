@@ -10,9 +10,7 @@ use ffmonitor::PlayerEvent;
 use rusty_fusion::{
     config::config_init,
     database::{db_init, db_shutdown},
-    error::{
-        backlog_init, log, log_if_failed, logger_flush, logger_init, FFError, FFResult, Severity,
-    },
+    error::{log, log_if_failed, log_init, FFError, FFResult, Logger, Severity},
     geo::geo_init,
     monitor::{monitor_flush, monitor_init, monitor_queue, MonitorEvent},
     net::{
@@ -32,13 +30,13 @@ use tokio::sync::Mutex;
 async fn main() -> FFResult<()> {
     color_eyre::install().unwrap();
     let mut terminal = ratatui::init();
-    backlog_init();
+    let log_rx = log_init();
     let mut tui = LoginTui::default();
 
     let _cleanup = Cleanup {};
 
     let config = config_init();
-    logger_init(config.login.log_path.get());
+    let mut logger = Logger::new(log_rx, &config.login.log_path.get());
     db_init().await;
     tdata_init();
 
@@ -144,9 +142,10 @@ async fn main() -> FFResult<()> {
                 }
             }
             _ = tui_timer.tick() => {
+                logger.drain();
                 let clients = server.get_clients().await;
                 let state = state.lock().await;
-                if let Err(e) = terminal.draw(|frame| tui.render(frame, &state, &clients)) {
+                if let Err(e) = terminal.draw(|frame| tui.render(frame, &state, &clients, logger.buffer())) {
                     log(
                         Severity::Warning,
                         &format!("Failed to draw TUI; skipping this frame: {}", e),
@@ -164,16 +163,18 @@ async fn main() -> FFResult<()> {
                 }
             }
             _ = logger_timer.tick() => {
-                if let Err(e) = logger_flush() {
-                    log(Severity::Warning, &format!("Could not flush log: {}", e));
-                } else {
-                    log(Severity::Debug, "Log flushed");
-                }
+                logger.flush();
             }
         }
     }
 
+    // final TUI render before cleanup
     log(Severity::Info, "Login server shutting down...");
+    logger.drain();
+    let clients = server.get_clients().await;
+    let state = state.lock().await;
+    let _ = terminal.draw(|frame| tui.render(frame, &state, &clients, logger.buffer()));
+
     Ok(())
 }
 
@@ -182,9 +183,6 @@ impl Drop for Cleanup {
     fn drop(&mut self) {
         ratatui::restore();
         db_shutdown();
-        if let Err(e) = logger_flush() {
-            println!("Could not flush log: {}", e);
-        }
     }
 }
 
