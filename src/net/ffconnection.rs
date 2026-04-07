@@ -52,7 +52,6 @@ pub struct FFConnection {
     fe_key: u64,
     enc_mode: EncryptionMode,
     live_check_time: Option<Instant>,
-    should_dc: bool,
     ignore_packets: bool,
     //
     pkt_handler: PacketCallback,
@@ -81,7 +80,6 @@ impl FFConnection {
             fe_key: DEFAULT_KEY,
             enc_mode: EncryptionMode::EKey,
             live_check_time: None,
-            should_dc: false,
             ignore_packets: false,
             //
             pkt_handler,
@@ -96,7 +94,7 @@ impl FFConnection {
     pub async fn run(&mut self, mut rx: UnboundedReceiver<ClientMessage>) {
         let mut lc_interval = self.live_check.map(|(dur, _)| tokio::time::interval(dur));
 
-        while !self.should_dc {
+        loop {
             enum Event {
                 Message(ClientMessage),
                 PacketReady(FFResult<Packet>),
@@ -115,15 +113,14 @@ impl FFConnection {
                     ClientMessage::SendPacket(pkt) => {
                         if let Err(e) = self.send_payload(pkt).await {
                             log_error(e);
-                            self.should_dc = true;
+                            return;
                         }
                     }
                     ClientMessage::ClearLiveCheck => {
                         self.clear_live_check();
                     }
                     ClientMessage::Shutdown => {
-                        self.should_dc = true;
-                        continue;
+                        return;
                     }
                     ClientMessage::UpdateEncryption {
                         new_e_key,
@@ -142,19 +139,21 @@ impl FFConnection {
                     }
                 },
                 Event::PacketReady(Err(e)) => {
-                    if e.should_dc() {
-                        self.should_dc = true;
-                    }
+                    let should_dc = e.should_dc();
                     log_error(e);
+                    if should_dc {
+                        return;
+                    }
                 }
                 Event::PacketReady(Ok(pkt)) => {
                     let clients = self.clients.read().await;
                     let mut state = self.state.lock().await;
                     if let Err(e) = (self.pkt_handler)(pkt, self.key, &clients, &mut state) {
-                        if e.should_dc() {
-                            self.should_dc = true;
-                        }
+                        let should_dc = e.should_dc();
                         log_error(e);
+                        if should_dc {
+                            return;
+                        }
                     }
                 }
                 Event::LiveCheck => {
@@ -216,7 +215,7 @@ impl FFConnection {
                     self.client.get_addr()
                 ),
             );
-            self.should_dc = true;
+            self.client.disconnect();
         } else {
             log(
                 Severity::Debug,

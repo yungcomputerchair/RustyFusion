@@ -75,7 +75,12 @@ impl FFServer {
             Some(event) = self.event_rx.recv() => {
                 match event {
                     ServerMessage::ClientDisconnected(key) => {
-                        self.disconnect_client(key).await?;
+                        let client = self.disconnect_client(key).await?;
+
+                        log(
+                            Severity::Debug,
+                            &format!("Client {} disconnected", client.get_addr()),
+                        );
                     }
                 }
                 Ok(())
@@ -101,6 +106,7 @@ impl FFServer {
             let mut state = self.state.lock().await;
             callback(key, &clients, &mut state);
         };
+
         self.unregister_client(key).await
     }
 

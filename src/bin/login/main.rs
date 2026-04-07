@@ -204,23 +204,18 @@ fn handle_disconnect(key: usize, clients: &HashMap<usize, FFClient>, state: &mut
         ClientType::GameClient { account_id, .. } => {
             log_if_failed(state.end_session(account_id));
             log(
-                Severity::Debug,
+                Severity::Info,
                 &format!("Login session ended for account #{}", account_id),
             );
         }
-        ClientType::Unknown => {
-            log(
-                Severity::Debug,
-                &format!("Client disconnected: {}", client.get_addr()),
-            );
-        }
-        _ => {
+        ClientType::Unknown => {}
+        other => {
             log(
                 Severity::Warning,
                 &format!(
                     "Unhandled disconnect for client {} (type {})",
                     client.get_addr(),
-                    client.get_client_type()
+                    other
                 ),
             );
         }
