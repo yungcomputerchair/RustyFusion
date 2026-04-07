@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     sync::atomic::Ordering,
     time::{Duration, Instant},
 };
@@ -12,7 +13,7 @@ use crate::{
     config::config_get,
     entity::Entity,
     error::{Severity, BACKLOG},
-    net::ClientMap,
+    net::{ClientMap, FFClient},
     state::{LoginServerState, ServerState, ShardServerState},
     tabledata::tdata_get,
     util,
@@ -100,7 +101,12 @@ impl TuiState {
 }
 
 pub trait Tui {
-    fn render(&mut self, frame: &mut Frame, server_state: &ServerState, clients: &ClientMap);
+    fn render(
+        &mut self,
+        frame: &mut Frame,
+        server_state: &ServerState,
+        clients: &HashMap<usize, FFClient>,
+    );
 }
 
 pub struct LoginTui {
@@ -117,7 +123,12 @@ impl Default for LoginTui {
     }
 }
 impl Tui for LoginTui {
-    fn render(&mut self, frame: &mut Frame, server_state: &ServerState, clients: &ClientMap) {
+    fn render(
+        &mut self,
+        frame: &mut Frame,
+        server_state: &ServerState,
+        clients: &HashMap<usize, FFClient>,
+    ) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(70), Constraint::Fill(1)].as_ref())
@@ -126,10 +137,11 @@ impl Tui for LoginTui {
         let log_widget = LogWidget { state: &self.state };
         frame.render_widget(log_widget, layout[0]);
 
+        let clients = ClientMap::new(0, clients);
         let server_state = server_state.as_login();
         let shard_list_widget = ShardListWidget {
             login_state: server_state,
-            clients,
+            clients: &clients,
         };
         frame.render_widget(shard_list_widget, layout[1]);
     }
@@ -167,8 +179,10 @@ impl<'a, 'b, 'c> Widget for ShardListWidget<'a, 'b, 'c> {
                 };
 
                 let shard = self.clients.get_shard_server(*sid).unwrap();
-                let meta = shard.meta.blocking_read();
-                let ping = meta.ping_ms.as_ref().map(|p| p.load(Ordering::Relaxed));
+                let ping = {
+                    let meta = shard.meta.read();
+                    meta.ping_ms.as_ref().map(|p| p.load(Ordering::Relaxed))
+                };
 
                 let mut block = Block::bordered()
                     .title(format!(
@@ -248,7 +262,12 @@ impl Default for ShardTui {
     }
 }
 impl Tui for ShardTui {
-    fn render(&mut self, frame: &mut Frame, server_state: &ServerState, clients: &ClientMap) {
+    fn render(
+        &mut self,
+        frame: &mut Frame,
+        server_state: &ServerState,
+        clients: &HashMap<usize, FFClient>,
+    ) {
         let outer_layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(70), Constraint::Fill(1)].as_ref())
@@ -263,10 +282,11 @@ impl Tui for ShardTui {
         frame.render_widget(log_widget, inner_layout_left[0]);
 
         let server_state = server_state.as_shard();
+        let clients = ClientMap::new(0, clients);
 
         let player_list_widget = PlayerListWidget {
             shard_state: server_state,
-            clients,
+            clients: &clients,
         };
         frame.render_widget(player_list_widget, outer_layout[1]);
 
@@ -274,7 +294,7 @@ impl Tui for ShardTui {
         let shard_stats_widget = ShardStatsWidget {
             shard_state: server_state,
             stats_cache: &self.stats_cache,
-            clients,
+            clients: &clients,
         };
         frame.render_widget(shard_stats_widget, inner_layout_left[1]);
     }
@@ -362,12 +382,10 @@ impl<'a, 'b, 'c> Widget for PlayerListWidget<'a, 'b, 'c> {
             .map(|pid| {
                 let player = self.shard_state.get_player(*pid).unwrap();
                 let client = player.get_client(self.clients).unwrap();
-                let ping = client
-                    .meta
-                    .blocking_read()
-                    .ping_ms
-                    .as_ref()
-                    .map(|p| p.load(Ordering::Relaxed));
+                let ping = {
+                    let meta = client.meta.read();
+                    meta.ping_ms.as_ref().map(|p| p.load(Ordering::Relaxed))
+                };
 
                 let chunk_coords = player.get_chunk_coords();
                 let world_data = tdata_get().get_world_name_data(chunk_coords);
@@ -433,8 +451,11 @@ impl<'a, 'b, 'c> Widget for ShardStatsWidget<'a, 'b, 'c> {
         let stats_lines = [
             if let Some(uuid) = self.shard_state.login_server_conn_id {
                 let ls = self.clients.get_login_server().unwrap();
-                let meta = ls.meta.blocking_read();
-                let ping = meta.ping_ms.as_ref().map(|p| p.load(Ordering::Relaxed));
+                let ping = {
+                    let meta = ls.meta.read();
+                    meta.ping_ms.as_ref().map(|p| p.load(Ordering::Relaxed))
+                };
+
                 Line::from(match ping {
                     Some(ping) => format!("Login server connected | {} | {} ms", uuid, ping),
                     None => format!("Login server connected | {} | ... ms", uuid),

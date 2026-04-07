@@ -218,8 +218,7 @@ impl<'a> ClientMap<'a> {
         self.clients
             .values()
             .filter(|c| {
-                // TODO make async
-                let meta = c.meta.blocking_read();
+                let meta = c.meta.read();
                 matches!(meta.client_type, ClientType::GameClient { .. })
             })
             .collect()
@@ -227,8 +226,7 @@ impl<'a> ClientMap<'a> {
 
     pub fn get_shard_server(&self, shard_id: i32) -> Option<&FFClient> {
         self.clients.values().find(|c| {
-            // TODO make async
-            let meta = c.meta.blocking_read();
+            let meta = c.meta.read();
             meta.client_type == ClientType::ShardServer(shard_id)
         })
     }
@@ -238,8 +236,7 @@ impl<'a> ClientMap<'a> {
         let cache_valid = cached_key
             .and_then(|key| self.clients.get(&key))
             .is_some_and(|c| {
-                // TODO make async
-                let meta = c.meta.blocking_read();
+                let meta = c.meta.read();
                 meta.client_type == ClientType::LoginServer
             });
 
@@ -248,7 +245,7 @@ impl<'a> ClientMap<'a> {
                 .clients
                 .iter()
                 .find(|(_, c)| {
-                    let meta = c.meta.blocking_read();
+                    let meta = c.meta.read();
                     meta.client_type == ClientType::LoginServer
                 })
                 .map(|(k, _)| *k);

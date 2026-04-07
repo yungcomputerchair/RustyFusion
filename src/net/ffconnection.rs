@@ -141,8 +141,7 @@ impl FFConnection {
 
     fn can_send_packet(&self, pkt_id: PacketID) -> bool {
         let pkt_id_raw = pkt_id as u32;
-        // TODO make async
-        let meta = self.client.meta.blocking_read();
+        let meta = self.client.meta.read();
         match meta.client_type {
             ClientType::Unknown => UNKNOWN_CT_ALLOWED_PACKETS.contains(&pkt_id),
             ClientType::UnauthedClient { .. } | ClientType::GameClient { .. } => {
@@ -173,8 +172,7 @@ impl FFConnection {
     }
 
     fn supports_live_check(&self) -> bool {
-        // TODO make async
-        let meta = self.client.meta.blocking_read();
+        let meta = self.client.meta.read();
         matches!(
             meta.client_type,
             ClientType::GameClient { .. } | ClientType::ShardServer(_) | ClientType::LoginServer

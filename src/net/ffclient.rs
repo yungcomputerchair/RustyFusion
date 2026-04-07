@@ -8,7 +8,12 @@ use std::{
     time::Instant,
 };
 
-use tokio::sync::{mpsc::UnboundedSender, RwLock};
+// We use parking_lot's RwLock instead of std's because it's more efficient and has a simpler API.
+// On top of that, client metadata needs to be accessed from pure-sync context like the TUI,
+// so we can't use tokio's async RwLock.
+use parking_lot::RwLock;
+
+use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
     error::{log, panic_if_failed, FFError, FFResult, Severity},
@@ -97,32 +102,27 @@ impl FFClient {
 
     pub fn disconnect(&self) {
         let _ = self.tx.send(ClientMessage::Shutdown);
-        // TODO make async
-        let mut meta = self.meta.blocking_write();
+        let mut meta = self.meta.write();
         meta.client_type = ClientType::Unknown;
     }
 
     pub fn get_ip(&self) -> IpAddr {
-        // TODO make async
-        let meta = self.meta.blocking_read();
+        let meta = self.meta.read();
         meta.addr.ip()
     }
 
     pub fn get_addr(&self) -> String {
-        // TODO make async
-        let meta = self.meta.blocking_read();
+        let meta = self.meta.read();
         meta.addr.to_string()
     }
 
     pub fn get_client_type(&self) -> ClientType {
-        // TODO make async
-        let meta = self.meta.blocking_read();
+        let meta = self.meta.read();
         meta.client_type.clone()
     }
 
     pub fn get_account_id(&self) -> FFResult<i64> {
-        // TODO make async
-        let meta = self.meta.blocking_read();
+        let meta = self.meta.read();
         if let ClientType::GameClient { account_id, .. } = meta.client_type {
             Ok(account_id)
         } else {
@@ -134,8 +134,7 @@ impl FFClient {
     }
 
     pub fn get_player_id(&self) -> FFResult<i32> {
-        // TODO make async
-        let meta = self.meta.blocking_read();
+        let meta = self.meta.read();
         if let ClientType::GameClient {
             pc_id: Some(pc_id), ..
         } = meta.client_type
@@ -150,8 +149,7 @@ impl FFClient {
     }
 
     pub fn get_shard_id(&self) -> FFResult<i32> {
-        // TODO make async
-        let meta = self.meta.blocking_read();
+        let meta = self.meta.read();
         if let ClientType::ShardServer(shard_id) = meta.client_type {
             Ok(shard_id)
         } else {
@@ -163,9 +161,8 @@ impl FFClient {
     }
 
     pub fn clear_player_id(&mut self) -> FFResult<i32> {
-        // TODO make async
         let pc_id = self.get_player_id()?;
-        let mut meta = self.meta.blocking_write();
+        let mut meta = self.meta.write();
         if let ClientType::GameClient { pc_id, .. } = &mut meta.client_type {
             *pc_id = None;
         }
@@ -173,8 +170,7 @@ impl FFClient {
     }
 
     pub fn get_serial_key(&self) -> FFResult<i64> {
-        // TODO make async
-        let meta = self.meta.blocking_read();
+        let meta = self.meta.read();
         if let ClientType::GameClient { serial_key, .. } = meta.client_type {
             Ok(serial_key)
         } else {
@@ -186,7 +182,7 @@ impl FFClient {
     }
 
     pub fn clear_live_check(&self) {
-        let meta = self.meta.blocking_read();
+        let meta = self.meta.read();
         let Some(time_lc) = meta.live_check_time else {
             // spurious live check response; ignore
             return;
@@ -206,7 +202,7 @@ impl FFClient {
             ),
         );
 
-        let mut meta = self.meta.blocking_write();
+        let mut meta = self.meta.write();
         meta.live_check_time = None;
 
         if let Some(ping) = meta.ping_ms.as_ref() {

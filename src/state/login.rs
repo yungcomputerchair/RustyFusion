@@ -439,8 +439,7 @@ impl LoginServerState {
             };
 
             let Some(shard) = clients.values().find(|c| {
-                // TODO make async
-                let meta = c.meta.blocking_read();
+                let meta = c.meta.read();
                 meta.client_type == ClientType::ShardServer(shard_id)
             }) else {
                 continue;
