@@ -173,7 +173,7 @@ impl FFClient {
         }
     }
 
-    pub fn clear_player_id(&mut self) -> FFResult<i32> {
+    pub fn clear_player_id(&self) -> FFResult<i32> {
         let pc_id = self.get_player_id()?;
         let mut meta = self.meta.write();
         if let ClientType::GameClient { pc_id, .. } = &mut meta.client_type {

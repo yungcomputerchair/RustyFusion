@@ -19,13 +19,19 @@ struct sTargetNpcId {
 }
 impl FFPacket for sTargetNpcId {}
 
-pub fn pc_attack_npcs(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+pub fn pc_attack_npcs(
+    pkt: Packet,
+    clients: &ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
     const MAX_TARGETS: usize = 3;
     const BATTERY_BASE_COST: u32 = 6;
 
     let client = clients.get_self();
     let pc_id = client.get_player_id()?;
-    let pkt: sP_CL2FE_REQ_PC_ATTACK_NPCs = *client.get_packet(P_CL2FE_REQ_PC_ATTACK_NPCs)?;
+
+    let mut reader = PacketReader::new(&pkt);
+    let pkt: &sP_CL2FE_REQ_PC_ATTACK_NPCs = reader.get_packet(P_CL2FE_REQ_PC_ATTACK_NPCs)?;
     let target_count = pkt.iNPCCnt as usize;
     if target_count == 0 {
         return Ok(());
@@ -45,7 +51,7 @@ pub fn pc_attack_npcs(clients: &mut ClientMap, state: &mut ShardServerState) -> 
                 ),
             ));
         }
-        let npc_id = client.get_struct::<sTargetNpcId>()?.iNPC_ID;
+        let npc_id = reader.get_struct::<sTargetNpcId>()?.iNPC_ID;
         let npc = match state.get_npc(npc_id) {
             Ok(npc) => npc,
             Err(e) => {

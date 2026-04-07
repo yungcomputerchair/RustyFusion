@@ -15,7 +15,7 @@ use std::time::SystemTime;
 
 const ERROR_CODE_BUDDY_DENY: i32 = 6;
 
-pub fn get_buddy_state(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+pub fn get_buddy_state(clients: &ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
     let pc_id = client.get_player_id()?;
     let player = state.get_player(pc_id)?;
@@ -31,7 +31,7 @@ pub fn get_buddy_state(clients: &mut ClientMap, state: &mut ShardServerState) ->
     }
 
     if let Some(login_server) = clients.get_login_server() {
-        log_if_failed(login_server.send_packet(P_FE2LS_REQ_GET_BUDDY_STATE, &req));
+        login_server.send_packet(P_FE2LS_REQ_GET_BUDDY_STATE, &req);
         Ok(())
     } else {
         Err(FFError::build(
@@ -41,10 +41,13 @@ pub fn get_buddy_state(clients: &mut ClientMap, state: &mut ShardServerState) ->
     }
 }
 
-pub fn request_make_buddy(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+pub fn request_make_buddy(
+    pkt: Packet,
+    clients: &ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
     let client = clients.get_self();
-    let pkt: sP_CL2FE_REQ_REQUEST_MAKE_BUDDY =
-        *client.get_packet(P_CL2FE_REQ_REQUEST_MAKE_BUDDY)?;
+    let pkt: &sP_CL2FE_REQ_REQUEST_MAKE_BUDDY = pkt.get(P_CL2FE_REQ_REQUEST_MAKE_BUDDY)?;
 
     let pc_id = client.get_player_id()?;
     let buddy_id = pkt.iBuddyID;
@@ -88,6 +91,7 @@ pub fn request_make_buddy(clients: &mut ClientMap, state: &mut ShardServerState)
             ),
         ));
     }
+
     if buddy.get_num_buddies() >= SIZEOF_BUDDYLIST_SLOT as usize {
         // instant deny
         let deny_pkt = sP_FE2CL_REP_ACCEPT_MAKE_BUDDY_FAIL {
@@ -95,7 +99,9 @@ pub fn request_make_buddy(clients: &mut ClientMap, state: &mut ShardServerState)
             iBuddyPCUID: buddy_uid,
             iErrorCode: ERROR_CODE_BUDDY_DENY,
         };
-        return client.send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_FAIL, &deny_pkt);
+
+        client.send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_FAIL, &deny_pkt);
+        return Ok(());
     }
 
     let buddy_client = buddy.get_client(clients).unwrap();
@@ -107,10 +113,14 @@ pub fn request_make_buddy(clients: &mut ClientMap, state: &mut ShardServerState)
     Ok(())
 }
 
-pub fn find_name_make_buddy(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+pub fn find_name_make_buddy(
+    pkt: Packet,
+    clients: &ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
     let client = clients.get_self();
-    let pkt: sP_CL2FE_REQ_PC_FIND_NAME_MAKE_BUDDY =
-        *client.get_packet(P_CL2FE_REQ_PC_FIND_NAME_MAKE_BUDDY)?;
+    let pkt: &sP_CL2FE_REQ_PC_FIND_NAME_MAKE_BUDDY =
+        pkt.get(P_CL2FE_REQ_PC_FIND_NAME_MAKE_BUDDY)?;
 
     let pc_id = client.get_player_id()?;
     let player = state.get_player(pc_id)?;
@@ -149,8 +159,10 @@ pub fn find_name_make_buddy(clients: &mut ClientMap, state: &mut ShardServerStat
             szFirstName: pkt.szFirstName,
             szLastName: pkt.szLastName,
         };
+
         let client = clients.get_self();
-        return client.send_packet(P_FE2CL_REP_PC_FIND_NAME_MAKE_BUDDY_FAIL, &deny_pkt);
+        client.send_packet(P_FE2CL_REP_PC_FIND_NAME_MAKE_BUDDY_FAIL, &deny_pkt);
+        return Ok(());
     }
 
     let buddy_client = buddy.get_client(clients).unwrap();
@@ -166,9 +178,13 @@ pub fn find_name_make_buddy(clients: &mut ClientMap, state: &mut ShardServerStat
     Ok(())
 }
 
-pub fn accept_make_buddy(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+pub fn accept_make_buddy(
+    pkt: Packet,
+    clients: &ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
     let client = clients.get_self();
-    let pkt: sP_CL2FE_REQ_ACCEPT_MAKE_BUDDY = *client.get_packet(P_CL2FE_REQ_ACCEPT_MAKE_BUDDY)?;
+    let pkt: &sP_CL2FE_REQ_ACCEPT_MAKE_BUDDY = pkt.get(P_CL2FE_REQ_ACCEPT_MAKE_BUDDY)?;
 
     let pc_id = client.get_player_id()?;
     let player = state.get_player(pc_id)?;
@@ -187,71 +203,69 @@ pub fn accept_make_buddy(clients: &mut ClientMap, state: &mut ShardServerState) 
     }
     buddy.buddy_offered_to = None;
 
-    catch_fail(
-        (|| {
-            let buddy = state.get_player_mut(buddy_id).unwrap(); // re-borrow
-            if !accepted {
-                // this failure will be caught and the deny packet will be sent
-                return Err(FFError::build(
-                    Severity::Debug,
-                    format!("{} denied buddy request from player {}", buddy, pc_id),
-                ));
-            }
+    (|| {
+        let buddy = state.get_player_mut(buddy_id).unwrap(); // re-borrow
+        if !accepted {
+            // this failure will be caught and the deny packet will be sent
+            return Err(FFError::build(
+                Severity::Debug,
+                format!("{} denied buddy request from player {}", buddy, pc_id),
+            ));
+        }
 
-            // player -> buddy
-            let pkt_buddy = sP_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC {
-                iBuddySlot: buddy.add_buddy(player_buddy_info.clone())? as i8,
-                BuddyInfo: player_buddy_info.into(),
-            };
+        // player -> buddy
+        let pkt_buddy = sP_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC {
+            iBuddySlot: buddy.add_buddy(player_buddy_info.clone())? as i8,
+            BuddyInfo: player_buddy_info.into(),
+        };
 
-            buddy
-                .get_client(clients)
-                .unwrap()
-                .send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC, &pkt_buddy);
+        buddy
+            .get_client(clients)
+            .unwrap()
+            .send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC, &pkt_buddy);
 
-            // buddy -> player
-            let buddy_buddy_info = BuddyListEntry::new(buddy);
-            let player = state.get_player_mut(pc_id).unwrap();
-            let pkt_player = sP_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC {
-                iBuddySlot: player.add_buddy(buddy_buddy_info.clone())? as i8,
-                BuddyInfo: buddy_buddy_info.into(),
-            };
-            log_if_failed(
-                clients
-                    .get_self()
-                    .send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC, &pkt_player),
-            );
+        // buddy -> player
+        let buddy_buddy_info = BuddyListEntry::new(buddy);
+        let player = state.get_player_mut(pc_id).unwrap();
+        let pkt_player = sP_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC {
+            iBuddySlot: player.add_buddy(buddy_buddy_info.clone())? as i8,
+            BuddyInfo: buddy_buddy_info.into(),
+        };
 
-            Ok(())
-        })(),
-        || {
-            let player = state.get_player_mut(pc_id).unwrap();
-            let _ = player.remove_buddy(buddy_uid);
+        clients
+            .get_self()
+            .send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC, &pkt_player);
 
-            let buddy = state.get_player_mut(buddy_id).unwrap();
-            let _ = buddy.remove_buddy(pc_uid);
+        Ok(())
+    })()
+    .catch_fail(|| {
+        let player = state.get_player_mut(pc_id).unwrap();
+        let _ = player.remove_buddy(buddy_uid);
 
-            // we send the deny packet to the buddy in case of failure
-            let deny_pkt = sP_FE2CL_REP_ACCEPT_MAKE_BUDDY_FAIL {
-                iBuddyID: pc_id,
-                iBuddyPCUID: pc_uid,
-                iErrorCode: ERROR_CODE_BUDDY_DENY,
-            };
+        let buddy = state.get_player_mut(buddy_id).unwrap();
+        let _ = buddy.remove_buddy(pc_uid);
 
-            let buddy_client = buddy.get_client(clients).unwrap();
-            buddy_client.send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_FAIL, &deny_pkt);
-            Ok(())
-        },
-    )
+        // we send the deny packet to the buddy in case of failure
+        let deny_pkt = sP_FE2CL_REP_ACCEPT_MAKE_BUDDY_FAIL {
+            iBuddyID: pc_id,
+            iBuddyPCUID: pc_uid,
+            iErrorCode: ERROR_CODE_BUDDY_DENY,
+        };
+
+        let buddy_client = buddy.get_client(clients).unwrap();
+        buddy_client.send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_FAIL, &deny_pkt);
+    })
 }
 
 pub fn find_name_accept_buddy(
-    clients: &mut ClientMap,
+    pkt: Packet,
+    clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let client = clients.get_self();
-    let pkt: sP_CL2FE_REQ_PC_FIND_NAME_ACCEPT_BUDDY =
-        *client.get_packet(P_CL2FE_REQ_PC_FIND_NAME_ACCEPT_BUDDY)?;
+    let pkt: &sP_CL2FE_REQ_PC_FIND_NAME_ACCEPT_BUDDY =
+        pkt.get(P_CL2FE_REQ_PC_FIND_NAME_ACCEPT_BUDDY)?;
+
     let accepted = pkt.iAcceptFlag == 1;
 
     let pc_id = client.get_player_id()?;
@@ -283,67 +297,67 @@ pub fn find_name_accept_buddy(
     }
     buddy.buddy_offered_to = None;
 
-    catch_fail(
-        (|| {
-            let buddy = state.get_player_mut(buddy_id).unwrap(); // re-borrow
-            if !accepted {
-                // this failure will be caught and the deny packet will be sent
-                return Err(FFError::build(
-                    Severity::Debug,
-                    format!("{} denied buddy request from player {}", buddy, pc_id),
-                ));
-            }
+    (|| {
+        let buddy = state.get_player_mut(buddy_id).unwrap(); // re-borrow
+        if !accepted {
+            // this failure will be caught and the deny packet will be sent
+            return Err(FFError::build(
+                Severity::Debug,
+                format!("{} denied buddy request from player {}", buddy, pc_id),
+            ));
+        }
 
-            // player -> buddy
-            let pkt_buddy = sP_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC {
-                iBuddySlot: buddy.add_buddy(player_buddy_info.clone())? as i8,
-                BuddyInfo: player_buddy_info.into(),
-            };
+        // player -> buddy
+        let pkt_buddy = sP_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC {
+            iBuddySlot: buddy.add_buddy(player_buddy_info.clone())? as i8,
+            BuddyInfo: player_buddy_info.into(),
+        };
 
-            buddy
-                .get_client(clients)
-                .unwrap()
-                .send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC, &pkt_buddy);
+        buddy
+            .get_client(clients)
+            .unwrap()
+            .send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC, &pkt_buddy);
 
-            // buddy -> player
-            let buddy_buddy_info = BuddyListEntry::new(buddy);
-            let player = state.get_player_mut(pc_id).unwrap();
-            let pkt_player = sP_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC {
-                iBuddySlot: player.add_buddy(buddy_buddy_info.clone())? as i8,
-                BuddyInfo: buddy_buddy_info.into(),
-            };
-            log_if_failed(
-                clients
-                    .get_self()
-                    .send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC, &pkt_player),
-            );
+        // buddy -> player
+        let buddy_buddy_info = BuddyListEntry::new(buddy);
+        let player = state.get_player_mut(pc_id).unwrap();
+        let pkt_player = sP_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC {
+            iBuddySlot: player.add_buddy(buddy_buddy_info.clone())? as i8,
+            BuddyInfo: buddy_buddy_info.into(),
+        };
 
-            Ok(())
-        })(),
-        || {
-            let player = state.get_player_mut(pc_id).unwrap();
-            let _ = player.remove_buddy(buddy_uid);
+        clients
+            .get_self()
+            .send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC, &pkt_player);
 
-            let buddy = state.get_player_mut(buddy_id).unwrap();
-            let _ = buddy.remove_buddy(pc_uid);
+        Ok(())
+    })()
+    .catch_fail(|| {
+        let player = state.get_player_mut(pc_id).unwrap();
+        let _ = player.remove_buddy(buddy_uid);
 
-            // we send the deny packet to the buddy in case of failure
-            let deny_pkt = sP_FE2CL_REP_ACCEPT_MAKE_BUDDY_FAIL {
-                iBuddyID: pc_id,
-                iBuddyPCUID: pc_uid,
-                iErrorCode: ERROR_CODE_BUDDY_DENY,
-            };
+        let buddy = state.get_player_mut(buddy_id).unwrap();
+        let _ = buddy.remove_buddy(pc_uid);
 
-            let buddy_client = buddy.get_client(clients).unwrap();
-            buddy_client.send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_FAIL, &deny_pkt);
-            Ok(())
-        },
-    )
+        // we send the deny packet to the buddy in case of failure
+        let deny_pkt = sP_FE2CL_REP_ACCEPT_MAKE_BUDDY_FAIL {
+            iBuddyID: pc_id,
+            iBuddyPCUID: pc_uid,
+            iErrorCode: ERROR_CODE_BUDDY_DENY,
+        };
+
+        let buddy_client = buddy.get_client(clients).unwrap();
+        buddy_client.send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_FAIL, &deny_pkt);
+    })
 }
 
-pub fn pc_buddy_warp(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+pub fn pc_buddy_warp(
+    pkt: Packet,
+    clients: &ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
     let client = clients.get_self();
-    let pkt: sP_CL2FE_REQ_PC_BUDDY_WARP = *client.get_packet(P_CL2FE_REQ_PC_BUDDY_WARP)?;
+    let pkt: &sP_CL2FE_REQ_PC_BUDDY_WARP = pkt.get(P_CL2FE_REQ_PC_BUDDY_WARP)?;
 
     let pc_id = client.get_player_id()?;
     let player = state.get_player(pc_id)?;
@@ -353,16 +367,16 @@ pub fn pc_buddy_warp(clients: &mut ClientMap, state: &mut ShardServerState) -> F
     let player_is_warp_on_cooldown = player.is_warp_on_cooldown();
     let buddy_uid = pkt.iBuddyPCUID;
 
-    let mut invalid_warp = |msg: String, error_code: i32| -> FFResult<()> {
+    let invalid_warp = |msg: String, error_code: i32| -> FFResult<()> {
         let response = sP_FE2CL_REP_PC_BUDDY_WARP_FAIL {
             iBuddyPCUID: buddy_uid,
             iErrorCode: error_code,
         };
-        log_if_failed(
-            clients
-                .get_self()
-                .send_packet(P_FE2CL_REP_PC_BUDDY_WARP_FAIL, &response),
-        );
+
+        clients
+            .get_self()
+            .send_packet(P_FE2CL_REP_PC_BUDDY_WARP_FAIL, &response);
+
         Err(FFError::build(Severity::Info, msg))
     };
 
@@ -409,7 +423,8 @@ pub fn pc_buddy_warp(clients: &mut ClientMap, state: &mut ShardServerState) -> F
             iBuddyPCUID: buddy_uid,
         };
 
-        return login_server.send_packet(P_FE2LS_REQ_BUDDY_WARP, &req_pkt);
+        login_server.send_packet(P_FE2LS_REQ_BUDDY_WARP, &req_pkt);
+        return Ok(());
     }
 
     let buddy_id = res.unwrap();
@@ -441,57 +456,50 @@ pub fn pc_buddy_warp(clients: &mut ClientMap, state: &mut ShardServerState) -> F
         );
     }
 
-    catch_fail(
-        {
-            let player = state.get_player_mut(pc_id).unwrap();
-            player.set_position(buddy_position);
-            player.set_instance_id(InstanceID {
-                map_num: buddy_instance_id.map_num,
-                channel_num: buddy_instance_id.channel_num,
-                instance_num: None,
-            });
-            player.buddy_warp_available_at =
-                Some(util::get_timestamp_sec(SystemTime::now()) + BUDDYWARP_INTERVAL);
+    {
+        let player = state.get_player_mut(pc_id).unwrap();
+        player.set_position(buddy_position);
+        player.set_instance_id(InstanceID {
+            map_num: buddy_instance_id.map_num,
+            channel_num: buddy_instance_id.channel_num,
+            instance_num: None,
+        });
+        player.buddy_warp_available_at =
+            Some(util::get_timestamp_sec(SystemTime::now()) + BUDDYWARP_INTERVAL);
 
-            state
-                .entity_map
-                .update(EntityID::Player(pc_id), None, Some(clients));
+        state
+            .entity_map
+            .update(EntityID::Player(pc_id), None, Some(clients));
 
-            // this packet in client code seems to just leave group
-            let same_shard_succ_pkt = sP_FE2CL_REP_PC_BUDDY_WARP_SAME_SHARD_SUCC { UNUSED: 0 };
+        // this packet in client code seems to just leave group
+        let same_shard_succ_pkt = sP_FE2CL_REP_PC_BUDDY_WARP_SAME_SHARD_SUCC { UNUSED: 0 };
 
-            // this packet in client code loads the new position
-            let goto_succ_pkt = sP_FE2CL_REP_PC_GOTO_SUCC {
-                iX: buddy_position.x,
-                iY: buddy_position.y,
-                iZ: buddy_position.z,
-            };
+        // this packet in client code loads the new position
+        let goto_succ_pkt = sP_FE2CL_REP_PC_GOTO_SUCC {
+            iX: buddy_position.x,
+            iY: buddy_position.y,
+            iZ: buddy_position.z,
+        };
 
-            let result = clients
-                .get_self()
-                .send_packet(
-                    P_FE2CL_REP_PC_BUDDY_WARP_SAME_SHARD_SUCC,
-                    &same_shard_succ_pkt,
-                )
-                .and_then(|_| {
-                    clients
-                        .get_self()
-                        .send_packet(P_FE2CL_REP_PC_GOTO_SUCC, &goto_succ_pkt)
-                });
+        let client = clients.get_self();
 
-            result
-        },
-        || {
-            let response = sP_FE2CL_REP_PC_BUDDY_WARP_FAIL {
-                iBuddyPCUID: buddy_uid,
-                iErrorCode: BuddyWarpErr::CantWarpToLocation as i32,
-            };
-            log_if_failed(
-                clients
-                    .get_self()
-                    .send_packet(P_FE2CL_REP_PC_BUDDY_WARP_FAIL, &response),
-            );
-            Ok(())
-        },
-    )
+        client.send_packet(
+            P_FE2CL_REP_PC_BUDDY_WARP_SAME_SHARD_SUCC,
+            &same_shard_succ_pkt,
+        );
+
+        client.send_packet(P_FE2CL_REP_PC_GOTO_SUCC, &goto_succ_pkt);
+
+        Ok(())
+    }
+    .catch_fail(|| {
+        let response = sP_FE2CL_REP_PC_BUDDY_WARP_FAIL {
+            iBuddyPCUID: buddy_uid,
+            iErrorCode: BuddyWarpErr::CantWarpToLocation as i32,
+        };
+
+        clients
+            .get_self()
+            .send_packet(P_FE2CL_REP_PC_BUDDY_WARP_FAIL, &response);
+    })
 }

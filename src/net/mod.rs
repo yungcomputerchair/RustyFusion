@@ -1,6 +1,5 @@
 use std::{
     any::type_name,
-    cell::Cell,
     collections::HashMap,
     future::Future,
     mem::size_of,
@@ -9,10 +8,13 @@ use std::{
     slice::from_raw_parts,
 };
 
+use parking_lot::Mutex;
+
 use self::packet::{
     FFPacket,
     PacketID::{self, *},
 };
+
 use crate::{
     error::{log, FFError, FFResult, Severity},
     net::packet::Packet,
@@ -200,14 +202,14 @@ fn struct_to_bytes<T: FFPacket>(pkt: &T) -> &[u8] {
 
 pub struct ClientMap<'a> {
     key: usize,
-    login_server_key: Cell<Option<usize>>,
+    login_server_key: Mutex<Option<usize>>,
     clients: &'a HashMap<usize, FFClient>,
 }
 impl<'a> ClientMap<'a> {
     pub fn new(key: usize, clients: &'a HashMap<usize, FFClient>) -> Self {
         Self {
             key,
-            login_server_key: Cell::new(None),
+            login_server_key: Mutex::new(None),
             clients,
         }
     }
@@ -238,7 +240,7 @@ impl<'a> ClientMap<'a> {
     }
 
     pub fn get_login_server(&self) -> Option<&FFClient> {
-        let cached_key = self.login_server_key.get();
+        let mut cached_key = self.login_server_key.lock();
         let cache_valid = cached_key
             .and_then(|key| self.clients.get(&key))
             .is_some_and(|c| {
@@ -260,12 +262,10 @@ impl<'a> ClientMap<'a> {
                 log(Severity::Warning, "No login server connected");
             }
 
-            self.login_server_key.set(found_key);
+            *cached_key = found_key;
         }
 
-        self.login_server_key
-            .get()
-            .and_then(|key| self.clients.get(&key))
+        cached_key.and_then(|key| self.clients.get(&key))
     }
 }
 

@@ -3,7 +3,7 @@ use std::time::{Duration, SystemTime};
 use rusty_fusion::{
     chunk::{TickMode, MAP_SQUARE_SIZE},
     config::config_get,
-    db_run_sync,
+    database::db_get,
     defines::*,
     entity::{Combatant, Entity, EntityID, Player},
     enums::*,
@@ -18,14 +18,14 @@ use rusty_fusion::{
     unused, util, Position,
 };
 
-pub fn pc_enter(
-    clients: &mut ClientMap,
+pub async fn pc_enter(
+    pkt: Packet,
+    clients: &ClientMap<'_>,
     key: usize,
     state: &mut ShardServerState,
     time: SystemTime,
 ) -> FFResult<()> {
-    let client = clients.get_self();
-    let pkt: sP_CL2FE_REQ_PC_ENTER = *client.get_packet(P_CL2FE_REQ_PC_ENTER)?;
+    let pkt: &sP_CL2FE_REQ_PC_ENTER = pkt.get(P_CL2FE_REQ_PC_ENTER)?;
     let serial_key: i64 = pkt.iEnterSerialKey;
     let Some(login_data) = state.login_data.remove(&serial_key) else {
         return Err(FFError::build(Severity::Warning, format!("Login data for serial key {} missing; double check your shard's external IP config", serial_key)));
@@ -52,19 +52,23 @@ pub fn pc_enter(
                 login_data.iPC_UID, existing_pc_id
             ),
         );
+
         let existing_player = state.get_player(existing_pc_id).unwrap();
         let existing_client = existing_player.get_client(clients).unwrap();
         let pkt = sP_FE2CL_REP_PC_EXIT_DUPLICATE {
             iErrorCode: unused!(),
         };
+
         existing_client.send_packet(P_FE2CL_REP_PC_EXIT_DUPLICATE, &pkt);
         Player::disconnect(existing_pc_id, state, clients); // saves to DB synchronously
     }
 
     let pc_id = state.entity_map.gen_next_pc_id();
-    let mut player = db_run_sync!(db =>
-        db.load_player(login_data.iAccountID, login_data.iPC_UID)
-    )?;
+    let db = db_get();
+    let mut player = db
+        .load_player(login_data.iAccountID, login_data.iPC_UID)
+        .await?;
+
     player.set_player_id(pc_id);
     player.set_client_id(key);
 
@@ -78,6 +82,7 @@ pub fn pc_enter(
     } else {
         state.entity_map.get_min_pop_channel_num()
     };
+
     player.instance_id.channel_num = channel_num;
 
     let resp = sP_FE2CL_REP_PC_ENTER_SUCC {
@@ -87,22 +92,23 @@ pub fn pc_enter(
     };
 
     let client = clients.get_self();
-    client.client_type = ClientType::GameClient {
+    client.set_client_type(ClientType::GameClient {
         account_id: login_data.iAccountID,
         serial_key: pkt.iEnterSerialKey,
         pc_id: Some(pc_id),
-    };
+    });
 
     let iv1: i32 = resp.iID + 1;
     let iv2: i32 = resp.PCLoadData2CL.iFusionMatter + 1;
-    client.e_key = crypto::gen_key(resp.uiSvrTime, iv1, iv2);
-    client.fe_key = login_data.uiFEKey;
-    client.enc_mode = EncryptionMode::FEKey;
+    let e_key = crypto::gen_key(resp.uiSvrTime, iv1, iv2);
+    let fe_key = login_data.uiFEKey;
+    let enc_mode = EncryptionMode::FEKey;
+    client.update_encryption(Some(e_key), Some(fe_key), Some(enc_mode));
 
     let pkt_motd = sP_FE2LS_REQ_MOTD { iPC_ID: pc_id };
     match clients.get_login_server() {
         Some(login_server) => {
-            log_if_failed(login_server.send_packet(P_FE2LS_REQ_MOTD, &pkt_motd));
+            login_server.send_packet(P_FE2LS_REQ_MOTD, &pkt_motd);
         }
         None => {
             log(
@@ -119,16 +125,19 @@ pub fn pc_enter(
             player, player.instance_id.channel_num
         ),
     );
+
     let player_uid = player.get_uid();
     state.entity_map.track(Box::new(player), TickMode::Always);
     state.player_uid_to_id.insert(player_uid, pc_id);
 
     clients
         .get_self()
-        .send_packet(P_FE2CL_REP_PC_ENTER_SUCC, &resp)
+        .send_packet(P_FE2CL_REP_PC_ENTER_SUCC, &resp);
+
+    Ok(())
 }
 
-pub fn pc_exit(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+pub fn pc_exit(clients: &ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
     let pc_id = client.clear_player_id()?;
     Player::disconnect(pc_id, state, clients);
@@ -146,97 +155,94 @@ pub fn pc_exit(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResul
 
     clients
         .get_self()
-        .send_packet(P_FE2CL_REP_PC_EXIT_SUCC, &resp)
+        .send_packet(P_FE2CL_REP_PC_EXIT_SUCC, &resp);
+
+    Ok(())
 }
 
-pub fn pc_loading_complete(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
-    let _pkt: &sP_CL2FE_REQ_PC_LOADING_COMPLETE = clients
-        .get_self()
-        .get_packet(P_CL2FE_REQ_PC_LOADING_COMPLETE)?;
+pub fn pc_loading_complete(
+    pkt: Packet,
+    clients: &ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let _pkt: &sP_CL2FE_REQ_PC_LOADING_COMPLETE = pkt.get(P_CL2FE_REQ_PC_LOADING_COMPLETE)?;
+
     let resp = sP_FE2CL_REP_PC_LOADING_COMPLETE_SUCC { iPC_ID: unused!() };
-    catch_fail(
-        (|| {
-            let pc_id = clients.get_self().get_player_id()?;
-            let player = state.get_player(pc_id)?;
-            let map_num = player.instance_id.map_num;
-            let chunk = player.get_chunk_coords();
-            state
-                .entity_map
-                .update(player.get_id(), Some(chunk), Some(clients));
-            let client = clients.get_self();
-            client.send_packet(P_FE2CL_REP_PC_LOADING_COMPLETE_SUCC, &resp)?;
+    let pc_id = clients.get_self().get_player_id()?;
+    let player = state.get_player(pc_id)?;
+    let map_num = player.instance_id.map_num;
+    let chunk = player.get_chunk_coords();
+    state
+        .entity_map
+        .update(player.get_id(), Some(chunk), Some(clients));
+    let client = clients.get_self();
+    client.send_packet(P_FE2CL_REP_PC_LOADING_COMPLETE_SUCC, &resp);
 
-            // map info sync
-            if map_num != ID_OVERWORLD {
-                let map_data = tdata_get().get_map_data(map_num)?;
-                let x_min = map_data.map_square.0 * MAP_SQUARE_SIZE;
-                let y_min = map_data.map_square.1 * MAP_SQUARE_SIZE;
-                let mut map_info_pkt = sP_FE2CL_INSTANCE_MAP_INFO {
-                    iInstanceMapNum: map_num as i32,
-                    iCreateTick: unused!(),
-                    iMapCoordX_Min: x_min,
-                    iMapCoordX_Max: x_min + MAP_SQUARE_SIZE,
-                    iMapCoordY_Min: y_min,
-                    iMapCoordY_Max: y_min + MAP_SQUARE_SIZE,
-                    iMapCoordZ_Min: i32::MIN,
-                    iMapCoordZ_Max: i32::MAX,
-                    iEP_ID: unused!(),
-                    iEPTopRecord_Score: unused!(),
-                    iEPTopRecord_Rank: unused!(),
-                    iEPTopRecord_Time: unused!(),
-                    iEPTopRecord_RingCount: unused!(),
-                    iEPSwitch_StatusON_Cnt: unused!(),
-                };
+    // map info sync
+    if map_num != ID_OVERWORLD {
+        let map_data = tdata_get().get_map_data(map_num)?;
+        let x_min = map_data.map_square.0 * MAP_SQUARE_SIZE;
+        let y_min = map_data.map_square.1 * MAP_SQUARE_SIZE;
+        let mut map_info_pkt = sP_FE2CL_INSTANCE_MAP_INFO {
+            iInstanceMapNum: map_num as i32,
+            iCreateTick: unused!(),
+            iMapCoordX_Min: x_min,
+            iMapCoordX_Max: x_min + MAP_SQUARE_SIZE,
+            iMapCoordY_Min: y_min,
+            iMapCoordY_Max: y_min + MAP_SQUARE_SIZE,
+            iMapCoordZ_Min: i32::MIN,
+            iMapCoordZ_Max: i32::MAX,
+            iEP_ID: unused!(),
+            iEPTopRecord_Score: unused!(),
+            iEPTopRecord_Rank: unused!(),
+            iEPTopRecord_Time: unused!(),
+            iEPTopRecord_RingCount: unused!(),
+            iEPSwitch_StatusON_Cnt: unused!(),
+        };
 
-                if let Some(ep_id) = map_data.ep_id {
-                    map_info_pkt.iEP_ID = ep_id as i32;
-                    // TODO remaining EP data
-                }
-                client.send_packet(P_FE2CL_INSTANCE_MAP_INFO, &map_info_pkt)?;
-            }
+        if let Some(ep_id) = map_data.ep_id {
+            map_info_pkt.iEP_ID = ep_id as i32;
+            // TODO remaining EP data
+        }
+        client.send_packet(P_FE2CL_INSTANCE_MAP_INFO, &map_info_pkt);
+    }
 
-            // buddy list sync.
-            // we only want to do this once and we can't do it on initial load
-            let player = state.get_player_mut(pc_id).unwrap();
-            if !player.buddy_list_synced {
-                let buddy_info = player.get_all_buddy_info();
-                let mut buddy_list_pkt = PacketBuilder::new(P_FE2CL_REP_PC_BUDDYLIST_INFO_SUCC)
-                    .with(&sP_FE2CL_REP_PC_BUDDYLIST_INFO_SUCC {
-                        iID: unused!(),
-                        iPCUID: unused!(),
-                        iListNum: 0, // we don't need to chunk the buddy list
-                        iBuddyCnt: buddy_info.len() as i8,
-                    });
+    // buddy list sync.
+    // we only want to do this once and we can't do it on initial load
+    let player = state.get_player_mut(pc_id).unwrap();
+    if !player.buddy_list_synced {
+        let buddy_info = player.get_all_buddy_info();
+        let mut buddy_list_pkt = PacketBuilder::new(P_FE2CL_REP_PC_BUDDYLIST_INFO_SUCC).with(
+            &sP_FE2CL_REP_PC_BUDDYLIST_INFO_SUCC {
+                iID: unused!(),
+                iPCUID: unused!(),
+                iListNum: 0, // we don't need to chunk the buddy list
+                iBuddyCnt: buddy_info.len() as i8,
+            },
+        );
 
-                for entry in buddy_info {
-                    let buddy_pkt: sBuddyBaseInfo = entry.into();
-                    buddy_list_pkt.push(&buddy_pkt);
-                }
+        for entry in buddy_info {
+            let buddy_pkt: sBuddyBaseInfo = entry.into();
+            buddy_list_pkt.push(&buddy_pkt);
+        }
 
-                let buddy_list_pkt = buddy_list_pkt.build()?;
-                client.send_payload(buddy_list_pkt)?;
-                player.buddy_list_synced = true;
-            }
+        let buddy_list_pkt = buddy_list_pkt.build()?;
+        client.send_payload(buddy_list_pkt);
+        player.buddy_list_synced = true;
+    }
 
-            Ok(())
-        })(),
-        || {
-            Err(FFError::build_dc(
-                Severity::Warning,
-                "Loading complete failed".to_string(),
-            ))
-        },
-    )
+    Ok(())
 }
 
 pub fn pc_move(
-    clients: &mut ClientMap,
+    pkt: Packet,
+    clients: &ClientMap,
     state: &mut ShardServerState,
     time: SystemTime,
 ) -> FFResult<()> {
     let client = clients.get_self();
     let pc_id = client.get_player_id()?;
-    let pkt: &sP_CL2FE_REQ_PC_MOVE = client.get_packet(P_CL2FE_REQ_PC_MOVE)?;
+    let pkt: &sP_CL2FE_REQ_PC_MOVE = pkt.get(P_CL2FE_REQ_PC_MOVE)?;
     let pos = Position {
         x: pkt.iX,
         y: pkt.iY,
@@ -264,7 +270,7 @@ pub fn pc_move(
     state
         .entity_map
         .for_each_around(EntityID::Player(pc_id), clients, |client| {
-            client.send_packet(P_FE2CL_PC_MOVE, &resp)
+            client.send_packet(P_FE2CL_PC_MOVE, &resp);
         });
 
     let player = state.get_player_mut(pc_id)?;
@@ -279,13 +285,14 @@ pub fn pc_move(
 }
 
 pub fn pc_jump(
-    clients: &mut ClientMap,
+    pkt: Packet,
+    clients: &ClientMap,
     state: &mut ShardServerState,
     time: SystemTime,
 ) -> FFResult<()> {
     let client = clients.get_self();
     let pc_id = client.get_player_id()?;
-    let pkt: &sP_CL2FE_REQ_PC_JUMP = client.get_packet(P_CL2FE_REQ_PC_JUMP)?;
+    let pkt: &sP_CL2FE_REQ_PC_JUMP = pkt.get(P_CL2FE_REQ_PC_JUMP)?;
     let pos = Position {
         x: pkt.iX,
         y: pkt.iY,
@@ -313,7 +320,7 @@ pub fn pc_jump(
     state
         .entity_map
         .for_each_around(EntityID::Player(pc_id), clients, |client| {
-            client.send_packet(P_FE2CL_PC_JUMP, &resp)
+            client.send_packet(P_FE2CL_PC_JUMP, &resp);
         });
 
     let player = state.get_player_mut(pc_id)?;
@@ -328,13 +335,14 @@ pub fn pc_jump(
 }
 
 pub fn pc_stop(
-    clients: &mut ClientMap,
+    pkt: Packet,
+    clients: &ClientMap,
     state: &mut ShardServerState,
     time: SystemTime,
 ) -> FFResult<()> {
     let client = clients.get_self();
     let pc_id = client.get_player_id()?;
-    let pkt: &sP_CL2FE_REQ_PC_STOP = client.get_packet(P_CL2FE_REQ_PC_STOP)?;
+    let pkt: &sP_CL2FE_REQ_PC_STOP = pkt.get(P_CL2FE_REQ_PC_STOP)?;
     let pos = Position {
         x: pkt.iX,
         y: pkt.iY,
@@ -355,7 +363,7 @@ pub fn pc_stop(
     state
         .entity_map
         .for_each_around(EntityID::Player(pc_id), clients, |client| {
-            client.send_packet(P_FE2CL_PC_STOP, &resp)
+            client.send_packet(P_FE2CL_PC_STOP, &resp);
         });
 
     let player = state.get_player_mut(pc_id)?;
@@ -365,18 +373,19 @@ pub fn pc_stop(
     state
         .entity_map
         .update(entity_id, Some(chunk), Some(clients));
+
     Ok(())
 }
 
 pub fn pc_movetransportation(
-    clients: &mut ClientMap,
+    pkt: Packet,
+    clients: &ClientMap,
     state: &mut ShardServerState,
     time: SystemTime,
 ) -> FFResult<()> {
     let client = clients.get_self();
     let pc_id = client.get_player_id()?;
-    let pkt: &sP_CL2FE_REQ_PC_MOVETRANSPORTATION =
-        client.get_packet(P_CL2FE_REQ_PC_MOVETRANSPORTATION)?;
+    let pkt: &sP_CL2FE_REQ_PC_MOVETRANSPORTATION = pkt.get(P_CL2FE_REQ_PC_MOVETRANSPORTATION)?;
     let pos = Position {
         x: pkt.iX,
         y: pkt.iY,
@@ -409,7 +418,7 @@ pub fn pc_movetransportation(
     state
         .entity_map
         .for_each_around(EntityID::Player(pc_id), clients, |client| {
-            client.send_packet(P_FE2CL_PC_MOVETRANSPORTATION, &resp)
+            client.send_packet(P_FE2CL_PC_MOVETRANSPORTATION, &resp);
         });
 
     let player = state.get_player_mut(pc_id)?;
@@ -426,8 +435,12 @@ pub fn pc_movetransportation(
     Ok(())
 }
 
-pub fn pc_transport_warp(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_PC_TRANSPORT_WARP = client.get_packet(P_CL2FE_REQ_PC_TRANSPORT_WARP)?;
+pub fn pc_transport_warp(
+    pkt: Packet,
+    client: &FFClient,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let pkt: &sP_CL2FE_REQ_PC_TRANSPORT_WARP = pkt.get(P_CL2FE_REQ_PC_TRANSPORT_WARP)?;
 
     let slider = state.get_slider(pkt.iTransport_ID)?;
     let resp = sP_FE2CL_REP_PC_TRANSPORT_WARP_SUCC {
@@ -437,107 +450,101 @@ pub fn pc_transport_warp(client: &mut FFClient, state: &mut ShardServerState) ->
         iLcZ: pkt.iLcZ,
     };
 
-    client.send_packet(P_FE2CL_REP_PC_TRANSPORT_WARP_SUCC, &resp)
+    client.send_packet(P_FE2CL_REP_PC_TRANSPORT_WARP_SUCC, &resp);
+    Ok(())
 }
 
-pub fn pc_vehicle_on(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
-    catch_fail(
-        (|| {
-            let client = clients.get_self();
-            let pc_id = client.get_player_id()?;
-            let player = state.get_player_mut(pc_id)?;
+pub fn pc_vehicle_on(clients: &ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    (|| {
+        let client = clients.get_self();
+        let pc_id = client.get_player_id()?;
+        let player = state.get_player_mut(pc_id)?;
 
-            if player.instance_id.map_num != ID_OVERWORLD {
-                return Err(FFError::build(
-                    Severity::Warning,
-                    format!(
-                        "Player {} tried to mount a vehicle outside the overworld: {}",
-                        pc_id, player.instance_id
-                    ),
-                ));
-            }
+        if player.instance_id.map_num != ID_OVERWORLD {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Player {} tried to mount a vehicle outside the overworld: {}",
+                    pc_id, player.instance_id
+                ),
+            ));
+        }
 
-            let vehicle = player
-                .get_item(ItemLocation::Equip, EQUIP_SLOT_VEHICLE as usize)
-                .unwrap();
-            if vehicle.is_none() {
-                return Err(FFError::build(
-                    Severity::Warning,
-                    format!(
-                        "Player {} tried to mount a vehicle without one equipped",
-                        pc_id
-                    ),
-                ));
-            }
-            let vehicle = vehicle.as_ref().unwrap();
+        let vehicle = player
+            .get_item(ItemLocation::Equip, EQUIP_SLOT_VEHICLE as usize)
+            .unwrap();
+        if vehicle.is_none() {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Player {} tried to mount a vehicle without one equipped",
+                    pc_id
+                ),
+            ));
+        }
+        let vehicle = vehicle.as_ref().unwrap();
 
-            if let Some(vehicle_speed) = vehicle.get_stats()?.speed {
-                player.vehicle_speed = Some(vehicle_speed);
-            } else {
-                panic_log(&format!("Vehicle has no speed: {:?}", vehicle));
-            }
-            rusty_fusion::helpers::broadcast_state(
-                pc_id,
-                player.get_state_bit_flag(),
-                clients,
-                state,
-            );
+        if let Some(vehicle_speed) = vehicle.get_stats()?.speed {
+            player.vehicle_speed = Some(vehicle_speed);
+        } else {
+            panic_log(&format!("Vehicle has no speed: {:?}", vehicle));
+        }
+        rusty_fusion::helpers::broadcast_state(pc_id, player.get_state_bit_flag(), clients, state);
 
-            let resp = sP_FE2CL_PC_VEHICLE_ON_SUCC { UNUSED: unused!() };
-            clients
-                .get_self()
-                .send_packet(P_FE2CL_PC_VEHICLE_ON_SUCC, &resp)
-        })(),
-        || {
-            let resp = sP_FE2CL_PC_VEHICLE_ON_FAIL {
-                iErrorCode: unused!(),
-            };
-            clients
-                .get_self()
-                .send_packet(P_FE2CL_PC_VEHICLE_ON_FAIL, &resp)
-        },
-    )
+        let resp = sP_FE2CL_PC_VEHICLE_ON_SUCC { UNUSED: unused!() };
+        clients
+            .get_self()
+            .send_packet(P_FE2CL_PC_VEHICLE_ON_SUCC, &resp);
+
+        Ok(())
+    })()
+    .catch_fail(|| {
+        let resp = sP_FE2CL_PC_VEHICLE_ON_FAIL {
+            iErrorCode: unused!(),
+        };
+
+        clients
+            .get_self()
+            .send_packet(P_FE2CL_PC_VEHICLE_ON_FAIL, &resp);
+    })
 }
 
-pub fn pc_vehicle_off(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
-    catch_fail(
-        (|| {
-            let client = clients.get_self();
-            let pc_id = client.get_player_id()?;
-            let player = state.get_player_mut(pc_id)?;
+pub fn pc_vehicle_off(clients: &ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+    (|| {
+        let client = clients.get_self();
+        let pc_id = client.get_player_id()?;
+        let player = state.get_player_mut(pc_id)?;
 
-            player.vehicle_speed = None;
-            rusty_fusion::helpers::broadcast_state(
-                pc_id,
-                player.get_state_bit_flag(),
-                clients,
-                state,
-            );
+        player.vehicle_speed = None;
+        rusty_fusion::helpers::broadcast_state(pc_id, player.get_state_bit_flag(), clients, state);
 
-            let resp = sP_FE2CL_PC_VEHICLE_OFF_SUCC { UNUSED: unused!() };
-            clients
-                .get_self()
-                .send_packet(P_FE2CL_PC_VEHICLE_OFF_SUCC, &resp)
-        })(),
-        || {
-            let resp = sP_FE2CL_PC_VEHICLE_OFF_FAIL {
-                iErrorCode: unused!(),
-            };
-            clients
-                .get_self()
-                .send_packet(P_FE2CL_PC_VEHICLE_OFF_FAIL, &resp)
-        },
-    )
+        let resp = sP_FE2CL_PC_VEHICLE_OFF_SUCC { UNUSED: unused!() };
+        clients
+            .get_self()
+            .send_packet(P_FE2CL_PC_VEHICLE_OFF_SUCC, &resp);
+
+        Ok(())
+    })()
+    .catch_fail(|| {
+        let resp = sP_FE2CL_PC_VEHICLE_OFF_FAIL {
+            iErrorCode: unused!(),
+        };
+
+        clients
+            .get_self()
+            .send_packet(P_FE2CL_PC_VEHICLE_OFF_FAIL, &resp);
+    })
 }
 
 pub fn pc_special_state_switch(
-    clients: &mut ClientMap,
+    pkt: Packet,
+    clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let client = clients.get_self();
     let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH =
-        client.get_packet(P_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH)?;
+        pkt.get(P_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH)?;
 
     let player = state.get_player_mut(pc_id)?;
 
@@ -566,15 +573,16 @@ pub fn pc_special_state_switch(
     state
         .entity_map
         .for_each_around(EntityID::Player(pc_id), clients, |c| {
-            c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp)
+            c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
         });
     clients
         .get_self()
-        .send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp)
+        .send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp);
+    Ok(())
 }
 
 pub fn pc_combat_begin_end(
-    clients: &mut ClientMap,
+    clients: &ClientMap,
     state: &mut ShardServerState,
     in_combat: bool,
 ) -> FFResult<()> {
@@ -597,7 +605,7 @@ pub fn pc_combat_begin_end(
     state
         .entity_map
         .for_each_around(EntityID::Player(pc_id), clients, |c| {
-            c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp)
+            c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
         });
     Ok(())
 }
@@ -613,12 +621,12 @@ fn get_respawn_point(pos: Position, map_num: u32) -> Position {
     })
 }
 
-pub fn pc_regen(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+pub fn pc_regen(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     const WARP_AWAY_COOLDOWN: Duration = Duration::from_secs(60);
 
     let client = clients.get_self();
     let pc_id = client.get_player_id()?;
-    let pkt: &sP_CL2FE_REQ_PC_REGEN = client.get_packet(P_CL2FE_REQ_PC_REGEN)?;
+    let pkt: &sP_CL2FE_REQ_PC_REGEN = pkt.get(P_CL2FE_REQ_PC_REGEN)?;
     let revive_type: PCRegenType = pkt.iRegenType.try_into()?;
 
     let player = state.get_player_mut(pc_id)?;
@@ -678,7 +686,7 @@ pub fn pc_regen(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
         // might be in an instance that would get cleaned up prematurely.
         bMoveLocation: 0,
     };
-    log_if_failed(client.send_packet(P_FE2CL_REP_PC_REGEN_SUCC, &resp));
+    client.send_packet(P_FE2CL_REP_PC_REGEN_SUCC, &resp);
     if let Some(new_chunk) = new_chunk_coords {
         state
             .entity_map
@@ -691,61 +699,70 @@ pub fn pc_regen(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResu
     state
         .entity_map
         .for_each_around(EntityID::Player(pc_id), clients, |c| {
-            c.send_packet(P_FE2CL_PC_REGEN, &bcast)
+            c.send_packet(P_FE2CL_PC_REGEN, &bcast);
         });
     Ok(())
 }
 
-pub fn pc_first_use_flag_set(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+pub fn pc_first_use_flag_set(
+    pkt: Packet,
+    client: &FFClient,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
     let pc_id = client.get_player_id()?;
-    let pkt: &sP_CL2FE_REQ_PC_FIRST_USE_FLAG_SET =
-        client.get_packet(P_CL2FE_REQ_PC_FIRST_USE_FLAG_SET)?;
+    let pkt: &sP_CL2FE_REQ_PC_FIRST_USE_FLAG_SET = pkt.get(P_CL2FE_REQ_PC_FIRST_USE_FLAG_SET)?;
 
     let player = state.get_player_mut(pc_id)?;
     player.update_first_use_flag(pkt.iFlagCode)?;
     Ok(())
 }
 
-pub fn pc_change_mentor(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
-    let pkt: sP_CL2FE_REQ_PC_CHANGE_MENTOR = *client.get_packet(P_CL2FE_REQ_PC_CHANGE_MENTOR)?;
-    catch_fail(
-        (|| {
-            let player = state.get_player_mut(client.get_player_id()?)?;
-            if player.get_level() < 4 {
-                return Err(FFError::build(
-                    Severity::Warning,
-                    "Player tried to change mentor before level 4".to_string(),
-                ));
-            }
+pub fn pc_change_mentor(
+    pkt: Packet,
+    client: &FFClient,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let pkt: &sP_CL2FE_REQ_PC_CHANGE_MENTOR = pkt.get(P_CL2FE_REQ_PC_CHANGE_MENTOR)?;
+    (|| {
+        let player = state.get_player_mut(client.get_player_id()?)?;
+        if player.get_level() < 4 {
+            return Err(FFError::build(
+                Severity::Warning,
+                "Player tried to change mentor before level 4".to_string(),
+            ));
+        }
 
-            let guide_count = player.update_guide(pkt.iMentor.try_into()?);
+        let guide_count = player.update_guide(pkt.iMentor.try_into()?);
 
-            let resp = sP_FE2CL_REP_PC_CHANGE_MENTOR_SUCC {
-                iMentor: pkt.iMentor,
-                iMentorCnt: guide_count as i16,
-                iFusionMatter: player.get_fusion_matter() as i32,
-            };
-            client.send_packet(P_FE2CL_REP_PC_CHANGE_MENTOR_SUCC, &resp)
-        })(),
-        || {
-            let resp = sP_FE2CL_REP_PC_CHANGE_MENTOR_FAIL {
-                iMentor: pkt.iMentor,
-                iErrorCode: unused!(),
-            };
-            client.send_packet(P_FE2CL_REP_PC_CHANGE_MENTOR_FAIL, &resp)
-        },
-    )
+        let resp = sP_FE2CL_REP_PC_CHANGE_MENTOR_SUCC {
+            iMentor: pkt.iMentor,
+            iMentorCnt: guide_count as i16,
+            iFusionMatter: player.get_fusion_matter() as i32,
+        };
+
+        client.send_packet(P_FE2CL_REP_PC_CHANGE_MENTOR_SUCC, &resp);
+        Ok(())
+    })()
+    .catch_fail(|| {
+        let resp = sP_FE2CL_REP_PC_CHANGE_MENTOR_FAIL {
+            iMentor: pkt.iMentor,
+            iErrorCode: unused!(),
+        };
+
+        client.send_packet(P_FE2CL_REP_PC_CHANGE_MENTOR_FAIL, &resp);
+    })
 }
 
-pub fn pc_channel_num(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+pub fn pc_channel_num(client: &FFClient, state: &mut ShardServerState) -> FFResult<()> {
     let player = state.get_player(client.get_player_id()?)?;
     let resp = sP_FE2CL_REP_PC_CHANNEL_NUM {
         iChannelNum: player.instance_id.channel_num as i32,
     };
-    client.send_packet(P_FE2CL_REP_PC_CHANNEL_NUM, &resp)
+    client.send_packet(P_FE2CL_REP_PC_CHANNEL_NUM, &resp);
+    Ok(())
 }
 
-pub fn pc_channel_info(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+pub fn pc_channel_info(client: &FFClient, state: &mut ShardServerState) -> FFResult<()> {
     let player = state.get_player(client.get_player_id()?)?;
     let channel_num = player.instance_id.channel_num;
     let num_channels = config_get().shard.num_channels.get();
@@ -762,66 +779,70 @@ pub fn pc_channel_info(client: &mut FFClient, state: &mut ShardServerState) -> F
     }
 
     let pkt = resp.build()?;
-    client.send_payload(pkt)
+    client.send_payload(pkt);
+    Ok(())
 }
 
-pub fn pc_warp_channel(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
-    let pkt: sP_CL2FE_REQ_PC_WARP_CHANNEL =
-        *clients.get_self().get_packet(P_CL2FE_REQ_PC_WARP_CHANNEL)?;
+pub fn pc_warp_channel(
+    pkt: Packet,
+    clients: &ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let pkt: &sP_CL2FE_REQ_PC_WARP_CHANNEL = pkt.get(P_CL2FE_REQ_PC_WARP_CHANNEL)?;
+
     let mut error_code = 0;
-    catch_fail(
-        (|| {
-            let pc_id = clients.get_self().get_player_id()?;
-            let channel_num = pkt.iChannelNum as u8;
-            let num_channels = config_get().shard.num_channels.get();
+    (|| {
+        let pc_id = clients.get_self().get_player_id()?;
+        let channel_num = pkt.iChannelNum as u8;
+        let num_channels = config_get().shard.num_channels.get();
 
-            if channel_num == 0 || channel_num > num_channels {
-                error_code = 3; // "the channel number is invalid."
-                return Err(FFError::build(
-                    Severity::Warning,
-                    format!("Invalid channel number: {}", channel_num),
-                ));
-            }
+        if channel_num == 0 || channel_num > num_channels {
+            error_code = 3; // "the channel number is invalid."
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Invalid channel number: {}", channel_num),
+            ));
+        }
 
-            let max_channel_pop = config_get().shard.max_channel_pop.get();
-            if state.entity_map.get_channel_population(channel_num) >= max_channel_pop {
-                error_code = 4; // "the channel is full."
-                return Err(FFError::build(
-                    Severity::Warning,
-                    format!("Channel {} is full", channel_num),
-                ));
-            }
+        let max_channel_pop = config_get().shard.max_channel_pop.get();
+        if state.entity_map.get_channel_population(channel_num) >= max_channel_pop {
+            error_code = 4; // "the channel is full."
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Channel {} is full", channel_num),
+            ));
+        }
 
-            let player = state.get_player_mut(pc_id)?;
-            if player.instance_id.channel_num == channel_num {
-                error_code = 2; // "you're already in the channel."
-                return Err(FFError::build(
-                    Severity::Warning,
-                    format!("Player {} is already in channel {}", pc_id, channel_num),
-                ));
-            }
+        let player = state.get_player_mut(pc_id)?;
+        if player.instance_id.channel_num == channel_num {
+            error_code = 2; // "you're already in the channel."
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Player {} is already in channel {}", pc_id, channel_num),
+            ));
+        }
 
-            player.instance_id.channel_num = channel_num;
-            let chunk_coords = player.get_chunk_coords();
+        player.instance_id.channel_num = channel_num;
+        let chunk_coords = player.get_chunk_coords();
 
-            let resp = sP_FE2CL_REP_PC_WARP_CHANNEL_SUCC { UNUSED: unused!() };
-            clients
-                .get_self()
-                .send_packet(P_FE2CL_REP_PC_WARP_CHANNEL_SUCC, &resp)?;
+        let resp = sP_FE2CL_REP_PC_WARP_CHANNEL_SUCC { UNUSED: unused!() };
+        clients
+            .get_self()
+            .send_packet(P_FE2CL_REP_PC_WARP_CHANNEL_SUCC, &resp);
 
-            state
-                .entity_map
-                .update(EntityID::Player(pc_id), Some(chunk_coords), Some(clients));
+        state
+            .entity_map
+            .update(EntityID::Player(pc_id), Some(chunk_coords), Some(clients));
 
-            Ok(())
-        })(),
-        || {
-            let resp = sP_FE2CL_REP_PC_WARP_CHANNEL_FAIL {
-                iErrorCode: error_code,
-            };
-            clients
-                .get_self()
-                .send_packet(P_FE2CL_REP_PC_WARP_CHANNEL_FAIL, &resp)
-        },
-    )
+        Ok(())
+    })()
+    .catch_fail(|| {
+        let resp = sP_FE2CL_REP_PC_WARP_CHANNEL_FAIL {
+            iErrorCode: error_code,
+        };
+
+        clients
+            .get_self()
+            .send_packet(P_FE2CL_REP_PC_WARP_CHANNEL_FAIL, &resp);
+    })
 }

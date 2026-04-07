@@ -1,59 +1,46 @@
 use std::{
     collections::HashMap,
+    future::Future,
+    pin::Pin,
     sync::Arc,
-    time::{Duration, SystemTime},
+    time::{Duration, Instant, SystemTime},
 };
 
 use crossterm::event::{self as ce, KeyCode};
 
+use futures::StreamExt as _;
 use rusty_fusion::{
     config::{config_get, config_init},
-    database::{db_init, db_shutdown},
-    db_run_async,
+    database::{db_get, db_init},
     defines::*,
     entity::{Entity, Player},
-    error::{
-        backlog_init, log, log_if_failed, logger_flush, logger_init, FFError, FFResult, Severity,
-    },
+    error::{log, log_error, log_if_failed, log_init, FFError, FFResult, Logger, Severity},
     net::{
-        packet::{
-            PacketID::{self, *},
-            *,
-        },
-        ClientMap, ClientType, FFClient, FFClientHandle, FFServer,
+        packet::{PacketID::*, *},
+        ClientMap, ClientType, FFClient, FFServer,
     },
     state::{ServerState, ShardServerState},
     tabledata::tdata_init,
     tui::{ShardTui, Tui as _},
     unused, util,
 };
-use tokio::sync::Mutex;
+use tokio::{sync::Mutex, task::JoinHandle};
 
 #[tokio::main]
 async fn main() -> FFResult<()> {
     color_eyre::install().unwrap();
     let mut terminal = ratatui::init();
-    backlog_init();
     let mut tui = ShardTui::default();
 
     let _cleanup = Cleanup {};
 
+    let log_rx = log_init();
     let config = config_init();
-    logger_init(config.shard.log_path.get());
-    log(Severity::Info, "Shard server starting up...");
+    let mut logger = Logger::new(log_rx, &config.shard.log_path.get());
+
     db_init().await;
     tdata_init();
 
-    let live_check_time = Duration::from_secs(config.general.live_check_time.get());
-    let listen_addr = config_get().shard.listen_addr.get();
-    let mut server = FFServer::new(
-        listen_addr,
-        handle_packet,
-        Some(handle_disconnect),
-        Some((live_check_time, send_live_check)),
-    )?;
-
-    let mut poll_timer = util::make_timer(Duration::from_millis(10), true);
     let mut tui_timer = util::make_timer(Duration::from_millis(100), true);
     let mut logger_timer = util::make_timer(
         Duration::from_secs(config.general.log_write_interval.get()),
@@ -78,48 +65,65 @@ async fn main() -> FFResult<()> {
     );
     let mut slow_timer = util::make_timer(Duration::from_secs(1), false);
 
+    let state = Arc::new(Mutex::new(ServerState::new_shard()));
+    let live_check_time = Duration::from_secs(config.general.live_check_time.get());
+    let listen_addr = config_get().shard.listen_addr.get();
+    let mut server = FFServer::new(
+        listen_addr,
+        handle_packet,
+        Some(handle_disconnect),
+        Some((live_check_time, send_live_check)),
+        state.clone(),
+    )
+    .await?;
+
     log(
         Severity::Info,
         &format!("Shard server listening on {}", server.get_endpoint()),
     );
 
-    fn _assert_send<T: Send>() {}
-    fn _assert() {
-        _assert_send::<ServerState>();
-    }
-
-    let state = Arc::new(Mutex::new(ServerState::new_shard()));
-    let mut running = true;
-    while running {
+    let mut key_event_stream = ce::EventStream::new();
+    loop {
         // Check timers
         tokio::select! {
-            _ = poll_timer.tick() => {
-                if let Err(e) = server.poll(&state).await {
+            res = server.poll() => {
+                if let Err(e) = res {
                     log(Severity::Fatal, &format!("Error during server poll: {}", e));
                     break;
                 }
             }
-            _ = tui_timer.tick() => {
-                // process events
-                while let Ok(true) = ce::poll(Duration::ZERO) {
-                    if let ce::Event::Key(key_event) = ce::read().unwrap() {
-                        if util::is_ctrl_c(&key_event) {
-                            running = false;
-                        }
-                        match key_event.code {
-                            KeyCode::Up => tui.state.scroll(1),
-                            KeyCode::Down => tui.state.scroll(-1),
-                            KeyCode::PageUp => tui.state.scroll(10),
-                            KeyCode::PageDown => tui.state.scroll(-10),
-                            KeyCode::Esc => tui.state.reset_scroll(),
-                            _ => {}
+            ke = key_event_stream.next() => {
+                match ke {
+                    Some(Ok(event)) => {
+                        if let ce::Event::Key(key_event) = event {
+                            if util::is_ctrl_c(&key_event) {
+                                break;
+                            }
+                            match key_event.code {
+                                KeyCode::Up => tui.state.scroll(1),
+                                KeyCode::Down => tui.state.scroll(-1),
+                                KeyCode::PageUp => tui.state.scroll(10),
+                                KeyCode::PageDown => tui.state.scroll(-10),
+                                KeyCode::Esc => tui.state.reset_scroll(),
+                                _ => {}
+                            }
                         }
                     }
+                    Some(Err(e)) => {
+                        log(Severity::Warning, &format!("Error reading key event: {}", e));
+                    }
+                    None => {
+                        // should not happen
+                        log(Severity::Fatal, "Key event stream ended unexpectedly");
+                        break;
+                    }
                 }
-
-                // render
+            }
+            _ = tui_timer.tick() => {
+                logger.drain();
+                let clients = server.get_clients().await;
                 let state = state.lock().await;
-                if let Err(e) = terminal.draw(|frame| tui.render(frame, &state, server.get_client_map())) {
+                if let Err(e) = terminal.draw(|frame| tui.render(frame, &state, &clients, logger.buffer())) {
                     log(
                         Severity::Warning,
                         &format!("Failed to draw TUI; skipping this frame: {}", e),
@@ -127,52 +131,59 @@ async fn main() -> FFResult<()> {
                 }
             }
             _ = entity_timer.tick() => {
+                let clients = server.get_clients().await;
+                let client_map = ClientMap::new(0, &clients);
                 state.lock().await.as_shard_mut()
-                    .tick_entities(SystemTime::now(), &mut server.get_client_map());
+                    .tick_entities(SystemTime::now(), &client_map);
             }
             _ = slow_timer.tick() => {
+                let clients = server.get_clients().await;
+                let client_map = ClientMap::new(0, &clients);
                 let mut state = state.lock().await;
                 let shard = state.as_shard_mut();
-                shard.tick_garbage_collection(&mut server.get_client_map());
-                shard.tick_groups(&mut server.get_client_map());
-                shard.check_receivers();
+                shard.tick_garbage_collection(&client_map);
+                shard.tick_groups(&client_map);
             }
             _ = vehicle_timer.tick() => {
+                let clients = server.get_clients().await;
+                let client_map = ClientMap::new(0, &clients);
                 state.lock().await.as_shard_mut()
-                    .check_for_expired_vehicles(SystemTime::now(), &mut server.get_client_map());
+                    .check_for_expired_vehicles(SystemTime::now(), &client_map);
             }
             _ = login_conn_timer.tick() => {
-                log_if_failed(connect_to_login_server(&mut server, state.lock().await.as_shard_mut()));
+                log_if_failed(connect_to_login_server(&mut server, state.lock().await.as_shard_mut()).await);
             }
             _ = status_timer.tick() => {
-                log_if_failed(send_status_to_login_server(&mut server, state.lock().await.as_shard()));
+                let clients = server.get_clients().await;
+                let client_map = ClientMap::new(0, &clients);
+                log_if_failed(send_status_to_login_server(&client_map, state.lock().await.as_shard()));
             }
             _ = save_timer.tick() => {
-                log_if_failed(do_save(SystemTime::now(), state.lock().await.as_shard_mut()));
+                let state = state.lock().await;
+                let _ = do_save(state.as_shard());
             }
             _ = logger_timer.tick() => {
-                log_if_failed(logger_flush());
+                logger.flush();
             }
         }
     }
 
+    // final TUI render before cleanup
     log(Severity::Info, "Shard server shutting down...");
+    logger.drain();
 
-    let mut state = state.lock().await;
-    log_if_failed(do_save(SystemTime::now(), state.as_shard_mut()));
+    let clients = server.get_clients().await;
+    let state = state.lock().await;
 
-    let mut attempts = 5;
-    while state.as_shard_mut().check_receivers() {
-        // Wait for all receivers to finish
-        if attempts == 0 {
-            log(Severity::Warning, "Some receivers hanging!");
-            break;
-        }
-        std::thread::sleep(Duration::from_secs(1));
-        attempts -= 1;
+    let _ = terminal.draw(|frame| tui.render(frame, &state, &clients, logger.buffer()));
+
+    // save players
+    if let Some(handle) = do_save(state.as_shard()) {
+        let _ = handle.await;
     }
 
-    shutdown_notify_clients(&mut server, state.as_shard_mut());
+    let client_map = ClientMap::new(0, &clients);
+    shutdown_notify_clients(&client_map, state.as_shard());
     Ok(())
 }
 
@@ -180,23 +191,14 @@ struct Cleanup;
 impl Drop for Cleanup {
     fn drop(&mut self) {
         ratatui::restore();
-        db_shutdown();
-        if let Err(e) = logger_flush() {
-            println!("Could not flush log: {}", e);
-        }
     }
 }
 
-fn handle_disconnect(
-    key: usize,
-    clients: &mut HashMap<usize, FFClient>,
-    handles: &HashMap<usize, FFClientHandle>,
-    state: &mut ServerState,
-) {
+fn handle_disconnect(key: usize, clients: &HashMap<usize, FFClient>, state: &mut ServerState) {
     let state = state.as_shard_mut();
-    let mut clients = ClientMap::new(key, clients, handles);
+    let clients = ClientMap::new(key, clients);
     let client = clients.get_self();
-    match client.client_type {
+    match client.get_client_type() {
         ClientType::LoginServer => {
             log(
                 Severity::Warning,
@@ -208,7 +210,7 @@ fn handle_disconnect(
             pc_id: Some(pc_id), ..
         } => {
             // dirty exit; clean exit happens in P_CL2FE_REQ_PC_EXIT handler
-            Player::disconnect(pc_id, state, &mut clients);
+            Player::disconnect(pc_id, state, &clients);
         }
         ClientType::Unknown => {
             log(
@@ -222,7 +224,7 @@ fn handle_disconnect(
                 &format!(
                     "Unhandled disconnect for client {} (type {})",
                     client.get_addr(),
-                    client.client_type
+                    client.get_client_type()
                 ),
             );
         }
@@ -242,193 +244,230 @@ mod npc;
 mod pc;
 mod trade;
 mod transport;
-fn handle_packet(
+fn handle_packet<'a>(
+    pkt: Packet,
     key: usize,
-    clients: &mut HashMap<usize, FFClient>,
-    handles: &HashMap<usize, FFClientHandle>,
-    pkt_id: PacketID,
-    state: &mut ServerState,
-) -> FFResult<()> {
-    let time = SystemTime::now();
-    let state = state.as_shard_mut();
-    let mut clients = ClientMap::new(key, clients, handles);
-    match pkt_id {
-        P_LS2FE_REP_AUTH_CHALLENGE => login::login_connect_challenge(clients.get_self()),
-        P_LS2FE_REP_CONNECT_SUCC => login::login_connect_succ(clients.get_self(), state),
-        P_LS2FE_REP_CONNECT_FAIL => login::login_connect_fail(clients.get_self()),
-        P_LS2FE_REQ_UPDATE_LOGIN_INFO => login::login_update_info(clients.get_self(), state),
-        P_LS2FE_REQ_LIVE_CHECK => login::login_live_check(clients.get_self()),
-        P_LS2FE_REP_MOTD => login::login_motd(&mut clients, state),
-        P_LS2FE_ANNOUNCE_MSG => login::login_announce_msg(&mut clients),
-        P_LS2FE_REQ_PC_LOCATION => login::login_pc_location(&mut clients, state),
-        P_LS2FE_REP_PC_LOCATION_SUCC => login::login_pc_location_succ(&mut clients, state),
-        P_LS2FE_REP_PC_LOCATION_FAIL => login::login_pc_location_fail(&mut clients, state),
-        P_LS2FE_REQ_PC_EXIT_DUPLICATE => login::login_pc_exit_duplicate(&mut clients, state),
-        P_LS2FE_REP_GET_BUDDY_STATE => login::login_get_buddy_state(&mut clients, state),
-        P_LS2FE_REQ_SEND_BUDDY_FREECHAT => login::login_buddy_freechat(&mut clients, state),
-        P_LS2FE_REP_SEND_BUDDY_FREECHAT_SUCC => login::buddy_freechat_succ(&mut clients, state),
-        P_LS2FE_REQ_SEND_BUDDY_MENUCHAT => login::login_buddy_menuchat(&mut clients, state),
-        P_LS2FE_REP_SEND_BUDDY_MENUCHAT_SUCC => login::buddy_menuchat_succ(&mut clients, state),
-        P_LS2FE_REQ_BUDDY_WARP => login::login_buddy_warp(&mut clients, state),
-        P_LS2FE_REP_BUDDY_WARP_SUCC => login::login_buddy_warp_succ(&mut clients, state),
-        P_LS2FE_REP_BUDDY_WARP_FAIL => login::login_buddy_warp_fail(&mut clients, state),
-        P_LS2FE_REP_LIVE_CHECK => {
-            clients.get_self().clear_live_check();
-            Ok(())
-        }
-        //
-        P_CL2LS_REQ_LOGIN => wrong_server(clients.get_self()),
-        //
-        P_CL2FE_REQ_PC_ENTER => pc::pc_enter(&mut clients, key, state, time),
-        P_CL2FE_REQ_PC_LOADING_COMPLETE => pc::pc_loading_complete(&mut clients, state),
-        P_CL2FE_REQ_PC_CHANNEL_NUM => pc::pc_channel_num(clients.get_self(), state),
-        P_CL2FE_REQ_CHANNEL_INFO => pc::pc_channel_info(clients.get_self(), state),
-        P_CL2FE_REQ_PC_WARP_CHANNEL => pc::pc_warp_channel(&mut clients, state),
-        P_CL2FE_REQ_PC_MOVE => pc::pc_move(&mut clients, state, time),
-        P_CL2FE_REQ_PC_JUMP => pc::pc_jump(&mut clients, state, time),
-        P_CL2FE_REQ_PC_STOP => pc::pc_stop(&mut clients, state, time),
-        P_CL2FE_REQ_PC_MOVETRANSPORTATION => pc::pc_movetransportation(&mut clients, state, time),
-        P_CL2FE_REQ_PC_TRANSPORT_WARP => pc::pc_transport_warp(clients.get_self(), state),
-        P_CL2FE_REQ_PC_VEHICLE_ON => pc::pc_vehicle_on(&mut clients, state),
-        P_CL2FE_REQ_PC_VEHICLE_OFF => pc::pc_vehicle_off(&mut clients, state),
-        P_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH => pc::pc_special_state_switch(&mut clients, state),
-        P_CL2FE_REQ_PC_COMBAT_BEGIN => pc::pc_combat_begin_end(&mut clients, state, true),
-        P_CL2FE_REQ_PC_COMBAT_END => pc::pc_combat_begin_end(&mut clients, state, false),
-        P_CL2FE_REQ_PC_REGEN => pc::pc_regen(&mut clients, state),
-        P_CL2FE_REQ_PC_FIRST_USE_FLAG_SET => pc::pc_first_use_flag_set(clients.get_self(), state),
-        P_CL2FE_REQ_PC_CHANGE_MENTOR => pc::pc_change_mentor(clients.get_self(), state),
-        P_CL2FE_REQ_PC_EXIT => pc::pc_exit(&mut clients, state),
-        //
-        P_CL2FE_REQ_PC_GIVE_ITEM => gm::gm_pc_give_item(clients.get_self(), state),
-        P_CL2FE_GM_REQ_PC_SET_VALUE => gm::gm_pc_set_value(&mut clients, state),
-        P_CL2FE_REQ_PC_GIVE_NANO => gm::gm_pc_give_nano(&mut clients, state),
-        P_CL2FE_REQ_PC_GOTO => gm::gm_pc_goto(&mut clients, state),
-        P_CL2FE_GM_REQ_PC_SPECIAL_STATE_SWITCH => {
-            gm::gm_pc_special_state_switch(&mut clients, state)
-        }
-        P_CL2FE_GM_REQ_PC_MOTD_REGISTER => gm::gm_pc_motd_register(&mut clients, state),
-        P_CL2FE_GM_REQ_PC_ANNOUNCE => gm::gm_pc_announce(&mut clients, state),
-        P_CL2FE_GM_REQ_PC_LOCATION => gm::gm_pc_location(&mut clients, state),
-        P_CL2FE_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF => {
-            gm::gm_target_pc_special_state_onoff(&mut clients, state)
-        }
-        P_CL2FE_GM_REQ_TARGET_PC_TELEPORT => gm::gm_target_pc_teleport(&mut clients, state),
-        P_CL2FE_GM_REQ_KICK_PLAYER => gm::gm_kick_player(&mut clients, state),
-        P_CL2FE_GM_REQ_REWARD_RATE => gm::gm_reward_rate(clients.get_self(), state),
-        P_CL2FE_REQ_PC_TASK_COMPLETE => gm::gm_pc_task_complete(clients.get_self(), state),
-        P_CL2FE_REQ_PC_MISSION_COMPLETE => gm::gm_pc_mission_complete(clients.get_self(), state),
-        P_CL2FE_REQ_NPC_SUMMON => gm::gm_npc_summon(&mut clients, state),
-        P_CL2FE_REQ_NPC_GROUP_SUMMON => gm::gm_npc_group_summon(&mut clients, state),
-        P_CL2FE_REQ_NPC_UNSUMMON => gm::gm_npc_unsummon(&mut clients, state),
-        P_CL2FE_REQ_SHINY_SUMMON => gm::gm_shiny_summon(&mut clients, state),
-        //
-        P_CL2FE_REQ_NPC_INTERACTION => npc::npc_interaction(clients.get_self(), state),
-        P_CL2FE_REQ_BARKER => npc::npc_bark(clients.get_self(), state),
-        //
-        P_CL2FE_REQ_SEND_FREECHAT_MESSAGE => chat::send_freechat_message(&mut clients, state),
-        P_CL2FE_REQ_SEND_MENUCHAT_MESSAGE => chat::send_menuchat_message(&mut clients, state),
-        P_CL2FE_REQ_SEND_ALL_GROUP_FREECHAT_MESSAGE => {
-            chat::send_group_freechat_message(&mut clients, state)
-        }
-        P_CL2FE_REQ_SEND_ALL_GROUP_MENUCHAT_MESSAGE => {
-            chat::send_group_menuchat_message(&mut clients, state)
-        }
-        P_CL2FE_REQ_PC_AVATAR_EMOTES_CHAT => chat::pc_avatar_emotes_chat(&mut clients, state),
-        P_CL2FE_REQ_SEND_BUDDY_FREECHAT_MESSAGE => {
-            chat::send_buddy_freechat_message(&mut clients, state)
-        }
+    clients: &'a HashMap<usize, FFClient>,
+    state: &'a mut ServerState,
+) -> Pin<Box<dyn Future<Output = FFResult<()>> + Send + 'a>> {
+    Box::pin(async move {
+        let time = SystemTime::now();
+        let state = state.as_shard_mut();
+        let clients = ClientMap::new(key, clients);
+        match pkt.id() {
+            P_LS2FE_REP_AUTH_CHALLENGE => login::login_connect_challenge(pkt, clients.get_self()),
+            P_LS2FE_REP_CONNECT_SUCC => login::login_connect_succ(pkt, clients.get_self(), state),
+            P_LS2FE_REP_CONNECT_FAIL => login::login_connect_fail(pkt),
+            P_LS2FE_REQ_UPDATE_LOGIN_INFO => {
+                login::login_update_info(pkt, clients.get_self(), state)
+            }
+            P_LS2FE_REQ_LIVE_CHECK => login::login_live_check(clients.get_self()),
+            P_LS2FE_REP_MOTD => login::login_motd(pkt, &clients, state),
+            P_LS2FE_ANNOUNCE_MSG => login::login_announce_msg(pkt, &clients),
+            P_LS2FE_REQ_PC_LOCATION => login::login_pc_location(pkt, &clients, state),
+            P_LS2FE_REP_PC_LOCATION_SUCC => login::login_pc_location_succ(pkt, &clients, state),
+            P_LS2FE_REP_PC_LOCATION_FAIL => login::login_pc_location_fail(pkt, &clients, state),
+            P_LS2FE_REQ_PC_EXIT_DUPLICATE => login::login_pc_exit_duplicate(pkt, &clients, state),
+            P_LS2FE_REP_GET_BUDDY_STATE => login::login_get_buddy_state(pkt, &clients, state),
+            P_LS2FE_REQ_SEND_BUDDY_FREECHAT => login::login_buddy_freechat(pkt, &clients, state),
+            P_LS2FE_REP_SEND_BUDDY_FREECHAT_SUCC => {
+                login::buddy_freechat_succ(pkt, &clients, state)
+            }
+            P_LS2FE_REQ_SEND_BUDDY_MENUCHAT => login::login_buddy_menuchat(pkt, &clients, state),
+            P_LS2FE_REP_SEND_BUDDY_MENUCHAT_SUCC => {
+                login::buddy_menuchat_succ(pkt, &clients, state)
+            }
+            P_LS2FE_REQ_BUDDY_WARP => login::login_buddy_warp(pkt, &clients, state),
+            P_LS2FE_REP_BUDDY_WARP_SUCC => login::login_buddy_warp_succ(pkt, &clients, state).await,
+            P_LS2FE_REP_BUDDY_WARP_FAIL => login::login_buddy_warp_fail(pkt, &clients, state),
+            P_LS2FE_REP_LIVE_CHECK => {
+                clients.get_self().clear_live_check();
+                Ok(())
+            }
+            //
+            P_CL2LS_REQ_LOGIN => wrong_server(pkt, clients.get_self()),
+            //
+            P_CL2FE_REQ_PC_ENTER => pc::pc_enter(pkt, &clients, key, state, time).await,
+            P_CL2FE_REQ_PC_LOADING_COMPLETE => pc::pc_loading_complete(pkt, &clients, state),
+            P_CL2FE_REQ_PC_CHANNEL_NUM => pc::pc_channel_num(clients.get_self(), state),
+            P_CL2FE_REQ_CHANNEL_INFO => pc::pc_channel_info(clients.get_self(), state),
+            P_CL2FE_REQ_PC_WARP_CHANNEL => pc::pc_warp_channel(pkt, &clients, state),
+            P_CL2FE_REQ_PC_MOVE => pc::pc_move(pkt, &clients, state, time),
+            P_CL2FE_REQ_PC_JUMP => pc::pc_jump(pkt, &clients, state, time),
+            P_CL2FE_REQ_PC_STOP => pc::pc_stop(pkt, &clients, state, time),
+            P_CL2FE_REQ_PC_MOVETRANSPORTATION => {
+                pc::pc_movetransportation(pkt, &clients, state, time)
+            }
+            P_CL2FE_REQ_PC_TRANSPORT_WARP => pc::pc_transport_warp(pkt, clients.get_self(), state),
+            P_CL2FE_REQ_PC_VEHICLE_ON => pc::pc_vehicle_on(&clients, state),
+            P_CL2FE_REQ_PC_VEHICLE_OFF => pc::pc_vehicle_off(&clients, state),
+            P_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH => {
+                pc::pc_special_state_switch(pkt, &clients, state)
+            }
+            P_CL2FE_REQ_PC_COMBAT_BEGIN => pc::pc_combat_begin_end(&clients, state, true),
+            P_CL2FE_REQ_PC_COMBAT_END => pc::pc_combat_begin_end(&clients, state, false),
+            P_CL2FE_REQ_PC_REGEN => pc::pc_regen(pkt, &clients, state),
+            P_CL2FE_REQ_PC_FIRST_USE_FLAG_SET => {
+                pc::pc_first_use_flag_set(pkt, clients.get_self(), state)
+            }
+            P_CL2FE_REQ_PC_CHANGE_MENTOR => pc::pc_change_mentor(pkt, clients.get_self(), state),
+            P_CL2FE_REQ_PC_EXIT => pc::pc_exit(&clients, state),
+            //
+            P_CL2FE_REQ_PC_GIVE_ITEM => gm::gm_pc_give_item(pkt, clients.get_self(), state),
+            P_CL2FE_GM_REQ_PC_SET_VALUE => gm::gm_pc_set_value(pkt, &clients, state),
+            P_CL2FE_REQ_PC_GIVE_NANO => gm::gm_pc_give_nano(pkt, &clients, state),
+            P_CL2FE_REQ_PC_GOTO => gm::gm_pc_goto(pkt, &clients, state),
+            P_CL2FE_GM_REQ_PC_SPECIAL_STATE_SWITCH => {
+                gm::gm_pc_special_state_switch(pkt, &clients, state)
+            }
+            P_CL2FE_GM_REQ_PC_MOTD_REGISTER => gm::gm_pc_motd_register(pkt, &clients, state),
+            P_CL2FE_GM_REQ_PC_ANNOUNCE => gm::gm_pc_announce(pkt, &clients, state),
+            P_CL2FE_GM_REQ_PC_LOCATION => gm::gm_pc_location(pkt, &clients, state),
+            P_CL2FE_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF => {
+                gm::gm_target_pc_special_state_onoff(pkt, &clients, state)
+            }
+            P_CL2FE_GM_REQ_TARGET_PC_TELEPORT => gm::gm_target_pc_teleport(pkt, &clients, state),
+            P_CL2FE_GM_REQ_KICK_PLAYER => gm::gm_kick_player(pkt, &clients, state),
+            P_CL2FE_GM_REQ_REWARD_RATE => gm::gm_reward_rate(pkt, clients.get_self(), state),
+            P_CL2FE_REQ_PC_TASK_COMPLETE => gm::gm_pc_task_complete(pkt, clients.get_self(), state),
+            P_CL2FE_REQ_PC_MISSION_COMPLETE => {
+                gm::gm_pc_mission_complete(pkt, clients.get_self(), state)
+            }
+            P_CL2FE_REQ_NPC_SUMMON => gm::gm_npc_summon(pkt, &clients, state),
+            P_CL2FE_REQ_NPC_GROUP_SUMMON => gm::gm_npc_group_summon(pkt, &clients, state),
+            P_CL2FE_REQ_NPC_UNSUMMON => gm::gm_npc_unsummon(pkt, &clients, state),
+            P_CL2FE_REQ_SHINY_SUMMON => gm::gm_shiny_summon(pkt, &clients, state),
+            //
+            P_CL2FE_REQ_NPC_INTERACTION => npc::npc_interaction(pkt, clients.get_self(), state),
+            P_CL2FE_REQ_BARKER => npc::npc_bark(pkt, clients.get_self(), state),
+            //
+            P_CL2FE_REQ_SEND_FREECHAT_MESSAGE => {
+                chat::send_freechat_message(pkt, &clients, state).await
+            }
+            P_CL2FE_REQ_SEND_MENUCHAT_MESSAGE => chat::send_menuchat_message(pkt, &clients, state),
+            P_CL2FE_REQ_SEND_ALL_GROUP_FREECHAT_MESSAGE => {
+                chat::send_group_freechat_message(pkt, &clients, state)
+            }
+            P_CL2FE_REQ_SEND_ALL_GROUP_MENUCHAT_MESSAGE => {
+                chat::send_group_menuchat_message(pkt, &clients, state)
+            }
+            P_CL2FE_REQ_PC_AVATAR_EMOTES_CHAT => chat::pc_avatar_emotes_chat(pkt, &clients, state),
+            P_CL2FE_REQ_SEND_BUDDY_FREECHAT_MESSAGE => {
+                chat::send_buddy_freechat_message(pkt, &clients, state)
+            }
 
-        P_CL2FE_REQ_SEND_BUDDY_MENUCHAT_MESSAGE => {
-            chat::send_buddy_menuchat_message(&mut clients, state)
-        }
+            P_CL2FE_REQ_SEND_BUDDY_MENUCHAT_MESSAGE => {
+                chat::send_buddy_menuchat_message(pkt, &clients, state)
+            }
 
-        //
-        P_CL2FE_REQ_PC_ATTACK_NPCs => combat::pc_attack_npcs(&mut clients, state),
-        //
-        P_CL2FE_REQ_ITEM_MOVE => item::item_move(&mut clients, state),
-        P_CL2FE_REQ_PC_ITEM_DELETE => item::item_delete(clients.get_self(), state),
-        P_CL2FE_REQ_PC_ITEM_COMBINATION => item::item_combination(clients.get_self(), state),
-        P_CL2FE_REQ_ITEM_CHEST_OPEN => item::item_chest_open(clients.get_self(), state),
-        P_CL2FE_REQ_PC_VENDOR_START => item::vendor_start(clients.get_self(), state),
-        P_CL2FE_REQ_PC_VENDOR_TABLE_UPDATE => item::vendor_table_update(clients.get_self()),
-        P_CL2FE_REQ_PC_VENDOR_ITEM_BUY => item::vendor_item_buy(clients.get_self(), state, time),
-        P_CL2FE_REQ_PC_VENDOR_ITEM_SELL => item::vendor_item_sell(clients.get_self(), state),
-        P_CL2FE_REQ_PC_VENDOR_ITEM_RESTORE_BUY => {
-            item::vendor_item_restore_buy(clients.get_self(), state)
+            //
+            P_CL2FE_REQ_PC_ATTACK_NPCs => combat::pc_attack_npcs(pkt, &clients, state),
+            //
+            P_CL2FE_REQ_ITEM_MOVE => item::item_move(pkt, &clients, state),
+            P_CL2FE_REQ_PC_ITEM_DELETE => item::item_delete(pkt, clients.get_self(), state),
+            P_CL2FE_REQ_PC_ITEM_COMBINATION => {
+                item::item_combination(pkt, clients.get_self(), state)
+            }
+            P_CL2FE_REQ_ITEM_CHEST_OPEN => item::item_chest_open(pkt, clients.get_self(), state),
+            P_CL2FE_REQ_PC_VENDOR_START => item::vendor_start(pkt, clients.get_self(), state),
+            P_CL2FE_REQ_PC_VENDOR_TABLE_UPDATE => {
+                item::vendor_table_update(pkt, clients.get_self())
+            }
+            P_CL2FE_REQ_PC_VENDOR_ITEM_BUY => {
+                item::vendor_item_buy(pkt, clients.get_self(), state, time)
+            }
+            P_CL2FE_REQ_PC_VENDOR_ITEM_SELL => {
+                item::vendor_item_sell(pkt, clients.get_self(), state)
+            }
+            P_CL2FE_REQ_PC_VENDOR_ITEM_RESTORE_BUY => {
+                item::vendor_item_restore_buy(pkt, clients.get_self(), state)
+            }
+            P_CL2FE_REQ_PC_VENDOR_BATTERY_BUY => {
+                item::vendor_battery_buy(pkt, clients.get_self(), state)
+            }
+            P_CL2FE_PC_STREETSTALL_REQ_CANCEL => item::streetstall_cancel(clients.get_self()),
+            //
+            P_CL2FE_REQ_NANO_EQUIP => nano::nano_equip(pkt, &clients, state),
+            P_CL2FE_REQ_NANO_UNEQUIP => nano::nano_unequip(pkt, &clients, state),
+            P_CL2FE_REQ_NANO_ACTIVE => nano::nano_active(pkt, &clients, state),
+            P_CL2FE_REQ_NANO_TUNE => nano::nano_tune(pkt, clients.get_self(), state),
+            //
+            P_CL2FE_REQ_REQUEST_MAKE_BUDDY => buddy::request_make_buddy(pkt, &clients, state),
+            P_CL2FE_REQ_ACCEPT_MAKE_BUDDY => buddy::accept_make_buddy(pkt, &clients, state),
+            P_CL2FE_REQ_PC_FIND_NAME_MAKE_BUDDY => {
+                buddy::find_name_make_buddy(pkt, &clients, state)
+            }
+            P_CL2FE_REQ_PC_FIND_NAME_ACCEPT_BUDDY => {
+                buddy::find_name_accept_buddy(pkt, &clients, state)
+            }
+            P_CL2FE_REQ_GET_BUDDY_STATE => buddy::get_buddy_state(&clients, state),
+            P_CL2FE_REQ_PC_BUDDY_WARP => buddy::pc_buddy_warp(pkt, &clients, state),
+            //
+            P_CL2FE_REQ_PC_TRADE_OFFER => trade::trade_offer(pkt, &clients, state),
+            P_CL2FE_REQ_PC_TRADE_OFFER_REFUSAL => trade::trade_offer_refusal(pkt, &clients, state),
+            P_CL2FE_REQ_PC_TRADE_OFFER_ACCEPT => trade::trade_offer_accept(pkt, &clients, state),
+            P_CL2FE_REQ_PC_TRADE_OFFER_CANCEL => trade::trade_offer_cancel(pkt, &clients, state),
+            P_CL2FE_REQ_PC_TRADE_CASH_REGISTER => trade::trade_cash_register(pkt, &clients, state),
+            P_CL2FE_REQ_PC_TRADE_ITEM_REGISTER => trade::trade_item_register(pkt, &clients, state),
+            P_CL2FE_REQ_PC_TRADE_ITEM_UNREGISTER => {
+                trade::trade_item_unregister(pkt, &clients, state)
+            }
+            P_CL2FE_REQ_PC_TRADE_CONFIRM_CANCEL => {
+                trade::trade_confirm_cancel(pkt, &clients, state)
+            }
+            P_CL2FE_REQ_PC_TRADE_CONFIRM => trade::trade_confirm(&clients, state).await,
+            P_CL2FE_REQ_PC_TRADE_EMOTES_CHAT => trade::trade_emotes_chat(pkt, &clients, state),
+            //
+            P_CL2FE_REQ_REGIST_TRANSPORTATION_LOCATION => {
+                transport::regist_transportation_location(pkt, clients.get_self(), state)
+            }
+            P_CL2FE_REQ_PC_WARP_USE_TRANSPORTATION => {
+                transport::warp_use_transportation(pkt, &clients, state)
+            }
+            P_CL2FE_REQ_PC_WARP_USE_NPC => transport::warp_use_npc(pkt, &clients, state),
+            P_CL2FE_REQ_PC_TIME_TO_GO_WARP => transport::time_to_go_warp(pkt, &clients, state),
+            //
+            P_CL2FE_REQ_PC_TASK_START => mission::task_start(pkt, clients.get_self(), state),
+            P_CL2FE_REQ_PC_TASK_STOP => mission::task_stop(pkt, clients.get_self(), state),
+            P_CL2FE_REQ_PC_TASK_END => mission::task_end(pkt, &clients, state),
+            P_CL2FE_REQ_PC_SET_CURRENT_MISSION_ID => {
+                mission::set_current_mission_id(pkt, clients.get_self(), state)
+            }
+            //
+            P_CL2FE_REQ_PC_GROUP_INVITE => group::pc_group_invite(pkt, &clients, state),
+            P_CL2FE_REQ_PC_GROUP_INVITE_REFUSE => {
+                group::pc_group_invite_refuse(pkt, &clients, state)
+            }
+            P_CL2FE_REQ_PC_GROUP_JOIN => group::pc_group_join(pkt, &clients, state),
+            P_CL2FE_REQ_PC_GROUP_LEAVE => group::pc_group_leave(&clients, state),
+            P_CL2FE_REQ_NPC_GROUP_INVITE => group::npc_group_invite(pkt, &clients, state),
+            P_CL2FE_REQ_NPC_GROUP_KICK => group::npc_group_kick(pkt, &clients, state),
+            //
+            P_CL2FE_REP_LIVE_CHECK => {
+                clients.get_self().clear_live_check();
+                Ok(())
+            }
+            //
+            _ => Err(FFError::build(
+                Severity::Warning,
+                "Unhandled packet".to_string(),
+            )),
         }
-        P_CL2FE_REQ_PC_VENDOR_BATTERY_BUY => item::vendor_battery_buy(clients.get_self(), state),
-        P_CL2FE_PC_STREETSTALL_REQ_CANCEL => item::streetstall_cancel(clients.get_self()),
-        //
-        P_CL2FE_REQ_NANO_EQUIP => nano::nano_equip(&mut clients, state),
-        P_CL2FE_REQ_NANO_UNEQUIP => nano::nano_unequip(&mut clients, state),
-        P_CL2FE_REQ_NANO_ACTIVE => nano::nano_active(&mut clients, state),
-        P_CL2FE_REQ_NANO_TUNE => nano::nano_tune(clients.get_self(), state),
-        //
-        P_CL2FE_REQ_REQUEST_MAKE_BUDDY => buddy::request_make_buddy(&mut clients, state),
-        P_CL2FE_REQ_ACCEPT_MAKE_BUDDY => buddy::accept_make_buddy(&mut clients, state),
-        P_CL2FE_REQ_PC_FIND_NAME_MAKE_BUDDY => buddy::find_name_make_buddy(&mut clients, state),
-        P_CL2FE_REQ_PC_FIND_NAME_ACCEPT_BUDDY => buddy::find_name_accept_buddy(&mut clients, state),
-        P_CL2FE_REQ_GET_BUDDY_STATE => buddy::get_buddy_state(&mut clients, state),
-        P_CL2FE_REQ_PC_BUDDY_WARP => buddy::pc_buddy_warp(&mut clients, state),
-        //
-        P_CL2FE_REQ_PC_TRADE_OFFER => trade::trade_offer(&mut clients, state),
-        P_CL2FE_REQ_PC_TRADE_OFFER_REFUSAL => trade::trade_offer_refusal(&mut clients, state),
-        P_CL2FE_REQ_PC_TRADE_OFFER_ACCEPT => trade::trade_offer_accept(&mut clients, state),
-        P_CL2FE_REQ_PC_TRADE_OFFER_CANCEL => trade::trade_offer_cancel(&mut clients, state),
-        P_CL2FE_REQ_PC_TRADE_CASH_REGISTER => trade::trade_cash_register(&mut clients, state),
-        P_CL2FE_REQ_PC_TRADE_ITEM_REGISTER => trade::trade_item_register(&mut clients, state),
-        P_CL2FE_REQ_PC_TRADE_ITEM_UNREGISTER => trade::trade_item_unregister(&mut clients, state),
-        P_CL2FE_REQ_PC_TRADE_CONFIRM_CANCEL => trade::trade_confirm_cancel(&mut clients, state),
-        P_CL2FE_REQ_PC_TRADE_CONFIRM => trade::trade_confirm(&mut clients, state),
-        P_CL2FE_REQ_PC_TRADE_EMOTES_CHAT => trade::trade_emotes_chat(&mut clients, state),
-        //
-        P_CL2FE_REQ_REGIST_TRANSPORTATION_LOCATION => {
-            transport::regist_transportation_location(clients.get_self(), state)
-        }
-        P_CL2FE_REQ_PC_WARP_USE_TRANSPORTATION => {
-            transport::warp_use_transportation(&mut clients, state)
-        }
-        P_CL2FE_REQ_PC_WARP_USE_NPC => transport::warp_use_npc(&mut clients, state),
-        P_CL2FE_REQ_PC_TIME_TO_GO_WARP => transport::time_to_go_warp(&mut clients, state),
-        //
-        P_CL2FE_REQ_PC_TASK_START => mission::task_start(clients.get_self(), state),
-        P_CL2FE_REQ_PC_TASK_STOP => mission::task_stop(clients.get_self(), state),
-        P_CL2FE_REQ_PC_TASK_END => mission::task_end(&mut clients, state),
-        P_CL2FE_REQ_PC_SET_CURRENT_MISSION_ID => {
-            mission::set_current_mission_id(clients.get_self(), state)
-        }
-        //
-        P_CL2FE_REQ_PC_GROUP_INVITE => group::pc_group_invite(&mut clients, state),
-        P_CL2FE_REQ_PC_GROUP_INVITE_REFUSE => group::pc_group_invite_refuse(&mut clients, state),
-        P_CL2FE_REQ_PC_GROUP_JOIN => group::pc_group_join(&mut clients, state),
-        P_CL2FE_REQ_PC_GROUP_LEAVE => group::pc_group_leave(&mut clients, state),
-        P_CL2FE_REQ_NPC_GROUP_INVITE => group::npc_group_invite(&mut clients, state),
-        P_CL2FE_REQ_NPC_GROUP_KICK => group::npc_group_kick(&mut clients, state),
-        //
-        P_CL2FE_REP_LIVE_CHECK => {
-            clients.get_self().clear_live_check();
-            Ok(())
-        }
-        //
-        _ => Err(FFError::build(
-            Severity::Warning,
-            "Unhandled packet".to_string(),
-        )),
-    }
+    })
 }
 
-fn wrong_server(client: &mut FFClient) -> FFResult<()> {
-    let pkt: &sP_CL2LS_REQ_LOGIN = client.get_packet(P_CL2LS_REQ_LOGIN)?;
+fn wrong_server(pkt: Packet, client: &FFClient) -> FFResult<()> {
+    let pkt: &sP_CL2LS_REQ_LOGIN = pkt.get(P_CL2LS_REQ_LOGIN)?;
     let resp = sP_LS2CL_REP_LOGIN_FAIL {
         iErrorCode: 4, // "Login error"
         szID: pkt.szID,
     };
-    client.send_packet(P_LS2CL_REP_LOGIN_FAIL, &resp)?;
 
+    client.send_packet(P_LS2CL_REP_LOGIN_FAIL, &resp);
     Ok(())
 }
 
-fn connect_to_login_server(
+async fn connect_to_login_server(
     shard_server: &mut FFServer,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
@@ -441,8 +480,11 @@ fn connect_to_login_server(
         Severity::Info,
         &format!("Connecting to login server at {}...", login_server_addr),
     );
-    let conn = shard_server.connect(login_server_addr, ClientType::LoginServer);
-    if let Some(login_server) = conn {
+
+    let conn = shard_server
+        .connect(login_server_addr, ClientType::LoginServer)
+        .await;
+    if let Some(login_server) = &conn {
         login::login_connect_req(login_server);
     }
 
@@ -453,15 +495,11 @@ fn is_login_server_connected(state: &ShardServerState) -> bool {
     state.login_server_conn_id.is_some()
 }
 
-fn send_status_to_login_server(
-    shard_server: &mut FFServer,
-    state: &ShardServerState,
-) -> FFResult<()> {
+fn send_status_to_login_server(clients: &ClientMap, state: &ShardServerState) -> FFResult<()> {
     if !is_login_server_connected(state) {
         return Ok(());
     }
 
-    let clients = &mut shard_server.get_client_map();
     let Some(client) = clients.get_login_server() else {
         return Ok(());
     };
@@ -487,59 +525,76 @@ fn send_status_to_login_server(
     }
 
     let pkt = pkt.build()?;
-    client.send_payload(pkt)
+    client.send_payload(pkt);
+    Ok(())
 }
 
-fn send_live_check(client: &mut FFClient) -> FFResult<()> {
-    match client.client_type {
+fn send_live_check(client: &FFClient) {
+    match client.get_client_type() {
         ClientType::GameClient { .. } => {
             let pkt = sP_FE2CL_REQ_LIVE_CHECK {
                 iTempValue: unused!(),
             };
-            client.send_packet(P_FE2CL_REQ_LIVE_CHECK, &pkt)
+            client.send_packet(P_FE2CL_REQ_LIVE_CHECK, &pkt);
         }
         ClientType::LoginServer => {
             let pkt = sP_FE2LS_REQ_LIVE_CHECK {
                 iTempValue: unused!(),
             };
-            client.send_packet(P_FE2LS_REQ_LIVE_CHECK, &pkt)
+            client.send_packet(P_FE2LS_REQ_LIVE_CHECK, &pkt);
         }
-        _ => Ok(()),
+        _ => {}
     }
 }
 
-fn do_save(_time: SystemTime, state: &mut ShardServerState) -> FFResult<()> {
+fn do_save(state: &ShardServerState) -> Option<JoinHandle<()>> {
     let pc_ids: Vec<i32> = state.entity_map.get_player_ids().collect();
     if pc_ids.is_empty() {
-        return Ok(());
+        return None;
     }
 
+    let time_start = Instant::now();
     log(
         Severity::Info,
         &format!("Saving {} player(s)...", pc_ids.len()),
     );
+
     let players: Vec<Player> = pc_ids
         .iter()
         .map(|pc_id| state.get_player(*pc_id).unwrap().clone())
         .collect();
-    let rx = db_run_async!(db => {
+
+    let handle = tokio::spawn(async move {
+        let db = db_get();
         let player_refs: Vec<&Player> = players.iter().collect();
-        db.save_players(&player_refs).await
+        let res = db.save_players(&player_refs).await;
+        if let Err(e) = res {
+            let e2 = FFError::build(Severity::Warning, "Failed to save players".to_string());
+            log_error(e.with_parent(e2));
+        }
+
+        log(
+            Severity::Info,
+            &format!(
+                "Saved {} player(s) in {}ms",
+                players.len(),
+                time_start.elapsed().as_millis()
+            ),
+        );
     });
 
-    state.save_rx = Some(rx);
-    Ok(())
+    Some(handle)
 }
 
-fn shutdown_notify_clients(server: &mut FFServer, state: &mut ShardServerState) {
-    let clients = &mut server.get_client_map();
+fn shutdown_notify_clients(clients: &ClientMap, state: &ShardServerState) {
     let reconnect = if let Some(login_server) = clients.get_login_server() {
         let pkt = sP_FE2LS_DISCONNECTING {
             iTempValue: unused!(),
         };
-        login_server
-            .send_packet(P_FE2LS_DISCONNECTING, &pkt)
-            .is_ok()
+
+        login_server.send_packet(P_FE2LS_DISCONNECTING, &pkt);
+
+        true
     } else {
         false
     };
@@ -554,7 +609,8 @@ fn shutdown_notify_clients(server: &mut FFServer, state: &mut ShardServerState) 
                 iID: pc_id,
                 iExitCode: EXIT_CODE_REQ_BY_SVR as i32, // "You have lost your connection with the server."
             };
-            let _ = client.send_packet(P_FE2CL_REP_PC_EXIT_SUCC, &shutdown_pkt);
+
+            client.send_packet(P_FE2CL_REP_PC_EXIT_SUCC, &shutdown_pkt);
             continue;
         }
 
@@ -568,7 +624,8 @@ fn shutdown_notify_clients(server: &mut FFServer, state: &mut ShardServerState) 
             )
             .unwrap(),
         };
-        let _ = client.send_packet(P_FE2CL_ANNOUNCE_MSG, &alert_pkt);
+
+        client.send_packet(P_FE2CL_ANNOUNCE_MSG, &alert_pkt);
 
         let Ok(player) = state.get_player(pc_id) else {
             continue;
@@ -585,6 +642,7 @@ fn shutdown_notify_clients(server: &mut FFServer, state: &mut ShardServerState) 
             iShardNum: state.shard_id.unwrap() as i8,
             iChannelNum: channel_num.unwrap_or(0),
         };
-        let _ = client.send_packet(P_FE2CL_REP_PC_BUDDY_WARP_OTHER_SHARD_SUCC, &dc_pkt);
+
+        client.send_packet(P_FE2CL_REP_PC_BUDDY_WARP_OTHER_SHARD_SUCC, &dc_pkt);
     }
 }

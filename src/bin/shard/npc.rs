@@ -10,8 +10,12 @@ use rusty_fusion::{
     tabledata::tdata_get,
 };
 
-pub fn npc_interaction(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
-    let pkt: sP_CL2FE_REQ_NPC_INTERACTION = *client.get_packet(P_CL2FE_REQ_NPC_INTERACTION)?;
+pub fn npc_interaction(
+    pkt: Packet,
+    client: &FFClient,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let pkt: &sP_CL2FE_REQ_NPC_INTERACTION = pkt.get(P_CL2FE_REQ_NPC_INTERACTION)?;
     let pc_id = client.get_player_id()?;
     let npc_id = pkt.iNPC_ID;
 
@@ -39,8 +43,8 @@ pub fn npc_interaction(client: &mut FFClient, state: &mut ShardServerState) -> F
     Ok(())
 }
 
-pub fn npc_bark(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_BARKER = client.get_packet(P_CL2FE_REQ_BARKER)?;
+pub fn npc_bark(pkt: Packet, client: &FFClient, state: &mut ShardServerState) -> FFResult<()> {
+    let pkt: &sP_CL2FE_REQ_BARKER = pkt.get(P_CL2FE_REQ_BARKER)?;
     let task_id = pkt.iMissionTaskID;
     let pc_id = client.get_player_id()?;
 
@@ -72,15 +76,14 @@ pub fn npc_bark(client: &mut FFClient, state: &mut ShardServerState) -> FFResult
     }
 
     let chosen_bark = compatible_barks.iter().choose(&mut rand::thread_rng());
-    match chosen_bark {
-        Some(&(npc_id, bark_idx)) => {
-            let bark_id = barks[bark_idx];
-            let pkt = sP_FE2CL_REP_BARKER {
-                iNPC_ID: npc_id,
-                iMissionStringID: bark_id,
-            };
-            client.send_packet(P_FE2CL_REP_BARKER, &pkt)
-        }
-        None => Ok(()),
+    if let Some(&(npc_id, bark_idx)) = chosen_bark {
+        let bark_id = barks[bark_idx];
+        let pkt = sP_FE2CL_REP_BARKER {
+            iNPC_ID: npc_id,
+            iMissionStringID: bark_id,
+        };
+        client.send_packet(P_FE2CL_REP_BARKER, &pkt);
     }
+
+    Ok(())
 }

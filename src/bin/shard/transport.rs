@@ -13,13 +13,13 @@ use rusty_fusion::{
 };
 
 pub fn regist_transportation_location(
-    client: &mut FFClient,
+    pkt: Packet,
+    client: &FFClient,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: sP_CL2FE_REQ_REGIST_TRANSPORTATION_LOCATION =
-        *client.get_packet(P_CL2FE_REQ_REGIST_TRANSPORTATION_LOCATION)?;
-    catch_fail(
-        (|| {
+    let pkt: &sP_CL2FE_REQ_REGIST_TRANSPORTATION_LOCATION =
+        pkt.get(P_CL2FE_REQ_REGIST_TRANSPORTATION_LOCATION)?;
+    (|| {
             let pc_id = client.get_player_id()?;
             let npc = state.get_npc(pkt.iNPC_ID)?;
             let npc_type = npc.ty;
@@ -70,262 +70,275 @@ pub fn regist_transportation_location(
                 iWarpLocationFlag: player.flags.scamper_flags.get_chunk(0).unwrap(),
                 aWyvernLocationFlag: player.flags.skyway_flags.to_array().unwrap(),
             };
-            client.send_packet(P_FE2CL_REP_PC_REGIST_TRANSPORTATION_LOCATION_SUCC, &resp)
-        })(),
+
+            client.send_packet(P_FE2CL_REP_PC_REGIST_TRANSPORTATION_LOCATION_SUCC, &resp);
+            Ok(())
+        })().catch_fail(
         || {
             let resp = sP_FE2CL_REP_PC_REGIST_TRANSPORTATION_LOCATION_FAIL {
                 eTT: pkt.eTT,
                 iLocationID: pkt.iLocationID,
                 iErrorCode: unused!(),
             };
-            client.send_packet(P_FE2CL_REP_PC_REGIST_TRANSPORTATION_LOCATION_FAIL, &resp)
-        },
+
+            client.send_packet(P_FE2CL_REP_PC_REGIST_TRANSPORTATION_LOCATION_FAIL, &resp);
+        }
     )
 }
 
 pub fn warp_use_transportation(
-    clients: &mut ClientMap,
+    pkt: Packet,
+    clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: sP_CL2FE_REQ_PC_WARP_USE_TRANSPORTATION = *clients
-        .get_self()
-        .get_packet(P_CL2FE_REQ_PC_WARP_USE_TRANSPORTATION)?;
-    catch_fail(
-        (|| {
-            let client = clients.get_self();
-            let pc_id = client.get_player_id()?;
+    let pkt: &sP_CL2FE_REQ_PC_WARP_USE_TRANSPORTATION =
+        pkt.get(P_CL2FE_REQ_PC_WARP_USE_TRANSPORTATION)?;
 
-            let npc = state.get_npc(pkt.iNPC_ID)?;
-            let npc_type = npc.ty;
-            state
-                .entity_map
-                .validate_proximity(&[EntityID::Player(pc_id), npc.get_id()], RANGE_INTERACT)?;
+    (|| {
+        let client = clients.get_self();
+        let pc_id = client.get_player_id()?;
 
-            let player = state.get_player_mut(pc_id)?;
-            let trip_id = pkt.iTransporationID;
-            let trip = tdata_get().get_trip_data(trip_id)?;
-            if player.get_taros() < trip.cost {
-                return Err(FFError::build(
-                    Severity::Warning,
-                    format!(
-                        "Player {} doesn't have enough taros to warp",
-                        player.get_player_id()
-                    ),
-                ));
-            }
+        let npc = state.get_npc(pkt.iNPC_ID)?;
+        let npc_type = npc.ty;
+        state
+            .entity_map
+            .validate_proximity(&[EntityID::Player(pc_id), npc.get_id()], RANGE_INTERACT)?;
 
-            let new_taros = player.get_taros() - trip.cost;
-            match trip.transportation_type {
-                TransportationType::Warp => {
-                    let src_data = tdata_get().get_scamper_data(trip.start_location)?;
-                    if !player
-                        .is_scamper_location_unlocked(trip.start_location)
-                        .unwrap()
-                    {
-                        return Err(FFError::build(
-                            Severity::Warning,
-                            format!(
-                                "Player {} tried to warp from an unregistered S.C.A.M.P.E.R. location",
-                                player.get_player_id()
-                            ),
-                        ));
-                    }
+        let player = state.get_player_mut(pc_id)?;
+        let trip_id = pkt.iTransporationID;
+        let trip = tdata_get().get_trip_data(trip_id)?;
+        if player.get_taros() < trip.cost {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Player {} doesn't have enough taros to warp",
+                    player.get_player_id()
+                ),
+            ));
+        }
 
-                    let dest_data = tdata_get().get_scamper_data(trip.end_location)?;
-                    if !player
-                        .is_scamper_location_unlocked(trip.end_location)
-                        .unwrap()
-                    {
-                        return Err(FFError::build(
-                            Severity::Warning,
-                            format!(
-                                "Player {} tried to warp to an unregistered S.C.A.M.P.E.R. location",
-                                player.get_player_id()
-                            ),
-                        ));
-                    }
-
-                    if src_data.npc_type != npc_type {
-                        return Err(FFError::build(
-                            Severity::Warning,
-                            format!(
-                                "Player {} tried to warp with the wrong NPC type",
-                                player.get_player_id()
-                            ),
-                        ));
-                    }
-
-                    player.set_taros(new_taros);
-                    player.set_position(dest_data.pos);
-                }
-                TransportationType::Wyvern => {
-                    let src_data = tdata_get().get_skyway_data(trip.start_location)?;
-                    if !player
-                        .is_skyway_location_unlocked(trip.start_location)
-                        .unwrap()
-                    {
-                        return Err(FFError::build(
-                            Severity::Warning,
-                            format!(
-                                "Player {} tried to warp from an unregistered Skyway location",
-                                player.get_player_id()
-                            ),
-                        ));
-                    }
-
-                    if !player.is_skyway_location_unlocked(trip.end_location)? {
-                        return Err(FFError::build(
-                            Severity::Warning,
-                            format!(
-                                "Player {} tried to warp to an unregistered Skyway location",
-                                player.get_player_id()
-                            ),
-                        ));
-                    }
-
-                    if src_data.npc_type != npc_type {
-                        return Err(FFError::build(
-                            Severity::Warning,
-                            format!(
-                                "Player {} tried to warp with the wrong NPC type",
-                                player.get_player_id()
-                            ),
-                        ));
-                    }
-
-                    let path = tdata_get().get_skyway_path(trip.route_number)?;
-                    player.set_active_nano_slot(None).unwrap();
-                    player.start_skyway_ride(trip, path);
-                    // we don't charge the player until the ride is done
-                }
-                other => {
+        let new_taros = player.get_taros() - trip.cost;
+        match trip.transportation_type {
+            TransportationType::Warp => {
+                let src_data = tdata_get().get_scamper_data(trip.start_location)?;
+                if !player
+                    .is_scamper_location_unlocked(trip.start_location)
+                    .unwrap()
+                {
                     return Err(FFError::build(
                         Severity::Warning,
-                        format!("Can't warp with transportation type {:?}", other),
+                        format!(
+                            "Player {} tried to warp from an unregistered S.C.A.M.P.E.R. location",
+                            player.get_player_id()
+                        ),
                     ));
                 }
+
+                let dest_data = tdata_get().get_scamper_data(trip.end_location)?;
+                if !player
+                    .is_scamper_location_unlocked(trip.end_location)
+                    .unwrap()
+                {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!(
+                            "Player {} tried to warp to an unregistered S.C.A.M.P.E.R. location",
+                            player.get_player_id()
+                        ),
+                    ));
+                }
+
+                if src_data.npc_type != npc_type {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!(
+                            "Player {} tried to warp with the wrong NPC type",
+                            player.get_player_id()
+                        ),
+                    ));
+                }
+
+                player.set_taros(new_taros);
+                player.set_position(dest_data.pos);
             }
+            TransportationType::Wyvern => {
+                let src_data = tdata_get().get_skyway_data(trip.start_location)?;
+                if !player
+                    .is_skyway_location_unlocked(trip.start_location)
+                    .unwrap()
+                {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!(
+                            "Player {} tried to warp from an unregistered Skyway location",
+                            player.get_player_id()
+                        ),
+                    ));
+                }
 
-            let new_pos = player.get_position();
-            let resp = sP_FE2CL_REP_PC_WARP_USE_TRANSPORTATION_SUCC {
-                eTT: trip.transportation_type as i32,
-                iX: new_pos.x,
-                iY: new_pos.y,
-                iZ: new_pos.z,
-                iCandy: new_taros as i32,
-            };
-            clients
-                .get_self()
-                .send_packet(P_FE2CL_REP_PC_WARP_USE_TRANSPORTATION_SUCC, &resp)?;
+                if !player.is_skyway_location_unlocked(trip.end_location)? {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!(
+                            "Player {} tried to warp to an unregistered Skyway location",
+                            player.get_player_id()
+                        ),
+                    ));
+                }
 
-            if trip.transportation_type == TransportationType::Wyvern {
-                rusty_fusion::helpers::broadcast_monkey(pc_id, RideType::Wyvern, clients, state);
+                if src_data.npc_type != npc_type {
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!(
+                            "Player {} tried to warp with the wrong NPC type",
+                            player.get_player_id()
+                        ),
+                    ));
+                }
+
+                let path = tdata_get().get_skyway_path(trip.route_number)?;
+                player.set_active_nano_slot(None).unwrap();
+                player.start_skyway_ride(trip, path);
+                // we don't charge the player until the ride is done
             }
-            Ok(())
-        })(),
-        || {
-            let resp = sP_FE2CL_REP_PC_WARP_USE_TRANSPORTATION_FAIL {
-                iTransportationID: pkt.iTransporationID,
-                iErrorCode: unused!(),
-            };
-            clients
-                .get_self()
-                .send_packet(P_FE2CL_REP_PC_WARP_USE_TRANSPORTATION_FAIL, &resp)
-        },
-    )
-}
-
-pub fn warp_use_npc(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
-    let pkt: sP_CL2FE_REQ_PC_WARP_USE_NPC =
-        *clients.get_self().get_packet(P_CL2FE_REQ_PC_WARP_USE_NPC)?;
-    catch_fail(
-        (|| {
-            let item_remaining = helpers::do_warp(
-                clients,
-                state,
-                Some(pkt.iNPC_ID),
-                pkt.iWarpID,
-                pkt.eIL1,
-                pkt.iItemSlot1 as usize,
-                pkt.eIL2,
-                pkt.iItemSlot2 as usize,
-            )?;
-
-            let client = clients.get_self();
-            let player = state.get_player(client.get_player_id().unwrap()).unwrap();
-            let pos = player.get_position();
-            let taros_left = player.get_taros();
-            let resp = sP_FE2CL_REP_PC_WARP_USE_NPC_SUCC {
-                iX: pos.x,
-                iY: pos.y,
-                iZ: pos.z,
-                eIL: pkt.eIL2,
-                iItemSlotNum: pkt.iItemSlot2,
-                Item: item_remaining.into(),
-                iCandy: taros_left as i32,
-            };
-            client.send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp)
-        })(),
-        || {
-            let resp = sP_FE2CL_REP_PC_WARP_USE_NPC_FAIL {
-                iErrorCode: unused!(),
-            };
-            clients
-                .get_self()
-                .send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_FAIL, &resp)
-        },
-    )
-}
-
-pub fn time_to_go_warp(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
-    let pkt: sP_CL2FE_REQ_PC_TIME_TO_GO_WARP = *clients
-        .get_self()
-        .get_packet(P_CL2FE_REQ_PC_TIME_TO_GO_WARP)?;
-    catch_fail(
-        (|| {
-            let player = state.get_player(clients.get_self().get_player_id()?)?;
-            if player.is_future_done() {
+            other => {
                 return Err(FFError::build(
                     Severity::Warning,
-                    format!("Player {} is in the past", player.get_player_id()),
+                    format!("Can't warp with transportation type {:?}", other),
                 ));
             }
+        }
 
-            let item_remaining = helpers::do_warp(
-                clients,
-                state,
-                None,
-                ID_TIME_MACHINE_WARP,
-                pkt.eIL1,
-                pkt.iItemSlot1 as usize,
-                pkt.eIL2,
-                pkt.iItemSlot2 as usize,
-            )?;
+        let new_pos = player.get_position();
+        let resp = sP_FE2CL_REP_PC_WARP_USE_TRANSPORTATION_SUCC {
+            eTT: trip.transportation_type as i32,
+            iX: new_pos.x,
+            iY: new_pos.y,
+            iZ: new_pos.z,
+            iCandy: new_taros as i32,
+        };
 
-            let client = clients.get_self();
-            let player = state.get_player(client.get_player_id().unwrap()).unwrap();
-            let pos = player.get_position();
-            let taros_left = player.get_taros();
-            let resp = sP_FE2CL_REP_PC_WARP_USE_NPC_SUCC {
-                iX: pos.x,
-                iY: pos.y,
-                iZ: pos.z,
-                eIL: pkt.eIL2,
-                iItemSlotNum: pkt.iItemSlot2,
-                Item: item_remaining.into(),
-                iCandy: taros_left as i32,
-            };
-            client.send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp)
-        })(),
-        || {
-            let resp = sP_FE2CL_REP_PC_WARP_USE_NPC_FAIL {
-                iErrorCode: unused!(),
-            };
-            clients
-                .get_self()
-                .send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_FAIL, &resp)
-        },
-    )
+        clients
+            .get_self()
+            .send_packet(P_FE2CL_REP_PC_WARP_USE_TRANSPORTATION_SUCC, &resp);
+
+        if trip.transportation_type == TransportationType::Wyvern {
+            rusty_fusion::helpers::broadcast_monkey(pc_id, RideType::Wyvern, clients, state);
+        }
+
+        Ok(())
+    })()
+    .catch_fail(|| {
+        let resp = sP_FE2CL_REP_PC_WARP_USE_TRANSPORTATION_FAIL {
+            iTransportationID: pkt.iTransporationID,
+            iErrorCode: unused!(),
+        };
+
+        clients
+            .get_self()
+            .send_packet(P_FE2CL_REP_PC_WARP_USE_TRANSPORTATION_FAIL, &resp);
+    })
+}
+
+pub fn warp_use_npc(
+    pkt: Packet,
+    clients: &ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let pkt: &sP_CL2FE_REQ_PC_WARP_USE_NPC = pkt.get(P_CL2FE_REQ_PC_WARP_USE_NPC)?;
+
+    (|| {
+        let item_remaining = helpers::do_warp(
+            clients,
+            state,
+            Some(pkt.iNPC_ID),
+            pkt.iWarpID,
+            pkt.eIL1,
+            pkt.iItemSlot1 as usize,
+            pkt.eIL2,
+            pkt.iItemSlot2 as usize,
+        )?;
+
+        let client = clients.get_self();
+        let player = state.get_player(client.get_player_id().unwrap()).unwrap();
+        let pos = player.get_position();
+        let taros_left = player.get_taros();
+        let resp = sP_FE2CL_REP_PC_WARP_USE_NPC_SUCC {
+            iX: pos.x,
+            iY: pos.y,
+            iZ: pos.z,
+            eIL: pkt.eIL2,
+            iItemSlotNum: pkt.iItemSlot2,
+            Item: item_remaining.into(),
+            iCandy: taros_left as i32,
+        };
+
+        client.send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp);
+        Ok(())
+    })()
+    .catch_fail(|| {
+        let resp = sP_FE2CL_REP_PC_WARP_USE_NPC_FAIL {
+            iErrorCode: unused!(),
+        };
+        clients
+            .get_self()
+            .send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_FAIL, &resp);
+    })
+}
+
+pub fn time_to_go_warp(
+    pkt: Packet,
+    clients: &ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let pkt: &sP_CL2FE_REQ_PC_TIME_TO_GO_WARP = pkt.get(P_CL2FE_REQ_PC_TIME_TO_GO_WARP)?;
+
+    (|| {
+        let player = state.get_player(clients.get_self().get_player_id()?)?;
+        if player.is_future_done() {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Player {} is in the past", player.get_player_id()),
+            ));
+        }
+
+        let item_remaining = helpers::do_warp(
+            clients,
+            state,
+            None,
+            ID_TIME_MACHINE_WARP,
+            pkt.eIL1,
+            pkt.iItemSlot1 as usize,
+            pkt.eIL2,
+            pkt.iItemSlot2 as usize,
+        )?;
+
+        let client = clients.get_self();
+        let player = state.get_player(client.get_player_id().unwrap()).unwrap();
+        let pos = player.get_position();
+        let taros_left = player.get_taros();
+        let resp = sP_FE2CL_REP_PC_WARP_USE_NPC_SUCC {
+            iX: pos.x,
+            iY: pos.y,
+            iZ: pos.z,
+            eIL: pkt.eIL2,
+            iItemSlotNum: pkt.iItemSlot2,
+            Item: item_remaining.into(),
+            iCandy: taros_left as i32,
+        };
+
+        client.send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp);
+        Ok(())
+    })()
+    .catch_fail(|| {
+        let resp = sP_FE2CL_REP_PC_WARP_USE_NPC_FAIL {
+            iErrorCode: unused!(),
+        };
+
+        clients
+            .get_self()
+            .send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_FAIL, &resp);
+    })
 }
 
 mod helpers {
@@ -336,7 +349,7 @@ mod helpers {
     use super::*;
 
     pub fn do_warp(
-        clients: &mut ClientMap,
+        clients: &ClientMap,
         state: &mut ShardServerState,
         npc_id: Option<i32>,
         warp_id: i32,

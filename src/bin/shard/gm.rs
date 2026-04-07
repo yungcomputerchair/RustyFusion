@@ -21,11 +21,15 @@ use rusty_fusion::{
     unused, util, Position,
 };
 
-pub fn gm_pc_set_value(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+pub fn gm_pc_set_value(
+    pkt: Packet,
+    clients: &ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
     let client = clients.get_self();
     helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
 
-    let pkt: sP_CL2FE_GM_REQ_PC_SET_VALUE = *client.get_packet(P_CL2FE_GM_REQ_PC_SET_VALUE)?;
+    let pkt: &sP_CL2FE_GM_REQ_PC_SET_VALUE = pkt.get(P_CL2FE_GM_REQ_PC_SET_VALUE)?;
     let pc_id = pkt.iPC_ID;
     let value = pkt.iSetValue;
     let value_type = pkt.iSetValueType;
@@ -56,111 +60,118 @@ pub fn gm_pc_set_value(clients: &mut ClientMap, state: &mut ShardServerState) ->
     };
     clients
         .get_self()
-        .send_packet(P_FE2CL_GM_REP_PC_SET_VALUE, &resp)
+        .send_packet(P_FE2CL_GM_REP_PC_SET_VALUE, &resp);
+    Ok(())
 }
 
-pub fn gm_pc_give_item(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
-    catch_fail(
-        (|| {
-            let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
-            let pkt: &sP_CL2FE_REQ_PC_GIVE_ITEM = client.get_packet(P_CL2FE_REQ_PC_GIVE_ITEM)?;
-            let player = state.get_player_mut(pc_id)?;
+pub fn gm_pc_give_item(
+    pkt: Packet,
+    client: &FFClient,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    (|| {
+        let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
+        let pkt: &sP_CL2FE_REQ_PC_GIVE_ITEM = pkt.get(P_CL2FE_REQ_PC_GIVE_ITEM)?;
+        let player = state.get_player_mut(pc_id)?;
 
-            let mut item: Option<Item> = pkt.Item.try_into()?;
-            let time = pkt.iTimeLeft as u32;
-            if let Some(item) = item.as_mut() {
-                if time > 0 {
-                    let duration = Duration::from_secs(time as u64);
-                    let expiry_time = SystemTime::now() + duration;
-                    item.set_expiry_time(expiry_time);
-                }
+        let mut item: Option<Item> = pkt.Item.try_into()?;
+        let time = pkt.iTimeLeft as u32;
+        if let Some(item) = item.as_mut() {
+            if time > 0 {
+                let duration = Duration::from_secs(time as u64);
+                let expiry_time = SystemTime::now() + duration;
+                item.set_expiry_time(expiry_time);
             }
+        }
 
-            let location = pkt.eIL.try_into()?;
-            let slot_number = match location {
-                ItemLocation::QInven => {
-                    let qitem_id = pkt.Item.iID;
-                    let qitem_count = pkt.Item.iOpt as usize;
-                    player.set_quest_item_count(qitem_id, qitem_count)?
-                }
-                other => {
-                    let req_slot_number = pkt.iSlotNum as usize;
-                    player.set_item(other, req_slot_number, item)?;
-                    req_slot_number
-                }
-            };
+        let location = pkt.eIL.try_into()?;
+        let slot_number = match location {
+            ItemLocation::QInven => {
+                let qitem_id = pkt.Item.iID;
+                let qitem_count = pkt.Item.iOpt as usize;
+                player.set_quest_item_count(qitem_id, qitem_count)?
+            }
+            other => {
+                let req_slot_number = pkt.iSlotNum as usize;
+                player.set_item(other, req_slot_number, item)?;
+                req_slot_number
+            }
+        };
 
-            let resp = sP_FE2CL_REP_PC_GIVE_ITEM_SUCC {
-                eIL: pkt.eIL,
-                iSlotNum: slot_number as i32,
-                Item: item.into(),
-            };
-            client.send_packet(P_FE2CL_REP_PC_GIVE_ITEM_SUCC, &resp)
-        })(),
-        || {
-            let resp = sP_FE2CL_REP_PC_GIVE_ITEM_FAIL {
-                iErrorCode: unused!(),
-            };
-            client.send_packet(P_FE2CL_REP_PC_GIVE_ITEM_FAIL, &resp)
-        },
-    )
+        let resp = sP_FE2CL_REP_PC_GIVE_ITEM_SUCC {
+            eIL: pkt.eIL,
+            iSlotNum: slot_number as i32,
+            Item: item.into(),
+        };
+
+        client.send_packet(P_FE2CL_REP_PC_GIVE_ITEM_SUCC, &resp);
+        Ok(())
+    })()
+    .catch_fail(|| {
+        let resp = sP_FE2CL_REP_PC_GIVE_ITEM_FAIL {
+            iErrorCode: unused!(),
+        };
+        client.send_packet(P_FE2CL_REP_PC_GIVE_ITEM_FAIL, &resp);
+    })
 }
 
-pub fn gm_pc_give_nano(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
-    let pkt: sP_CL2FE_REQ_PC_GIVE_NANO =
-        *clients.get_self().get_packet(P_CL2FE_REQ_PC_GIVE_NANO)?;
-    catch_fail(
-        (|| {
-            let client = clients.get_self();
-            let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
-            let nano_id = pkt.iNanoID;
-            let player = state.get_player_mut(pc_id)?;
-            let new_level = max(player.get_level(), nano_id);
-            player.set_level(new_level)?;
-            let nano = player.unlock_nano(nano_id)?.clone();
+pub fn gm_pc_give_nano(
+    pkt: Packet,
+    clients: &ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let pkt: &sP_CL2FE_REQ_PC_GIVE_NANO = pkt.get(P_CL2FE_REQ_PC_GIVE_NANO)?;
 
-            let resp = sP_FE2CL_REP_PC_NANO_CREATE_SUCC {
-                iPC_FusionMatter: player.get_fusion_matter() as i32,
-                iQuestItemSlotNum: -1,
-                QuestItem: None.into(),
-                Nano: Some(nano).into(),
-                iPC_Level: new_level,
-            };
+    (|| {
+        let client = clients.get_self();
+        let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
+        let nano_id = pkt.iNanoID;
+        let player = state.get_player_mut(pc_id)?;
+        let new_level = max(player.get_level(), nano_id);
+        player.set_level(new_level)?;
+        let nano = player.unlock_nano(nano_id)?.clone();
 
-            log_if_failed(
-                clients
-                    .get_self()
-                    .send_packet(P_FE2CL_REP_PC_NANO_CREATE_SUCC, &resp),
-            );
+        let resp = sP_FE2CL_REP_PC_NANO_CREATE_SUCC {
+            iPC_FusionMatter: player.get_fusion_matter() as i32,
+            iQuestItemSlotNum: -1,
+            QuestItem: None.into(),
+            Nano: Some(nano).into(),
+            iPC_Level: new_level,
+        };
 
-            let bcast = sP_FE2CL_REP_PC_CHANGE_LEVEL {
-                iPC_ID: pc_id,
-                iPC_Level: new_level,
-            };
-            state
-                .entity_map
-                .for_each_around(EntityID::Player(pc_id), clients, |c| {
-                    c.send_packet(P_FE2CL_REP_PC_CHANGE_LEVEL, &bcast)
-                });
-            Ok(())
-        })(),
-        || {
-            let client = clients.get_self();
-            let resp = sP_FE2CL_REP_PC_NANO_CREATE_FAIL {
-                iPC_ID: client.get_player_id()?,
-                iErrorCode: unused!(),
-            };
-            clients
-                .get_self()
-                .send_packet(P_FE2CL_REP_PC_NANO_CREATE_FAIL, &resp)
-        },
-    )
+        clients
+            .get_self()
+            .send_packet(P_FE2CL_REP_PC_NANO_CREATE_SUCC, &resp);
+
+        let bcast = sP_FE2CL_REP_PC_CHANGE_LEVEL {
+            iPC_ID: pc_id,
+            iPC_Level: new_level,
+        };
+
+        state
+            .entity_map
+            .for_each_around(EntityID::Player(pc_id), clients, |c| {
+                c.send_packet(P_FE2CL_REP_PC_CHANGE_LEVEL, &bcast);
+            });
+        Ok(())
+    })()
+    .catch_fail(|| {
+        let client = clients.get_self();
+        let resp = sP_FE2CL_REP_PC_NANO_CREATE_FAIL {
+            iPC_ID: client.get_player_id().unwrap(),
+            iErrorCode: unused!(),
+        };
+
+        clients
+            .get_self()
+            .send_packet(P_FE2CL_REP_PC_NANO_CREATE_FAIL, &resp);
+    })
 }
 
-pub fn gm_pc_goto(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+pub fn gm_pc_goto(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_self();
     let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
-    let pkt: &sP_CL2FE_REQ_PC_GOTO = client.get_packet(P_CL2FE_REQ_PC_GOTO)?;
+    let pkt: &sP_CL2FE_REQ_PC_GOTO = pkt.get(P_CL2FE_REQ_PC_GOTO)?;
     let new_pos = Position {
         x: pkt.iToX,
         y: pkt.iToY,
@@ -188,17 +199,19 @@ pub fn gm_pc_goto(clients: &mut ClientMap, state: &mut ShardServerState) -> FFRe
     };
     clients
         .get_self()
-        .send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp)
+        .send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp);
+    Ok(())
 }
 
 pub fn gm_pc_special_state_switch(
-    clients: &mut ClientMap,
+    pkt: Packet,
+    clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let client = clients.get_self();
     let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__GM as i16)?;
     let pkt: &sP_CL2FE_GM_REQ_PC_SPECIAL_STATE_SWITCH =
-        client.get_packet(P_CL2FE_GM_REQ_PC_SPECIAL_STATE_SWITCH)?;
+        pkt.get(P_CL2FE_GM_REQ_PC_SPECIAL_STATE_SWITCH)?;
 
     let player = state.get_player_mut(pc_id)?;
 
@@ -233,33 +246,43 @@ pub fn gm_pc_special_state_switch(
     state
         .entity_map
         .for_each_around(EntityID::Player(pkt.iPC_ID), clients, |c| {
-            c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp)
+            c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
         });
     clients
         .get_self()
-        .send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp)
+        .send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp);
+    Ok(())
 }
 
-pub fn gm_pc_motd_register(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+pub fn gm_pc_motd_register(
+    pkt: Packet,
+    clients: &ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
     let client = clients.get_self();
     helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__CS as i16)?;
-    let pkt: &sP_CL2FE_GM_REQ_PC_MOTD_REGISTER =
-        client.get_packet(P_CL2FE_GM_REQ_PC_MOTD_REGISTER)?;
+    let pkt: &sP_CL2FE_GM_REQ_PC_MOTD_REGISTER = pkt.get(P_CL2FE_GM_REQ_PC_MOTD_REGISTER)?;
+
     let pkt = sP_FE2LS_MOTD_REGISTER {
         szMessage: pkt.szSystemMsg,
     };
+
     if let Some(login_server) = clients.get_login_server() {
-        login_server.send_packet(P_FE2LS_MOTD_REGISTER, &pkt)
-    } else {
-        Ok(())
+        login_server.send_packet(P_FE2LS_MOTD_REGISTER, &pkt);
     }
+
+    Ok(())
 }
 
-pub fn gm_pc_announce(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+pub fn gm_pc_announce(
+    pkt: Packet,
+    clients: &ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
     let client = clients.get_self();
     let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__CS as i16)?;
     let player = state.get_player(pc_id).unwrap();
-    let pkt: &sP_CL2FE_GM_REQ_PC_ANNOUNCE = client.get_packet(P_CL2FE_GM_REQ_PC_ANNOUNCE)?;
+    let pkt: &sP_CL2FE_GM_REQ_PC_ANNOUNCE = pkt.get(P_CL2FE_GM_REQ_PC_ANNOUNCE)?;
     let area_type: AreaType = pkt.iAreaType.try_into()?;
 
     let msg = util::parse_utf16(&pkt.szAnnounceMsg)?;
@@ -292,7 +315,7 @@ pub fn gm_pc_announce(clients: &mut ClientMap, state: &mut ShardServerState) -> 
             state
                 .entity_map
                 .for_each_around(EntityID::Player(pc_id), clients, |c| {
-                    c.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt)
+                    c.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
                 });
         }
         AreaType::Channel => state
@@ -315,7 +338,7 @@ pub fn gm_pc_announce(clients: &mut ClientMap, state: &mut ShardServerState) -> 
             }),
         AreaType::Global => {
             if let Some(login_server) = clients.get_login_server() {
-                login_server.send_packet(P_FE2LS_ANNOUNCE_MSG, &pkt)?;
+                login_server.send_packet(P_FE2LS_ANNOUNCE_MSG, &pkt);
             } else {
                 log(
                     Severity::Warning,
@@ -328,7 +351,7 @@ pub fn gm_pc_announce(clients: &mut ClientMap, state: &mut ShardServerState) -> 
     if let Some(login_server) = clients.get_login_server() {
         let monitor_pkt =
             monitor_event_to_packet(ffmonitor::Event::Broadcast(bcast_event)).unwrap();
-        log_if_failed(login_server.send_packet(P_FE2LS_UPDATE_MONITOR, &monitor_pkt));
+        login_server.send_packet(P_FE2LS_UPDATE_MONITOR, &monitor_pkt);
     } else {
         log(
             Severity::Warning,
@@ -339,10 +362,14 @@ pub fn gm_pc_announce(clients: &mut ClientMap, state: &mut ShardServerState) -> 
     Ok(())
 }
 
-pub fn gm_pc_location(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+pub fn gm_pc_location(
+    pkt: Packet,
+    clients: &ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
     let client = clients.get_self();
     let gm_pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__CS as i16)?;
-    let pkt: sP_CL2FE_GM_REQ_PC_LOCATION = *client.get_packet(P_CL2FE_GM_REQ_PC_LOCATION)?;
+    let pkt: &sP_CL2FE_GM_REQ_PC_LOCATION = pkt.get(P_CL2FE_GM_REQ_PC_LOCATION)?;
     let search_mode: TargetSearchBy = pkt.eTargetSearchBy.try_into()?;
     let search_query = match search_mode {
         TargetSearchBy::PlayerID => PlayerSearchQuery::ByID(pkt.iTargetPC_ID),
@@ -372,18 +399,22 @@ pub fn gm_pc_location(clients: &mut ClientMap, state: &mut ShardServerState) -> 
             szTargetPC_FirstName: util::encode_utf16(&player.first_name).unwrap(),
             szTargetPC_LastName: util::encode_utf16(&player.last_name).unwrap(),
         };
+
         clients
             .get_self()
-            .send_packet(P_FE2CL_GM_REP_PC_LOCATION, &resp)
+            .send_packet(P_FE2CL_GM_REP_PC_LOCATION, &resp);
+
+        Ok(())
     } else if search_mode != TargetSearchBy::PlayerID && clients.get_login_server().is_some() {
         // for name or UID search, we can ask the login server,
         // which will ask all the other shards
         let pkt = sP_FE2LS_REQ_PC_LOCATION {
             iPC_ID: gm_pc_id,
-            sReq: pkt,
+            sReq: *pkt,
         };
+
         let login_server = clients.get_login_server().unwrap();
-        log_if_failed(login_server.send_packet(P_FE2LS_REQ_PC_LOCATION, &pkt));
+        login_server.send_packet(P_FE2LS_REQ_PC_LOCATION, &pkt);
         Ok(())
     } else {
         Err(helpers::send_search_fail(clients.get_self(), search_query))
@@ -391,13 +422,14 @@ pub fn gm_pc_location(clients: &mut ClientMap, state: &mut ShardServerState) -> 
 }
 
 pub fn gm_target_pc_special_state_onoff(
-    clients: &mut ClientMap,
+    pkt: Packet,
+    clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let client = clients.get_self();
     helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__CS as i16)?;
-    let pkt: sP_CL2FE_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF =
-        *client.get_packet(P_CL2FE_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF)?;
+    let pkt: &sP_CL2FE_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF =
+        pkt.get(P_CL2FE_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF)?;
 
     let search_mode: TargetSearchBy = pkt.eTargetSearchBy.try_into()?;
     let search_query = match search_mode {
@@ -408,11 +440,12 @@ pub fn gm_target_pc_special_state_onoff(
         ),
         TargetSearchBy::PlayerUID => PlayerSearchQuery::ByUID(pkt.iTargetPC_UID),
     };
+
     let pc_id = search_query
         .execute(state)
         .ok_or_else(|| helpers::send_search_fail(client, search_query))?;
-    let player = state.get_player_mut(pc_id)?;
 
+    let player = state.get_player_mut(pc_id)?;
     let new_flag = pkt.iONOFF != 0;
     match pkt.iSpecialStateFlag as u32 {
         // this packet is only used for /mute
@@ -431,30 +464,33 @@ pub fn gm_target_pc_special_state_onoff(
     }
 
     let special_state_flags = player.get_special_state_bit_flag();
-
     let resp = sP_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC {
         iPC_ID: pc_id,
         iReqSpecialStateFlag: pkt.iSpecialStateFlag,
         iSpecialState: special_state_flags,
     };
+
     state
         .entity_map
         .for_each_around(EntityID::Player(pc_id), clients, |c| {
-            c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp)
+            c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
         });
+
     clients
         .get_self()
-        .send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp)
+        .send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp);
+
+    Ok(())
 }
 
 pub fn gm_target_pc_teleport(
-    clients: &mut ClientMap,
+    pkt: Packet,
+    clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let client = clients.get_self();
     let gm_pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__CS as i16)?;
-    let pkt: sP_CL2FE_GM_REQ_TARGET_PC_TELEPORT =
-        *client.get_packet(P_CL2FE_GM_REQ_TARGET_PC_TELEPORT)?;
+    let pkt: &sP_CL2FE_GM_REQ_TARGET_PC_TELEPORT = pkt.get(P_CL2FE_GM_REQ_TARGET_PC_TELEPORT)?;
 
     // the "target PC" is the player being teleported
     let search_mode: TargetSearchBy = pkt.eTargetPCSearchBy.try_into()?;
@@ -549,10 +585,14 @@ pub fn gm_target_pc_teleport(
     Ok(())
 }
 
-pub fn gm_kick_player(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+pub fn gm_kick_player(
+    pkt: Packet,
+    clients: &ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
     let client = clients.get_self();
     helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__CS as i16)?;
-    let pkt: sP_CL2FE_GM_REQ_KICK_PLAYER = *client.get_packet(P_CL2FE_GM_REQ_KICK_PLAYER)?;
+    let pkt: &sP_CL2FE_GM_REQ_KICK_PLAYER = pkt.get(P_CL2FE_GM_REQ_KICK_PLAYER)?;
     let search_mode: TargetSearchBy = pkt.eTargetSearchBy.try_into()?;
     let search_query = match search_mode {
         TargetSearchBy::PlayerID => PlayerSearchQuery::ByID(pkt.iTargetPC_ID),
@@ -583,9 +623,13 @@ pub fn gm_kick_player(clients: &mut ClientMap, state: &mut ShardServerState) -> 
     Ok(())
 }
 
-pub fn gm_reward_rate(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+pub fn gm_reward_rate(
+    pkt: Packet,
+    client: &FFClient,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
     let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
-    let pkt: &sP_CL2FE_GM_REQ_REWARD_RATE = client.get_packet(P_CL2FE_GM_REQ_REWARD_RATE)?;
+    let pkt: &sP_CL2FE_GM_REQ_REWARD_RATE = pkt.get(P_CL2FE_GM_REQ_REWARD_RATE)?;
     let player = state.get_player_mut(pc_id)?;
 
     if pkt.iGetSet != 0 {
@@ -603,36 +647,50 @@ pub fn gm_reward_rate(client: &mut FFClient, state: &mut ShardServerState) -> FF
             .reward_data
             .get_rates_as_array(RewardType::FusionMatter),
     };
-    client.send_packet(P_FE2CL_GM_REP_REWARD_RATE_SUCC, &resp)
+    client.send_packet(P_FE2CL_GM_REP_REWARD_RATE_SUCC, &resp);
+    Ok(())
 }
 
-pub fn gm_pc_task_complete(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+pub fn gm_pc_task_complete(
+    pkt: Packet,
+    client: &FFClient,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
     let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
-    let pkt: &sP_CL2FE_REQ_PC_TASK_COMPLETE = client.get_packet(P_CL2FE_REQ_PC_TASK_COMPLETE)?;
+    let pkt: &sP_CL2FE_REQ_PC_TASK_COMPLETE = pkt.get(P_CL2FE_REQ_PC_TASK_COMPLETE)?;
     let player = state.get_player_mut(pc_id)?;
     let task_id = pkt.iTaskNum;
     player.mission_journal.complete_task(task_id)?;
     let resp = sP_FE2CL_REP_PC_TASK_END_SUCC { iTaskNum: task_id };
-    client.send_packet(P_FE2CL_REP_PC_TASK_END_SUCC, &resp)
+    client.send_packet(P_FE2CL_REP_PC_TASK_END_SUCC, &resp);
+    Ok(())
 }
 
-pub fn gm_pc_mission_complete(client: &mut FFClient, state: &mut ShardServerState) -> FFResult<()> {
+pub fn gm_pc_mission_complete(
+    pkt: Packet,
+    client: &FFClient,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
     let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
-    let pkt: &sP_CL2FE_REQ_PC_MISSION_COMPLETE =
-        client.get_packet(P_CL2FE_REQ_PC_MISSION_COMPLETE)?;
+    let pkt: &sP_CL2FE_REQ_PC_MISSION_COMPLETE = pkt.get(P_CL2FE_REQ_PC_MISSION_COMPLETE)?;
     let player = state.get_player_mut(pc_id)?;
     let mission_id = pkt.iMissionNum;
     player.mission_journal.set_mission_completed(mission_id)?;
     let resp = sP_FE2CL_REP_PC_MISSION_COMPLETE_SUCC {
         iMissionNum: mission_id,
     };
-    client.send_packet(P_FE2CL_REP_PC_MISSION_COMPLETE_SUCC, &resp)
+    client.send_packet(P_FE2CL_REP_PC_MISSION_COMPLETE_SUCC, &resp);
+    Ok(())
 }
 
-pub fn gm_shiny_summon(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+pub fn gm_shiny_summon(
+    pkt: Packet,
+    clients: &ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
     let client = clients.get_self();
     let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__GM as i16)?;
-    let pkt: sP_CL2FE_REQ_SHINY_SUMMON = *client.get_packet(P_CL2FE_REQ_SHINY_SUMMON)?;
+    let pkt: &sP_CL2FE_REQ_SHINY_SUMMON = pkt.get(P_CL2FE_REQ_SHINY_SUMMON)?;
     let player = state.get_player(pc_id)?;
 
     let egg_type = pkt.iShinyType;
@@ -653,10 +711,14 @@ pub fn gm_shiny_summon(clients: &mut ClientMap, state: &mut ShardServerState) ->
     Ok(())
 }
 
-pub fn gm_npc_summon(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+pub fn gm_npc_summon(
+    pkt: Packet,
+    clients: &ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
     let client = clients.get_self();
     let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__GM as i16)?;
-    let pkt: sP_CL2FE_REQ_NPC_SUMMON = *client.get_packet(P_CL2FE_REQ_NPC_SUMMON)?;
+    let pkt: &sP_CL2FE_REQ_NPC_SUMMON = pkt.get(P_CL2FE_REQ_NPC_SUMMON)?;
     let player = state.get_player(pc_id)?;
 
     let npc_type = pkt.iNPCType;
@@ -677,10 +739,14 @@ pub fn gm_npc_summon(clients: &mut ClientMap, state: &mut ShardServerState) -> F
     Ok(())
 }
 
-pub fn gm_npc_group_summon(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+pub fn gm_npc_group_summon(
+    pkt: Packet,
+    clients: &ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
     let client = clients.get_self();
     let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__GM as i16)?;
-    let pkt: sP_CL2FE_REQ_NPC_GROUP_SUMMON = *client.get_packet(P_CL2FE_REQ_NPC_GROUP_SUMMON)?;
+    let pkt: &sP_CL2FE_REQ_NPC_GROUP_SUMMON = pkt.get(P_CL2FE_REQ_NPC_GROUP_SUMMON)?;
     let player = state.get_player(pc_id)?;
 
     let spawn_pos = player.get_position();
@@ -700,10 +766,14 @@ pub fn gm_npc_group_summon(clients: &mut ClientMap, state: &mut ShardServerState
     Ok(())
 }
 
-pub fn gm_npc_unsummon(clients: &mut ClientMap, state: &mut ShardServerState) -> FFResult<()> {
+pub fn gm_npc_unsummon(
+    pkt: Packet,
+    clients: &ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
     let client = clients.get_self();
     helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__GM as i16)?;
-    let pkt: sP_CL2FE_REQ_NPC_UNSUMMON = *client.get_packet(P_CL2FE_REQ_NPC_UNSUMMON)?;
+    let pkt: &sP_CL2FE_REQ_NPC_UNSUMMON = pkt.get(P_CL2FE_REQ_NPC_UNSUMMON)?;
     let npc_id = pkt.iNPC_ID;
     let npc = state.get_npc(npc_id)?;
     if !npc.summoned {
@@ -720,7 +790,7 @@ mod helpers {
     use super::*;
 
     pub fn validate_perms(
-        client: &mut FFClient,
+        client: &FFClient,
         state: &ShardServerState,
         req_perms: i16,
     ) -> FFResult<i32> {
@@ -738,18 +808,18 @@ mod helpers {
         Ok(user_pc_id)
     }
 
-    pub fn send_search_fail(client: &mut FFClient, query: PlayerSearchQuery) -> FFError {
+    pub fn send_search_fail(client: &FFClient, query: PlayerSearchQuery) -> FFError {
         let err_msg = format!("Player not found: {:?}", query);
         let pkt = sP_FE2CL_ANNOUNCE_MSG {
             iAnnounceType: unused!(),
             iDuringTime: MSG_BOX_DURATION_DEFAULT,
             szAnnounceMsg: util::encode_utf16(&err_msg).unwrap(),
         };
-        log_if_failed(client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt));
+        client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
         FFError::build(Severity::Warning, err_msg)
     }
 
-    pub fn spawn_temp_npc(clients: &mut ClientMap, entity_map: &mut EntityMap, mut npc: NPC) {
+    pub fn spawn_temp_npc(clients: &ClientMap, entity_map: &mut EntityMap, mut npc: NPC) {
         npc.summoned = true;
         let (ai, tick_mode) = AI::make_for_npc(&npc, true);
         npc.ai = ai;
@@ -758,7 +828,7 @@ mod helpers {
         entity_map.update(eid, Some(chunk_coords), Some(clients));
     }
 
-    pub fn remove_temp_npc(clients: &mut ClientMap, state: &mut ShardServerState, npc_id: i32) {
+    pub fn remove_temp_npc(clients: &ClientMap, state: &mut ShardServerState, npc_id: i32) {
         let entity_map = &mut state.entity_map;
         let eid = EntityID::NPC(npc_id);
         entity_map.update(eid, None, Some(clients));

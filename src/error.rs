@@ -131,7 +131,7 @@ impl FFError {
         Self::new(Severity::Warning, format!("Enum error ({:?})", val), true)
     }
 
-    pub fn chain(self, other: FFError) -> Self {
+    pub fn with_parent(self, other: FFError) -> Self {
         Self {
             parent: Some(Box::new(other)),
             ..self

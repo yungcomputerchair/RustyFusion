@@ -32,13 +32,14 @@ use tokio::sync::Mutex;
 async fn main() -> FFResult<()> {
     color_eyre::install().unwrap();
     let mut terminal = ratatui::init();
-    let log_rx = log_init();
     let mut tui = LoginTui::default();
 
     let _cleanup = Cleanup {};
 
+    let log_rx = log_init();
     let config = config_init();
     let mut logger = Logger::new(log_rx, &config.login.log_path.get());
+
     db_init().await;
     tdata_init();
 
