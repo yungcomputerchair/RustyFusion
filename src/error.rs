@@ -224,7 +224,6 @@ pub fn logger_flush() -> FFResult<()> {
     if let Some(logger) = LOGGER.get() {
         let mut logger = logger.lock().unwrap();
         logger.flush()?;
-        log(Severity::Debug, "Log flushed");
         Ok(())
     } else {
         Ok(())

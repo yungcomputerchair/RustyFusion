@@ -153,7 +153,11 @@ async fn main() -> FFResult<()> {
                 }
             }
             _ = logger_timer.tick() => {
-                log_if_failed(logger_flush());
+                if let Err(e) = logger_flush() {
+                    log(Severity::Warning, &format!("Could not flush log: {}", e));
+                } else {
+                    log(Severity::Debug, "Log flushed");
+                }
             }
         }
     }
