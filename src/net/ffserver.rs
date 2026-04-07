@@ -63,6 +63,12 @@ impl FFServer {
         tokio::select! {
             result = self.sock.accept() => {
                 let conn_data = result?;
+
+                log(
+                    Severity::Debug,
+                    &format!("New connection from {}", conn_data.1),
+                );
+
                 self.register_client(conn_data, None).await?;
                 Ok(())
             }

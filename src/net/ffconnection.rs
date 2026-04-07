@@ -1,7 +1,10 @@
 use std::{
     collections::HashMap,
     io::IoSlice,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
     time::{Duration, Instant},
 };
 
@@ -32,6 +35,7 @@ pub enum ClientMessage {
         new_fe_key: Option<u64>,
         new_mode: Option<EncryptionMode>,
     },
+    ClearLiveCheck,
     Shutdown,
 }
 
@@ -113,6 +117,9 @@ impl FFConnection {
                             log_error(e);
                             self.should_dc = true;
                         }
+                    }
+                    ClientMessage::ClearLiveCheck => {
+                        self.clear_live_check();
                     }
                     ClientMessage::Shutdown => {
                         self.should_dc = true;
@@ -217,6 +224,33 @@ impl FFConnection {
             );
             lc_callback(&self.client);
             self.live_check_time = Some(Instant::now());
+        }
+    }
+
+    fn clear_live_check(&mut self) {
+        let Some(time_lc) = self.live_check_time.take() else {
+            // spurious live check response; ignore
+            return;
+        };
+
+        let ping_ms = time_lc.elapsed().as_millis() as u64;
+
+        log(
+            Severity::Debug,
+            &format!(
+                "Client {} responded to live check in {} ms",
+                self.client.get_addr(),
+                ping_ms,
+            ),
+        );
+
+        let meta = self.client.meta.read();
+        if let Some(ping) = meta.ping_ms.as_ref() {
+            ping.store(ping_ms, Ordering::Relaxed);
+        } else {
+            drop(meta);
+            let mut meta = self.client.meta.write();
+            meta.ping_ms = Some(AtomicU64::new(ping_ms));
         }
     }
 

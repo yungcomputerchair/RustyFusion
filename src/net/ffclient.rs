@@ -1,11 +1,7 @@
 use std::{
     fmt::Display,
     net::{IpAddr, SocketAddr},
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
-    time::Instant,
+    sync::{atomic::AtomicU64, Arc},
 };
 
 // We use parking_lot's RwLock instead of std's because it's more efficient and has a simpler API.
@@ -16,7 +12,7 @@ use parking_lot::RwLock;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
-    error::{log, panic_if_failed, FFError, FFResult, Severity},
+    error::{panic_if_failed, FFError, FFResult, Severity},
     net::{
         crypto::EncryptionMode,
         packet::{FFPacket, Packet, PacketID},
@@ -60,7 +56,6 @@ pub struct ClientMetadata {
     pub addr: SocketAddr,
     pub client_type: ClientType,
     pub ping_ms: Option<AtomicU64>,
-    pub live_check_time: Option<Instant>,
 }
 impl ClientMetadata {
     pub fn new(addr: SocketAddr, client_type: Option<ClientType>) -> Self {
@@ -68,7 +63,6 @@ impl ClientMetadata {
             addr,
             client_type: client_type.unwrap_or(ClientType::Unknown),
             ping_ms: None,
-            live_check_time: None,
         }
     }
 }
@@ -201,33 +195,6 @@ impl FFClient {
     }
 
     pub fn clear_live_check(&self) {
-        let meta = self.meta.read();
-        let Some(time_lc) = meta.live_check_time else {
-            // spurious live check response; ignore
-            return;
-        };
-        drop(meta);
-
-        let time_now = Instant::now();
-        let ping = time_now.duration_since(time_lc);
-        let ping_ms = ping.as_millis() as u64;
-
-        log(
-            Severity::Debug,
-            &format!(
-                "Client {} responded to live check in {} ms",
-                self.get_addr(),
-                ping_ms,
-            ),
-        );
-
-        let mut meta = self.meta.write();
-        meta.live_check_time = None;
-
-        if let Some(ping) = meta.ping_ms.as_ref() {
-            ping.store(ping_ms, Ordering::Relaxed);
-        } else {
-            meta.ping_ms = Some(AtomicU64::new(ping_ms));
-        }
+        let _ = self.tx.send(ClientMessage::ClearLiveCheck);
     }
 }
