@@ -18,6 +18,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use crate::{
     error::{log, panic_if_failed, FFError, FFResult, Severity},
     net::{
+        crypto::EncryptionMode,
         packet::{FFPacket, Packet, PacketID},
         ClientMessage,
     },
@@ -36,8 +37,8 @@ pub enum ClientType {
         pc_id: Option<i32>, // iPC_ID
     },
     LoginServer,
-    UnauthedShardServer(Vec<u8>), // auth challenge
-    ShardServer(i32),             // shard ID
+    UnauthedShardServer(Arc<Vec<u8>>), // auth challenge
+    ShardServer(i32),                  // shard ID
 }
 impl Display for ClientType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -100,6 +101,19 @@ impl FFClient {
         let _ = self.tx.send(ClientMessage::SendPacket(pkt));
     }
 
+    pub fn update_encryption(
+        &self,
+        new_e_key: Option<u64>,
+        new_fe_key: Option<u64>,
+        new_mode: Option<EncryptionMode>,
+    ) {
+        let _ = self.tx.send(ClientMessage::UpdateEncryption {
+            new_e_key,
+            new_fe_key,
+            new_mode,
+        });
+    }
+
     pub fn disconnect(&self) {
         let _ = self.tx.send(ClientMessage::Shutdown);
         let mut meta = self.meta.write();
@@ -119,6 +133,11 @@ impl FFClient {
     pub fn get_client_type(&self) -> ClientType {
         let meta = self.meta.read();
         meta.client_type.clone()
+    }
+
+    pub fn set_client_type(&self, client_type: ClientType) {
+        let mut meta = self.meta.write();
+        meta.client_type = client_type;
     }
 
     pub fn get_account_id(&self) -> FFResult<i64> {

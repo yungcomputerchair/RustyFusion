@@ -10,13 +10,13 @@ use rusty_fusion::{
     defines::*,
     entity::{Combatant, Entity, Player},
     enums::{ItemLocation, ItemType, LoginType, PlayerNameStatus},
-    error::{catch_fail, codes::LoginError, log, log_if_failed, FFError, FFResult, Severity},
+    error::{codes::LoginError, log, log_if_failed, CatchFail as _, FFError, FFResult, Severity},
     item::Item,
     monitor::{monitor_queue, MonitorEvent},
     net::{
         crypto,
         packet::{PacketID::*, *},
-        ClientType, FFClient,
+        ClientMap, ClientType, FFClient,
     },
     state::LoginServerState,
     unused, util,
@@ -29,7 +29,8 @@ static PASSWORD_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"[a-zA-Z0-9!@#$%^&*()_+]{8,32}").unwrap());
 
 pub fn login(
-    client: &mut FFClient,
+    pkt: Packet,
+    client: &FFClient,
     state: &mut LoginServerState,
     time: SystemTime,
 ) -> FFResult<()> {
@@ -42,255 +43,259 @@ Username must be 4-32 characters long and contain only letters, numbers, undersc
         "Invalid password
 Password must be 8-32 characters long and contain only letters, numbers, or special characters !@#$%^&*()_+.";
 
-    let pkt: sP_CL2LS_REQ_LOGIN = *client.get_packet(P_CL2LS_REQ_LOGIN)?;
+    let pkt: sP_CL2LS_REQ_LOGIN = *pkt.get(P_CL2LS_REQ_LOGIN)?;
     let mut error_code = LoginError::LoginError;
-    catch_fail(
-        (|| {
-            let login_type = LoginType::try_from(pkt.iLoginType).map_err(|_| {
-                FFError::build(
-                    Severity::Warning,
-                    format!("Bad login type {}", pkt.iLoginType),
-                )
-            })?;
+    (|| -> FFResult<()> {
+        let login_type = LoginType::try_from(pkt.iLoginType).map_err(|_| {
+            FFError::build(
+                Severity::Warning,
+                format!("Bad login type {}", pkt.iLoginType),
+            )
+        })?;
 
-            let allow_plaintext_passwords = if cfg!(debug_assertions) {
-                // plaintext passwords are disabled by default for security,
-                // but dev environments are very unlikely to have an OFAPI
-                // instance set up. So just allow plaintext passwords always
-                // if we are in a debug build.
-                true
-            } else {
-                config_get().login.allow_plaintext_passwords.get()
+        let allow_plaintext_passwords = if cfg!(debug_assertions) {
+            // plaintext passwords are disabled by default for security,
+            // but dev environments are very unlikely to have an OFAPI
+            // instance set up. So just allow plaintext passwords always
+            // if we are in a debug build.
+            true
+        } else {
+            config_get().login.allow_plaintext_passwords.get()
+        };
+
+        if login_type == LoginType::Password && !allow_plaintext_passwords {
+            let announce = sP_FE2CL_GM_REP_PC_ANNOUNCE {
+                iAnnounceType: unused!(),
+                iDuringTime: 10,
+                szAnnounceMsg: util::encode_utf16(PLAINTEXT_PASSWORD_NOT_ALLOWED_MSG).unwrap(),
             };
+            client.send_packet(P_FE2CL_GM_REP_PC_ANNOUNCE, &announce);
+            return Ok(());
+        }
 
-            if login_type == LoginType::Password && !allow_plaintext_passwords {
-                let announce = sP_FE2CL_GM_REP_PC_ANNOUNCE {
-                    iAnnounceType: unused!(),
-                    iDuringTime: 10,
-                    szAnnounceMsg: util::encode_utf16(PLAINTEXT_PASSWORD_NOT_ALLOWED_MSG).unwrap(),
-                };
-                return client.send_packet(P_FE2CL_GM_REP_PC_ANNOUNCE, &announce);
-            }
+        let username = match login_type {
+            LoginType::Password => util::parse_utf16(&pkt.szID)?,
+            LoginType::Cookie => util::parse_utf8(&pkt.szCookie_TEGid)?,
+        }
+        .trim()
+        .to_lowercase();
 
-            let username = match login_type {
-                LoginType::Password => util::parse_utf16(&pkt.szID)?,
-                LoginType::Cookie => util::parse_utf8(&pkt.szCookie_TEGid)?,
-            }
-            .trim()
-            .to_lowercase();
-
-            if !USERNAME_REGEX.is_match(&username) {
-                let announce = sP_FE2CL_GM_REP_PC_ANNOUNCE {
-                    iAnnounceType: unused!(),
-                    iDuringTime: 10,
-                    szAnnounceMsg: util::encode_utf16(BAD_USERNAME_REGEX_MSG).unwrap(),
-                };
-                return client.send_packet(P_FE2CL_GM_REP_PC_ANNOUNCE, &announce);
-            }
-
-            let token = match login_type {
-                LoginType::Password => {
-                    let password = util::parse_utf16(&pkt.szPassword)?;
-                    if !PASSWORD_REGEX.is_match(&password) {
-                        let announce = sP_FE2CL_GM_REP_PC_ANNOUNCE {
-                            iAnnounceType: unused!(),
-                            iDuringTime: 10,
-                            szAnnounceMsg: util::encode_utf16(BAD_PASSWORD_REGEX_MSG).unwrap(),
-                        };
-                        client.send_packet(P_FE2CL_GM_REP_PC_ANNOUNCE, &announce)?;
-                        return Err(FFError::build(
-                            Severity::Warning,
-                            "Password did not match regex".to_string(),
-                        ));
-                    }
-                    password
-                }
-                LoginType::Cookie => util::parse_utf8(&pkt.szCookie_authid)?,
-            }
-            .trim()
-            .to_owned();
-
-            let lookup_username = username.clone();
-            let account = match db_run_sync!(db =>
-                db.find_account_from_username(&lookup_username)
-            )? {
-                Some(account) => account,
-                None => {
-                    if config_get().login.auto_create_accounts.get()
-                        && login_type == LoginType::Password
-                    {
-                        // automatically create the account with the supplied credentials
-                        let new_username = username.clone();
-                        let password_hashed = util::hash_password(&token)?;
-                        let new_acc = db_run_sync!(db =>
-                            db.create_account(&new_username, &password_hashed)
-                        )?;
-                        log(
-                            Severity::Info,
-                            &format!(
-                                "Created account {} with ID {} and level {}",
-                                username, new_acc.id, new_acc.account_level
-                            ),
-                        );
-                        new_acc
-                    } else {
-                        error_code = LoginError::UsernameNotFound;
-                        return Err(FFError::build(
-                            Severity::Warning,
-                            format!("Couldn't find account {}", username),
-                        ));
-                    }
-                }
+        if !USERNAME_REGEX.is_match(&username) {
+            let announce = sP_FE2CL_GM_REP_PC_ANNOUNCE {
+                iAnnounceType: unused!(),
+                iDuringTime: 10,
+                szAnnounceMsg: util::encode_utf16(BAD_USERNAME_REGEX_MSG).unwrap(),
             };
+            client.send_packet(P_FE2CL_GM_REP_PC_ANNOUNCE, &announce);
+            return Ok(());
+        }
 
-            // check password
-            match login_type {
-                LoginType::Password => {
-                    if !util::check_password(&token, &account.password_hashed)? {
-                        error_code = LoginError::IncorrectPassword;
-                        return Err(FFError::build(
-                            Severity::Debug,
-                            format!("Incorrect password for account {}", username),
-                        ));
-                    }
+        let token = match login_type {
+            LoginType::Password => {
+                let password = util::parse_utf16(&pkt.szPassword)?;
+                if !PASSWORD_REGEX.is_match(&password) {
+                    let announce = sP_FE2CL_GM_REP_PC_ANNOUNCE {
+                        iAnnounceType: unused!(),
+                        iDuringTime: 10,
+                        szAnnounceMsg: util::encode_utf16(BAD_PASSWORD_REGEX_MSG).unwrap(),
+                    };
+                    client.send_packet(P_FE2CL_GM_REP_PC_ANNOUNCE, &announce);
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        "Password did not match regex".to_string(),
+                    ));
                 }
-                LoginType::Cookie => {
-                    if account.cookie.is_none()
-                        || account.cookie.as_ref().unwrap().expires < time
-                        || !crypto::timing_safe_strcmp(
-                            account.cookie.as_ref().unwrap().token.as_str(),
-                            &token,
-                        )
-                    {
-                        error_code = LoginError::IncorrectPassword;
-                        return Err(FFError::build(
-                            Severity::Debug,
-                            format!("Invalid or expired cookie for account {}", username),
-                        ));
-                    }
+                password
+            }
+            LoginType::Cookie => util::parse_utf8(&pkt.szCookie_authid)?,
+        }
+        .trim()
+        .to_owned();
+
+        let lookup_username = username.clone();
+        let account = match db_run_sync!(db =>
+            db.find_account_from_username(&lookup_username)
+        )? {
+            Some(account) => account,
+            None => {
+                if config_get().login.auto_create_accounts.get()
+                    && login_type == LoginType::Password
+                {
+                    // automatically create the account with the supplied credentials
+                    let new_username = username.clone();
+                    let password_hashed = util::hash_password(&token)?;
+                    let new_acc = db_run_sync!(db =>
+                        db.create_account(&new_username, &password_hashed)
+                    )?;
+                    log(
+                        Severity::Info,
+                        &format!(
+                            "Created account {} with ID {} and level {}",
+                            username, new_acc.id, new_acc.account_level
+                        ),
+                    );
+                    new_acc
+                } else {
+                    error_code = LoginError::UsernameNotFound;
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!("Couldn't find account {}", username),
+                    ));
                 }
             }
+        };
 
-            // check if banned
-            if account.banned_until > time {
-                let ban_duration =
-                    util::format_duration(account.banned_until.duration_since(time).unwrap());
-                log(
-                    Severity::Info,
-                    &format!(
-                        "Banned account {} tried to log in (banned for {})",
-                        account.username, ban_duration
-                    ),
-                );
-                let ban_message = format!(
-                    "You are banned for {}.\nReason: {}",
-                    ban_duration, account.ban_reason
-                );
-                let resp = sP_FE2CL_GM_REP_PC_ANNOUNCE {
-                    iAnnounceType: unused!(),
-                    iDuringTime: i32::MAX,
-                    szAnnounceMsg: util::encode_utf16(&ban_message)?,
-                };
-                return client.send_packet(P_FE2CL_GM_REP_PC_ANNOUNCE, &resp);
+        // check password
+        match login_type {
+            LoginType::Password => {
+                if !util::check_password(&token, &account.password_hashed)? {
+                    error_code = LoginError::IncorrectPassword;
+                    return Err(FFError::build(
+                        Severity::Debug,
+                        format!("Incorrect password for account {}", username),
+                    ));
+                }
             }
-
-            let last_player_slot = account.selected_slot;
-            let acc_id = account.id;
-            let players = db_run_sync!(db => db.load_players(acc_id))?;
-
-            /*
-             * Check if this account is already logged in, meaning:
-             * a) the account has a session here in the login server, or
-             * b) one of the account's players is tracked in a shard server
-             *
-             * Disabled in debug mode for convenience!
-             */
-            #[cfg(not(debug_assertions))]
-            if state.is_session_active(account.id) {
-                client.client_type = ClientType::UnauthedClient {
-                    username: username.clone(),
-                    dup_pc_uid: None,
-                };
-            } else if let Some(dup_player) = players
-                .iter()
-                .find(|p| state.get_player_shard(p.get_uid()).is_some())
-            {
-                client.client_type = ClientType::UnauthedClient {
-                    username: username.clone(),
-                    dup_pc_uid: Some(dup_player.get_uid()),
-                };
+            LoginType::Cookie => {
+                if account.cookie.is_none()
+                    || account.cookie.as_ref().unwrap().expires < time
+                    || !crypto::timing_safe_strcmp(
+                        account.cookie.as_ref().unwrap().token.as_str(),
+                        &token,
+                    )
+                {
+                    error_code = LoginError::IncorrectPassword;
+                    return Err(FFError::build(
+                        Severity::Debug,
+                        format!("Invalid or expired cookie for account {}", username),
+                    ));
+                }
             }
+        }
 
-            if matches!(client.client_type, ClientType::UnauthedClient { .. }) {
-                error_code = LoginError::AlreadyLoggedIn;
-                return Err(FFError::build(
-                    Severity::Debug,
-                    format!("Account {} already logged in", username),
-                ));
-            }
-
-            let resp = sP_LS2CL_REP_LOGIN_SUCC {
-                iCharCount: players.len() as i8,
-                iSlotNum: last_player_slot as i8,
-                iTempForPacking4: unused!(),
-                uiSvrTime: util::get_timestamp_ms(time),
-                szID: pkt.szID,
-                iPaymentFlag: 1,  // all accounts have a subscription
-                iOpenBetaFlag: 0, // and we're not in open beta
+        // check if banned
+        if account.banned_until > time {
+            let ban_duration =
+                util::format_duration(account.banned_until.duration_since(time).unwrap());
+            log(
+                Severity::Info,
+                &format!(
+                    "Banned account {} tried to log in (banned for {})",
+                    account.username, ban_duration
+                ),
+            );
+            let ban_message = format!(
+                "You are banned for {}.\nReason: {}",
+                ban_duration, account.ban_reason
+            );
+            let resp = sP_FE2CL_GM_REP_PC_ANNOUNCE {
+                iAnnounceType: unused!(),
+                iDuringTime: i32::MAX,
+                szAnnounceMsg: util::encode_utf16(&ban_message)?,
             };
+            client.send_packet(P_FE2CL_GM_REP_PC_ANNOUNCE, &resp);
+            return Ok(());
+        }
 
-            let e_base: u64 = resp.uiSvrTime;
-            let e_iv1: i32 = (resp.iCharCount + 1) as i32;
-            let e_iv2: i32 = (resp.iSlotNum + 1) as i32;
-            let fe_base: u64 = crypto::DEFAULT_KEY;
-            let fe_iv1: i32 = pkt.iClientVerC;
-            let fe_iv2: i32 = 1;
+        let last_player_slot = account.selected_slot;
+        let acc_id = account.id;
+        let players = db_run_sync!(db => db.load_players(acc_id))?;
 
-            client.send_packet(P_LS2CL_REP_LOGIN_SUCC, &resp)?;
-
-            client.e_key = crypto::gen_key(e_base, e_iv1, e_iv2);
-            client.fe_key = crypto::gen_key(fe_base, fe_iv1, fe_iv2);
-
-            let serial_key: i64 = random();
-            client.client_type = ClientType::GameClient {
-                account_id: account.id,
-                serial_key,
-                pc_id: None,
+        /*
+         * Check if this account is already logged in, meaning:
+         * a) the account has a session here in the login server, or
+         * b) one of the account's players is tracked in a shard server
+         *
+         * Disabled in debug mode for convenience!
+         */
+        #[cfg(not(debug_assertions))]
+        if state.is_session_active(account.id) {
+            client.get_client_type() = ClientType::UnauthedClient {
+                username: username.clone(),
+                dup_pc_uid: None,
             };
-            state.start_session(account, players.clone().iter().cloned());
-
-            players.iter().try_for_each(|player| {
-                let pos = player.get_position();
-                let pkt = sP_LS2CL_REP_CHAR_INFO {
-                    iSlot: player.get_slot_num() as i8,
-                    iLevel: player.get_level(),
-                    sPC_Style: player.get_style(),
-                    sPC_Style2: player.get_style_2(),
-                    iX: pos.x,
-                    iY: pos.y,
-                    iZ: pos.z,
-                    aEquip: player.get_equipped().map(Option::<Item>::into),
-                };
-                client.send_packet(P_LS2CL_REP_CHAR_INFO, &pkt)
-            })
-        })(),
-        || {
-            let resp = sP_LS2CL_REP_LOGIN_FAIL {
-                iErrorCode: error_code as i32,
-                szID: pkt.szID,
+        } else if let Some(dup_player) = players
+            .iter()
+            .find(|p| state.get_player_shard(p.get_uid()).is_some())
+        {
+            client.get_client_type() = ClientType::UnauthedClient {
+                username: username.clone(),
+                dup_pc_uid: Some(dup_player.get_uid()),
             };
-            client.send_packet(P_LS2CL_REP_LOGIN_FAIL, &resp)
-        },
-    )
+        }
+
+        if matches!(client.get_client_type(), ClientType::UnauthedClient { .. }) {
+            error_code = LoginError::AlreadyLoggedIn;
+            return Err(FFError::build(
+                Severity::Debug,
+                format!("Account {} already logged in", username),
+            ));
+        }
+
+        let resp = sP_LS2CL_REP_LOGIN_SUCC {
+            iCharCount: players.len() as i8,
+            iSlotNum: last_player_slot as i8,
+            iTempForPacking4: unused!(),
+            uiSvrTime: util::get_timestamp_ms(time),
+            szID: pkt.szID,
+            iPaymentFlag: 1,  // all accounts have a subscription
+            iOpenBetaFlag: 0, // and we're not in open beta
+        };
+
+        let e_base: u64 = resp.uiSvrTime;
+        let e_iv1: i32 = (resp.iCharCount + 1) as i32;
+        let e_iv2: i32 = (resp.iSlotNum + 1) as i32;
+        let fe_base: u64 = crypto::DEFAULT_KEY;
+        let fe_iv1: i32 = pkt.iClientVerC;
+        let fe_iv2: i32 = 1;
+
+        let e_key = crypto::gen_key(e_base, e_iv1, e_iv2);
+        let fe_key = crypto::gen_key(fe_base, fe_iv1, fe_iv2);
+
+        client.send_packet(P_LS2CL_REP_LOGIN_SUCC, &resp);
+        client.update_encryption(Some(e_key), Some(fe_key), None);
+
+        let serial_key: i64 = random();
+        client.set_client_type(ClientType::GameClient {
+            account_id: account.id,
+            serial_key,
+            pc_id: None,
+        });
+
+        state.start_session(account, players.iter().cloned(), fe_key);
+
+        players.iter().for_each(|player| {
+            let pos = player.get_position();
+            let pkt = sP_LS2CL_REP_CHAR_INFO {
+                iSlot: player.get_slot_num() as i8,
+                iLevel: player.get_level(),
+                sPC_Style: player.get_style(),
+                sPC_Style2: player.get_style_2(),
+                iX: pos.x,
+                iY: pos.y,
+                iZ: pos.z,
+                aEquip: player.get_equipped().map(Option::<Item>::into),
+            };
+            client.send_packet(P_LS2CL_REP_CHAR_INFO, &pkt);
+        });
+        Ok(())
+    })()
+    .catch_fail(|| {
+        let resp = sP_LS2CL_REP_LOGIN_FAIL {
+            iErrorCode: error_code as i32,
+            szID: pkt.szID,
+        };
+        client.send_packet(P_LS2CL_REP_LOGIN_FAIL, &resp)
+    })
 }
 
 pub fn pc_exit_duplicate(
     new_key: usize,
-    clients: &mut HashMap<usize, FFClient>,
+    clients: &HashMap<usize, FFClient>,
     state: &mut LoginServerState,
 ) -> FFResult<()> {
-    let client = clients.get_mut(&new_key).unwrap();
-    let client_type = client.client_type.clone();
+    let client = clients.get(&new_key).unwrap();
+    let client_type = client.get_client_type().clone();
     let ClientType::UnauthedClient {
         username,
         dup_pc_uid,
@@ -308,24 +313,24 @@ pub fn pc_exit_duplicate(
             Severity::Warning,
             format!("Couldn't find shard server for player {}", dup_pc_uid),
         ))?;
-        let shard = clients
-            .values_mut()
-            .find(|c| matches!(c.client_type, ClientType::ShardServer(sid) if sid == shard_id))
-            .unwrap();
+
+        let clients = ClientMap::new(new_key, clients);
+        let shard = clients.get_shard_server(shard_id).unwrap();
         let pkt = sP_LS2FE_REQ_PC_EXIT_DUPLICATE {
             iPC_UID: dup_pc_uid,
         };
-        log_if_failed(shard.send_packet(P_LS2FE_REQ_PC_EXIT_DUPLICATE, &pkt));
+
+        shard.send_packet(P_LS2FE_REQ_PC_EXIT_DUPLICATE, &pkt);
         Ok(())
     } else {
         // kick login server session
-        for client in clients.values_mut() {
-            if matches!(client.client_type, ClientType::GameClient { account_id, .. } if state.get_username(account_id)? == username)
+        for client in clients.values() {
+            if matches!(client.get_client_type(), ClientType::GameClient { account_id, .. } if state.get_username(account_id)? == username)
             {
                 let pkt = sP_LS2CL_REP_PC_EXIT_DUPLICATE {
                     iErrorCode: unused!(),
                 };
-                log_if_failed(client.send_packet(P_LS2CL_REP_PC_EXIT_DUPLICATE, &pkt));
+                client.send_packet(P_LS2CL_REP_PC_EXIT_DUPLICATE, &pkt);
                 client.disconnect();
                 return Ok(());
             }
@@ -340,20 +345,25 @@ pub fn pc_exit_duplicate(
     }
 }
 
-pub fn check_char_name(client: &mut FFClient) -> FFResult<()> {
+pub fn check_char_name(pkt: Packet, client: &FFClient) -> FFResult<()> {
     // TODO failure
-    let pkt: &sP_CL2LS_REQ_CHECK_CHAR_NAME = client.get_packet(P_CL2LS_REQ_CHECK_CHAR_NAME)?;
+    let pkt: &sP_CL2LS_REQ_CHECK_CHAR_NAME = pkt.get(P_CL2LS_REQ_CHECK_CHAR_NAME)?;
     let resp = sP_LS2CL_REP_CHECK_CHAR_NAME_SUCC {
         szFirstName: pkt.szFirstName,
         szLastName: pkt.szLastName,
     };
-    client.send_packet(P_LS2CL_REP_CHECK_CHAR_NAME_SUCC, &resp)
+    client.send_packet(P_LS2CL_REP_CHECK_CHAR_NAME_SUCC, &resp);
+    Ok(())
 }
 
-pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
+pub fn save_char_name(
+    pkt: Packet,
+    client: &FFClient,
+    state: &mut LoginServerState,
+) -> FFResult<()> {
     // TODO failure
     let acc_id = client.get_account_id()?;
-    let pkt: &sP_CL2LS_REQ_SAVE_CHAR_NAME = client.get_packet(P_CL2LS_REQ_SAVE_CHAR_NAME)?;
+    let pkt: &sP_CL2LS_REQ_SAVE_CHAR_NAME = pkt.get(P_CL2LS_REQ_SAVE_CHAR_NAME)?;
 
     let pc_uid = util::get_uid();
     let slot_num = pkt.iSlotNum as usize;
@@ -400,15 +410,15 @@ pub fn save_char_name(client: &mut FFClient, state: &mut LoginServerState) -> FF
         szFirstName: style.szFirstName,
         szLastName: style.szLastName,
     };
-    client.send_packet(P_LS2CL_REP_SAVE_CHAR_NAME_SUCC, &resp)?;
+    client.send_packet(P_LS2CL_REP_SAVE_CHAR_NAME_SUCC, &resp);
     state.get_players_mut(acc_id)?.insert(pc_uid, player);
 
     Ok(())
 }
 
-pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
+pub fn char_create(pkt: Packet, client: &FFClient, state: &mut LoginServerState) -> FFResult<()> {
     let acc_id = client.get_account_id()?;
-    let pkt: &sP_CL2LS_REQ_CHAR_CREATE = client.get_packet(P_CL2LS_REQ_CHAR_CREATE)?;
+    let pkt: &sP_CL2LS_REQ_CHAR_CREATE = pkt.get(P_CL2LS_REQ_CHAR_CREATE)?;
 
     let pc_uid = pkt.PCStyle.iPC_UID;
     if let Some(player) = state.get_players_mut(acc_id)?.get_mut(&pc_uid) {
@@ -448,7 +458,8 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
             sOn_Item: pkt.sOn_Item,
         };
 
-        client.send_packet(P_LS2CL_REP_CHAR_CREATE_SUCC, &resp)
+        client.send_packet(P_LS2CL_REP_CHAR_CREATE_SUCC, &resp);
+        Ok(())
     } else {
         Err(FFError::build(
             Severity::Warning,
@@ -457,9 +468,9 @@ pub fn char_create(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
     }
 }
 
-pub fn char_delete(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
+pub fn char_delete(pkt: Packet, client: &FFClient, state: &mut LoginServerState) -> FFResult<()> {
     let acc_id = client.get_account_id()?;
-    let pkt: &sP_CL2LS_REQ_CHAR_DELETE = client.get_packet(P_CL2LS_REQ_CHAR_DELETE)?;
+    let pkt: &sP_CL2LS_REQ_CHAR_DELETE = pkt.get(P_CL2LS_REQ_CHAR_DELETE)?;
     let pc_uid = pkt.iPC_UID;
     let player = state
         .get_players_mut(acc_id)?
@@ -472,12 +483,17 @@ pub fn char_delete(client: &mut FFClient, state: &mut LoginServerState) -> FFRes
     let resp = sP_LS2CL_REP_CHAR_DELETE_SUCC {
         iSlotNum: player.get_slot_num() as i8,
     };
-    client.send_packet(P_LS2CL_REP_CHAR_DELETE_SUCC, &resp)
+    client.send_packet(P_LS2CL_REP_CHAR_DELETE_SUCC, &resp);
+    Ok(())
 }
 
-pub fn save_char_tutor(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
+pub fn save_char_tutor(
+    pkt: Packet,
+    client: &FFClient,
+    state: &mut LoginServerState,
+) -> FFResult<()> {
     let acc_id = client.get_account_id()?;
-    let pkt: &sP_CL2LS_REQ_SAVE_CHAR_TUTOR = client.get_packet(P_CL2LS_REQ_SAVE_CHAR_TUTOR)?;
+    let pkt: &sP_CL2LS_REQ_SAVE_CHAR_TUTOR = pkt.get(P_CL2LS_REQ_SAVE_CHAR_TUTOR)?;
     let pc_uid = pkt.iPC_UID;
     let player = state
         .get_players_mut(acc_id)?
@@ -486,6 +502,7 @@ pub fn save_char_tutor(client: &mut FFClient, state: &mut LoginServerState) -> F
             Severity::Warning,
             format!("Couldn't get player {}", pc_uid),
         ))?;
+
     if pkt.iTutorialFlag == 1 {
         player.set_tutorial_done();
         let player_saved = player.clone();
@@ -499,13 +516,14 @@ pub fn save_char_tutor(client: &mut FFClient, state: &mut LoginServerState) -> F
 }
 
 pub fn char_select(
+    pkt: Packet,
     client_key: usize,
-    clients: &mut HashMap<usize, FFClient>,
+    clients: &HashMap<usize, FFClient>,
     state: &mut LoginServerState,
 ) -> FFResult<()> {
-    let client = clients.get_mut(&client_key).unwrap();
-    if let ClientType::GameClient { account_id, .. } = client.client_type {
-        let pkt: &sP_CL2LS_REQ_CHAR_SELECT = client.get_packet(P_CL2LS_REQ_CHAR_SELECT)?;
+    let client = clients.get(&client_key).unwrap();
+    if let ClientType::GameClient { account_id, .. } = client.get_client_type() {
+        let pkt: &sP_CL2LS_REQ_CHAR_SELECT = pkt.get(P_CL2LS_REQ_CHAR_SELECT)?;
         let pc_uid = pkt.iPC_UID;
         let players = state.get_players_mut(account_id)?;
         let player = players.get(&pc_uid).ok_or(FFError::build(
@@ -527,16 +545,20 @@ pub fn char_select(
         )?;
 
         let pkt = sP_LS2CL_REP_CHAR_SELECT_SUCC { UNUSED: unused!() };
-        client.send_packet(P_LS2CL_REP_CHAR_SELECT_SUCC, &pkt)
+        client.send_packet(P_LS2CL_REP_CHAR_SELECT_SUCC, &pkt);
+        Ok(())
     } else {
         Err(FFError::build(
             Severity::Warning,
-            format!("Client is not a game client ({:?})", client.client_type),
+            format!(
+                "Client is not a game client ({:?})",
+                client.get_client_type()
+            ),
         ))
     }
 }
 
-pub fn shard_list_info(client: &mut FFClient, state: &mut LoginServerState) -> FFResult<()> {
+pub fn shard_list_info(client: &FFClient, state: &mut LoginServerState) -> FFResult<()> {
     // client is hardcoded to shard 1 for this at the time of writing
     let shard_id = 1; // pkt.iShardNum some day?
     let mut statuses = [0; MAX_NUM_CHANNELS + 1];
@@ -545,57 +567,60 @@ pub fn shard_list_info(client: &mut FFClient, state: &mut LoginServerState) -> F
     let resp = sP_LS2CL_REP_SHARD_LIST_INFO_SUCC {
         aShardConnectFlag: statuses,
     };
-    client.send_packet(P_LS2CL_REP_SHARD_LIST_INFO_SUCC, &resp)
+    client.send_packet(P_LS2CL_REP_SHARD_LIST_INFO_SUCC, &resp);
+    Ok(())
 }
 
 pub fn shard_select(
+    pkt: Packet,
     client_key: usize,
-    clients: &mut HashMap<usize, FFClient>,
+    clients: &HashMap<usize, FFClient>,
     state: &mut LoginServerState,
     time: SystemTime,
 ) -> FFResult<()> {
-    let client = clients.get_mut(&client_key).unwrap();
-    let pkt: sP_CL2LS_REQ_SHARD_SELECT = *client.get_packet(P_CL2LS_REQ_SHARD_SELECT)?;
+    let client = clients.get(&client_key).unwrap();
+    let pkt: sP_CL2LS_REQ_SHARD_SELECT = *pkt.get(P_CL2LS_REQ_SHARD_SELECT)?;
     let req_shard_id = pkt.ShardNum as i32;
-    if let ClientType::GameClient { account_id, .. } = client.client_type {
+    if let ClientType::GameClient { account_id, .. } = client.get_client_type() {
         let mut error_code = 1; // "Shard connection error"
-        catch_fail(
-            (|| {
-                let pc_uid = match state.get_selected_player_id(account_id)? {
-                    Some(uid) => uid,
-                    None => {
-                        error_code = 2; // "Selected character error"
-                        return Err(FFError::build(
-                            Severity::Warning,
-                            format!("No selected player for account {}", account_id),
-                        ));
-                    }
-                };
+        (|| -> FFResult<()> {
+            let pc_uid = match state.get_selected_player_id(account_id)? {
+                Some(uid) => uid,
+                None => {
+                    error_code = 2; // "Selected character error"
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!("No selected player for account {}", account_id),
+                    ));
+                }
+            };
 
-                let channel_num = state.get_pending_channel_request(pc_uid);
+            let channel_num = state.get_pending_channel_request(pc_uid);
 
-                let shard_id = if req_shard_id == 0 {
-                    None
-                } else {
-                    Some(req_shard_id)
-                };
+            let shard_id = if req_shard_id == 0 {
+                None
+            } else {
+                Some(req_shard_id)
+            };
 
-                state.request_shard_connection(account_id, shard_id, channel_num)?;
-                state.process_shard_connection_requests(clients, time);
-                Ok(())
-            })(),
-            || {
-                let client = clients.get_mut(&client_key).unwrap();
-                let resp = sP_LS2CL_REP_SHARD_SELECT_FAIL {
-                    iErrorCode: error_code,
-                };
-                client.send_packet(P_LS2CL_REP_SHARD_SELECT_FAIL, &resp)
-            },
-        )
+            state.request_shard_connection(account_id, shard_id, channel_num)?;
+            state.process_shard_connection_requests(clients, time);
+            Ok(())
+        })()
+        .catch_fail(|| {
+            let client = clients.get(&client_key).unwrap();
+            let resp = sP_LS2CL_REP_SHARD_SELECT_FAIL {
+                iErrorCode: error_code,
+            };
+            client.send_packet(P_LS2CL_REP_SHARD_SELECT_FAIL, &resp)
+        })
     } else {
         Err(FFError::build(
             Severity::Warning,
-            format!("Client is not a game client ({:?})", client.client_type),
+            format!(
+                "Client is not a game client ({:?})",
+                client.get_client_type()
+            ),
         ))
     }
 }

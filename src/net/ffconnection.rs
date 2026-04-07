@@ -27,6 +27,11 @@ use crate::{
 
 pub enum ClientMessage {
     SendPacket(Packet),
+    UpdateEncryption {
+        new_e_key: Option<u64>,
+        new_fe_key: Option<u64>,
+        new_mode: Option<EncryptionMode>,
+    },
     Shutdown,
 }
 
@@ -112,6 +117,21 @@ impl FFConnection {
                     ClientMessage::Shutdown => {
                         self.should_dc = true;
                         continue;
+                    }
+                    ClientMessage::UpdateEncryption {
+                        new_e_key,
+                        new_fe_key,
+                        new_mode,
+                    } => {
+                        if let Some(e_key) = new_e_key {
+                            self.e_key = e_key;
+                        }
+                        if let Some(fe_key) = new_fe_key {
+                            self.fe_key = fe_key;
+                        }
+                        if let Some(enc_mode) = new_mode {
+                            self.enc_mode = enc_mode;
+                        }
                     }
                 },
                 Event::PacketReady(Err(e)) => {
