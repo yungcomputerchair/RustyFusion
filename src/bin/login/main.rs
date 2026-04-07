@@ -24,6 +24,8 @@ use rusty_fusion::{
     tui::{LoginTui, Tui as _},
     unused, util,
 };
+
+use futures::StreamExt;
 use tokio::sync::Mutex;
 
 #[tokio::main]
@@ -104,8 +106,8 @@ async fn main() -> FFResult<()> {
         ),
     );
 
-    let mut running = true;
-    while running {
+    let mut key_event_stream = ce::EventStream::new();
+    loop {
         // Check timers
         tokio::select! {
             res = server.poll() => {
@@ -114,25 +116,34 @@ async fn main() -> FFResult<()> {
                     break;
                 }
             }
-            _ = tui_timer.tick() => {
-                // process events
-                while let Ok(true) = ce::poll(Duration::ZERO) {
-                    if let ce::Event::Key(key_event) = ce::read().unwrap() {
-                        if util::is_ctrl_c(&key_event) {
-                            running = false;
-                        }
-                        match key_event.code {
-                            KeyCode::Up => tui.state.scroll(1),
-                            KeyCode::Down => tui.state.scroll(-1),
-                            KeyCode::PageUp => tui.state.scroll(10),
-                            KeyCode::PageDown => tui.state.scroll(-10),
-                            KeyCode::Esc => tui.state.reset_scroll(),
-                            _ => {}
+            ke = key_event_stream.next() => {
+                match ke {
+                    Some(Ok(event)) => {
+                        if let ce::Event::Key(key_event) = event {
+                            if util::is_ctrl_c(&key_event) {
+                                break;
+                            }
+                            match key_event.code {
+                                KeyCode::Up => tui.state.scroll(1),
+                                KeyCode::Down => tui.state.scroll(-1),
+                                KeyCode::PageUp => tui.state.scroll(10),
+                                KeyCode::PageDown => tui.state.scroll(-10),
+                                KeyCode::Esc => tui.state.reset_scroll(),
+                                _ => {}
+                            }
                         }
                     }
+                    Some(Err(e)) => {
+                        log(Severity::Warning, &format!("Error reading key event: {}", e));
+                    }
+                    None => {
+                        // should not happen
+                        log(Severity::Fatal, "Key event stream ended unexpectedly");
+                        break;
+                    }
                 }
-
-                // render
+            }
+            _ = tui_timer.tick() => {
                 let clients = server.get_clients().await;
                 let state = state.lock().await;
                 if let Err(e) = terminal.draw(|frame| tui.render(frame, &state, &clients)) {
