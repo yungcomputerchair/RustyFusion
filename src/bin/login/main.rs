@@ -229,10 +229,12 @@ fn handle_packet<'a>(
     pkt: Packet,
     key: usize,
     clients: &'a HashMap<usize, FFClient>,
-    state: &'a mut LoginServerState,
+    state: Arc<Mutex<LoginServerState>>,
 ) -> Pin<Box<dyn Future<Output = FFResult<()>> + Send + 'a>> {
     Box::pin(async move {
         let time = SystemTime::now();
+        let mut state = state.lock().await;
+        let state = &mut *state;
         let client = clients.get(&key).unwrap();
         match pkt.id() {
             P_FE2LS_REQ_AUTH_CHALLENGE => shard::auth_challenge(client),

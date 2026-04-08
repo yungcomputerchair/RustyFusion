@@ -6,9 +6,11 @@ use std::{
     ops::{Deref, DerefMut},
     pin::Pin,
     slice::from_raw_parts,
+    sync::Arc,
 };
 
-use parking_lot::Mutex;
+use parking_lot as pl;
+use tokio::sync::Mutex;
 
 use self::packet::{
     FFPacket,
@@ -66,7 +68,7 @@ pub type PacketCallback<S> = for<'a> fn(
     Packet,
     usize,
     &'a HashMap<usize, FFClient>,
-    &'a mut S,
+    Arc<Mutex<S>>,
 ) -> Pin<Box<dyn Future<Output = FFResult<()>> + Send + 'a>>;
 pub type DisconnectCallback<S> = fn(usize, &HashMap<usize, FFClient>, &mut S);
 pub type LiveCheckCallback = fn(&FFClient);
@@ -201,15 +203,17 @@ fn struct_to_bytes<T: FFPacket>(pkt: &T) -> &[u8] {
 
 pub struct ClientMap<'a> {
     key: usize,
-    login_server_key: Mutex<Option<usize>>,
     clients: &'a HashMap<usize, FFClient>,
+
+    // we use parking_lot's Mutex here for pure sync access
+    login_server_key: pl::Mutex<Option<usize>>,
 }
 impl<'a> ClientMap<'a> {
     pub fn new(key: usize, clients: &'a HashMap<usize, FFClient>) -> Self {
         Self {
             key,
-            login_server_key: Mutex::new(None),
             clients,
+            login_server_key: pl::Mutex::new(None),
         }
     }
 

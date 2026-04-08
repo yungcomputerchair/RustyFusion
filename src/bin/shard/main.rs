@@ -246,11 +246,19 @@ fn handle_packet<'a>(
     pkt: Packet,
     key: usize,
     clients: &'a HashMap<usize, FFClient>,
-    state: &'a mut ShardServerState,
+    state: Arc<Mutex<ShardServerState>>,
 ) -> Pin<Box<dyn Future<Output = FFResult<()>> + Send + 'a>> {
     Box::pin(async move {
         let time = SystemTime::now();
         let clients = ClientMap::new(key, clients);
+
+        // This packet handler uses the state lock directly for efficiency with the DB load
+        if pkt.id() == P_CL2FE_REQ_PC_ENTER {
+            return pc::pc_enter(pkt, &clients, key, state, time).await;
+        }
+
+        let mut state = state.lock().await;
+        let state = &mut *state;
         match pkt.id() {
             P_LS2FE_REP_AUTH_CHALLENGE => login::login_connect_challenge(pkt, clients.get_self()),
             P_LS2FE_REP_CONNECT_SUCC => login::login_connect_succ(pkt, clients.get_self(), state),
@@ -284,7 +292,7 @@ fn handle_packet<'a>(
             //
             P_CL2LS_REQ_LOGIN => wrong_server(pkt, clients.get_self()),
             //
-            P_CL2FE_REQ_PC_ENTER => pc::pc_enter(pkt, &clients, key, state, time).await,
+            P_CL2FE_REQ_PC_ENTER => unreachable!(),
             P_CL2FE_REQ_PC_LOADING_COMPLETE => pc::pc_loading_complete(pkt, &clients, state),
             P_CL2FE_REQ_PC_CHANNEL_NUM => pc::pc_channel_num(clients.get_self(), state),
             P_CL2FE_REQ_CHANNEL_INFO => pc::pc_channel_info(clients.get_self(), state),

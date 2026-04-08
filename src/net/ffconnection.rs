@@ -146,8 +146,9 @@ impl<S: Send + 'static> FFConnection<S> {
                 }
                 Event::PacketReady(Ok(pkt)) => {
                     let clients = self.clients.read().await;
-                    let mut state = self.state.lock().await;
-                    if let Err(e) = (self.pkt_handler)(pkt, self.key, &clients, &mut state).await {
+                    if let Err(e) =
+                        (self.pkt_handler)(pkt, self.key, &clients, self.state.clone()).await
+                    {
                         let should_dc = e.should_dc();
                         log_error(e);
                         if should_dc {

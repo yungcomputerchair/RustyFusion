@@ -1,4 +1,7 @@
-use std::time::{Duration, SystemTime};
+use std::{
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 
 use rusty_fusion::{
     chunk::{TickMode, MAP_SQUARE_SIZE},
@@ -17,57 +20,77 @@ use rusty_fusion::{
     tabledata::tdata_get,
     unused, util, Position,
 };
+use tokio::sync::Mutex;
 
 pub async fn pc_enter(
     pkt: Packet,
     clients: &ClientMap<'_>,
     key: usize,
-    state: &mut ShardServerState,
+    state_lock: Arc<Mutex<ShardServerState>>,
     time: SystemTime,
 ) -> FFResult<()> {
     let pkt: &sP_CL2FE_REQ_PC_ENTER = pkt.get(P_CL2FE_REQ_PC_ENTER)?;
     let serial_key: i64 = pkt.iEnterSerialKey;
-    let Some(login_data) = state.login_data.remove(&serial_key) else {
-        return Err(FFError::build(Severity::Warning, format!("Login data for serial key {} missing; double check your shard's external IP config", serial_key)));
-    };
+    let enter_serial_key = pkt.iEnterSerialKey;
 
-    log(
-        Severity::Info,
-        &format!(
-            "Loading player {} with pending channel {}",
-            login_data.iPC_UID, login_data.iChannelRequestNum
-        ),
-    );
+    // Phase 1: validate, kick duplicate, reserve ID (lock held)
+    let (login_data, pc_id, existing_player) = {
+        let mut state = state_lock.lock().await;
+        let Some(login_data) = state.login_data.remove(&serial_key) else {
+            return Err(FFError::build(Severity::Warning, format!("Login data for serial key {} missing; double check your shard's external IP config", serial_key)));
+        };
 
-    // check if this player is already in the shard and kick if so.
-    // important that we save the current player to DB first to avoid state desync
-    if let Some(existing_pc_id) = state
-        .get_player_by_uid(login_data.iPC_UID)
-        .map(|p| p.get_player_id())
-    {
         log(
-            Severity::Warning,
+            Severity::Info,
             &format!(
-                "Player with UID {} already in the shard as player {}; kicking...",
-                login_data.iPC_UID, existing_pc_id
+                "Loading player {} with pending channel {}",
+                login_data.iPC_UID, login_data.iChannelRequestNum
             ),
         );
 
-        let existing_player = state.get_player(existing_pc_id).unwrap();
-        let existing_client = existing_player.get_client(clients).unwrap();
-        let pkt = sP_FE2CL_REP_PC_EXIT_DUPLICATE {
-            iErrorCode: unused!(),
+        // check if this player is already in the shard and kick if so.
+        // take ownership of the existing Player to avoid a redundant DB load.
+        let existing_player = if let Some(existing_pc_id) = state
+            .get_player_by_uid(login_data.iPC_UID)
+            .map(|p| p.get_player_id())
+        {
+            log(
+                Severity::Warning,
+                &format!(
+                    "Player with UID {} already in the shard as player {}; kicking...",
+                    login_data.iPC_UID, existing_pc_id
+                ),
+            );
+
+            let existing_player = state.get_player(existing_pc_id).unwrap();
+            let existing_client = existing_player.get_client(clients).unwrap();
+            let pkt = sP_FE2CL_REP_PC_EXIT_DUPLICATE {
+                iErrorCode: unused!(),
+            };
+
+            existing_client.send_packet(P_FE2CL_REP_PC_EXIT_DUPLICATE, &pkt);
+            Some(Player::disconnect(existing_pc_id, &mut state, clients))
+        } else {
+            None
         };
 
-        existing_client.send_packet(P_FE2CL_REP_PC_EXIT_DUPLICATE, &pkt);
-        Player::disconnect(existing_pc_id, state, clients); // saves to DB synchronously
-    }
+        let pc_id = state.entity_map.gen_next_pc_id();
+        (login_data, pc_id, existing_player)
+        // lock released here
+    };
 
-    let pc_id = state.entity_map.gen_next_pc_id();
-    let db = db_get();
-    let mut player = db
-        .load_player(login_data.iAccountID, login_data.iPC_UID)
-        .await?;
+    // Phase 2: get the player, either from the existing session or from DB (lock NOT held)
+    let mut player = match existing_player {
+        Some(player) => player,
+        None => {
+            let db = db_get();
+            db.load_player(login_data.iAccountID, login_data.iPC_UID)
+                .await?
+        }
+    };
+
+    // Phase 3: insert player into state (re-acquire lock)
+    let mut state = state_lock.lock().await;
 
     player.set_player_id(pc_id);
     player.set_client_id(key);
@@ -94,7 +117,7 @@ pub async fn pc_enter(
     let client = clients.get_self();
     client.set_client_type(ClientType::GameClient {
         account_id: login_data.iAccountID,
-        serial_key: pkt.iEnterSerialKey,
+        serial_key: enter_serial_key,
         pc_id: Some(pc_id),
     });
 
