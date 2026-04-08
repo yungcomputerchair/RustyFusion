@@ -183,7 +183,7 @@ pub async fn pc_enter(
     Ok(())
 }
 
-pub async fn pc_exit(clients: &ClientMap<'_>, state: &mut ShardServerState) -> FFResult<()> {
+pub async fn pc_exit(clients: &ClientMap<'_>, state: Arc<Mutex<ShardServerState>>) -> FFResult<()> {
     let client = clients.get_self();
     let pc_id = client.get_player_id()?;
 
@@ -201,7 +201,10 @@ pub async fn pc_exit(clients: &ClientMap<'_>, state: &mut ShardServerState) -> F
     // need to send this before disconnecting so it actually goes through
     client.send_packet(P_FE2CL_REP_PC_EXIT_SUCC, &resp);
 
-    let player = Player::disconnect(pc_id, state, clients);
+    let player = {
+        let mut state = state.lock().await;
+        Player::disconnect(pc_id, &mut state, clients)
+    };
 
     // save to db
     let db = db_get();

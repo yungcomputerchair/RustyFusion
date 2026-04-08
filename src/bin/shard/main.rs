@@ -255,15 +255,20 @@ fn handle_packet<'a>(
     Box::pin(async move {
         let time = SystemTime::now();
         let clients = ClientMap::new(key, clients);
+        let pkt_id = pkt.id();
 
-        // This packet handler uses the state lock directly for efficiency with the DB load
-        if pkt.id() == P_CL2FE_REQ_PC_ENTER {
+        // These packet handlers use the state lock directly for efficiency with the DB
+        if pkt_id == P_CL2FE_REQ_PC_ENTER {
             return pc::pc_enter(pkt, &clients, key, state, time).await;
+        }
+
+        if pkt_id == P_CL2FE_REQ_PC_EXIT {
+            return pc::pc_exit(&clients, state).await;
         }
 
         let mut state = state.lock().await;
         let state = &mut *state;
-        match pkt.id() {
+        match pkt_id {
             P_LS2FE_REP_AUTH_CHALLENGE => login::login_connect_challenge(pkt, clients.get_self()),
             P_LS2FE_REP_CONNECT_SUCC => login::login_connect_succ(pkt, clients.get_self(), state),
             P_LS2FE_REP_CONNECT_FAIL => login::login_connect_fail(pkt),
@@ -320,7 +325,7 @@ fn handle_packet<'a>(
                 pc::pc_first_use_flag_set(pkt, clients.get_self(), state)
             }
             P_CL2FE_REQ_PC_CHANGE_MENTOR => pc::pc_change_mentor(pkt, clients.get_self(), state),
-            P_CL2FE_REQ_PC_EXIT => pc::pc_exit(&clients, state).await,
+            P_CL2FE_REQ_PC_EXIT => unreachable!(),
             //
             P_CL2FE_REQ_PC_GIVE_ITEM => gm::gm_pc_give_item(pkt, clients.get_self(), state),
             P_CL2FE_GM_REQ_PC_SET_VALUE => gm::gm_pc_set_value(pkt, &clients, state),
