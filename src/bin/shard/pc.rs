@@ -48,6 +48,14 @@ pub async fn pc_enter(
             ),
         );
 
+        // guard against a second pc_enter for the same UID while we're doing the DB load
+        if !state.pending_entering_uids.insert(login_data.iPC_UID) {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Player UID {} is already entering", login_data.iPC_UID),
+            ));
+        }
+
         // check if this player is already in the shard and kick if so.
         // take ownership of the existing Player to avoid a redundant DB load.
         let existing_player = if let Some(existing_pc_id) = state
@@ -80,17 +88,32 @@ pub async fn pc_enter(
     };
 
     // Phase 2: get the player, either from the existing session or from DB (lock NOT held)
+    let player_uid = login_data.iPC_UID;
     let mut player = match existing_player {
         Some(player) => player,
         None => {
             let db = db_get();
-            db.load_player(login_data.iAccountID, login_data.iPC_UID)
-                .await?
+            match db
+                .load_player(login_data.iAccountID, login_data.iPC_UID)
+                .await
+            {
+                Ok(player) => player,
+                Err(e) => {
+                    // clean up pending_entering_uids on failure
+                    state_lock
+                        .lock()
+                        .await
+                        .pending_entering_uids
+                        .remove(&player_uid);
+                    return Err(e);
+                }
+            }
         }
     };
 
     // Phase 3: insert player into state (re-acquire lock)
     let mut state = state_lock.lock().await;
+    state.pending_entering_uids.remove(&player_uid);
 
     player.set_player_id(pc_id);
     player.set_client_id(key);

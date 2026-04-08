@@ -1,4 +1,7 @@
-use std::{collections::HashMap, time::SystemTime};
+use std::{
+    collections::{HashMap, HashSet},
+    time::SystemTime,
+};
 
 use rand::thread_rng;
 use uuid::Uuid;
@@ -30,6 +33,7 @@ pub struct ShardServerState {
     pub ongoing_trades: HashMap<Uuid, TradeContext>,
     pub groups: HashMap<Uuid, Group>,
     pub player_uid_to_id: HashMap<i64, i32>,
+    pub pending_entering_uids: HashSet<i64>,
 }
 impl Default for ShardServerState {
     fn default() -> Self {
@@ -42,6 +46,7 @@ impl Default for ShardServerState {
             ongoing_trades: HashMap::new(),
             groups: HashMap::new(),
             player_uid_to_id: HashMap::new(),
+            pending_entering_uids: HashSet::new(),
         };
         let num_channels = config_get().shard.num_channels.get();
         if num_channels == 0 || num_channels > MAX_NUM_CHANNELS as u8 {
