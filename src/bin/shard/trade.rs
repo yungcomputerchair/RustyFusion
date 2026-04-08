@@ -1,7 +1,7 @@
 use uuid::Uuid;
 
 use rusty_fusion::{
-    database::db_get,
+    database::{db_get, Database as _},
     defines::*,
     entity::{Entity, EntityID},
     enums::*,

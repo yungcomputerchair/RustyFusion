@@ -6,7 +6,7 @@ use rand::random;
 use regex::Regex;
 use rusty_fusion::{
     config::config_get,
-    database::db_get,
+    database::{db_get, Database as _},
     defines::*,
     entity::{Combatant, Entity, Player},
     enums::{ItemLocation, ItemType, LoginType, PlayerNameStatus},

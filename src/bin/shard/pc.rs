@@ -6,7 +6,7 @@ use std::{
 use rusty_fusion::{
     chunk::{TickMode, MAP_SQUARE_SIZE},
     config::config_get,
-    database::db_get,
+    database::{db_get, Database as _},
     defines::*,
     entity::{Combatant, Entity, EntityID, Player},
     enums::*,

@@ -497,7 +497,10 @@ mod helpers {
 mod commands {
     use std::{collections::HashMap, future::Future, pin::Pin, sync::OnceLock, time::SystemTime};
 
-    use rusty_fusion::{ai::AI, database::db_get};
+    use rusty_fusion::{
+        ai::AI,
+        database::{db_get, Database as _},
+    };
 
     use super::*;
 

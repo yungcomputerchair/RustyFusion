@@ -358,7 +358,7 @@ impl LoginServerState {
         shard_id: Option<i32>,
         channel_num: Option<u8>,
     ) -> FFResult<()> {
-        const SHARD_CONN_TIMEOUT_SEC: u64 = 20;
+        const SHARD_CONN_TIMEOUT_SEC: u64 = 60;
         let session = self.get_session_mut(acc_id)?;
         session.shard_connection_request = Some(ShardConnectionRequest {
             shard_id,

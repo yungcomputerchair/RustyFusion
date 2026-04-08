@@ -43,7 +43,7 @@ impl std::fmt::Debug for PostgresDatabase {
     }
 }
 impl PostgresDatabase {
-    pub async fn connect(config: &GeneralConfig) -> FFResult<Box<dyn Database + Sync>> {
+    pub async fn connect(config: &GeneralConfig) -> FFResult<Self> {
         let mut db_config = deadpool_postgres::Config::new();
         db_config.host = Some(config.db_host.get());
         db_config.port = Some(config.db_port.get());
@@ -87,10 +87,10 @@ impl PostgresDatabase {
             .await?;
         }
 
-        Ok(Box::new(Self {
+        Ok(Self {
             pool,
             config: db_config,
-        }))
+        })
     }
 
     fn read_sql(name: &str) -> String {

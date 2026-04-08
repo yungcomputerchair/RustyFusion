@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std::fmt::Debug;
 use std::sync::OnceLock;
 use std::time::SystemTime;
 
@@ -18,10 +19,13 @@ type BigInt = i64;
 type Text = String;
 type Bytes = Vec<u8>;
 
-static DB: OnceLock<Box<dyn Database + Sync>> = OnceLock::new();
+#[cfg(feature = "postgres")]
+type DbBackend = postgresql::PostgresDatabase;
+
+static DB: OnceLock<DbBackend> = OnceLock::new();
 
 #[async_trait]
-pub trait Database: Send + Sync + std::fmt::Debug {
+pub trait Database: Send + Sync + Debug {
     async fn find_account_from_username(&self, username: &Text) -> FFResult<Option<Account>>;
     async fn find_account_from_player(&self, pc_uid: BigInt) -> FFResult<Account>;
     async fn create_account(&self, username: &Text, password_hashed: &Text) -> FFResult<Account>;
@@ -45,8 +49,8 @@ pub trait Database: Send + Sync + std::fmt::Debug {
 
 const DB_NAME: &str = "rustyfusion";
 
-async fn db_connect(config: &GeneralConfig) -> FFResult<Box<dyn Database + Sync>> {
-    let _db_impl: Option<FFResult<Box<dyn Database + Sync>>> = None;
+async fn db_connect(config: &GeneralConfig) -> FFResult<DbBackend> {
+    let _db_impl: Option<FFResult<DbBackend>> = None;
 
     #[cfg(feature = "postgres")]
     let _db_impl = Some(postgresql::PostgresDatabase::connect(config).await);
@@ -85,8 +89,7 @@ pub async fn db_init() {
     let _ = DB.set(db_impl);
 }
 
-pub fn db_get() -> &'static (dyn Database + Sync) {
+pub fn db_get() -> &'static DbBackend {
     DB.get()
         .unwrap_or_else(|| panic_log("Database not initialized"))
-        .as_ref()
 }
