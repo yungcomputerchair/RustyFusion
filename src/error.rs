@@ -236,6 +236,7 @@ impl Logger {
                 }
             }
         };
+
         Self {
             rx,
             buffer: RingBuffer::new(LOG_BUFFER_SIZE),

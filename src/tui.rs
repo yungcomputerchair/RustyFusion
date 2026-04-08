@@ -353,13 +353,15 @@ impl<'a> Widget for LogWidget<'a> {
             block = block.title_top(scroll_title);
         }
 
+        let inner_area = block.inner(area);
+
         let pg = Paragraph::new(lines)
             .block(block)
             .left_aligned()
             .wrap(Wrap { trim: true });
 
         let lines_to_scroll = pg
-            .line_count(area.width)
+            .line_count(inner_area.width)
             .saturating_sub(area.height as usize)
             .saturating_sub(self.state.get_scroll_offset());
 
