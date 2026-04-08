@@ -208,7 +208,11 @@ fn handle_disconnect(key: usize, clients: &HashMap<usize, FFClient>, state: &mut
             pc_id: Some(pc_id), ..
         } => {
             // dirty exit; clean exit happens in P_CL2FE_REQ_PC_EXIT handler
-            Player::disconnect(pc_id, state, &clients);
+            let player = Player::disconnect(pc_id, state, &clients);
+            tokio::spawn(async move {
+                let db = db_get();
+                log_if_failed(db.save_player(&player).await);
+            });
         }
         ClientType::Unknown => {
             log(
@@ -316,7 +320,7 @@ fn handle_packet<'a>(
                 pc::pc_first_use_flag_set(pkt, clients.get_self(), state)
             }
             P_CL2FE_REQ_PC_CHANGE_MENTOR => pc::pc_change_mentor(pkt, clients.get_self(), state),
-            P_CL2FE_REQ_PC_EXIT => pc::pc_exit(&clients, state),
+            P_CL2FE_REQ_PC_EXIT => pc::pc_exit(&clients, state).await,
             //
             P_CL2FE_REQ_PC_GIVE_ITEM => gm::gm_pc_give_item(pkt, clients.get_self(), state),
             P_CL2FE_GM_REQ_PC_SET_VALUE => gm::gm_pc_set_value(pkt, &clients, state),

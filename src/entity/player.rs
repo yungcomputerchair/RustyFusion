@@ -1318,7 +1318,7 @@ impl Player {
 
         let uid = player.get_uid();
         let client = player.get_client(clients).unwrap().clone();
-        let player_saved = player.clone();
+        let player_snapshot = player.clone();
 
         state.player_uid_to_id.remove(&uid);
 
@@ -1328,8 +1328,9 @@ impl Player {
         let mut player = entity_map.untrack(id);
         player.cleanup(clients, state);
 
+        let _ = client.clear_player_id();
         client.disconnect();
-        player_saved
+        player_snapshot
     }
 
     fn tick_skyway_ride(
