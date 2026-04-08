@@ -11,30 +11,29 @@ use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 use crate::{
     error::{log, FFError, FFResult, Severity},
     net::{ClientMetadata, FFConnection, ServerMessage},
-    state::ServerState,
 };
 
 use super::{ClientType, DisconnectCallback, FFClient, LiveCheckCallback, PacketCallback};
 
-pub struct FFServer {
+pub struct FFServer<S: Send + 'static> {
     sock: TcpListener,
     next_client_key: usize,
-    pkt_handler: PacketCallback,
-    dc_handler: Option<DisconnectCallback>,
+    pkt_handler: PacketCallback<S>,
+    dc_handler: Option<DisconnectCallback<S>>,
     live_check: Option<(Duration, LiveCheckCallback)>,
     clients: Arc<RwLock<HashMap<usize, FFClient>>>,
-    state: Arc<Mutex<ServerState>>,
+    state: Arc<Mutex<S>>,
     event_tx: UnboundedSender<ServerMessage>,
     event_rx: UnboundedReceiver<ServerMessage>,
 }
 
-impl FFServer {
+impl<S: Send + 'static> FFServer<S> {
     pub async fn new(
         addr: SocketAddr,
-        pkt_handler: PacketCallback,
-        dc_handler: Option<DisconnectCallback>,
+        pkt_handler: PacketCallback<S>,
+        dc_handler: Option<DisconnectCallback<S>>,
         live_check: Option<(Duration, LiveCheckCallback)>,
-        state: Arc<Mutex<ServerState>>,
+        state: Arc<Mutex<S>>,
     ) -> FFResult<Self> {
         let sock = TcpListener::bind(addr).await?;
         let (event_tx, event_rx) = mpsc::unbounded_channel();

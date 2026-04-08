@@ -19,7 +19,7 @@ use rusty_fusion::{
         packet::{PacketID::*, *},
         ClientType, FFClient, FFServer,
     },
-    state::{LoginServerState, ServerState},
+    state::LoginServerState,
     tabledata::tdata_init,
     tui::{LoginTui, Tui as _},
     unused, util,
@@ -83,8 +83,8 @@ async fn main() -> FFResult<()> {
         );
     }
 
-    let state = ServerState::new_login();
-    let server_id = state.as_login().server_id;
+    let state = LoginServerState::default();
+    let server_id = state.server_id;
 
     let state = Arc::new(Mutex::new(state));
     let live_check_time = Duration::from_secs(config.general.live_check_time.get());
@@ -157,12 +157,12 @@ async fn main() -> FFResult<()> {
             }
             _ = shard_conn_timer.tick() => {
                 let clients = server.get_clients().await;
-                state.lock().await.as_login_mut()
+                state.lock().await
                     .process_shard_connection_requests(&clients, SystemTime::now());
             }
             _ = monitor_timer.tick() => {
                 if monitor_enabled {
-                    log_if_failed(send_monitor_update(state.lock().await.as_login()));
+                    log_if_failed(send_monitor_update(&*state.lock().await));
                 }
             }
             _ = logger_timer.tick() => {
@@ -188,8 +188,7 @@ impl Drop for Cleanup {
     }
 }
 
-fn handle_disconnect(key: usize, clients: &HashMap<usize, FFClient>, state: &mut ServerState) {
-    let state = state.as_login_mut();
+fn handle_disconnect(key: usize, clients: &HashMap<usize, FFClient>, state: &mut LoginServerState) {
     let client = clients.get(&key).unwrap();
     match client.get_client_type() {
         ClientType::ShardServer(shard_id) => {
@@ -230,11 +229,10 @@ fn handle_packet<'a>(
     pkt: Packet,
     key: usize,
     clients: &'a HashMap<usize, FFClient>,
-    state: &'a mut ServerState,
+    state: &'a mut LoginServerState,
 ) -> Pin<Box<dyn Future<Output = FFResult<()>> + Send + 'a>> {
     Box::pin(async move {
         let time = SystemTime::now();
-        let state = state.as_login_mut();
         let client = clients.get(&key).unwrap();
         match pkt.id() {
             P_FE2LS_REQ_AUTH_CHALLENGE => shard::auth_challenge(client),

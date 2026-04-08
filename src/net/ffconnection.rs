@@ -25,7 +25,6 @@ use crate::{
         ClientType, FFClient, LiveCheckCallback, PacketBuffer, PacketCallback, PACKET_BUFFER_SIZE,
         PACKET_LENGTH_SIZE, SILENCED_PACKETS, UNKNOWN_CT_ALLOWED_PACKETS,
     },
-    state::ServerState,
 };
 
 pub enum ClientMessage {
@@ -43,7 +42,7 @@ pub enum ServerMessage {
     ClientDisconnected(usize),
 }
 
-pub struct FFConnection {
+pub struct FFConnection<S: Send + 'static> {
     key: usize,
     sock: TcpStream,
     in_buf: Arc<PacketBuffer>,
@@ -54,22 +53,22 @@ pub struct FFConnection {
     live_check_time: Option<Instant>,
     ignore_packets: bool,
     //
-    pkt_handler: PacketCallback,
+    pkt_handler: PacketCallback<S>,
     live_check: Option<(Duration, LiveCheckCallback)>,
     //
     client: FFClient,
     clients: Arc<RwLock<HashMap<usize, FFClient>>>,
-    state: Arc<Mutex<ServerState>>,
+    state: Arc<Mutex<S>>,
 }
-impl FFConnection {
+impl<S: Send + 'static> FFConnection<S> {
     pub fn new(
         key: usize,
         sock: TcpStream,
         client: FFClient,
-        pkt_handler: PacketCallback,
+        pkt_handler: PacketCallback<S>,
         live_check: Option<(Duration, LiveCheckCallback)>,
         clients: Arc<RwLock<HashMap<usize, FFClient>>>,
-        state: Arc<Mutex<ServerState>>,
+        state: Arc<Mutex<S>>,
     ) -> Self {
         Self {
             key,

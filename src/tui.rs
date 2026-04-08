@@ -14,7 +14,7 @@ use crate::{
     entity::Entity,
     error::{FFError, Severity},
     net::{ClientMap, FFClient},
-    state::{LoginServerState, ServerState, ShardServerState},
+    state::{LoginServerState, ShardServerState},
     tabledata::tdata_get,
     util::{self, RingBuffer},
 };
@@ -100,11 +100,11 @@ impl TuiState {
     }
 }
 
-pub trait Tui {
+pub trait Tui<S> {
     fn render(
         &mut self,
         frame: &mut Frame,
-        server_state: &ServerState,
+        server_state: &S,
         clients: &HashMap<usize, FFClient>,
         log_buffer: &RingBuffer<FFError>,
     );
@@ -123,11 +123,11 @@ impl Default for LoginTui {
         }
     }
 }
-impl Tui for LoginTui {
+impl Tui<LoginServerState> for LoginTui {
     fn render(
         &mut self,
         frame: &mut Frame,
-        server_state: &ServerState,
+        server_state: &LoginServerState,
         clients: &HashMap<usize, FFClient>,
         log_buffer: &RingBuffer<FFError>,
     ) {
@@ -143,7 +143,6 @@ impl Tui for LoginTui {
         frame.render_widget(log_widget, layout[0]);
 
         let clients = ClientMap::new(0, clients);
-        let server_state = server_state.as_login();
         let shard_list_widget = ShardListWidget {
             login_state: server_state,
             clients: &clients,
@@ -266,11 +265,11 @@ impl Default for ShardTui {
         }
     }
 }
-impl Tui for ShardTui {
+impl Tui<ShardServerState> for ShardTui {
     fn render(
         &mut self,
         frame: &mut Frame,
-        server_state: &ServerState,
+        server_state: &ShardServerState,
         clients: &HashMap<usize, FFClient>,
         log_buffer: &RingBuffer<FFError>,
     ) {
@@ -290,7 +289,6 @@ impl Tui for ShardTui {
         };
         frame.render_widget(log_widget, inner_layout_left[0]);
 
-        let server_state = server_state.as_shard();
         let clients = ClientMap::new(0, clients);
 
         let player_list_widget = PlayerListWidget {

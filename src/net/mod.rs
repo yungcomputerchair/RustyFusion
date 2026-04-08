@@ -18,7 +18,6 @@ use self::packet::{
 use crate::{
     error::{log, FFError, FFResult, Severity},
     net::packet::Packet,
-    state::ServerState,
 };
 
 const PACKET_BUFFER_SIZE: usize = 4096; // payload buffer size; includes ID, but not length
@@ -63,13 +62,13 @@ pub use ffserver::*;
 pub mod crypto;
 pub mod packet;
 
-pub type PacketCallback = for<'a> fn(
+pub type PacketCallback<S> = for<'a> fn(
     Packet,
     usize,
     &'a HashMap<usize, FFClient>,
-    &'a mut ServerState,
+    &'a mut S,
 ) -> Pin<Box<dyn Future<Output = FFResult<()>> + Send + 'a>>;
-pub type DisconnectCallback = fn(usize, &HashMap<usize, FFClient>, &mut ServerState);
+pub type DisconnectCallback<S> = fn(usize, &HashMap<usize, FFClient>, &mut S);
 pub type LiveCheckCallback = fn(&FFClient);
 
 #[derive(Clone, Copy)]

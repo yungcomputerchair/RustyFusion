@@ -19,7 +19,7 @@ use rusty_fusion::{
         packet::{PacketID::*, *},
         ClientMap, ClientType, FFClient, FFServer,
     },
-    state::{ServerState, ShardServerState},
+    state::ShardServerState,
     tabledata::tdata_init,
     tui::{ShardTui, Tui as _},
     unused, util,
@@ -65,7 +65,7 @@ async fn main() -> FFResult<()> {
     );
     let mut slow_timer = util::make_timer(Duration::from_secs(1), false);
 
-    let state = Arc::new(Mutex::new(ServerState::new_shard()));
+    let state = Arc::new(Mutex::new(ShardServerState::default()));
     let live_check_time = Duration::from_secs(config.general.live_check_time.get());
     let listen_addr = config_get().shard.listen_addr.get();
     let mut server = FFServer::new(
@@ -133,34 +133,33 @@ async fn main() -> FFResult<()> {
             _ = entity_timer.tick() => {
                 let clients = server.get_clients().await;
                 let client_map = ClientMap::new(0, &clients);
-                state.lock().await.as_shard_mut()
+                state.lock().await
                     .tick_entities(SystemTime::now(), &client_map);
             }
             _ = slow_timer.tick() => {
                 let clients = server.get_clients().await;
                 let client_map = ClientMap::new(0, &clients);
                 let mut state = state.lock().await;
-                let shard = state.as_shard_mut();
-                shard.tick_garbage_collection(&client_map);
-                shard.tick_groups(&client_map);
+                state.tick_garbage_collection(&client_map);
+                state.tick_groups(&client_map);
             }
             _ = vehicle_timer.tick() => {
                 let clients = server.get_clients().await;
                 let client_map = ClientMap::new(0, &clients);
-                state.lock().await.as_shard_mut()
+                state.lock().await
                     .check_for_expired_vehicles(SystemTime::now(), &client_map);
             }
             _ = login_conn_timer.tick() => {
-                log_if_failed(connect_to_login_server(&mut server, state.lock().await.as_shard_mut()).await);
+                log_if_failed(connect_to_login_server(&mut server, &mut *state.lock().await).await);
             }
             _ = status_timer.tick() => {
                 let clients = server.get_clients().await;
                 let client_map = ClientMap::new(0, &clients);
-                log_if_failed(send_status_to_login_server(&client_map, state.lock().await.as_shard()));
+                log_if_failed(send_status_to_login_server(&client_map, &*state.lock().await));
             }
             _ = save_timer.tick() => {
                 let state = state.lock().await;
-                let _ = do_save(state.as_shard());
+                let _ = do_save(&state);
             }
             _ = logger_timer.tick() => {
                 logger.flush();
@@ -178,12 +177,12 @@ async fn main() -> FFResult<()> {
     let _ = terminal.draw(|frame| tui.render(frame, &state, &clients, logger.buffer()));
 
     // save players
-    if let Some(handle) = do_save(state.as_shard()) {
+    if let Some(handle) = do_save(&state) {
         let _ = handle.await;
     }
 
     let client_map = ClientMap::new(0, &clients);
-    shutdown_notify_clients(&client_map, state.as_shard());
+    shutdown_notify_clients(&client_map, &state);
     Ok(())
 }
 
@@ -194,8 +193,7 @@ impl Drop for Cleanup {
     }
 }
 
-fn handle_disconnect(key: usize, clients: &HashMap<usize, FFClient>, state: &mut ServerState) {
-    let state = state.as_shard_mut();
+fn handle_disconnect(key: usize, clients: &HashMap<usize, FFClient>, state: &mut ShardServerState) {
     let clients = ClientMap::new(key, clients);
     let client = clients.get_self();
     match client.get_client_type() {
@@ -248,11 +246,10 @@ fn handle_packet<'a>(
     pkt: Packet,
     key: usize,
     clients: &'a HashMap<usize, FFClient>,
-    state: &'a mut ServerState,
+    state: &'a mut ShardServerState,
 ) -> Pin<Box<dyn Future<Output = FFResult<()>> + Send + 'a>> {
     Box::pin(async move {
         let time = SystemTime::now();
-        let state = state.as_shard_mut();
         let clients = ClientMap::new(key, clients);
         match pkt.id() {
             P_LS2FE_REP_AUTH_CHALLENGE => login::login_connect_challenge(pkt, clients.get_self()),
@@ -468,7 +465,7 @@ fn wrong_server(pkt: Packet, client: &FFClient) -> FFResult<()> {
 }
 
 async fn connect_to_login_server(
-    shard_server: &mut FFServer,
+    shard_server: &mut FFServer<ShardServerState>,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     if is_login_server_connected(state) {
