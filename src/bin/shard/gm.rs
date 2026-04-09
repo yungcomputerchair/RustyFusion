@@ -173,6 +173,7 @@ pub fn gm_pc_goto(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState
         y: pkt.iToY,
         z: pkt.iToZ,
     };
+
     let player = state.get_player_mut(pc_id)?;
     player.set_position(new_pos);
     player.instance_id = InstanceID::default();
@@ -372,6 +373,7 @@ pub fn gm_pc_location(
         ),
         TargetSearchBy::PlayerUID => PlayerSearchQuery::ByUID(pkt.iTargetPC_UID),
     };
+
     if let Some(pc_id) = search_query.execute(state) {
         let player = state.get_player(pc_id)?;
         let pos = player.get_position();

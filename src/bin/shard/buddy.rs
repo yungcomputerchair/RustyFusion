@@ -201,6 +201,7 @@ pub fn accept_make_buddy(
             format!("{} did not send buddy request to player {}", buddy, pc_id),
         ));
     }
+
     buddy.buddy_offered_to = None;
 
     (|| {
