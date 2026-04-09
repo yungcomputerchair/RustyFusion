@@ -69,6 +69,7 @@ Password must be 8-32 characters long and contain only letters, numbers, or spec
                 iDuringTime: 10,
                 szAnnounceMsg: util::encode_utf16(PLAINTEXT_PASSWORD_NOT_ALLOWED_MSG).unwrap(),
             };
+
             client.send_packet(P_FE2CL_GM_REP_PC_ANNOUNCE, &announce);
             return Ok(());
         }
@@ -86,6 +87,7 @@ Password must be 8-32 characters long and contain only letters, numbers, or spec
                 iDuringTime: 10,
                 szAnnounceMsg: util::encode_utf16(BAD_USERNAME_REGEX_MSG).unwrap(),
             };
+
             client.send_packet(P_FE2CL_GM_REP_PC_ANNOUNCE, &announce);
             return Ok(());
         }
@@ -99,6 +101,7 @@ Password must be 8-32 characters long and contain only letters, numbers, or spec
                         iDuringTime: 10,
                         szAnnounceMsg: util::encode_utf16(BAD_PASSWORD_REGEX_MSG).unwrap(),
                     };
+
                     client.send_packet(P_FE2CL_GM_REP_PC_ANNOUNCE, &announce);
                     return Err(FFError::build(
                         Severity::Warning,
@@ -190,6 +193,7 @@ Password must be 8-32 characters long and contain only letters, numbers, or spec
                 iDuringTime: i32::MAX,
                 szAnnounceMsg: util::encode_utf16(&ban_message)?,
             };
+
             client.send_packet(P_FE2CL_GM_REP_PC_ANNOUNCE, &resp);
             return Ok(());
         }

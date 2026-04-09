@@ -38,6 +38,7 @@ pub fn auth_challenge(server: &FFClient) -> FFResult<()> {
         aChallenge: chall_arr,
         aNonce: nonce,
     };
+
     server.send_packet(P_LS2FE_REP_AUTH_CHALLENGE, &resp);
     Ok(())
 }
@@ -93,6 +94,7 @@ pub fn connect(
         uiSvrTime: util::get_timestamp_ms(time),
         aLS_UID: state.server_id.to_bytes_le(),
     };
+
     server.send_packet(P_LS2FE_REP_CONNECT_SUCC, &resp);
 
     let iv1: i32 = resp.aLS_UID.into_iter().reduce(|a, b| a ^ b).unwrap() as i32;
