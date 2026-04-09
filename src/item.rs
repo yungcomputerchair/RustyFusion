@@ -4,7 +4,7 @@ use crate::{
     defines::*,
     entity::RewardData,
     enums::{ItemType, RewardCategory, RewardType},
-    error::{panic_log, FFError, FFResult},
+    error::{FFError, FFResult},
     net::packet::*,
     tabledata::tdata_get,
     util,
@@ -21,7 +21,7 @@ pub struct Item {
 impl Item {
     pub fn new(ty: ItemType, id: i16) -> Self {
         if id == 0 {
-            panic_log("Item ID cannot be 0");
+            panic!("Item ID cannot be 0");
         }
 
         Self {

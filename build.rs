@@ -237,11 +237,12 @@ pub struct Config {{
 {config_fields}
 }}
 impl Config {{
-    fn load(path: &str) -> Option<Self> {{
+    fn load(path: &str) -> FFResult<Self> {{
         #[derive(Deserialize)]
         struct ConfigLayout {{
 {layout_fields}
         }}
+
         let file_read = std::fs::read_to_string(path);
         if let Err(e) = file_read {{
             if let std::io::ErrorKind::NotFound = e.kind() {{
@@ -249,16 +250,28 @@ impl Config {{
                     Severity::Warning,
                     &format!("Config file {{}} missing, using default config", path),
                 );
-                return None;
+
+                return Ok(Self::default());
             }} else {{
-                panic_log(&format!("Can't open config file {{}}: {{}}", path, e));
+                return Err(FFError::build(
+                    Severity::Fatal,
+                    "Failed to read config file".to_string(),
+                ).with_parent(e.into()));
             }}
         }}
+
         let file_contents = file_read.unwrap();
-        let parsed: ConfigLayout = toml::from_str(&file_contents).unwrap_or_else(|e| {{
-            panic_log(&format!("Malformed config file: {{}}", e));
-        }});
-        Some(Config {{
+        let parsed = toml::from_str::<ConfigLayout>(&file_contents);
+        if let Err(e) = parsed {{
+            return Err(FFError::build(
+                Severity::Fatal,
+                format!("Failed to parse config file: {{}}", e),
+            ));
+        }};
+
+        let parsed = parsed.unwrap();
+
+        Ok(Config {{
 {unwrap_fields}
         }})
     }}

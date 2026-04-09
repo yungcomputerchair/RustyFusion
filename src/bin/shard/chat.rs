@@ -646,9 +646,14 @@ mod commands {
                 };
 
                 let pc_uid = player.get_uid();
-                let acc_id = db.find_account_from_player(pc_uid).await.unwrap().id;
+                let Some(acc) = db.find_account_from_player(pc_uid).await? else {
+                    return send_system_message(
+                        client,
+                        &format!("Account not found for player {}", pc_uid),
+                    );
+                };
 
-                acc_id
+                acc.id
             } else {
                 let Ok(acc_id) = tokens[1].parse::<i64>() else {
                     return send_system_message(client, "Invalid account ID");
@@ -929,7 +934,13 @@ mod commands {
             if tokens.get(3).is_some_and(|arg| *arg == "save") {
                 let db = db_get();
                 let saved = async {
-                    let acc = db.find_account_from_player(target_uid).await?;
+                    let acc =
+                        db.find_account_from_player(target_uid)
+                            .await?
+                            .ok_or(FFError::build(
+                                Severity::Warning,
+                                format!("Account not found for player with UID {}", target_uid),
+                            ))?;
                     db.change_account_level(acc.id, new_perms as i32).await
                 }
                 .await;

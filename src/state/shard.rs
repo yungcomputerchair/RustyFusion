@@ -13,7 +13,7 @@ use crate::{
     defines::*,
     entity::{Combatant, Egg, Entity, EntityID, Group, Player, Slider, NPC},
     enums::ItemType,
-    error::{log, log_if_failed, panic_log, FFError, FFResult, Severity},
+    error::{log, log_if_failed, FFError, FFResult, Severity},
     helpers,
     item::Item,
     net::{
@@ -48,10 +48,12 @@ impl Default for ShardServerState {
             player_uid_to_id: HashMap::new(),
             pending_entering_uids: HashSet::new(),
         };
+
         let num_channels = config_get().shard.num_channels.get();
         if num_channels == 0 || num_channels > MAX_NUM_CHANNELS as u8 {
-            panic_log("Invalid number of channels");
+            panic!("Invalid number of channels {}", num_channels);
         }
+
         for channel_num in 1..=num_channels {
             for mut npc in tdata_get().make_all_npcs(&mut state.entity_map, channel_num) {
                 if let Some(path) = tdata_get().get_npc_path(npc.ty) {

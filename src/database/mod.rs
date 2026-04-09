@@ -6,7 +6,7 @@ use std::time::SystemTime;
 
 use async_trait::async_trait;
 
-use crate::config::*;
+use crate::config::{config_get, GeneralConfig};
 use crate::entity::Player;
 use crate::error::*;
 use crate::state::Account;
@@ -27,7 +27,7 @@ static DB: OnceLock<DbBackend> = OnceLock::new();
 #[async_trait]
 pub trait Database: Send + Sync + Debug {
     async fn find_account_from_username(&self, username: &Text) -> FFResult<Option<Account>>;
-    async fn find_account_from_player(&self, pc_uid: BigInt) -> FFResult<Account>;
+    async fn find_account_from_player(&self, pc_uid: BigInt) -> FFResult<Option<Account>>;
     async fn create_account(&self, username: &Text, password_hashed: &Text) -> FFResult<Account>;
     async fn change_account_level(&self, acc_id: BigInt, new_level: Int) -> FFResult<()>;
     async fn ban_account(
@@ -42,7 +42,7 @@ pub trait Database: Send + Sync + Debug {
     async fn update_selected_player(&self, acc_id: BigInt, slot_num: Int) -> FFResult<()>;
     async fn save_player(&self, player: &Player) -> FFResult<()>;
     async fn save_players(&self, players: &[&Player]) -> FFResult<()>;
-    async fn load_player(&self, acc_id: BigInt, pc_uid: BigInt) -> FFResult<Player>;
+    async fn load_player(&self, acc_id: BigInt, pc_uid: BigInt) -> FFResult<Option<Player>>;
     async fn load_players(&self, acc_id: BigInt) -> FFResult<Vec<Player>>;
     async fn delete_player(&self, pc_uid: BigInt) -> FFResult<()>;
 }
@@ -59,8 +59,9 @@ async fn db_connect(config: &GeneralConfig) -> FFResult<DbBackend> {
         Some(Ok(db)) => Ok(db),
         Some(Err(e)) => Err(FFError::build(
             Severity::Fatal,
-            format!("Failed to connect to database: {}", e.get_msg()),
-        )),
+            "Failed to connect to database".to_string(),
+        )
+        .with_parent(e)),
         None => Err(FFError::build(
             Severity::Fatal,
             "No database implementation enabled; please enable one through a feature".to_string(),
@@ -68,14 +69,18 @@ async fn db_connect(config: &GeneralConfig) -> FFResult<DbBackend> {
     }
 }
 
-pub async fn db_init() {
+pub async fn db_init() -> FFResult<&'static DbBackend> {
     if DB.get().is_some() {
-        panic_log("Database already initialized");
+        return Err(FFError::build(
+            Severity::Warning,
+            "Database already initialized".to_string(),
+        ));
     }
 
     log(Severity::Info, "Connecting to database...");
     let config = &config_get().general;
-    let db_impl = panic_if_failed(db_connect(config).await);
+    let db_impl = db_connect(config).await?;
+
     log(
         Severity::Info,
         &format!(
@@ -87,9 +92,9 @@ pub async fn db_init() {
     );
 
     let _ = DB.set(db_impl);
+    Ok(db_get())
 }
 
 pub fn db_get() -> &'static DbBackend {
-    DB.get()
-        .unwrap_or_else(|| panic_log("Database not initialized"))
+    DB.get().expect("Database not initialized")
 }

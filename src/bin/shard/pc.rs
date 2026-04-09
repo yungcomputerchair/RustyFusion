@@ -97,7 +97,21 @@ pub async fn pc_enter(
                 .load_player(login_data.iAccountID, login_data.iPC_UID)
                 .await
             {
-                Ok(player) => player,
+                Ok(Some(player)) => player,
+                Ok(None) => {
+                    state_lock
+                        .lock()
+                        .await
+                        .pending_entering_uids
+                        .remove(&player_uid);
+                    return Err(FFError::build(
+                        Severity::Warning,
+                        format!(
+                            "Player with UID {} not found for account with ID {}",
+                            login_data.iPC_UID, login_data.iAccountID
+                        ),
+                    ));
+                }
                 Err(e) => {
                     // clean up pending_entering_uids on failure
                     state_lock

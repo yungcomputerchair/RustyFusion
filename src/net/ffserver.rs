@@ -81,6 +81,12 @@ impl<S: Send + 'static> FFServer<S> {
                             &format!("Client {} disconnected", client.get_addr()),
                         );
                     }
+                    ServerMessage::Shutdown => {
+                        return Err(FFError::build(
+                            Severity::Fatal,
+                            "Shutdown signal received from connection handler".to_string(),
+                        ));
+                    }
                 }
                 Ok(())
             }
@@ -129,8 +135,8 @@ impl<S: Send + 'static> FFServer<S> {
         }
 
         let meta = ClientMetadata::new(addr, client_type);
-        let (tx, rx) = mpsc::unbounded_channel();
-        let client = FFClient::new(tx, meta);
+        let (client_tx, client_rx) = mpsc::unbounded_channel();
+        let client = FFClient::new(client_tx, meta);
 
         let key: usize = self.get_next_client_key();
         {
@@ -148,10 +154,9 @@ impl<S: Send + 'static> FFServer<S> {
             self.state.clone(),
         );
 
-        let event_tx = self.event_tx.clone();
+        let stx = self.event_tx.clone();
         tokio::spawn(async move {
-            conn.run(rx).await;
-            let _ = event_tx.send(ServerMessage::ClientDisconnected(key));
+            conn.run(client_rx, stx).await;
         });
 
         Ok(key)

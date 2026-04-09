@@ -35,11 +35,11 @@ async fn main() -> FFResult<()> {
     let _cleanup = Cleanup {};
 
     let log_rx = log_init();
-    let config = config_init();
+    let config = config_init()?;
     let mut logger = Logger::new(log_rx, &config.shard.log_path.get());
 
-    db_init().await;
-    tdata_init();
+    db_init().await?;
+    tdata_init()?;
 
     let mut tui_timer = util::make_timer(Duration::from_millis(100), true);
     let mut logger_timer = util::make_timer(
@@ -88,8 +88,11 @@ async fn main() -> FFResult<()> {
         tokio::select! {
             res = server.poll() => {
                 if let Err(e) = res {
-                    log(Severity::Fatal, &format!("Error during server poll: {}", e));
-                    break;
+                    let sev = e.get_severity();
+                    log_error(e);
+                    if sev == Severity::Fatal {
+                        break;
+                    }
                 }
             }
             ke = key_event_stream.next() => {

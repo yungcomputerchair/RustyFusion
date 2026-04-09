@@ -12,7 +12,7 @@ use ffmonitor::PlayerEvent;
 use rusty_fusion::{
     config::config_init,
     database::db_init,
-    error::{log, log_if_failed, log_init, FFError, FFResult, Logger, Severity},
+    error::{log, log_error, log_if_failed, log_init, FFError, FFResult, Logger, Severity},
     geo::geo_init,
     monitor::{monitor_flush, monitor_init, monitor_queue, MonitorEvent},
     net::{
@@ -37,11 +37,11 @@ async fn main() -> FFResult<()> {
     let _cleanup = Cleanup {};
 
     let log_rx = log_init();
-    let config = config_init();
+    let config = config_init()?;
     let mut logger = Logger::new(log_rx, &config.login.log_path.get());
 
-    db_init().await;
-    tdata_init();
+    db_init().await?;
+    tdata_init()?;
 
     let mut tui_timer = util::make_timer(Duration::from_millis(100), true);
     let mut logger_timer = util::make_timer(
@@ -108,13 +108,20 @@ async fn main() -> FFResult<()> {
     );
 
     let mut key_event_stream = ce::EventStream::new();
+    let mut fatal_error = None;
     loop {
         // Check timers
         tokio::select! {
             res = server.poll() => {
                 if let Err(e) = res {
-                    log(Severity::Fatal, &format!("Error during server poll: {}", e));
-                    break;
+                    let fatal = e.get_severity() == Severity::Fatal;
+                    if fatal {
+                        log_error(e.clone());
+                        fatal_error = Some(e);
+                        break;
+                    }
+
+                    log_error(e);
                 }
             }
             ke = key_event_stream.next() => {
@@ -178,7 +185,11 @@ async fn main() -> FFResult<()> {
     let state = state.lock().await;
     let _ = terminal.draw(|frame| tui.render(frame, &state, &clients, logger.buffer()));
 
-    Ok(())
+    if let Some(e) = fatal_error {
+        Err(e)
+    } else {
+        Ok(())
+    }
 }
 
 struct Cleanup;

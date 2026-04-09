@@ -484,10 +484,13 @@ pub async fn char_delete(
             Severity::Warning,
             format!("Couldn't get player {}", pc_uid),
         ))?;
-    db_get().delete_player(pc_uid).await?;
+
+    let db = db_get();
+    db.delete_player(pc_uid).await?;
     let resp = sP_LS2CL_REP_CHAR_DELETE_SUCC {
         iSlotNum: player.get_slot_num() as i8,
     };
+
     client.send_packet(P_LS2CL_REP_CHAR_DELETE_SUCC, &resp);
     Ok(())
 }
@@ -511,7 +514,8 @@ pub async fn save_char_tutor(
     if pkt.iTutorialFlag == 1 {
         player.set_tutorial_done();
         let player_saved = player.clone();
-        db_get().save_player(&player_saved).await
+        let db = db_get();
+        db.save_player(&player_saved).await
     } else {
         Err(FFError::build(
             Severity::Warning,
@@ -545,8 +549,8 @@ pub async fn char_select(
         }
 
         log_if_failed(state.set_selected_player_id(account_id, pc_uid));
-        db_get()
-            .update_selected_player(account_id, slot_num as i32)
+        let db = db_get();
+        db.update_selected_player(account_id, slot_num as i32)
             .await?;
 
         let pkt = sP_LS2CL_REP_CHAR_SELECT_SUCC { UNUSED: unused!() };

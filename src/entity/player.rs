@@ -13,7 +13,7 @@ use crate::{
         CharType, CombatStyle, CombatantTeam, ItemLocation, ItemType, PlayerGuide,
         PlayerNameStatus, RewardCategory, RewardType, RideType, TaskType,
     },
-    error::{codes, log, log_if_failed, panic_log, FFError, FFResult, Severity},
+    error::{codes, log, log_if_failed, FFError, FFResult, Severity},
     item::Item,
     mission::{MissionJournal, Task, TaskDefinition},
     nano::Nano,
@@ -464,8 +464,7 @@ impl Player {
     }
 
     pub fn get_player_id(&self) -> i32 {
-        self.id
-            .unwrap_or_else(|| panic_log(&format!("Player with UID {} has no ID", self.uid)))
+        self.id.expect("Player should always have an ID")
     }
 
     pub fn get_player_uid(&self) -> i64 {

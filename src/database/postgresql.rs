@@ -1,7 +1,7 @@
 use std::{sync::LazyLock, time::Duration};
 
 use async_trait::async_trait;
-use deadpool_postgres::GenericClient;
+use deadpool_postgres::*;
 use tokio_postgres as postgres;
 
 use postgres::{tls, types::ToSql, Row};
@@ -22,20 +22,21 @@ use crate::{
     Position,
 };
 
-impl FFError {
-    fn from_db_err(e: postgres::Error) -> Self {
-        FFError::build(Severity::Warning, format!("Database error: {}", e))
-    }
-}
 impl From<postgres::Error> for FFError {
     fn from(e: postgres::Error) -> Self {
-        Self::from_db_err(e)
+        FFError::build(Severity::Fatal, e.to_string())
+    }
+}
+impl From<deadpool_postgres::PoolError> for FFError {
+    fn from(e: deadpool_postgres::PoolError) -> Self {
+        FFError::build(Severity::Fatal, "Database pool error".to_string())
+            .with_parent(FFError::build(Severity::Debug, e.to_string()))
     }
 }
 
 pub struct PostgresDatabase {
-    pool: deadpool_postgres::Pool,
-    config: deadpool_postgres::Config,
+    pool: Pool,
+    config: Config,
 }
 impl std::fmt::Debug for PostgresDatabase {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -44,19 +45,19 @@ impl std::fmt::Debug for PostgresDatabase {
 }
 impl PostgresDatabase {
     pub async fn connect(config: &GeneralConfig) -> FFResult<Self> {
-        let mut db_config = deadpool_postgres::Config::new();
+        let mut db_config = Config::new();
         db_config.host = Some(config.db_host.get());
         db_config.port = Some(config.db_port.get());
         db_config.user = Some(config.db_username.get());
         db_config.password = Some(config.db_password.get());
         db_config.dbname = Some(DB_NAME.to_string());
         db_config.connect_timeout = Some(Duration::from_secs(5));
-        db_config.manager = Some(deadpool_postgres::ManagerConfig {
-            recycling_method: deadpool_postgres::RecyclingMethod::Fast,
+        db_config.manager = Some(ManagerConfig {
+            recycling_method: RecyclingMethod::Fast,
         });
 
         let pool = db_config
-            .create_pool(Some(deadpool_postgres::Runtime::Tokio1), tls::NoTls)
+            .create_pool(Some(Runtime::Tokio1), tls::NoTls)
             .map_err(|e| {
                 FFError::build(
                     Severity::Warning,
@@ -64,12 +65,7 @@ impl PostgresDatabase {
                 )
             })?;
 
-        let mut db_client = pool.get().await.map_err(|e| {
-            FFError::build(
-                Severity::Warning,
-                format!("Failed to get database client from pool: {}", e),
-            )
-        })?;
+        let mut db_client = pool.get().await?;
 
         let meta_table_exists: bool =
             Self::query(&db_client, "meta_table_exists", &[]).await?[0].get(0);
@@ -93,13 +89,15 @@ impl PostgresDatabase {
         })
     }
 
-    fn read_sql(name: &str) -> String {
+    fn read_sql(name: &str) -> FFResult<String> {
         let path = format!("sql/{}.sql", name);
         match std::fs::read_to_string(&path) {
-            Ok(s) => s,
-            Err(e) => {
-                panic_log(&format!("Couldn't read SQL file {}: {}", path, e));
-            }
+            Ok(s) => Ok(s),
+            Err(e) => Err(FFError::build(
+                Severity::Warning,
+                format!("Couldn't read SQL file {}", path),
+            )
+            .with_parent(e.into())),
         }
     }
 
@@ -108,16 +106,16 @@ impl PostgresDatabase {
         name: &str,
         params: &[&(dyn ToSql + Sync)],
     ) -> FFResult<Vec<Row>> {
-        let query = Self::read_sql(name);
-        client
-            .query(&query, params)
-            .await
-            .map_err(FFError::from_db_err)
+        let query = Self::read_sql(name)?;
+        let rows = client.query(&query, params).await?;
+
+        Ok(rows)
     }
 
     async fn prep(client: &impl GenericClient, name: &str) -> FFResult<postgres::Statement> {
-        let query = Self::read_sql(name);
-        client.prepare(&query).await.map_err(FFError::from_db_err)
+        let query = Self::read_sql(name)?;
+        let stmt = client.prepare(&query).await?;
+        Ok(stmt)
     }
 
     async fn exec(
@@ -136,7 +134,7 @@ impl PostgresDatabase {
             max_param.unwrap_or(0)
         };
 
-        let queries = Self::read_sql(name);
+        let queries = Self::read_sql(name)?;
         let queries: Vec<&str> = queries.split(';').collect();
 
         // implicit transaction
@@ -147,17 +145,11 @@ impl PostgresDatabase {
             if query.trim().is_empty() {
                 continue;
             }
-            //println!("{}", query);
+
             let num_params = calc_num_params(query);
-            match tsct.execute(query, &params[..num_params]).await {
-                Ok(r) => {
-                    num_updated += r;
-                    params = &params[num_params..];
-                }
-                Err(e) => {
-                    panic_log(&format!("DB error: {}", e));
-                }
-            };
+            let r = tsct.execute(query, &params[..num_params]).await?;
+            num_updated += r;
+            params = &params[num_params..];
         }
 
         tsct.commit().await?;
@@ -498,13 +490,9 @@ impl PostgresDatabase {
         Ok(())
     }
 
-    async fn get_client(&self) -> FFResult<deadpool_postgres::Object> {
-        self.pool.get().await.map_err(|e| {
-            FFError::build(
-                Severity::Warning,
-                format!("Failed to get database client from pool: {}", e),
-            )
-        })
+    async fn get_client(&self) -> FFResult<Object> {
+        let client = self.pool.get().await?;
+        Ok(client)
     }
 }
 #[async_trait]
@@ -607,17 +595,14 @@ impl Database for PostgresDatabase {
         Ok(Some(account))
     }
 
-    async fn find_account_from_player(&self, pc_uid: BigInt) -> FFResult<Account> {
+    async fn find_account_from_player(&self, pc_uid: BigInt) -> FFResult<Option<Account>> {
         let client = self.get_client().await?;
         let rows = Self::query(&client, "find_account_from_player", &[&pc_uid]).await?;
         if rows.is_empty() {
-            return Err(FFError::build(
-                Severity::Warning,
-                format!("Account not found for player with UID {}", pc_uid),
-            ));
+            return Ok(None);
         }
         let row = &rows[0];
-        Ok(Account {
+        Ok(Some(Account {
             id: row.get("AccountId"),
             username: row.get("Login"),
             password_hashed: row.get("Password"),
@@ -626,7 +611,7 @@ impl Database for PostgresDatabase {
             account_level: row.get::<_, Int>("AccountLevel") as i16,
             banned_until: util::get_systime_from_sec(row.get::<_, Int>("BannedUntil") as u64),
             ban_reason: row.get("BanReason"),
-        })
+        }))
     }
 
     async fn create_account(&self, username: &Text, password_hashed: &Text) -> FFResult<Account> {
@@ -660,13 +645,13 @@ impl Database for PostgresDatabase {
         let updated =
             Self::exec(&mut client, "change_account_level", &[&acc_id, &new_level]).await?;
         if updated == 0 {
-            return Err(FFError::build(
+            log(
                 Severity::Warning,
-                format!(
+                &format!(
                     "Failed to change account level for account with ID {}",
                     acc_id
                 ),
-            ));
+            );
         }
         Ok(())
     }
@@ -687,10 +672,10 @@ impl Database for PostgresDatabase {
         )
         .await?;
         if updated == 0 {
-            return Err(FFError::build(
+            log(
                 Severity::Warning,
-                format!("Failed to ban account with ID {}", acc_id),
-            ));
+                &format!("Failed to ban account with ID {}", acc_id),
+            );
         }
         Ok(())
     }
@@ -699,10 +684,10 @@ impl Database for PostgresDatabase {
         let mut client = self.get_client().await?;
         let updated = Self::exec(&mut client, "unban_account", &[&acc_id]).await?;
         if updated == 0 {
-            return Err(FFError::build(
+            log(
                 Severity::Warning,
-                format!("Failed to unban account with ID {}", acc_id),
-            ));
+                &format!("Failed to unban account with ID {}", acc_id),
+            );
         }
         Ok(())
     }
@@ -720,21 +705,17 @@ impl Database for PostgresDatabase {
         Ok(())
     }
 
-    async fn load_player(&self, acc_id: BigInt, pc_uid: BigInt) -> FFResult<Player> {
+    async fn load_player(&self, acc_id: BigInt, pc_uid: BigInt) -> FFResult<Option<Player>> {
         let client = self.get_client().await?;
         let rows = Self::query(&client, "load_players", &[&acc_id]).await?;
         for row in &rows {
             if row.get::<_, BigInt>("PlayerId") == pc_uid {
-                return Self::load_player_internal(&client, row, true).await;
+                return Self::load_player_internal(&client, row, true)
+                    .await
+                    .map(Some);
             }
         }
-        Err(FFError::build(
-            Severity::Warning,
-            format!(
-                "Player with UID {} not found for account with ID {}",
-                pc_uid, acc_id
-            ),
-        ))
+        Ok(None)
     }
 
     async fn load_players(&self, acc_id: BigInt) -> FFResult<Vec<Player>> {

@@ -11,7 +11,10 @@ use std::{
 use tokio::{
     io::{AsyncReadExt as _, AsyncWriteExt as _},
     net::TcpStream,
-    sync::{mpsc::UnboundedReceiver, Mutex, RwLock},
+    sync::{
+        mpsc::{UnboundedReceiver, UnboundedSender},
+        Mutex, RwLock,
+    },
 };
 
 use crate::{
@@ -40,6 +43,7 @@ pub enum ClientMessage {
 
 pub enum ServerMessage {
     ClientDisconnected(usize),
+    Shutdown,
 }
 
 pub struct FFConnection<S: Send + 'static> {
@@ -90,7 +94,11 @@ impl<S: Send + 'static> FFConnection<S> {
         }
     }
 
-    pub async fn run(&mut self, mut rx: UnboundedReceiver<ClientMessage>) {
+    pub async fn run(
+        &mut self,
+        mut rx: UnboundedReceiver<ClientMessage>,
+        tx: UnboundedSender<ServerMessage>,
+    ) {
         let mut lc_interval = self.live_check.map(|(dur, _)| tokio::time::interval(dur));
 
         loop {
@@ -112,14 +120,14 @@ impl<S: Send + 'static> FFConnection<S> {
                     ClientMessage::SendPacket(pkt) => {
                         if let Err(e) = self.send_payload(pkt).await {
                             log_error(e);
-                            return;
+                            break;
                         }
                     }
                     ClientMessage::ClearLiveCheck => {
                         self.clear_live_check();
                     }
                     ClientMessage::Shutdown => {
-                        return;
+                        break;
                     }
                     ClientMessage::UpdateEncryption {
                         new_e_key,
@@ -141,7 +149,7 @@ impl<S: Send + 'static> FFConnection<S> {
                     let should_dc = e.should_dc();
                     log_error(e);
                     if should_dc {
-                        return;
+                        break;
                     }
                 }
                 Event::PacketReady(Ok(pkt)) => {
@@ -149,10 +157,16 @@ impl<S: Send + 'static> FFConnection<S> {
                     if let Err(e) =
                         (self.pkt_handler)(pkt, self.key, &clients, self.state.clone()).await
                     {
+                        let fatal = e.get_severity() == Severity::Fatal;
                         let should_dc = e.should_dc();
                         log_error(e);
+
+                        if fatal {
+                            let _ = tx.send(ServerMessage::Shutdown);
+                        }
+
                         if should_dc {
-                            return;
+                            break;
                         }
                     }
                 }
@@ -163,6 +177,8 @@ impl<S: Send + 'static> FFConnection<S> {
                 }
             }
         }
+
+        let _ = tx.send(ServerMessage::ClientDisconnected(self.key));
     }
 
     fn can_send_packet(&self, pkt_id: PacketID) -> bool {

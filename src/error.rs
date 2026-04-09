@@ -1,6 +1,6 @@
 use std::{
     cmp::min,
-    fmt::Display,
+    fmt::{Debug, Display},
     fs::File,
     io::{BufWriter, ErrorKind, Write},
     sync::OnceLock,
@@ -20,8 +20,7 @@ pub trait CatchFail<T> {
 }
 impl<T> CatchFail<T> for FFResult<T> {
     fn catch_fail(self, on_fail: impl FnOnce()) -> Self {
-        if let Err(e) = &self {
-            log_error(e.clone());
+        if self.is_err() {
             on_fail();
         }
         self
@@ -66,7 +65,7 @@ impl Severity {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct FFError {
     severity: Severity,
     msg: String,
@@ -75,9 +74,14 @@ pub struct FFError {
     parent: Option<Box<FFError>>,
 }
 impl std::error::Error for FFError {}
+impl Debug for FFError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(self, f)
+    }
+}
 impl Display for FFError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.get_formatted(false, false))
+        write!(f, "{}", self.get_formatted(true, false))
     }
 }
 impl From<std::io::Error> for FFError {
@@ -90,22 +94,18 @@ impl From<std::io::Error> for FFError {
             ErrorKind::WouldBlock => Severity::Debug,
             _ => Severity::Warning,
         };
+
         let should_dc =
             error.kind() != ErrorKind::WouldBlock && error.kind() != ErrorKind::TimedOut;
-        Self::new(
-            severity,
-            format!("I/O error ({:?})", error.kind()),
-            should_dc,
-        )
+
+        Self::new(severity, "I/O error".to_string(), should_dc)
+            .with_parent(Self::build(Severity::Debug, error.to_string()))
     }
 }
 impl From<bcrypt::BcryptError> for FFError {
     fn from(error: bcrypt::BcryptError) -> Self {
-        Self::new(
-            Severity::Warning,
-            format!("BCrypt error ({:?})", error),
-            false,
-        )
+        Self::new(Severity::Warning, "BCrypt error".to_string(), false)
+            .with_parent(Self::build(Severity::Debug, error.to_string()))
     }
 }
 impl FFError {
@@ -182,7 +182,7 @@ impl FFError {
         };
         if let Some(parent) = self.parent.as_ref() {
             msg.push_str(&format!(
-                "\n\tfrom: {}",
+                "\n  from: {}",
                 parent.get_formatted(colored, with_time)
             ));
         }
@@ -285,8 +285,7 @@ impl Drop for Logger {
 
 pub fn panic_log(msg: &str) -> ! {
     let err = FFError::build(Severity::Fatal, msg.to_string());
-    log_error(err);
-    panic!("A fatal error occurred, see log for details");
+    panic_if_failed(Err(err))
 }
 
 pub fn log_if_failed<T>(result: FFResult<T>) -> Option<T> {
@@ -301,8 +300,9 @@ pub fn log_if_failed<T>(result: FFResult<T>) -> Option<T> {
 
 pub fn panic_if_failed<T>(result: FFResult<T>) -> T {
     if let Err(e) = result {
+        let msg = e.get_msg().to_string();
         log_error(e);
-        panic!("A fatal error occurred, see log for details");
+        panic!("A fatal error occurred: {}. See log for more details.", msg);
     }
     result.unwrap()
 }

@@ -16,7 +16,7 @@ use crate::{
     defines::*,
     entity::{Egg, EntityID, NPC},
     enums::*,
-    error::{log, log_error, log_if_failed, panic_log, FFError, FFResult, Severity},
+    error::{log, log_error, log_if_failed, FFError, FFResult, Severity},
     item::{CrocPotData, Item, ItemStats, Reward, VendorData, VendorItem},
     mission::{MissionDefinition, TaskDefinition},
     nano::{NanoStats, NanoTuning},
@@ -161,6 +161,7 @@ struct RespawnPoint {
     map_num: u32,
 }
 
+#[derive(Debug, Default)]
 pub struct PlayerStats {
     pub hp_up: u32,
     pub max_hp: u32,
@@ -171,6 +172,7 @@ pub struct PlayerStats {
     pub nano_id: i16,
 }
 
+#[derive(Debug)]
 pub struct NPCStats {
     pub team: CombatantTeam,
     pub style: CombatStyle,
@@ -304,9 +306,9 @@ pub struct TableData {
     egg_data: EggData,
 }
 impl TableData {
-    fn new() -> Self {
-        Self::load().unwrap_or_else(|e| {
-            panic_log(&format!("Failed loading TableData: {}", e));
+    fn new() -> FFResult<Self> {
+        Self::load().map_err(|e| {
+            FFError::build(Severity::Fatal, format!("Failed loading TableData: {}", e))
         })
     }
 
@@ -852,6 +854,7 @@ impl TableData {
                 Severity::Warning,
                 format!("No world name data for chunk {:?}", chunk),
             ))?;
+
         self.world_name_data
             .world_name_data
             .get(map_num)
@@ -862,23 +865,29 @@ impl TableData {
     }
 }
 
-pub fn tdata_init() -> &'static TableData {
-    assert!(TABLE_DATA.get().is_none());
-    let load_start = SystemTime::now();
-    if TABLE_DATA.set(TableData::new()).is_err() {
-        panic_log("Couldn't initialize TableData");
+pub fn tdata_init() -> FFResult<&'static TableData> {
+    if TABLE_DATA.get().is_some() {
+        return Err(FFError::build(
+            Severity::Warning,
+            "TableData already initialized".to_string(),
+        ));
     }
+
+    let load_start = SystemTime::now();
+    let tdata = TableData::new()?;
     let load_time = load_start.elapsed().unwrap();
+
+    let _ = TABLE_DATA.set(tdata);
     log(
         Severity::Info,
         &format!("Loaded TableData ({:.2}s)", load_time.as_secs_f32()),
     );
-    tdata_get()
+
+    Ok(tdata_get())
 }
 
 pub fn tdata_get() -> &'static TableData {
-    assert!(TABLE_DATA.get().is_some());
-    TABLE_DATA.get().unwrap()
+    TABLE_DATA.get().expect("TableData not initialized")
 }
 
 fn load_json(filename: &str) -> Result<Map<std::string::String, Value>, String> {
@@ -2297,6 +2306,6 @@ mod tests {
 
     #[test]
     fn test_load() {
-        tdata_init();
+        tdata_init().expect("Failed to load tabledata");
     }
 }
