@@ -15,7 +15,7 @@ use rusty_fusion::{
 };
 
 pub fn task_start(pkt: Packet, client: &FFClient, state: &mut ShardServerState) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_PC_TASK_START = pkt.get(P_CL2FE_REQ_PC_TASK_START)?;
+    let pkt: &sP_CL2FE_REQ_PC_TASK_START = pkt.get()?;
     (|| {
         let pc_id = client.get_player_id()?;
         let player = state.get_player(pc_id)?;
@@ -284,7 +284,7 @@ pub fn task_start(pkt: Packet, client: &FFClient, state: &mut ShardServerState) 
 }
 
 pub fn task_stop(pkt: Packet, client: &FFClient, state: &mut ShardServerState) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_PC_TASK_STOP = pkt.get(P_CL2FE_REQ_PC_TASK_STOP)?;
+    let pkt: &sP_CL2FE_REQ_PC_TASK_STOP = pkt.get()?;
     let pc_id = client.get_player_id()?;
     let player = state.get_player_mut(pc_id)?;
 
@@ -318,7 +318,7 @@ pub fn task_stop(pkt: Packet, client: &FFClient, state: &mut ShardServerState) -
 }
 
 pub fn task_end(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_PC_TASK_END = pkt.get(P_CL2FE_REQ_PC_TASK_END)?;
+    let pkt: &sP_CL2FE_REQ_PC_TASK_END = pkt.get()?;
     let mut error_code = codes::TaskEndErr::NotComplete; // N.B. true failures are handled in player tick
     (|| {
         let pc_id = clients.get_sender().get_player_id()?;
@@ -637,8 +637,7 @@ pub fn set_current_mission_id(
     client: &FFClient,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_PC_SET_CURRENT_MISSION_ID =
-        pkt.get(P_CL2FE_REQ_PC_SET_CURRENT_MISSION_ID)?;
+    let pkt: &sP_CL2FE_REQ_PC_SET_CURRENT_MISSION_ID = pkt.get()?;
 
     (|| {
         let pc_id = client.get_player_id()?;

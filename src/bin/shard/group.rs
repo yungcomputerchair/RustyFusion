@@ -15,7 +15,7 @@ pub fn pc_group_invite(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_PC_GROUP_INVITE = pkt.get(P_CL2FE_REQ_PC_GROUP_INVITE)?;
+    let pkt: &sP_CL2FE_REQ_PC_GROUP_INVITE = pkt.get()?;
     (|| {
         let client = clients.get_sender();
         let pc_id = client.get_player_id()?;
@@ -59,7 +59,7 @@ pub fn pc_group_invite_refuse(
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let client = clients.get_sender();
-    let pkt: &sP_CL2FE_REQ_PC_GROUP_INVITE_REFUSE = pkt.get(P_CL2FE_REQ_PC_GROUP_INVITE_REFUSE)?;
+    let pkt: &sP_CL2FE_REQ_PC_GROUP_INVITE_REFUSE = pkt.get()?;
     let pc_id = client.get_player_id()?;
 
     let host_pc_id = pkt.iID_From;
@@ -83,7 +83,7 @@ pub fn pc_group_join(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_PC_GROUP_JOIN = pkt.get(P_CL2FE_REQ_PC_GROUP_JOIN)?;
+    let pkt: &sP_CL2FE_REQ_PC_GROUP_JOIN = pkt.get()?;
     (|| {
         let client = clients.get_sender();
         let pc_id = client.get_player_id()?;
@@ -202,7 +202,7 @@ pub fn npc_group_invite(
 ) -> FFResult<()> {
     let client = clients.get_sender();
     let pc_id = client.get_player_id()?;
-    let pkt: &sP_CL2FE_REQ_NPC_GROUP_INVITE = pkt.get(P_CL2FE_REQ_NPC_GROUP_INVITE)?;
+    let pkt: &sP_CL2FE_REQ_NPC_GROUP_INVITE = pkt.get()?;
     let player = state.get_player_mut(pc_id)?;
 
     let group_id = player.group_id.unwrap_or(Uuid::new_v4());
@@ -262,7 +262,7 @@ pub fn npc_group_kick(
 ) -> FFResult<()> {
     let client = clients.get_sender();
     let pc_id = client.get_player_id()?;
-    let pkt: &sP_CL2FE_REQ_NPC_GROUP_KICK = pkt.get(P_CL2FE_REQ_NPC_GROUP_KICK)?;
+    let pkt: &sP_CL2FE_REQ_NPC_GROUP_KICK = pkt.get()?;
     let player = state.get_player(pc_id)?;
 
     let group_id = player.group_id.ok_or_else(|| {

@@ -29,7 +29,7 @@ pub fn gm_pc_set_value(
     let client = clients.get_sender();
     helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
 
-    let pkt: &sP_CL2FE_GM_REQ_PC_SET_VALUE = pkt.get(P_CL2FE_GM_REQ_PC_SET_VALUE)?;
+    let pkt: &sP_CL2FE_GM_REQ_PC_SET_VALUE = pkt.get()?;
     let pc_id = pkt.iPC_ID;
     let value = pkt.iSetValue;
     let value_type = pkt.iSetValueType;
@@ -71,7 +71,7 @@ pub fn gm_pc_give_item(
 ) -> FFResult<()> {
     (|| {
         let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
-        let pkt: &sP_CL2FE_REQ_PC_GIVE_ITEM = pkt.get(P_CL2FE_REQ_PC_GIVE_ITEM)?;
+        let pkt: &sP_CL2FE_REQ_PC_GIVE_ITEM = pkt.get()?;
         let player = state.get_player_mut(pc_id)?;
 
         let mut item: Option<Item> = pkt.Item.try_into()?;
@@ -120,7 +120,7 @@ pub fn gm_pc_give_nano(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_PC_GIVE_NANO = pkt.get(P_CL2FE_REQ_PC_GIVE_NANO)?;
+    let pkt: &sP_CL2FE_REQ_PC_GIVE_NANO = pkt.get()?;
 
     (|| {
         let client = clients.get_sender();
@@ -167,7 +167,7 @@ pub fn gm_pc_give_nano(
 pub fn gm_pc_goto(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_sender();
     let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
-    let pkt: &sP_CL2FE_REQ_PC_GOTO = pkt.get(P_CL2FE_REQ_PC_GOTO)?;
+    let pkt: &sP_CL2FE_REQ_PC_GOTO = pkt.get()?;
     let new_pos = Position {
         x: pkt.iToX,
         y: pkt.iToY,
@@ -205,8 +205,7 @@ pub fn gm_pc_special_state_switch(
 ) -> FFResult<()> {
     let client = clients.get_sender();
     let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__GM as i16)?;
-    let pkt: &sP_CL2FE_GM_REQ_PC_SPECIAL_STATE_SWITCH =
-        pkt.get(P_CL2FE_GM_REQ_PC_SPECIAL_STATE_SWITCH)?;
+    let pkt: &sP_CL2FE_GM_REQ_PC_SPECIAL_STATE_SWITCH = pkt.get()?;
 
     let player = state.get_player_mut(pc_id)?;
 
@@ -255,7 +254,7 @@ pub fn gm_pc_motd_register(
 ) -> FFResult<()> {
     let client = clients.get_sender();
     helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__CS as i16)?;
-    let pkt: &sP_CL2FE_GM_REQ_PC_MOTD_REGISTER = pkt.get(P_CL2FE_GM_REQ_PC_MOTD_REGISTER)?;
+    let pkt: &sP_CL2FE_GM_REQ_PC_MOTD_REGISTER = pkt.get()?;
 
     let pkt = sP_FE2LS_MOTD_REGISTER {
         szMessage: pkt.szSystemMsg,
@@ -276,7 +275,7 @@ pub fn gm_pc_announce(
     let client = clients.get_sender();
     let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__CS as i16)?;
     let player = state.get_player(pc_id).unwrap();
-    let pkt: &sP_CL2FE_GM_REQ_PC_ANNOUNCE = pkt.get(P_CL2FE_GM_REQ_PC_ANNOUNCE)?;
+    let pkt: &sP_CL2FE_GM_REQ_PC_ANNOUNCE = pkt.get()?;
     let area_type: AreaType = pkt.iAreaType.try_into()?;
 
     let msg = util::parse_utf16(&pkt.szAnnounceMsg)?;
@@ -363,7 +362,7 @@ pub fn gm_pc_location(
 ) -> FFResult<()> {
     let client = clients.get_sender();
     let gm_pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__CS as i16)?;
-    let pkt: &sP_CL2FE_GM_REQ_PC_LOCATION = pkt.get(P_CL2FE_GM_REQ_PC_LOCATION)?;
+    let pkt: &sP_CL2FE_GM_REQ_PC_LOCATION = pkt.get()?;
     let search_mode: TargetSearchBy = pkt.eTargetSearchBy.try_into()?;
     let search_query = match search_mode {
         TargetSearchBy::PlayerID => PlayerSearchQuery::ByID(pkt.iTargetPC_ID),
@@ -424,8 +423,7 @@ pub fn gm_target_pc_special_state_onoff(
 ) -> FFResult<()> {
     let client = clients.get_sender();
     helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__CS as i16)?;
-    let pkt: &sP_CL2FE_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF =
-        pkt.get(P_CL2FE_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF)?;
+    let pkt: &sP_CL2FE_GM_REQ_TARGET_PC_SPECIAL_STATE_ONOFF = pkt.get()?;
 
     let search_mode: TargetSearchBy = pkt.eTargetSearchBy.try_into()?;
     let search_query = match search_mode {
@@ -484,7 +482,7 @@ pub fn gm_target_pc_teleport(
 ) -> FFResult<()> {
     let client = clients.get_sender();
     let gm_pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__CS as i16)?;
-    let pkt: &sP_CL2FE_GM_REQ_TARGET_PC_TELEPORT = pkt.get(P_CL2FE_GM_REQ_TARGET_PC_TELEPORT)?;
+    let pkt: &sP_CL2FE_GM_REQ_TARGET_PC_TELEPORT = pkt.get()?;
 
     // the "target PC" is the player being teleported
     let search_mode: TargetSearchBy = pkt.eTargetPCSearchBy.try_into()?;
@@ -586,7 +584,7 @@ pub fn gm_kick_player(
 ) -> FFResult<()> {
     let client = clients.get_sender();
     helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__CS as i16)?;
-    let pkt: &sP_CL2FE_GM_REQ_KICK_PLAYER = pkt.get(P_CL2FE_GM_REQ_KICK_PLAYER)?;
+    let pkt: &sP_CL2FE_GM_REQ_KICK_PLAYER = pkt.get()?;
     let search_mode: TargetSearchBy = pkt.eTargetSearchBy.try_into()?;
     let search_query = match search_mode {
         TargetSearchBy::PlayerID => PlayerSearchQuery::ByID(pkt.iTargetPC_ID),
@@ -623,7 +621,7 @@ pub fn gm_reward_rate(
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
-    let pkt: &sP_CL2FE_GM_REQ_REWARD_RATE = pkt.get(P_CL2FE_GM_REQ_REWARD_RATE)?;
+    let pkt: &sP_CL2FE_GM_REQ_REWARD_RATE = pkt.get()?;
     let player = state.get_player_mut(pc_id)?;
 
     if pkt.iGetSet != 0 {
@@ -651,7 +649,7 @@ pub fn gm_pc_task_complete(
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
-    let pkt: &sP_CL2FE_REQ_PC_TASK_COMPLETE = pkt.get(P_CL2FE_REQ_PC_TASK_COMPLETE)?;
+    let pkt: &sP_CL2FE_REQ_PC_TASK_COMPLETE = pkt.get()?;
     let player = state.get_player_mut(pc_id)?;
     let task_id = pkt.iTaskNum;
     player.mission_journal.complete_task(task_id)?;
@@ -666,7 +664,7 @@ pub fn gm_pc_mission_complete(
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
-    let pkt: &sP_CL2FE_REQ_PC_MISSION_COMPLETE = pkt.get(P_CL2FE_REQ_PC_MISSION_COMPLETE)?;
+    let pkt: &sP_CL2FE_REQ_PC_MISSION_COMPLETE = pkt.get()?;
     let player = state.get_player_mut(pc_id)?;
     let mission_id = pkt.iMissionNum;
     player.mission_journal.set_mission_completed(mission_id)?;
@@ -684,7 +682,7 @@ pub fn gm_shiny_summon(
 ) -> FFResult<()> {
     let client = clients.get_sender();
     let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__GM as i16)?;
-    let pkt: &sP_CL2FE_REQ_SHINY_SUMMON = pkt.get(P_CL2FE_REQ_SHINY_SUMMON)?;
+    let pkt: &sP_CL2FE_REQ_SHINY_SUMMON = pkt.get()?;
     let player = state.get_player(pc_id)?;
 
     let egg_type = pkt.iShinyType;
@@ -712,7 +710,7 @@ pub fn gm_npc_summon(
 ) -> FFResult<()> {
     let client = clients.get_sender();
     let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__GM as i16)?;
-    let pkt: &sP_CL2FE_REQ_NPC_SUMMON = pkt.get(P_CL2FE_REQ_NPC_SUMMON)?;
+    let pkt: &sP_CL2FE_REQ_NPC_SUMMON = pkt.get()?;
     let player = state.get_player(pc_id)?;
 
     let npc_type = pkt.iNPCType;
@@ -740,7 +738,7 @@ pub fn gm_npc_group_summon(
 ) -> FFResult<()> {
     let client = clients.get_sender();
     let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__GM as i16)?;
-    let pkt: &sP_CL2FE_REQ_NPC_GROUP_SUMMON = pkt.get(P_CL2FE_REQ_NPC_GROUP_SUMMON)?;
+    let pkt: &sP_CL2FE_REQ_NPC_GROUP_SUMMON = pkt.get()?;
     let player = state.get_player(pc_id)?;
 
     let spawn_pos = player.get_position();
@@ -767,7 +765,7 @@ pub fn gm_npc_unsummon(
 ) -> FFResult<()> {
     let client = clients.get_sender();
     helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__GM as i16)?;
-    let pkt: &sP_CL2FE_REQ_NPC_UNSUMMON = pkt.get(P_CL2FE_REQ_NPC_UNSUMMON)?;
+    let pkt: &sP_CL2FE_REQ_NPC_UNSUMMON = pkt.get()?;
     let npc_id = pkt.iNPC_ID;
     let npc = state.get_npc(npc_id)?;
     if !npc.summoned {

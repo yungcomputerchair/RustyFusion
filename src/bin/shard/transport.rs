@@ -17,8 +17,7 @@ pub fn regist_transportation_location(
     client: &FFClient,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_REGIST_TRANSPORTATION_LOCATION =
-        pkt.get(P_CL2FE_REQ_REGIST_TRANSPORTATION_LOCATION)?;
+    let pkt: &sP_CL2FE_REQ_REGIST_TRANSPORTATION_LOCATION = pkt.get()?;
     (|| {
             let pc_id = client.get_player_id()?;
             let npc = state.get_npc(pkt.iNPC_ID)?;
@@ -91,8 +90,7 @@ pub fn warp_use_transportation(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_PC_WARP_USE_TRANSPORTATION =
-        pkt.get(P_CL2FE_REQ_PC_WARP_USE_TRANSPORTATION)?;
+    let pkt: &sP_CL2FE_REQ_PC_WARP_USE_TRANSPORTATION = pkt.get()?;
 
     (|| {
         let client = clients.get_sender();
@@ -243,7 +241,7 @@ pub fn warp_use_npc(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_PC_WARP_USE_NPC = pkt.get(P_CL2FE_REQ_PC_WARP_USE_NPC)?;
+    let pkt: &sP_CL2FE_REQ_PC_WARP_USE_NPC = pkt.get()?;
 
     (|| {
         let item_remaining = helpers::do_warp(
@@ -289,7 +287,7 @@ pub fn time_to_go_warp(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_PC_TIME_TO_GO_WARP = pkt.get(P_CL2FE_REQ_PC_TIME_TO_GO_WARP)?;
+    let pkt: &sP_CL2FE_REQ_PC_TIME_TO_GO_WARP = pkt.get()?;
 
     (|| {
         let player = state.get_player(clients.get_sender().get_player_id()?)?;

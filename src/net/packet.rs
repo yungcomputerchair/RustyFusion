@@ -40,8 +40,8 @@ impl Packet {
         })
     }
 
-    pub fn get<T: FFPacket>(&self, expected_pkt_id: PacketID) -> FFResult<&T> {
-        PacketReader::new(self).get_packet(expected_pkt_id)
+    pub fn get<T: FFPacket>(&self) -> FFResult<&T> {
+        PacketReader::new(self).get_struct()
     }
 
     pub fn id(&self) -> PacketID {
@@ -128,20 +128,6 @@ impl<'a> PacketReader<'a> {
         let id_bytes = &self.data[..PACKET_ID_SIZE];
         let id = u32::from_le_bytes(id_bytes.try_into().unwrap());
         PacketID::try_from(id).unwrap() // guaranteed to have valid id
-    }
-
-    pub fn get_packet<T: FFPacket>(&mut self, expected_pkt_id: PacketID) -> FFResult<&'a T> {
-        let id = self.get_id();
-        if id != expected_pkt_id {
-            return Err(FFError::build(
-                Severity::Warning,
-                format!(
-                    "Packet ID mismatch: expected {:?}, got {:?}",
-                    expected_pkt_id, id
-                ),
-            ));
-        }
-        self.get_struct()
     }
 
     pub fn get_struct<T: FFPacket>(&mut self) -> FFResult<&'a T> {

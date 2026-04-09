@@ -19,7 +19,7 @@ pub async fn send_freechat_message(
     clients: &ClientMap<'_>,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_SEND_FREECHAT_MESSAGE = pkt.get(P_CL2FE_REQ_SEND_FREECHAT_MESSAGE)?;
+    let pkt: &sP_CL2FE_REQ_SEND_FREECHAT_MESSAGE = pkt.get()?;
 
     (async {
         let msg = util::parse_utf16(&pkt.szFreeChat)?;
@@ -106,7 +106,7 @@ pub fn send_menuchat_message(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_SEND_MENUCHAT_MESSAGE = pkt.get(P_CL2FE_REQ_SEND_MENUCHAT_MESSAGE)?;
+    let pkt: &sP_CL2FE_REQ_SEND_MENUCHAT_MESSAGE = pkt.get()?;
 
     (|| {
         let client = clients.get_sender();
@@ -168,8 +168,7 @@ pub fn send_group_freechat_message(
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let client = clients.get_sender();
-    let pkt: &sP_CL2FE_REQ_SEND_ALL_GROUP_FREECHAT_MESSAGE =
-        pkt.get(P_CL2FE_REQ_SEND_ALL_GROUP_FREECHAT_MESSAGE)?;
+    let pkt: &sP_CL2FE_REQ_SEND_ALL_GROUP_FREECHAT_MESSAGE = pkt.get()?;
 
     let pc_id = client.get_player_id()?;
     let player = state.get_player(pc_id)?;
@@ -233,8 +232,7 @@ pub fn send_group_menuchat_message(
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let client = clients.get_sender();
-    let pkt: &sP_CL2FE_REQ_SEND_ALL_GROUP_MENUCHAT_MESSAGE =
-        pkt.get(P_CL2FE_REQ_SEND_ALL_GROUP_MENUCHAT_MESSAGE)?;
+    let pkt: &sP_CL2FE_REQ_SEND_ALL_GROUP_MENUCHAT_MESSAGE = pkt.get()?;
     let pc_id = client.get_player_id()?;
     let player = state.get_player(pc_id)?;
 
@@ -288,8 +286,7 @@ pub fn send_buddy_freechat_message(
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let client = clients.get_sender();
-    let pkt: &sP_CL2FE_REQ_SEND_BUDDY_FREECHAT_MESSAGE =
-        pkt.get(P_CL2FE_REQ_SEND_BUDDY_FREECHAT_MESSAGE)?;
+    let pkt: &sP_CL2FE_REQ_SEND_BUDDY_FREECHAT_MESSAGE = pkt.get()?;
 
     let pc_id = client.get_player_id()?;
     let player = state.get_player(pc_id)?;
@@ -374,8 +371,7 @@ pub fn send_buddy_menuchat_message(
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let client = clients.get_sender();
-    let pkt: &sP_CL2FE_REQ_SEND_BUDDY_MENUCHAT_MESSAGE =
-        pkt.get(P_CL2FE_REQ_SEND_BUDDY_MENUCHAT_MESSAGE)?;
+    let pkt: &sP_CL2FE_REQ_SEND_BUDDY_MENUCHAT_MESSAGE = pkt.get()?;
 
     let pc_id = client.get_player_id()?;
     let player = state.get_player(pc_id)?;
@@ -466,7 +462,7 @@ pub fn pc_avatar_emotes_chat(
 ) -> FFResult<()> {
     let client = clients.get_sender();
     let pc_id = client.get_player_id()?;
-    let pkt: &sP_CL2FE_REQ_PC_AVATAR_EMOTES_CHAT = pkt.get(P_CL2FE_REQ_PC_AVATAR_EMOTES_CHAT)?;
+    let pkt: &sP_CL2FE_REQ_PC_AVATAR_EMOTES_CHAT = pkt.get()?;
 
     let resp = sP_FE2CL_REP_PC_AVATAR_EMOTES_CHAT {
         iID_From: pkt.iID_From,

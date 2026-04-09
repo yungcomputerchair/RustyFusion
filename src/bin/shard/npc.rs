@@ -15,7 +15,7 @@ pub fn npc_interaction(
     client: &FFClient,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_NPC_INTERACTION = pkt.get(P_CL2FE_REQ_NPC_INTERACTION)?;
+    let pkt: &sP_CL2FE_REQ_NPC_INTERACTION = pkt.get()?;
     let pc_id = client.get_player_id()?;
     let npc_id = pkt.iNPC_ID;
 
@@ -44,7 +44,7 @@ pub fn npc_interaction(
 }
 
 pub fn npc_bark(pkt: Packet, client: &FFClient, state: &mut ShardServerState) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_BARKER = pkt.get(P_CL2FE_REQ_BARKER)?;
+    let pkt: &sP_CL2FE_REQ_BARKER = pkt.get()?;
     let task_id = pkt.iMissionTaskID;
     let pc_id = client.get_player_id()?;
 

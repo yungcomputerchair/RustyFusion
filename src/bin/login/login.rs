@@ -43,7 +43,7 @@ Username must be 4-32 characters long and contain only letters, numbers, undersc
         "Invalid password
 Password must be 8-32 characters long and contain only letters, numbers, or special characters !@#$%^&*()_+.";
 
-    let pkt: &sP_CL2LS_REQ_LOGIN = pkt.get(P_CL2LS_REQ_LOGIN)?;
+    let pkt: &sP_CL2LS_REQ_LOGIN = pkt.get()?;
     let mut error_code = LoginError::LoginError;
     (async {
         let login_type = LoginType::try_from(pkt.iLoginType).map_err(|_| {
@@ -349,7 +349,7 @@ pub fn pc_exit_duplicate(
 
 pub fn check_char_name(pkt: Packet, client: &FFClient) -> FFResult<()> {
     // TODO failure
-    let pkt: &sP_CL2LS_REQ_CHECK_CHAR_NAME = pkt.get(P_CL2LS_REQ_CHECK_CHAR_NAME)?;
+    let pkt: &sP_CL2LS_REQ_CHECK_CHAR_NAME = pkt.get()?;
     let resp = sP_LS2CL_REP_CHECK_CHAR_NAME_SUCC {
         szFirstName: pkt.szFirstName,
         szLastName: pkt.szLastName,
@@ -365,7 +365,7 @@ pub async fn save_char_name(
 ) -> FFResult<()> {
     // TODO failure
     let acc_id = client.get_account_id()?;
-    let pkt: &sP_CL2LS_REQ_SAVE_CHAR_NAME = pkt.get(P_CL2LS_REQ_SAVE_CHAR_NAME)?;
+    let pkt: &sP_CL2LS_REQ_SAVE_CHAR_NAME = pkt.get()?;
 
     let pc_uid = util::get_uid();
     let slot_num = pkt.iSlotNum as usize;
@@ -422,7 +422,7 @@ pub async fn char_create(
     state: &mut LoginServerState,
 ) -> FFResult<()> {
     let acc_id = client.get_account_id()?;
-    let pkt: &sP_CL2LS_REQ_CHAR_CREATE = pkt.get(P_CL2LS_REQ_CHAR_CREATE)?;
+    let pkt: &sP_CL2LS_REQ_CHAR_CREATE = pkt.get()?;
 
     let pc_uid = pkt.PCStyle.iPC_UID;
     if let Some(player) = state.get_players_mut(acc_id)?.get_mut(&pc_uid) {
@@ -479,7 +479,7 @@ pub async fn char_delete(
     state: &mut LoginServerState,
 ) -> FFResult<()> {
     let acc_id = client.get_account_id()?;
-    let pkt: &sP_CL2LS_REQ_CHAR_DELETE = pkt.get(P_CL2LS_REQ_CHAR_DELETE)?;
+    let pkt: &sP_CL2LS_REQ_CHAR_DELETE = pkt.get()?;
     let pc_uid = pkt.iPC_UID;
     let player = state
         .get_players_mut(acc_id)?
@@ -505,7 +505,7 @@ pub async fn save_char_tutor(
     state: &mut LoginServerState,
 ) -> FFResult<()> {
     let acc_id = client.get_account_id()?;
-    let pkt: &sP_CL2LS_REQ_SAVE_CHAR_TUTOR = pkt.get(P_CL2LS_REQ_SAVE_CHAR_TUTOR)?;
+    let pkt: &sP_CL2LS_REQ_SAVE_CHAR_TUTOR = pkt.get()?;
     let pc_uid = pkt.iPC_UID;
     let player = state
         .get_players_mut(acc_id)?
@@ -536,7 +536,7 @@ pub async fn char_select(
 ) -> FFResult<()> {
     let client = clients.get(&client_key).unwrap();
     if let ClientType::GameClient { account_id, .. } = client.get_client_type() {
-        let pkt: &sP_CL2LS_REQ_CHAR_SELECT = pkt.get(P_CL2LS_REQ_CHAR_SELECT)?;
+        let pkt: &sP_CL2LS_REQ_CHAR_SELECT = pkt.get()?;
         let pc_uid = pkt.iPC_UID;
         let players = state.get_players_mut(account_id)?;
         let player = players.get(&pc_uid).ok_or(FFError::build(
@@ -592,7 +592,7 @@ pub fn shard_select(
     time: SystemTime,
 ) -> FFResult<()> {
     let client = clients.get(&client_key).unwrap();
-    let pkt: &sP_CL2LS_REQ_SHARD_SELECT = pkt.get(P_CL2LS_REQ_SHARD_SELECT)?;
+    let pkt: &sP_CL2LS_REQ_SHARD_SELECT = pkt.get()?;
     let req_shard_id = pkt.ShardNum as i32;
     if let ClientType::GameClient { account_id, .. } = client.get_client_type() {
         let mut error_code = 1; // "Shard connection error"

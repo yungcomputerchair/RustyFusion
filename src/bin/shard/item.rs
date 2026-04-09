@@ -23,7 +23,7 @@ use rusty_fusion::{
 
 pub fn item_move(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_sender();
-    let pkt: &sP_CL2FE_REQ_ITEM_MOVE = pkt.get(P_CL2FE_REQ_ITEM_MOVE)?;
+    let pkt: &sP_CL2FE_REQ_ITEM_MOVE = pkt.get()?;
 
     let pc_id = client.get_player_id()?;
     let player = state.get_player_mut(pc_id)?;
@@ -93,7 +93,7 @@ pub fn item_move(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState)
 
 pub fn item_delete(pkt: Packet, client: &FFClient, state: &mut ShardServerState) -> FFResult<()> {
     let pc_id = client.get_player_id()?;
-    let pkt: &sP_CL2FE_REQ_PC_ITEM_DELETE = pkt.get(P_CL2FE_REQ_PC_ITEM_DELETE)?;
+    let pkt: &sP_CL2FE_REQ_PC_ITEM_DELETE = pkt.get()?;
     let player = state.get_player_mut(pc_id)?;
     let location = pkt.eIL.try_into()?;
     if location != ItemLocation::Inven {
@@ -121,7 +121,7 @@ pub fn item_combination(
     client: &FFClient,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_PC_ITEM_COMBINATION = pkt.get(P_CL2FE_REQ_PC_ITEM_COMBINATION)?;
+    let pkt: &sP_CL2FE_REQ_PC_ITEM_COMBINATION = pkt.get()?;
     (|| {
         let player = state.get_player_mut(client.get_player_id()?)?;
 
@@ -249,7 +249,7 @@ pub fn item_chest_open(
     client: &FFClient,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_ITEM_CHEST_OPEN = pkt.get(P_CL2FE_REQ_ITEM_CHEST_OPEN)?;
+    let pkt: &sP_CL2FE_REQ_ITEM_CHEST_OPEN = pkt.get()?;
     (|| {
         let player = state.get_player_mut(client.get_player_id()?)?;
         let location: ItemLocation = pkt.eIL.try_into()?;
@@ -324,7 +324,7 @@ pub fn item_chest_open(
 }
 
 pub fn vendor_start(pkt: Packet, client: &FFClient, state: &mut ShardServerState) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_PC_VENDOR_START = pkt.get(P_CL2FE_REQ_PC_VENDOR_START)?;
+    let pkt: &sP_CL2FE_REQ_PC_VENDOR_START = pkt.get()?;
     (|| {
         helpers::validate_vendor(client, state, pkt.iNPC_ID, pkt.iVendorID)?;
         let resp = sP_FE2CL_REP_PC_VENDOR_START_SUCC {
@@ -346,8 +346,7 @@ pub fn vendor_start(pkt: Packet, client: &FFClient, state: &mut ShardServerState
 
 pub fn vendor_table_update(pkt: Packet, client: &FFClient) -> FFResult<()> {
     (|| {
-        let pkt: &sP_CL2FE_REQ_PC_VENDOR_TABLE_UPDATE =
-            pkt.get(P_CL2FE_REQ_PC_VENDOR_TABLE_UPDATE)?;
+        let pkt: &sP_CL2FE_REQ_PC_VENDOR_TABLE_UPDATE = pkt.get()?;
 
         let vendor_data = tdata_get().get_vendor_data(pkt.iVendorID)?;
         let resp = sP_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_SUCC {
@@ -373,7 +372,7 @@ pub fn vendor_item_buy(
     time: SystemTime,
 ) -> FFResult<()> {
     (|| {
-        let pkt: &sP_CL2FE_REQ_PC_VENDOR_ITEM_BUY = pkt.get(P_CL2FE_REQ_PC_VENDOR_ITEM_BUY)?;
+        let pkt: &sP_CL2FE_REQ_PC_VENDOR_ITEM_BUY = pkt.get()?;
 
         helpers::validate_vendor(client, state, pkt.iNPC_ID, pkt.iVendorID)?;
 
@@ -443,7 +442,7 @@ pub fn vendor_item_sell(
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     (|| {
-        let pkt: &sP_CL2FE_REQ_PC_VENDOR_ITEM_SELL = pkt.get(P_CL2FE_REQ_PC_VENDOR_ITEM_SELL)?;
+        let pkt: &sP_CL2FE_REQ_PC_VENDOR_ITEM_SELL = pkt.get()?;
         let pc_id = client.get_player_id()?;
         let player = state.get_player_mut(pc_id)?;
 
@@ -505,8 +504,7 @@ pub fn vendor_item_restore_buy(
 ) -> FFResult<()> {
     (|| {
         let pc_id = client.get_player_id()?;
-        let pkt: &sP_CL2FE_REQ_PC_VENDOR_ITEM_RESTORE_BUY =
-            pkt.get(P_CL2FE_REQ_PC_VENDOR_ITEM_RESTORE_BUY)?;
+        let pkt: &sP_CL2FE_REQ_PC_VENDOR_ITEM_RESTORE_BUY = pkt.get()?;
         helpers::validate_vendor(client, state, pkt.iNPC_ID, pkt.iVendorID)?;
 
         let item: Option<Item> = pkt.Item.try_into()?;
@@ -579,8 +577,7 @@ pub fn vendor_battery_buy(
     const BATTERY_TYPE_POTION: i16 = 4;
 
     (|| {
-        let pkt: &sP_CL2FE_REQ_PC_VENDOR_BATTERY_BUY =
-            pkt.get(P_CL2FE_REQ_PC_VENDOR_BATTERY_BUY)?;
+        let pkt: &sP_CL2FE_REQ_PC_VENDOR_BATTERY_BUY = pkt.get()?;
         helpers::validate_vendor(client, state, pkt.iNPC_ID, pkt.iVendorID)?;
 
         let battery_type = pkt.Item.iID;

@@ -29,7 +29,7 @@ pub async fn pc_enter(
     state_lock: Arc<Mutex<ShardServerState>>,
     time: SystemTime,
 ) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_PC_ENTER = pkt.get(P_CL2FE_REQ_PC_ENTER)?;
+    let pkt: &sP_CL2FE_REQ_PC_ENTER = pkt.get()?;
     let serial_key: i64 = pkt.iEnterSerialKey;
     let enter_serial_key = pkt.iEnterSerialKey;
 
@@ -232,7 +232,7 @@ pub fn pc_loading_complete(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let _pkt: &sP_CL2FE_REQ_PC_LOADING_COMPLETE = pkt.get(P_CL2FE_REQ_PC_LOADING_COMPLETE)?;
+    let _pkt: &sP_CL2FE_REQ_PC_LOADING_COMPLETE = pkt.get()?;
 
     let resp = sP_FE2CL_REP_PC_LOADING_COMPLETE_SUCC { iPC_ID: unused!() };
     let pc_id = clients.get_sender().get_player_id()?;
@@ -309,7 +309,7 @@ pub fn pc_move(
 ) -> FFResult<()> {
     let client = clients.get_sender();
     let pc_id = client.get_player_id()?;
-    let pkt: &sP_CL2FE_REQ_PC_MOVE = pkt.get(P_CL2FE_REQ_PC_MOVE)?;
+    let pkt: &sP_CL2FE_REQ_PC_MOVE = pkt.get()?;
     let pos = Position {
         x: pkt.iX,
         y: pkt.iY,
@@ -360,7 +360,7 @@ pub fn pc_jump(
 ) -> FFResult<()> {
     let client = clients.get_sender();
     let pc_id = client.get_player_id()?;
-    let pkt: &sP_CL2FE_REQ_PC_JUMP = pkt.get(P_CL2FE_REQ_PC_JUMP)?;
+    let pkt: &sP_CL2FE_REQ_PC_JUMP = pkt.get()?;
     let pos = Position {
         x: pkt.iX,
         y: pkt.iY,
@@ -411,7 +411,7 @@ pub fn pc_stop(
 ) -> FFResult<()> {
     let client = clients.get_sender();
     let pc_id = client.get_player_id()?;
-    let pkt: &sP_CL2FE_REQ_PC_STOP = pkt.get(P_CL2FE_REQ_PC_STOP)?;
+    let pkt: &sP_CL2FE_REQ_PC_STOP = pkt.get()?;
     let pos = Position {
         x: pkt.iX,
         y: pkt.iY,
@@ -454,7 +454,7 @@ pub fn pc_movetransportation(
 ) -> FFResult<()> {
     let client = clients.get_sender();
     let pc_id = client.get_player_id()?;
-    let pkt: &sP_CL2FE_REQ_PC_MOVETRANSPORTATION = pkt.get(P_CL2FE_REQ_PC_MOVETRANSPORTATION)?;
+    let pkt: &sP_CL2FE_REQ_PC_MOVETRANSPORTATION = pkt.get()?;
     let pos = Position {
         x: pkt.iX,
         y: pkt.iY,
@@ -510,7 +510,7 @@ pub fn pc_transport_warp(
     client: &FFClient,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_PC_TRANSPORT_WARP = pkt.get(P_CL2FE_REQ_PC_TRANSPORT_WARP)?;
+    let pkt: &sP_CL2FE_REQ_PC_TRANSPORT_WARP = pkt.get()?;
 
     let slider = state.get_slider(pkt.iTransport_ID)?;
     let resp = sP_FE2CL_REP_PC_TRANSPORT_WARP_SUCC {
@@ -609,8 +609,7 @@ pub fn pc_special_state_switch(
 ) -> FFResult<()> {
     let client = clients.get_sender();
     let pc_id = client.get_player_id()?;
-    let pkt: &sP_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH =
-        pkt.get(P_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH)?;
+    let pkt: &sP_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH = pkt.get()?;
 
     let player = state.get_player_mut(pc_id)?;
 
@@ -691,7 +690,7 @@ pub fn pc_regen(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
 
     let client = clients.get_sender();
     let pc_id = client.get_player_id()?;
-    let pkt: &sP_CL2FE_REQ_PC_REGEN = pkt.get(P_CL2FE_REQ_PC_REGEN)?;
+    let pkt: &sP_CL2FE_REQ_PC_REGEN = pkt.get()?;
     let revive_type: PCRegenType = pkt.iRegenType.try_into()?;
 
     let player = state.get_player_mut(pc_id)?;
@@ -775,7 +774,7 @@ pub fn pc_first_use_flag_set(
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let pc_id = client.get_player_id()?;
-    let pkt: &sP_CL2FE_REQ_PC_FIRST_USE_FLAG_SET = pkt.get(P_CL2FE_REQ_PC_FIRST_USE_FLAG_SET)?;
+    let pkt: &sP_CL2FE_REQ_PC_FIRST_USE_FLAG_SET = pkt.get()?;
 
     let player = state.get_player_mut(pc_id)?;
     player.update_first_use_flag(pkt.iFlagCode)?;
@@ -787,7 +786,7 @@ pub fn pc_change_mentor(
     client: &FFClient,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_PC_CHANGE_MENTOR = pkt.get(P_CL2FE_REQ_PC_CHANGE_MENTOR)?;
+    let pkt: &sP_CL2FE_REQ_PC_CHANGE_MENTOR = pkt.get()?;
     (|| {
         let player = state.get_player_mut(client.get_player_id()?)?;
         if player.get_level() < 4 {
@@ -853,7 +852,7 @@ pub fn pc_warp_channel(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_PC_WARP_CHANNEL = pkt.get(P_CL2FE_REQ_PC_WARP_CHANNEL)?;
+    let pkt: &sP_CL2FE_REQ_PC_WARP_CHANNEL = pkt.get()?;
 
     let mut error_code = 0;
     (|| {

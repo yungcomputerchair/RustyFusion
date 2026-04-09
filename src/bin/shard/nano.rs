@@ -17,7 +17,7 @@ use rusty_fusion::{
 pub fn nano_equip(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_sender();
     let pc_id = client.get_player_id()?;
-    let pkt: &sP_CL2FE_REQ_NANO_EQUIP = pkt.get(P_CL2FE_REQ_NANO_EQUIP)?;
+    let pkt: &sP_CL2FE_REQ_NANO_EQUIP = pkt.get()?;
 
     let player = state.get_player(pc_id)?;
     if player.perms as u32 > CN_ACCOUNT_LEVEL__DEVELOPER {
@@ -72,7 +72,7 @@ pub fn nano_unequip(
 ) -> FFResult<()> {
     let client = clients.get_sender();
     let pc_id = client.get_player_id()?;
-    let pkt: &sP_CL2FE_REQ_NANO_UNEQUIP = pkt.get(P_CL2FE_REQ_NANO_UNEQUIP)?;
+    let pkt: &sP_CL2FE_REQ_NANO_UNEQUIP = pkt.get()?;
 
     let player = state.get_player_mut(pc_id)?;
     player.change_nano(pkt.iNanoSlotNum as usize, None)?;
@@ -105,7 +105,7 @@ pub fn nano_unequip(
 pub fn nano_active(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_sender();
     let pc_id = client.get_player_id()?;
-    let pkt: &sP_CL2FE_REQ_NANO_ACTIVE = pkt.get(P_CL2FE_REQ_NANO_ACTIVE)?;
+    let pkt: &sP_CL2FE_REQ_NANO_ACTIVE = pkt.get()?;
 
     let player = state.get_player_mut(pc_id)?;
     if pkt.iNanoSlotNum == -1 {
@@ -137,7 +137,7 @@ pub fn nano_active(pkt: Packet, clients: &ClientMap, state: &mut ShardServerStat
 }
 
 pub fn nano_tune(pkt: Packet, client: &FFClient, state: &mut ShardServerState) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_NANO_TUNE = pkt.get(P_CL2FE_REQ_NANO_TUNE)?;
+    let pkt: &sP_CL2FE_REQ_NANO_TUNE = pkt.get()?;
     let pc_id = client.get_player_id()?;
     (|| {
         let player = state.get_player_mut(pc_id)?;

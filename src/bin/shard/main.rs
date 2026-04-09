@@ -505,7 +505,7 @@ fn handle_packet<'a>(
 }
 
 fn wrong_server(pkt: Packet, client: &FFClient) -> FFResult<()> {
-    let pkt: &sP_CL2LS_REQ_LOGIN = pkt.get(P_CL2LS_REQ_LOGIN)?;
+    let pkt: &sP_CL2LS_REQ_LOGIN = pkt.get()?;
     let resp = sP_LS2CL_REP_LOGIN_FAIL {
         iErrorCode: 4, // "Login error"
         szID: pkt.szID,

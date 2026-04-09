@@ -30,7 +30,7 @@ pub fn login_connect_req(server: &FFClient) {
 }
 
 pub fn login_connect_challenge(pkt: Packet, server: &FFClient) -> FFResult<()> {
-    let pkt: &sP_LS2FE_REP_AUTH_CHALLENGE = pkt.get(P_LS2FE_REP_AUTH_CHALLENGE)?;
+    let pkt: &sP_LS2FE_REP_AUTH_CHALLENGE = pkt.get()?;
     let key = config_get().general.server_key.get().clone();
     let chall_encrypted: Vec<u8> = pkt.aChallenge[..pkt.uiChallengeLength as usize].to_vec();
     let chall_decrypted = crypto::decrypt_payload_aes(&pkt.aNonce, &chall_encrypted, &key)?;
@@ -57,7 +57,7 @@ pub fn login_connect_succ(
     server: &FFClient,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_LS2FE_REP_CONNECT_SUCC = pkt.get(P_LS2FE_REP_CONNECT_SUCC)?;
+    let pkt: &sP_LS2FE_REP_CONNECT_SUCC = pkt.get()?;
     let login_server_id = Uuid::from_bytes_le(pkt.aLS_UID);
     let conn_time: u64 = pkt.uiSvrTime;
 
@@ -84,7 +84,7 @@ pub fn login_connect_succ(
 }
 
 pub fn login_connect_fail(pkt: Packet) -> FFResult<()> {
-    let pkt: &sP_LS2FE_REP_CONNECT_FAIL = pkt.get(P_LS2FE_REP_CONNECT_FAIL)?;
+    let pkt: &sP_LS2FE_REP_CONNECT_FAIL = pkt.get()?;
     Err(FFError::build(
         Severity::Warning,
         format!("Login server refused to connect (error {})", {
@@ -98,7 +98,7 @@ pub fn login_update_info(
     server: &FFClient,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_LS2FE_REQ_UPDATE_LOGIN_INFO = pkt.get(P_LS2FE_REQ_UPDATE_LOGIN_INFO)?;
+    let pkt: &sP_LS2FE_REQ_UPDATE_LOGIN_INFO = pkt.get()?;
     let resp = sP_FE2LS_REP_UPDATE_LOGIN_INFO_SUCC {
         iEnterSerialKey: pkt.iEnterSerialKey,
     };
@@ -140,7 +140,7 @@ pub fn login_live_check(client: &FFClient) -> FFResult<()> {
 }
 
 pub fn login_motd(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) -> FFResult<()> {
-    let pkt: &sP_LS2FE_REP_MOTD = pkt.get(P_LS2FE_REP_MOTD)?;
+    let pkt: &sP_LS2FE_REP_MOTD = pkt.get()?;
     let player = state.get_player(pkt.iPC_ID)?;
     let pkt = sP_FE2CL_PC_MOTD_LOGIN {
         iType: unused!(),
@@ -155,7 +155,7 @@ pub fn login_motd(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState
 }
 
 pub fn login_announce_msg(pkt: Packet, clients: &ClientMap) -> FFResult<()> {
-    let pkt: &sP_LS2FE_ANNOUNCE_MSG = pkt.get(P_LS2FE_ANNOUNCE_MSG)?;
+    let pkt: &sP_LS2FE_ANNOUNCE_MSG = pkt.get()?;
     clients.get_all_gameclient().iter().for_each(|c| {
         c.send_packet(P_FE2CL_ANNOUNCE_MSG, pkt);
     });
@@ -168,7 +168,7 @@ pub fn login_pc_location(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_LS2FE_REQ_PC_LOCATION = pkt.get(P_LS2FE_REQ_PC_LOCATION)?;
+    let pkt: &sP_LS2FE_REQ_PC_LOCATION = pkt.get()?;
     let req = pkt.sReq;
     let search_mode: TargetSearchBy = req.eTargetSearchBy.try_into()?;
     let search_query = match search_mode {
@@ -227,7 +227,7 @@ pub fn login_pc_location_succ(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_LS2FE_REP_PC_LOCATION_SUCC = pkt.get(P_LS2FE_REP_PC_LOCATION_SUCC)?;
+    let pkt: &sP_LS2FE_REP_PC_LOCATION_SUCC = pkt.get()?;
 
     let resp = pkt.sResp;
     let player = state.get_player(pkt.iPC_ID)?;
@@ -241,7 +241,7 @@ pub fn login_pc_location_fail(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_LS2FE_REP_PC_LOCATION_FAIL = pkt.get(P_LS2FE_REP_PC_LOCATION_FAIL)?;
+    let pkt: &sP_LS2FE_REP_PC_LOCATION_FAIL = pkt.get()?;
 
     let err_code: PlayerSearchReqErr = pkt.iErrorCode.try_into()?;
     let err_msg = match err_code {
@@ -281,7 +281,7 @@ pub fn login_pc_exit_duplicate(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_LS2FE_REQ_PC_EXIT_DUPLICATE = pkt.get(P_LS2FE_REQ_PC_EXIT_DUPLICATE)?;
+    let pkt: &sP_LS2FE_REQ_PC_EXIT_DUPLICATE = pkt.get()?;
 
     let pc_uid = pkt.iPC_UID;
     let pc_id = state
@@ -308,7 +308,7 @@ pub fn login_get_buddy_state(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_LS2FE_REP_GET_BUDDY_STATE = pkt.get(P_LS2FE_REP_GET_BUDDY_STATE)?;
+    let pkt: &sP_LS2FE_REP_GET_BUDDY_STATE = pkt.get()?;
     let pc_uid = pkt.iPC_UID;
 
     // buddy list may have changed during flight, so we can't just index into the query
@@ -365,7 +365,7 @@ pub fn login_buddy_freechat(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_LS2FE_REQ_SEND_BUDDY_FREECHAT = pkt.get(P_LS2FE_REQ_SEND_BUDDY_FREECHAT)?;
+    let pkt: &sP_LS2FE_REQ_SEND_BUDDY_FREECHAT = pkt.get()?;
 
     if let Some(buddy) = state.get_player_by_uid(pkt.iToPCUID) {
         if let Some(buddy_client) = buddy.get_client(clients) {
@@ -403,8 +403,7 @@ pub fn buddy_freechat_succ(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_LS2FE_REP_SEND_BUDDY_FREECHAT_SUCC =
-        pkt.get(P_LS2FE_REP_SEND_BUDDY_FREECHAT_SUCC)?;
+    let pkt: &sP_LS2FE_REP_SEND_BUDDY_FREECHAT_SUCC = pkt.get()?;
 
     let response_pkt = sP_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC {
         iFromPCUID: pkt.iFromPCUID,
@@ -427,7 +426,7 @@ pub fn login_buddy_menuchat(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_LS2FE_REQ_SEND_BUDDY_MENUCHAT = pkt.get(P_LS2FE_REQ_SEND_BUDDY_MENUCHAT)?;
+    let pkt: &sP_LS2FE_REQ_SEND_BUDDY_MENUCHAT = pkt.get()?;
 
     if let Some(buddy) = state.get_player_by_uid(pkt.iToPCUID) {
         if let Some(buddy_client) = buddy.get_client(clients) {
@@ -465,8 +464,7 @@ pub fn buddy_menuchat_succ(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_LS2FE_REP_SEND_BUDDY_MENUCHAT_SUCC =
-        pkt.get(P_LS2FE_REP_SEND_BUDDY_MENUCHAT_SUCC)?;
+    let pkt: &sP_LS2FE_REP_SEND_BUDDY_MENUCHAT_SUCC = pkt.get()?;
 
     let response_pkt = sP_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC {
         iFromPCUID: pkt.iFromPCUID,
@@ -490,7 +488,7 @@ pub fn login_buddy_warp(
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let client = clients.get_sender();
-    let pkt: &sP_LS2FE_REQ_BUDDY_WARP = pkt.get(P_LS2FE_REQ_BUDDY_WARP)?;
+    let pkt: &sP_LS2FE_REQ_BUDDY_WARP = pkt.get()?;
 
     let fail_pkt = sP_FE2LS_REP_BUDDY_WARP_FAIL {
         iBuddyPCUID: pkt.iBuddyPCUID,
@@ -569,7 +567,7 @@ pub async fn login_buddy_warp_succ(
     clients: &ClientMap<'_>,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_LS2FE_REP_BUDDY_WARP_SUCC = pkt.get(P_LS2FE_REP_BUDDY_WARP_SUCC)?;
+    let pkt: &sP_LS2FE_REP_BUDDY_WARP_SUCC = pkt.get()?;
     let player_pcuid = pkt.iFromPCUID;
     let player = state.get_player_by_uid(player_pcuid).ok_or_else(|| {
         FFError::build(
@@ -649,7 +647,7 @@ pub fn login_buddy_warp_fail(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_LS2FE_REP_BUDDY_WARP_FAIL = pkt.get(P_LS2FE_REP_BUDDY_WARP_FAIL)?;
+    let pkt: &sP_LS2FE_REP_BUDDY_WARP_FAIL = pkt.get()?;
 
     let player_pcuid = pkt.iFromPCUID;
 

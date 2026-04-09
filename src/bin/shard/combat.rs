@@ -1,10 +1,7 @@
 use rusty_fusion::{
     entity::{Combatant, Entity},
     error::*,
-    net::{
-        packet::{PacketID::*, *},
-        ClientMap,
-    },
+    net::{packet::*, ClientMap},
     skills,
     state::ShardServerState,
 };
@@ -31,7 +28,7 @@ pub fn pc_attack_npcs(
     let pc_id = client.get_player_id()?;
 
     let mut reader = PacketReader::new(&pkt);
-    let pkt: &sP_CL2FE_REQ_PC_ATTACK_NPCs = reader.get_packet(P_CL2FE_REQ_PC_ATTACK_NPCs)?;
+    let pkt: &sP_CL2FE_REQ_PC_ATTACK_NPCs = reader.get_struct()?;
     let target_count = pkt.iNPCCnt as usize;
     if target_count == 0 {
         return Ok(());

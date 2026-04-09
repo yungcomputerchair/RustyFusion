@@ -47,7 +47,7 @@ pub fn request_make_buddy(
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let client = clients.get_sender();
-    let pkt: &sP_CL2FE_REQ_REQUEST_MAKE_BUDDY = pkt.get(P_CL2FE_REQ_REQUEST_MAKE_BUDDY)?;
+    let pkt: &sP_CL2FE_REQ_REQUEST_MAKE_BUDDY = pkt.get()?;
 
     let pc_id = client.get_player_id()?;
     let buddy_id = pkt.iBuddyID;
@@ -119,8 +119,7 @@ pub fn find_name_make_buddy(
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let client = clients.get_sender();
-    let pkt: &sP_CL2FE_REQ_PC_FIND_NAME_MAKE_BUDDY =
-        pkt.get(P_CL2FE_REQ_PC_FIND_NAME_MAKE_BUDDY)?;
+    let pkt: &sP_CL2FE_REQ_PC_FIND_NAME_MAKE_BUDDY = pkt.get()?;
 
     let pc_id = client.get_player_id()?;
     let player = state.get_player(pc_id)?;
@@ -184,7 +183,7 @@ pub fn accept_make_buddy(
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let client = clients.get_sender();
-    let pkt: &sP_CL2FE_REQ_ACCEPT_MAKE_BUDDY = pkt.get(P_CL2FE_REQ_ACCEPT_MAKE_BUDDY)?;
+    let pkt: &sP_CL2FE_REQ_ACCEPT_MAKE_BUDDY = pkt.get()?;
 
     let pc_id = client.get_player_id()?;
     let player = state.get_player(pc_id)?;
@@ -264,8 +263,7 @@ pub fn find_name_accept_buddy(
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let client = clients.get_sender();
-    let pkt: &sP_CL2FE_REQ_PC_FIND_NAME_ACCEPT_BUDDY =
-        pkt.get(P_CL2FE_REQ_PC_FIND_NAME_ACCEPT_BUDDY)?;
+    let pkt: &sP_CL2FE_REQ_PC_FIND_NAME_ACCEPT_BUDDY = pkt.get()?;
 
     let accepted = pkt.iAcceptFlag == 1;
 
@@ -358,7 +356,7 @@ pub fn pc_buddy_warp(
     state: &mut ShardServerState,
 ) -> FFResult<()> {
     let client = clients.get_sender();
-    let pkt: &sP_CL2FE_REQ_PC_BUDDY_WARP = pkt.get(P_CL2FE_REQ_PC_BUDDY_WARP)?;
+    let pkt: &sP_CL2FE_REQ_PC_BUDDY_WARP = pkt.get()?;
 
     let pc_id = client.get_player_id()?;
     let player = state.get_player(pc_id)?;
