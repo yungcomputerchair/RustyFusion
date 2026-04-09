@@ -84,7 +84,7 @@ impl<S: Send + 'static> FFServer<S> {
                     ServerMessage::Shutdown => {
                         return Err(FFError::build(
                             Severity::Fatal,
-                            "Shutdown signal received from connection handler".to_string(),
+                            "Shutdown signal received from connection handler; see log for more details".to_string(),
                         ));
                     }
                 }

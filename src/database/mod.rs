@@ -23,6 +23,11 @@ type Bytes = Vec<u8>;
 type DbBackend = postgresql::PostgresDatabase;
 
 static DB: OnceLock<DbBackend> = OnceLock::new();
+static DB_ERROR_SEVERITY: OnceLock<Severity> = OnceLock::new();
+
+pub fn db_error_severity() -> Severity {
+    DB_ERROR_SEVERITY.get().copied().unwrap()
+}
 
 #[async_trait]
 pub trait Database: Send + Sync + Debug {
@@ -69,13 +74,15 @@ async fn db_connect(config: &GeneralConfig) -> FFResult<DbBackend> {
     }
 }
 
-pub async fn db_init() -> FFResult<&'static DbBackend> {
+pub async fn db_init(error_severity: Severity) -> FFResult<&'static DbBackend> {
     if DB.get().is_some() {
         return Err(FFError::build(
             Severity::Warning,
             "Database already initialized".to_string(),
         ));
     }
+
+    let _ = DB_ERROR_SEVERITY.set(error_severity);
 
     log(Severity::Info, "Connecting to database...");
     let config = &config_get().general;

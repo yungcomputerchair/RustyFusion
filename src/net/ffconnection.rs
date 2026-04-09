@@ -112,7 +112,7 @@ impl<S: Send + 'static> FFConnection<S> {
                 biased;
                 Some(msg) = rx.recv() => Event::Message(msg),
                 res = self.read_next_packet() => Event::PacketReady(res),
-                _ = lc_interval.as_mut().unwrap().tick(), if lc_interval.is_some() => Event::LiveCheck,
+                _ = async { lc_interval.as_mut().unwrap().tick().await }, if lc_interval.is_some() => Event::LiveCheck,
             };
 
             match event {

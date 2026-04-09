@@ -38,7 +38,7 @@ async fn main() -> FFResult<()> {
     let config = config_init()?;
     let mut logger = Logger::new(log_rx, &config.shard.log_path.get());
 
-    db_init().await?;
+    db_init(Severity::Fatal).await?;
     tdata_init()?;
 
     let mut tui_timer = util::make_timer(Duration::from_millis(100), true);
@@ -83,16 +83,21 @@ async fn main() -> FFResult<()> {
     );
 
     let mut key_event_stream = ce::EventStream::new();
+    let mut fatal_error = None;
+    let mut save_handle = None;
     loop {
         // Check timers
         tokio::select! {
             res = server.poll() => {
                 if let Err(e) = res {
-                    let sev = e.get_severity();
-                    log_error(e);
-                    if sev == Severity::Fatal {
+                    let fatal = e.get_severity() == Severity::Fatal;
+                    if fatal {
+                        log_error(e.clone());
+                        fatal_error = Some(e);
                         break;
                     }
+
+                    log_error(e);
                 }
             }
             ke = key_event_stream.next() => {
@@ -161,8 +166,25 @@ async fn main() -> FFResult<()> {
                 log_if_failed(send_status_to_login_server(&client_map, &*state.lock().await));
             }
             _ = save_timer.tick() => {
-                let state = state.lock().await;
-                let _ = do_save(&state);
+                if save_handle.is_none() {
+                    let state = state.lock().await;
+                    save_handle = do_save(&state);
+                }
+            }
+            res = async { save_handle.as_mut().unwrap().await }, if save_handle.is_some() => {
+                save_handle = None;
+                match res.unwrap() {
+                    Ok((num_players, time_taken)) => {
+                        log(
+                            Severity::Info,
+                            &format!("Saved {} player(s) in {}ms", num_players, time_taken.as_millis()),
+                        );
+                    }
+                    Err(e) => {
+                        fatal_error = Some(e);
+                        break;
+                    }
+                }
             }
             _ = logger_timer.tick() => {
                 logger.flush();
@@ -186,7 +208,12 @@ async fn main() -> FFResult<()> {
 
     let client_map = ClientMap::new(0, &clients);
     shutdown_notify_clients(&client_map, &state);
-    Ok(())
+
+    if let Some(e) = fatal_error {
+        Err(e)
+    } else {
+        Ok(())
+    }
 }
 
 struct Cleanup;
@@ -564,7 +591,7 @@ fn send_live_check(client: &FFClient) {
     }
 }
 
-fn do_save(state: &ShardServerState) -> Option<JoinHandle<()>> {
+fn do_save(state: &ShardServerState) -> Option<JoinHandle<FFResult<(usize, Duration)>>> {
     let pc_ids: Vec<i32> = state.entity_map.get_player_ids().collect();
     if pc_ids.is_empty() {
         return None;
@@ -584,20 +611,13 @@ fn do_save(state: &ShardServerState) -> Option<JoinHandle<()>> {
     let handle = tokio::spawn(async move {
         let db = db_get();
         let player_refs: Vec<&Player> = players.iter().collect();
-        let res = db.save_players(&player_refs).await;
-        if let Err(e) = res {
-            let e2 = FFError::build(Severity::Warning, "Failed to save players".to_string());
-            log_error(e.with_parent(e2));
-        }
+        db.save_players(&player_refs).await.map_err(|e| {
+            FFError::build(Severity::Warning, "Failed to autosave players".to_string())
+                .with_parent(e)
+        })?;
 
-        log(
-            Severity::Info,
-            &format!(
-                "Saved {} player(s) in {}ms",
-                players.len(),
-                time_start.elapsed().as_millis()
-            ),
-        );
+        let duration = time_start.elapsed();
+        Ok((players.len(), duration))
     });
 
     Some(handle)

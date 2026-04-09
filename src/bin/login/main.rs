@@ -40,7 +40,7 @@ async fn main() -> FFResult<()> {
     let config = config_init()?;
     let mut logger = Logger::new(log_rx, &config.login.log_path.get());
 
-    db_init().await?;
+    db_init(Severity::Warning).await?;
     tdata_init()?;
 
     let mut tui_timer = util::make_timer(Duration::from_millis(100), true);

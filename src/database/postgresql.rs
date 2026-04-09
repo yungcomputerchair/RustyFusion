@@ -24,12 +24,13 @@ use crate::{
 
 impl From<postgres::Error> for FFError {
     fn from(e: postgres::Error) -> Self {
-        FFError::build(Severity::Fatal, e.to_string())
+        FFError::build(db_error_severity(), "Database error".to_string())
+            .with_parent(FFError::build(Severity::Debug, e.to_string()))
     }
 }
 impl From<deadpool_postgres::PoolError> for FFError {
     fn from(e: deadpool_postgres::PoolError) -> Self {
-        FFError::build(Severity::Fatal, "Database pool error".to_string())
+        FFError::build(db_error_severity(), "Database pool error".to_string())
             .with_parent(FFError::build(Severity::Debug, e.to_string()))
     }
 }
@@ -40,7 +41,13 @@ pub struct PostgresDatabase {
 }
 impl std::fmt::Debug for PostgresDatabase {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Postgres Database ({:?})", self.config)
+        write!(
+            f,
+            "Postgres Database ({}@{}:{})",
+            self.config.user.as_deref().unwrap(),
+            self.config.host.as_deref().unwrap(),
+            self.config.port.unwrap()
+        )
     }
 }
 impl PostgresDatabase {

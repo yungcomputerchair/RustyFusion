@@ -174,12 +174,13 @@ impl FFError {
             format!(
                 "[{}] {} {}",
                 time_str,
-                self.severity.get_label(colored),
+                self.get_severity().get_label(colored),
                 self.msg
             )
         } else {
-            format!("{} {}", self.severity.get_label(colored), self.msg)
+            format!("{} {}", self.get_severity().get_label(colored), self.msg)
         };
+
         if let Some(parent) = self.parent.as_ref() {
             msg.push_str(&format!(
                 "\n  from: {}",
