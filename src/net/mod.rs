@@ -221,7 +221,7 @@ impl<'a> ClientMap<'a> {
         self.clients.get(&key)
     }
 
-    pub fn get_self(&self) -> &FFClient {
+    pub fn get_sender(&self) -> &FFClient {
         self.clients.get(&self.key).unwrap()
     }
 

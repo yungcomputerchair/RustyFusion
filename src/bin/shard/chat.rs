@@ -30,7 +30,7 @@ pub async fn send_freechat_message(
             }
         }
 
-        let client = clients.get_self();
+        let client = clients.get_sender();
         if msg.starts_with('/') {
             return send_system_message(
                 client,
@@ -91,7 +91,7 @@ pub async fn send_freechat_message(
     })
     .await
     .catch_fail(|| {
-        let client = clients.get_self();
+        let client = clients.get_sender();
         let resp = sP_FE2CL_REP_SEND_FREECHAT_MESSAGE_FAIL {
             iErrorCode: unused!(),
             szFreeChat: pkt.szFreeChat,
@@ -109,7 +109,7 @@ pub fn send_menuchat_message(
     let pkt: &sP_CL2FE_REQ_SEND_MENUCHAT_MESSAGE = pkt.get(P_CL2FE_REQ_SEND_MENUCHAT_MESSAGE)?;
 
     (|| {
-        let client = clients.get_self();
+        let client = clients.get_sender();
         let pc_id = client.get_player_id()?;
         let player = state.get_player(pc_id)?;
 
@@ -152,7 +152,7 @@ pub fn send_menuchat_message(
         Ok(())
     })()
     .catch_fail(|| {
-        let client = clients.get_self();
+        let client = clients.get_sender();
         let resp = sP_FE2CL_REP_SEND_MENUCHAT_MESSAGE_FAIL {
             iErrorCode: unused!(),
             szFreeChat: pkt.szFreeChat,
@@ -167,7 +167,7 @@ pub fn send_group_freechat_message(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let client = clients.get_self();
+    let client = clients.get_sender();
     let pkt: &sP_CL2FE_REQ_SEND_ALL_GROUP_FREECHAT_MESSAGE =
         pkt.get(P_CL2FE_REQ_SEND_ALL_GROUP_FREECHAT_MESSAGE)?;
 
@@ -232,7 +232,7 @@ pub fn send_group_menuchat_message(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let client = clients.get_self();
+    let client = clients.get_sender();
     let pkt: &sP_CL2FE_REQ_SEND_ALL_GROUP_MENUCHAT_MESSAGE =
         pkt.get(P_CL2FE_REQ_SEND_ALL_GROUP_MENUCHAT_MESSAGE)?;
     let pc_id = client.get_player_id()?;
@@ -287,7 +287,7 @@ pub fn send_buddy_freechat_message(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let client = clients.get_self();
+    let client = clients.get_sender();
     let pkt: &sP_CL2FE_REQ_SEND_BUDDY_FREECHAT_MESSAGE =
         pkt.get(P_CL2FE_REQ_SEND_BUDDY_FREECHAT_MESSAGE)?;
 
@@ -343,7 +343,7 @@ pub fn send_buddy_freechat_message(
         }
 
         clients
-            .get_self()
+            .get_sender()
             .send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &response_pkt);
 
         return Ok(());
@@ -373,7 +373,7 @@ pub fn send_buddy_menuchat_message(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let client = clients.get_self();
+    let client = clients.get_sender();
     let pkt: &sP_CL2FE_REQ_SEND_BUDDY_MENUCHAT_MESSAGE =
         pkt.get(P_CL2FE_REQ_SEND_BUDDY_MENUCHAT_MESSAGE)?;
 
@@ -434,7 +434,7 @@ pub fn send_buddy_menuchat_message(
         }
 
         clients
-            .get_self()
+            .get_sender()
             .send_packet(P_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC, &response_pkt);
 
         return Ok(());
@@ -464,7 +464,7 @@ pub fn pc_avatar_emotes_chat(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let client = clients.get_self();
+    let client = clients.get_sender();
     let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_AVATAR_EMOTES_CHAT = pkt.get(P_CL2FE_REQ_PC_AVATAR_EMOTES_CHAT)?;
 
@@ -565,7 +565,7 @@ mod commands {
             (cmd.handler)(tokens, clients, state).await
         } else {
             send_system_message(
-                clients.get_self(),
+                clients.get_sender(),
                 &format!(
                     "Unknown command {}{}\nUse {}help for a list of available commands",
                     CUSTOM_COMMAND_PREFIX, cmd_name, CUSTOM_COMMAND_PREFIX
@@ -581,7 +581,7 @@ mod commands {
     ) -> Pin<Box<dyn Future<Output = FFResult<()>> + Send + 'a>> {
         Box::pin(async move {
             send_system_message(
-                clients.get_self(),
+                clients.get_sender(),
                 &format!(
                     "RustyFusion by ycc\n\
                 Library version: {}\n\
@@ -601,7 +601,7 @@ mod commands {
         state: &'a mut ShardServerState,
     ) -> Pin<Box<dyn Future<Output = FFResult<()>> + Send + 'a>> {
         Box::pin(async move {
-            let client = clients.get_self();
+            let client = clients.get_sender();
             let is_ban_i = tokens[0] == "ban_i";
             if tokens.len() < 3 {
                 return send_system_message(
@@ -709,7 +709,7 @@ mod commands {
                 banned_client.send_packet(P_FE2CL_REP_PC_EXIT_SUCC, &pkt);
                 banned_client.disconnect();
 
-                let client = clients.get_self();
+                let client = clients.get_sender();
                 log_if_failed(send_system_message(
                     client,
                     &format!("{} kicked", banned_player),
@@ -726,7 +726,7 @@ mod commands {
         state: &'a mut ShardServerState,
     ) -> Pin<Box<dyn Future<Output = FFResult<()>> + Send + 'a>> {
         Box::pin(async move {
-            let client = clients.get_self();
+            let client = clients.get_sender();
             if tokens.len() < 2 {
                 return send_system_message(
                     client,
@@ -764,7 +764,7 @@ mod commands {
         state: &'a mut ShardServerState,
     ) -> Pin<Box<dyn Future<Output = FFResult<()>> + Send + 'a>> {
         Box::pin(async move {
-            let client = clients.get_self();
+            let client = clients.get_sender();
             let pc_id = client.get_player_id()?;
             let player = state.get_player(pc_id)?;
             if player.perms > CN_ACCOUNT_LEVEL__GM as i16 {
@@ -815,7 +815,7 @@ mod commands {
         state: &'a mut ShardServerState,
     ) -> Pin<Box<dyn Future<Output = FFResult<()>> + Send + 'a>> {
         Box::pin(async move {
-            let client = clients.get_self();
+            let client = clients.get_sender();
             let pc_id = client.get_player_id()?;
             let player = state.get_player(pc_id)?;
             if player.perms > CN_ACCOUNT_LEVEL__GM as i16 {
@@ -858,7 +858,7 @@ mod commands {
         state: &'a mut ShardServerState,
     ) -> Pin<Box<dyn Future<Output = FFResult<()>> + Send + 'a>> {
         Box::pin(async move {
-            let client = clients.get_self();
+            let client = clients.get_sender();
             if tokens.len() < 2 {
                 return send_system_message(
                     client,
@@ -965,7 +965,7 @@ mod commands {
         _state: &'a mut ShardServerState,
     ) -> Pin<Box<dyn Future<Output = FFResult<()>> + Send + 'a>> {
         Box::pin(async move {
-            let client = clients.get_self();
+            let client = clients.get_sender();
             let meta = client.meta.read();
             match meta.ping_ms {
                 Some(ref ping) => {
@@ -987,7 +987,7 @@ mod commands {
         state: &'a mut ShardServerState,
     ) -> Pin<Box<dyn Future<Output = FFResult<()>> + Send + 'a>> {
         Box::pin(async move {
-            let pc_id = clients.get_self().get_player_id()?;
+            let pc_id = clients.get_sender().get_player_id()?;
             let player = state.get_player(pc_id)?;
             let chunk_coords = player.get_chunk_coords();
             state
@@ -1017,7 +1017,7 @@ mod commands {
             }
 
             help_msg.pop(); // remove trailing newline
-            send_system_message(clients.get_self(), &help_msg)
+            send_system_message(clients.get_sender(), &help_msg)
         })
     }
 }

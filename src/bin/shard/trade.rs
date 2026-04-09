@@ -18,7 +18,7 @@ use rusty_fusion::{
 pub fn trade_offer(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     let pkt: &sP_CL2FE_REQ_PC_TRADE_OFFER = pkt.get(P_CL2FE_REQ_PC_TRADE_OFFER)?;
     (|| {
-        let client = clients.get_self();
+        let client = clients.get_sender();
         let pc_id = client.get_player_id()?;
         state.entity_map.validate_proximity(
             &[EntityID::Player(pc_id), EntityID::Player(pkt.iID_To)],
@@ -57,7 +57,7 @@ pub fn trade_offer(pkt: Packet, clients: &ClientMap, state: &mut ShardServerStat
         Ok(())
     })()
     .catch_fail(|| {
-        let client = clients.get_self();
+        let client = clients.get_sender();
         let resp = sP_FE2CL_REP_PC_TRADE_OFFER_REFUSAL {
             iID_Request: pkt.iID_Request,
             iID_From: pkt.iID_From,
@@ -77,7 +77,7 @@ pub fn trade_offer_accept(
     (|| {
         let trade_id = Uuid::new_v4();
 
-        let pc_id = clients.get_self().get_player_id()?;
+        let pc_id = clients.get_sender().get_player_id()?;
         let pc_id_other = pkt.iID_From;
 
         let player_from = state.get_player_mut(pc_id_other)?;
@@ -125,7 +125,7 @@ pub fn trade_offer_accept(
         };
 
         clients
-            .get_self()
+            .get_sender()
             .send_packet(P_FE2CL_REP_PC_TRADE_OFFER_ABORT, &resp);
     })
 }
@@ -135,7 +135,7 @@ pub fn trade_offer_refusal(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let client = clients.get_self();
+    let client = clients.get_sender();
     let pkt: &sP_CL2FE_REQ_PC_TRADE_OFFER_REFUSAL = pkt.get(P_CL2FE_REQ_PC_TRADE_OFFER_REFUSAL)?;
 
     let pc_id = client.get_player_id()?;
@@ -171,7 +171,7 @@ pub fn trade_offer_cancel(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let client = clients.get_self();
+    let client = clients.get_sender();
     let _pkt: &sP_CL2FE_REQ_PC_TRADE_OFFER_CANCEL = pkt.get(P_CL2FE_REQ_PC_TRADE_OFFER_CANCEL)?;
 
     let pc_id = client.get_player_id()?;
@@ -203,7 +203,7 @@ pub fn trade_cash_register(
     let pkt: &sP_CL2FE_REQ_PC_TRADE_CASH_REGISTER = pkt.get(P_CL2FE_REQ_PC_TRADE_CASH_REGISTER)?;
 
     (|| {
-        let client = clients.get_self();
+        let client = clients.get_sender();
         let pc_id = client.get_player_id()?;
         let player = state.get_player(pc_id)?;
         let trade_id = player.trade_id.ok_or(FFError::build(
@@ -239,7 +239,7 @@ pub fn trade_cash_register(
         Ok(())
     })()
     .catch_fail(|| {
-        let client = clients.get_self();
+        let client = clients.get_sender();
         let resp = sP_FE2CL_REP_PC_TRADE_CASH_REGISTER_FAIL {
             iID_Request: pkt.iID_Request,
             iID_From: pkt.iID_From,
@@ -259,7 +259,7 @@ pub fn trade_item_register(
     let pkt: &sP_CL2FE_REQ_PC_TRADE_ITEM_REGISTER = pkt.get(P_CL2FE_REQ_PC_TRADE_ITEM_REGISTER)?;
 
     (|| {
-        let client = clients.get_self();
+        let client = clients.get_sender();
         let pc_id = client.get_player_id()?;
         let player = state.get_player(pc_id)?;
         let trade_id = player.trade_id.ok_or(FFError::build(
@@ -315,7 +315,7 @@ pub fn trade_item_register(
         Ok(())
     })()
     .catch_fail(|| {
-        let client = clients.get_self();
+        let client = clients.get_sender();
         let resp = sP_FE2CL_REP_PC_TRADE_ITEM_REGISTER_FAIL {
             iID_Request: pkt.iID_Request,
             iID_From: pkt.iID_From,
@@ -336,7 +336,7 @@ pub fn trade_item_unregister(
         pkt.get(P_CL2FE_REQ_PC_TRADE_ITEM_UNREGISTER)?;
 
     (|| {
-        let client = clients.get_self();
+        let client = clients.get_sender();
         let pc_id = client.get_player_id()?;
         let player = state.get_player(pc_id)?;
         let trade_id = player.trade_id.ok_or(FFError::build(
@@ -381,7 +381,7 @@ pub fn trade_item_unregister(
         Ok(())
     })()
     .catch_fail(|| {
-        let client = clients.get_self();
+        let client = clients.get_sender();
         let resp = sP_FE2CL_REP_PC_TRADE_ITEM_UNREGISTER_FAIL {
             iID_Request: pkt.iID_Request,
             iID_From: pkt.iID_From,
@@ -398,7 +398,7 @@ pub fn trade_confirm_cancel(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let client = clients.get_self();
+    let client = clients.get_sender();
     let _pkt: &sP_CL2FE_REQ_PC_TRADE_CONFIRM_CANCEL =
         pkt.get(P_CL2FE_REQ_PC_TRADE_CONFIRM_CANCEL)?;
 
@@ -429,7 +429,7 @@ pub fn trade_confirm_cancel(
 }
 
 pub async fn trade_confirm(clients: &ClientMap<'_>, state: &mut ShardServerState) -> FFResult<()> {
-    let client = clients.get_self();
+    let client = clients.get_sender();
     let pc_id = client.get_player_id()?;
     let player = state.get_player(pc_id)?;
     let trade_id = player.trade_id.ok_or(FFError::build(
@@ -521,7 +521,7 @@ pub fn trade_emotes_chat(
     let pkt: &sP_CL2FE_REQ_PC_TRADE_EMOTES_CHAT = pkt.get(P_CL2FE_REQ_PC_TRADE_EMOTES_CHAT)?;
 
     (|| {
-        let pc_id = clients.get_self().get_player_id()?;
+        let pc_id = clients.get_sender().get_player_id()?;
         let player = state.get_player(pc_id)?;
         let trade_id = player.trade_id.ok_or(FFError::build(
             Severity::Warning,
@@ -558,7 +558,7 @@ pub fn trade_emotes_chat(
         };
 
         clients
-            .get_self()
+            .get_sender()
             .send_packet(P_FE2CL_REP_PC_TRADE_EMOTES_CHAT_FAIL, &resp);
     })
 }

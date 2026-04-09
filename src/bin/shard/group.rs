@@ -17,7 +17,7 @@ pub fn pc_group_invite(
 ) -> FFResult<()> {
     let pkt: &sP_CL2FE_REQ_PC_GROUP_INVITE = pkt.get(P_CL2FE_REQ_PC_GROUP_INVITE)?;
     (|| {
-        let client = clients.get_self();
+        let client = clients.get_sender();
         let pc_id = client.get_player_id()?;
         let player = state.get_player_mut(pc_id)?;
         if player.group_offered_to.is_some() {
@@ -48,7 +48,7 @@ pub fn pc_group_invite(
         };
 
         clients
-            .get_self()
+            .get_sender()
             .send_packet(P_FE2CL_PC_GROUP_INVITE_FAIL, &pkt);
     })
 }
@@ -58,7 +58,7 @@ pub fn pc_group_invite_refuse(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let client = clients.get_self();
+    let client = clients.get_sender();
     let pkt: &sP_CL2FE_REQ_PC_GROUP_INVITE_REFUSE = pkt.get(P_CL2FE_REQ_PC_GROUP_INVITE_REFUSE)?;
     let pc_id = client.get_player_id()?;
 
@@ -85,7 +85,7 @@ pub fn pc_group_join(
 ) -> FFResult<()> {
     let pkt: &sP_CL2FE_REQ_PC_GROUP_JOIN = pkt.get(P_CL2FE_REQ_PC_GROUP_JOIN)?;
     (|| {
-        let client = clients.get_self();
+        let client = clients.get_sender();
         let pc_id = client.get_player_id()?;
         let player = state.get_player(pc_id)?;
         if player.group_id.is_some() {
@@ -151,14 +151,14 @@ pub fn pc_group_join(
         };
 
         clients
-            .get_self()
+            .get_sender()
             .send_packet(P_FE2CL_PC_GROUP_JOIN_FAIL, &pkt);
     })
 }
 
 pub fn pc_group_leave(clients: &ClientMap, state: &mut ShardServerState) -> FFResult<()> {
     (|| {
-        let client = clients.get_self();
+        let client = clients.get_sender();
         let leaver_pc_id = client.get_player_id()?;
         let player = state.get_player_mut(leaver_pc_id)?;
         let group_id = player.group_id.take().ok_or_else(|| {
@@ -178,7 +178,7 @@ pub fn pc_group_leave(clients: &ClientMap, state: &mut ShardServerState) -> FFRe
         // leaver needs the leave success packet too, thx client
         let resp = sP_FE2CL_PC_GROUP_LEAVE_SUCC { UNUSED: unused!() };
         clients
-            .get_self()
+            .get_sender()
             .send_packet(P_FE2CL_PC_GROUP_LEAVE_SUCC, &resp);
 
         Ok(())
@@ -190,7 +190,7 @@ pub fn pc_group_leave(clients: &ClientMap, state: &mut ShardServerState) -> FFRe
         };
 
         clients
-            .get_self()
+            .get_sender()
             .send_packet(P_FE2CL_PC_GROUP_LEAVE_FAIL, &pkt);
     })
 }
@@ -200,7 +200,7 @@ pub fn npc_group_invite(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let client = clients.get_self();
+    let client = clients.get_sender();
     let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_NPC_GROUP_INVITE = pkt.get(P_CL2FE_REQ_NPC_GROUP_INVITE)?;
     let player = state.get_player_mut(pc_id)?;
@@ -260,7 +260,7 @@ pub fn npc_group_kick(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let client = clients.get_self();
+    let client = clients.get_sender();
     let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_NPC_GROUP_KICK = pkt.get(P_CL2FE_REQ_NPC_GROUP_KICK)?;
     let player = state.get_player(pc_id)?;

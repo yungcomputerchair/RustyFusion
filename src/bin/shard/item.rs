@@ -22,7 +22,7 @@ use rusty_fusion::{
 };
 
 pub fn item_move(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) -> FFResult<()> {
-    let client = clients.get_self();
+    let client = clients.get_sender();
     let pkt: &sP_CL2FE_REQ_ITEM_MOVE = pkt.get(P_CL2FE_REQ_ITEM_MOVE)?;
 
     let pc_id = client.get_player_id()?;
@@ -84,7 +84,7 @@ pub fn item_move(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState)
         rusty_fusion::helpers::broadcast_state(pc_id, player.get_state_bit_flag(), clients, state);
         let pkt = sP_FE2CL_PC_VEHICLE_OFF_SUCC { UNUSED: unused!() };
         clients
-            .get_self()
+            .get_sender()
             .send_packet(P_FE2CL_PC_VEHICLE_OFF_SUCC, &pkt);
     }
 

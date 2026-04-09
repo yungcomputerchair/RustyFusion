@@ -225,7 +225,7 @@ impl Drop for Cleanup {
 
 fn handle_disconnect(key: usize, clients: &HashMap<usize, FFClient>, state: &mut ShardServerState) {
     let clients = ClientMap::new(key, clients);
-    let client = clients.get_self();
+    let client = clients.get_sender();
     match client.get_client_type() {
         ClientType::LoginServer => {
             log(
@@ -299,13 +299,13 @@ fn handle_packet<'a>(
         let mut state = state.lock().await;
         let state = &mut *state;
         match pkt_id {
-            P_LS2FE_REP_AUTH_CHALLENGE => login::login_connect_challenge(pkt, clients.get_self()),
-            P_LS2FE_REP_CONNECT_SUCC => login::login_connect_succ(pkt, clients.get_self(), state),
+            P_LS2FE_REP_AUTH_CHALLENGE => login::login_connect_challenge(pkt, clients.get_sender()),
+            P_LS2FE_REP_CONNECT_SUCC => login::login_connect_succ(pkt, clients.get_sender(), state),
             P_LS2FE_REP_CONNECT_FAIL => login::login_connect_fail(pkt),
             P_LS2FE_REQ_UPDATE_LOGIN_INFO => {
-                login::login_update_info(pkt, clients.get_self(), state)
+                login::login_update_info(pkt, clients.get_sender(), state)
             }
-            P_LS2FE_REQ_LIVE_CHECK => login::login_live_check(clients.get_self()),
+            P_LS2FE_REQ_LIVE_CHECK => login::login_live_check(clients.get_sender()),
             P_LS2FE_REP_MOTD => login::login_motd(pkt, &clients, state),
             P_LS2FE_ANNOUNCE_MSG => login::login_announce_msg(pkt, &clients),
             P_LS2FE_REQ_PC_LOCATION => login::login_pc_location(pkt, &clients, state),
@@ -325,16 +325,16 @@ fn handle_packet<'a>(
             P_LS2FE_REP_BUDDY_WARP_SUCC => login::login_buddy_warp_succ(pkt, &clients, state).await,
             P_LS2FE_REP_BUDDY_WARP_FAIL => login::login_buddy_warp_fail(pkt, &clients, state),
             P_LS2FE_REP_LIVE_CHECK => {
-                clients.get_self().clear_live_check();
+                clients.get_sender().clear_live_check();
                 Ok(())
             }
             //
-            P_CL2LS_REQ_LOGIN => wrong_server(pkt, clients.get_self()),
+            P_CL2LS_REQ_LOGIN => wrong_server(pkt, clients.get_sender()),
             //
             P_CL2FE_REQ_PC_ENTER => unreachable!(),
             P_CL2FE_REQ_PC_LOADING_COMPLETE => pc::pc_loading_complete(pkt, &clients, state),
-            P_CL2FE_REQ_PC_CHANNEL_NUM => pc::pc_channel_num(clients.get_self(), state),
-            P_CL2FE_REQ_CHANNEL_INFO => pc::pc_channel_info(clients.get_self(), state),
+            P_CL2FE_REQ_PC_CHANNEL_NUM => pc::pc_channel_num(clients.get_sender(), state),
+            P_CL2FE_REQ_CHANNEL_INFO => pc::pc_channel_info(clients.get_sender(), state),
             P_CL2FE_REQ_PC_WARP_CHANNEL => pc::pc_warp_channel(pkt, &clients, state),
             P_CL2FE_REQ_PC_MOVE => pc::pc_move(pkt, &clients, state, time),
             P_CL2FE_REQ_PC_JUMP => pc::pc_jump(pkt, &clients, state, time),
@@ -342,7 +342,9 @@ fn handle_packet<'a>(
             P_CL2FE_REQ_PC_MOVETRANSPORTATION => {
                 pc::pc_movetransportation(pkt, &clients, state, time)
             }
-            P_CL2FE_REQ_PC_TRANSPORT_WARP => pc::pc_transport_warp(pkt, clients.get_self(), state),
+            P_CL2FE_REQ_PC_TRANSPORT_WARP => {
+                pc::pc_transport_warp(pkt, clients.get_sender(), state)
+            }
             P_CL2FE_REQ_PC_VEHICLE_ON => pc::pc_vehicle_on(&clients, state),
             P_CL2FE_REQ_PC_VEHICLE_OFF => pc::pc_vehicle_off(&clients, state),
             P_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH => {
@@ -352,12 +354,12 @@ fn handle_packet<'a>(
             P_CL2FE_REQ_PC_COMBAT_END => pc::pc_combat_begin_end(&clients, state, false),
             P_CL2FE_REQ_PC_REGEN => pc::pc_regen(pkt, &clients, state),
             P_CL2FE_REQ_PC_FIRST_USE_FLAG_SET => {
-                pc::pc_first_use_flag_set(pkt, clients.get_self(), state)
+                pc::pc_first_use_flag_set(pkt, clients.get_sender(), state)
             }
-            P_CL2FE_REQ_PC_CHANGE_MENTOR => pc::pc_change_mentor(pkt, clients.get_self(), state),
+            P_CL2FE_REQ_PC_CHANGE_MENTOR => pc::pc_change_mentor(pkt, clients.get_sender(), state),
             P_CL2FE_REQ_PC_EXIT => unreachable!(),
             //
-            P_CL2FE_REQ_PC_GIVE_ITEM => gm::gm_pc_give_item(pkt, clients.get_self(), state),
+            P_CL2FE_REQ_PC_GIVE_ITEM => gm::gm_pc_give_item(pkt, clients.get_sender(), state),
             P_CL2FE_GM_REQ_PC_SET_VALUE => gm::gm_pc_set_value(pkt, &clients, state),
             P_CL2FE_REQ_PC_GIVE_NANO => gm::gm_pc_give_nano(pkt, &clients, state),
             P_CL2FE_REQ_PC_GOTO => gm::gm_pc_goto(pkt, &clients, state),
@@ -372,18 +374,20 @@ fn handle_packet<'a>(
             }
             P_CL2FE_GM_REQ_TARGET_PC_TELEPORT => gm::gm_target_pc_teleport(pkt, &clients, state),
             P_CL2FE_GM_REQ_KICK_PLAYER => gm::gm_kick_player(pkt, &clients, state),
-            P_CL2FE_GM_REQ_REWARD_RATE => gm::gm_reward_rate(pkt, clients.get_self(), state),
-            P_CL2FE_REQ_PC_TASK_COMPLETE => gm::gm_pc_task_complete(pkt, clients.get_self(), state),
+            P_CL2FE_GM_REQ_REWARD_RATE => gm::gm_reward_rate(pkt, clients.get_sender(), state),
+            P_CL2FE_REQ_PC_TASK_COMPLETE => {
+                gm::gm_pc_task_complete(pkt, clients.get_sender(), state)
+            }
             P_CL2FE_REQ_PC_MISSION_COMPLETE => {
-                gm::gm_pc_mission_complete(pkt, clients.get_self(), state)
+                gm::gm_pc_mission_complete(pkt, clients.get_sender(), state)
             }
             P_CL2FE_REQ_NPC_SUMMON => gm::gm_npc_summon(pkt, &clients, state),
             P_CL2FE_REQ_NPC_GROUP_SUMMON => gm::gm_npc_group_summon(pkt, &clients, state),
             P_CL2FE_REQ_NPC_UNSUMMON => gm::gm_npc_unsummon(pkt, &clients, state),
             P_CL2FE_REQ_SHINY_SUMMON => gm::gm_shiny_summon(pkt, &clients, state),
             //
-            P_CL2FE_REQ_NPC_INTERACTION => npc::npc_interaction(pkt, clients.get_self(), state),
-            P_CL2FE_REQ_BARKER => npc::npc_bark(pkt, clients.get_self(), state),
+            P_CL2FE_REQ_NPC_INTERACTION => npc::npc_interaction(pkt, clients.get_sender(), state),
+            P_CL2FE_REQ_BARKER => npc::npc_bark(pkt, clients.get_sender(), state),
             //
             P_CL2FE_REQ_SEND_FREECHAT_MESSAGE => {
                 chat::send_freechat_message(pkt, &clients, state).await
@@ -408,33 +412,33 @@ fn handle_packet<'a>(
             P_CL2FE_REQ_PC_ATTACK_NPCs => combat::pc_attack_npcs(pkt, &clients, state),
             //
             P_CL2FE_REQ_ITEM_MOVE => item::item_move(pkt, &clients, state),
-            P_CL2FE_REQ_PC_ITEM_DELETE => item::item_delete(pkt, clients.get_self(), state),
+            P_CL2FE_REQ_PC_ITEM_DELETE => item::item_delete(pkt, clients.get_sender(), state),
             P_CL2FE_REQ_PC_ITEM_COMBINATION => {
-                item::item_combination(pkt, clients.get_self(), state)
+                item::item_combination(pkt, clients.get_sender(), state)
             }
-            P_CL2FE_REQ_ITEM_CHEST_OPEN => item::item_chest_open(pkt, clients.get_self(), state),
-            P_CL2FE_REQ_PC_VENDOR_START => item::vendor_start(pkt, clients.get_self(), state),
+            P_CL2FE_REQ_ITEM_CHEST_OPEN => item::item_chest_open(pkt, clients.get_sender(), state),
+            P_CL2FE_REQ_PC_VENDOR_START => item::vendor_start(pkt, clients.get_sender(), state),
             P_CL2FE_REQ_PC_VENDOR_TABLE_UPDATE => {
-                item::vendor_table_update(pkt, clients.get_self())
+                item::vendor_table_update(pkt, clients.get_sender())
             }
             P_CL2FE_REQ_PC_VENDOR_ITEM_BUY => {
-                item::vendor_item_buy(pkt, clients.get_self(), state, time)
+                item::vendor_item_buy(pkt, clients.get_sender(), state, time)
             }
             P_CL2FE_REQ_PC_VENDOR_ITEM_SELL => {
-                item::vendor_item_sell(pkt, clients.get_self(), state)
+                item::vendor_item_sell(pkt, clients.get_sender(), state)
             }
             P_CL2FE_REQ_PC_VENDOR_ITEM_RESTORE_BUY => {
-                item::vendor_item_restore_buy(pkt, clients.get_self(), state)
+                item::vendor_item_restore_buy(pkt, clients.get_sender(), state)
             }
             P_CL2FE_REQ_PC_VENDOR_BATTERY_BUY => {
-                item::vendor_battery_buy(pkt, clients.get_self(), state)
+                item::vendor_battery_buy(pkt, clients.get_sender(), state)
             }
-            P_CL2FE_PC_STREETSTALL_REQ_CANCEL => item::streetstall_cancel(clients.get_self()),
+            P_CL2FE_PC_STREETSTALL_REQ_CANCEL => item::streetstall_cancel(clients.get_sender()),
             //
             P_CL2FE_REQ_NANO_EQUIP => nano::nano_equip(pkt, &clients, state),
             P_CL2FE_REQ_NANO_UNEQUIP => nano::nano_unequip(pkt, &clients, state),
             P_CL2FE_REQ_NANO_ACTIVE => nano::nano_active(pkt, &clients, state),
-            P_CL2FE_REQ_NANO_TUNE => nano::nano_tune(pkt, clients.get_self(), state),
+            P_CL2FE_REQ_NANO_TUNE => nano::nano_tune(pkt, clients.get_sender(), state),
             //
             P_CL2FE_REQ_REQUEST_MAKE_BUDDY => buddy::request_make_buddy(pkt, &clients, state),
             P_CL2FE_REQ_ACCEPT_MAKE_BUDDY => buddy::accept_make_buddy(pkt, &clients, state),
@@ -463,7 +467,7 @@ fn handle_packet<'a>(
             P_CL2FE_REQ_PC_TRADE_EMOTES_CHAT => trade::trade_emotes_chat(pkt, &clients, state),
             //
             P_CL2FE_REQ_REGIST_TRANSPORTATION_LOCATION => {
-                transport::regist_transportation_location(pkt, clients.get_self(), state)
+                transport::regist_transportation_location(pkt, clients.get_sender(), state)
             }
             P_CL2FE_REQ_PC_WARP_USE_TRANSPORTATION => {
                 transport::warp_use_transportation(pkt, &clients, state)
@@ -471,11 +475,11 @@ fn handle_packet<'a>(
             P_CL2FE_REQ_PC_WARP_USE_NPC => transport::warp_use_npc(pkt, &clients, state),
             P_CL2FE_REQ_PC_TIME_TO_GO_WARP => transport::time_to_go_warp(pkt, &clients, state),
             //
-            P_CL2FE_REQ_PC_TASK_START => mission::task_start(pkt, clients.get_self(), state),
-            P_CL2FE_REQ_PC_TASK_STOP => mission::task_stop(pkt, clients.get_self(), state),
+            P_CL2FE_REQ_PC_TASK_START => mission::task_start(pkt, clients.get_sender(), state),
+            P_CL2FE_REQ_PC_TASK_STOP => mission::task_stop(pkt, clients.get_sender(), state),
             P_CL2FE_REQ_PC_TASK_END => mission::task_end(pkt, &clients, state),
             P_CL2FE_REQ_PC_SET_CURRENT_MISSION_ID => {
-                mission::set_current_mission_id(pkt, clients.get_self(), state)
+                mission::set_current_mission_id(pkt, clients.get_sender(), state)
             }
             //
             P_CL2FE_REQ_PC_GROUP_INVITE => group::pc_group_invite(pkt, &clients, state),
@@ -488,7 +492,7 @@ fn handle_packet<'a>(
             P_CL2FE_REQ_NPC_GROUP_KICK => group::npc_group_kick(pkt, &clients, state),
             //
             P_CL2FE_REP_LIVE_CHECK => {
-                clients.get_self().clear_live_check();
+                clients.get_sender().clear_live_check();
                 Ok(())
             }
             //

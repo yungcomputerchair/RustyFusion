@@ -15,7 +15,7 @@ use rusty_fusion::{
 };
 
 pub fn nano_equip(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) -> FFResult<()> {
-    let client = clients.get_self();
+    let client = clients.get_sender();
     let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_NANO_EQUIP = pkt.get(P_CL2FE_REQ_NANO_EQUIP)?;
 
@@ -70,7 +70,7 @@ pub fn nano_unequip(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let client = clients.get_self();
+    let client = clients.get_sender();
     let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_NANO_UNEQUIP = pkt.get(P_CL2FE_REQ_NANO_UNEQUIP)?;
 
@@ -103,7 +103,7 @@ pub fn nano_unequip(
 }
 
 pub fn nano_active(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) -> FFResult<()> {
-    let client = clients.get_self();
+    let client = clients.get_sender();
     let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_NANO_ACTIVE = pkt.get(P_CL2FE_REQ_NANO_ACTIVE)?;
 

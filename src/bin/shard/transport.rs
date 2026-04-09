@@ -95,7 +95,7 @@ pub fn warp_use_transportation(
         pkt.get(P_CL2FE_REQ_PC_WARP_USE_TRANSPORTATION)?;
 
     (|| {
-        let client = clients.get_self();
+        let client = clients.get_sender();
         let pc_id = client.get_player_id()?;
 
         let npc = state.get_npc(pkt.iNPC_ID)?;
@@ -233,7 +233,7 @@ pub fn warp_use_transportation(
         };
 
         clients
-            .get_self()
+            .get_sender()
             .send_packet(P_FE2CL_REP_PC_WARP_USE_TRANSPORTATION_FAIL, &resp);
     })
 }
@@ -257,7 +257,7 @@ pub fn warp_use_npc(
             pkt.iItemSlot2 as usize,
         )?;
 
-        let client = clients.get_self();
+        let client = clients.get_sender();
         let player = state.get_player(client.get_player_id().unwrap()).unwrap();
         let pos = player.get_position();
         let taros_left = player.get_taros();
@@ -279,7 +279,7 @@ pub fn warp_use_npc(
             iErrorCode: unused!(),
         };
         clients
-            .get_self()
+            .get_sender()
             .send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_FAIL, &resp);
     })
 }
@@ -292,7 +292,7 @@ pub fn time_to_go_warp(
     let pkt: &sP_CL2FE_REQ_PC_TIME_TO_GO_WARP = pkt.get(P_CL2FE_REQ_PC_TIME_TO_GO_WARP)?;
 
     (|| {
-        let player = state.get_player(clients.get_self().get_player_id()?)?;
+        let player = state.get_player(clients.get_sender().get_player_id()?)?;
         if player.is_future_done() {
             return Err(FFError::build(
                 Severity::Warning,
@@ -311,7 +311,7 @@ pub fn time_to_go_warp(
             pkt.iItemSlot2 as usize,
         )?;
 
-        let client = clients.get_self();
+        let client = clients.get_sender();
         let player = state.get_player(client.get_player_id().unwrap()).unwrap();
         let pos = player.get_position();
         let taros_left = player.get_taros();
@@ -334,7 +334,7 @@ pub fn time_to_go_warp(
         };
 
         clients
-            .get_self()
+            .get_sender()
             .send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_FAIL, &resp);
     })
 }
@@ -357,7 +357,7 @@ mod helpers {
         req_item_consume_slot: usize,
     ) -> FFResult<Option<Item>> {
         let warp_data = tdata_get().get_warp_data(warp_id)?;
-        let client = clients.get_self();
+        let client = clients.get_sender();
         let pc_id = client.get_player_id()?;
 
         let mut to_past = false;

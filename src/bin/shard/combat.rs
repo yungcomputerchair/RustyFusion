@@ -27,7 +27,7 @@ pub fn pc_attack_npcs(
     const MAX_TARGETS: usize = 3;
     const BATTERY_BASE_COST: u32 = 6;
 
-    let client = clients.get_self();
+    let client = clients.get_sender();
     let pc_id = client.get_player_id()?;
 
     let mut reader = PacketReader::new(&pkt);

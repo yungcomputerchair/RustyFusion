@@ -489,7 +489,7 @@ pub fn login_buddy_warp(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let client = clients.get_self();
+    let client = clients.get_sender();
     let pkt: &sP_LS2FE_REQ_BUDDY_WARP = pkt.get(P_LS2FE_REQ_BUDDY_WARP)?;
 
     let fail_pkt = sP_FE2LS_REP_BUDDY_WARP_FAIL {

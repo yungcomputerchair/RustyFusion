@@ -16,7 +16,7 @@ use std::time::SystemTime;
 const ERROR_CODE_BUDDY_DENY: i32 = 6;
 
 pub fn get_buddy_state(clients: &ClientMap, state: &mut ShardServerState) -> FFResult<()> {
-    let client = clients.get_self();
+    let client = clients.get_sender();
     let pc_id = client.get_player_id()?;
     let player = state.get_player(pc_id)?;
 
@@ -46,7 +46,7 @@ pub fn request_make_buddy(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let client = clients.get_self();
+    let client = clients.get_sender();
     let pkt: &sP_CL2FE_REQ_REQUEST_MAKE_BUDDY = pkt.get(P_CL2FE_REQ_REQUEST_MAKE_BUDDY)?;
 
     let pc_id = client.get_player_id()?;
@@ -118,7 +118,7 @@ pub fn find_name_make_buddy(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let client = clients.get_self();
+    let client = clients.get_sender();
     let pkt: &sP_CL2FE_REQ_PC_FIND_NAME_MAKE_BUDDY =
         pkt.get(P_CL2FE_REQ_PC_FIND_NAME_MAKE_BUDDY)?;
 
@@ -160,7 +160,7 @@ pub fn find_name_make_buddy(
             szLastName: pkt.szLastName,
         };
 
-        let client = clients.get_self();
+        let client = clients.get_sender();
         client.send_packet(P_FE2CL_REP_PC_FIND_NAME_MAKE_BUDDY_FAIL, &deny_pkt);
         return Ok(());
     }
@@ -183,7 +183,7 @@ pub fn accept_make_buddy(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let client = clients.get_self();
+    let client = clients.get_sender();
     let pkt: &sP_CL2FE_REQ_ACCEPT_MAKE_BUDDY = pkt.get(P_CL2FE_REQ_ACCEPT_MAKE_BUDDY)?;
 
     let pc_id = client.get_player_id()?;
@@ -234,7 +234,7 @@ pub fn accept_make_buddy(
         };
 
         clients
-            .get_self()
+            .get_sender()
             .send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC, &pkt_player);
 
         Ok(())
@@ -263,7 +263,7 @@ pub fn find_name_accept_buddy(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let client = clients.get_self();
+    let client = clients.get_sender();
     let pkt: &sP_CL2FE_REQ_PC_FIND_NAME_ACCEPT_BUDDY =
         pkt.get(P_CL2FE_REQ_PC_FIND_NAME_ACCEPT_BUDDY)?;
 
@@ -328,7 +328,7 @@ pub fn find_name_accept_buddy(
         };
 
         clients
-            .get_self()
+            .get_sender()
             .send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC, &pkt_player);
 
         Ok(())
@@ -357,7 +357,7 @@ pub fn pc_buddy_warp(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let client = clients.get_self();
+    let client = clients.get_sender();
     let pkt: &sP_CL2FE_REQ_PC_BUDDY_WARP = pkt.get(P_CL2FE_REQ_PC_BUDDY_WARP)?;
 
     let pc_id = client.get_player_id()?;
@@ -375,7 +375,7 @@ pub fn pc_buddy_warp(
         };
 
         clients
-            .get_self()
+            .get_sender()
             .send_packet(P_FE2CL_REP_PC_BUDDY_WARP_FAIL, &response);
 
         Err(FFError::build(Severity::Info, msg))
@@ -482,7 +482,7 @@ pub fn pc_buddy_warp(
             iZ: buddy_position.z,
         };
 
-        let client = clients.get_self();
+        let client = clients.get_sender();
 
         client.send_packet(
             P_FE2CL_REP_PC_BUDDY_WARP_SAME_SHARD_SUCC,
@@ -500,7 +500,7 @@ pub fn pc_buddy_warp(
         };
 
         clients
-            .get_self()
+            .get_sender()
             .send_packet(P_FE2CL_REP_PC_BUDDY_WARP_FAIL, &response);
     })
 }

@@ -321,7 +321,7 @@ pub fn task_end(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
     let pkt: &sP_CL2FE_REQ_PC_TASK_END = pkt.get(P_CL2FE_REQ_PC_TASK_END)?;
     let mut error_code = codes::TaskEndErr::NotComplete; // N.B. true failures are handled in player tick
     (|| {
-        let pc_id = clients.get_self().get_player_id()?;
+        let pc_id = clients.get_sender().get_player_id()?;
         let player = state.get_player(pc_id)?;
         let running_tasks = player.mission_journal.get_current_tasks();
         let task = running_tasks
@@ -502,7 +502,7 @@ pub fn task_end(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
             }
 
             if let Some(qitem_pkt) = log_if_failed(qitem_pkt.build()) {
-                clients.get_self().send_payload(qitem_pkt);
+                clients.get_sender().send_payload(qitem_pkt);
             }
         }
 
@@ -543,7 +543,7 @@ pub fn task_end(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
                     }
 
                     if let Some(reward_pkt) = log_if_failed(reward_pkt.build()) {
-                        clients.get_self().send_payload(reward_pkt);
+                        clients.get_sender().send_payload(reward_pkt);
                     }
                 }
             }
@@ -592,7 +592,7 @@ pub fn task_end(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
                             },
                         };
                         clients
-                            .get_self()
+                            .get_sender()
                             .send_packet(P_FE2CL_REP_PC_NANO_CREATE_SUCC, &resp);
 
                         let bcast = sP_FE2CL_REP_PC_CHANGE_LEVEL {
@@ -615,7 +615,7 @@ pub fn task_end(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
         };
 
         clients
-            .get_self()
+            .get_sender()
             .send_packet(P_FE2CL_REP_PC_TASK_END_SUCC, &resp);
 
         Ok(())
@@ -627,7 +627,7 @@ pub fn task_end(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
         };
 
         clients
-            .get_self()
+            .get_sender()
             .send_packet(P_FE2CL_REP_PC_TASK_END_FAIL, &resp);
     })
 }
