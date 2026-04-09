@@ -103,6 +103,7 @@ pub fn pc_group_join(
                 format!("Group offer from {} expired", host_player),
             ));
         }
+
         host_player.group_offered_to = None;
 
         let group_id = host_player.group_id.unwrap_or(Uuid::new_v4());

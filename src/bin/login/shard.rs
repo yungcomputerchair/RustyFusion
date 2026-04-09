@@ -38,6 +38,7 @@ pub fn auth_challenge(server: &FFClient) -> FFResult<()> {
         aChallenge: chall_arr,
         aNonce: nonce,
     };
+
     server.send_packet(P_LS2FE_REP_AUTH_CHALLENGE, &resp);
     Ok(())
 }
@@ -93,6 +94,7 @@ pub fn connect(
         uiSvrTime: util::get_timestamp_ms(time),
         aLS_UID: state.server_id.to_bytes_le(),
     };
+
     server.send_packet(P_LS2FE_REP_CONNECT_SUCC, &resp);
 
     let iv1: i32 = resp.aLS_UID.into_iter().reduce(|a, b| a ^ b).unwrap() as i32;
@@ -256,10 +258,10 @@ pub fn motd_register(pkt: Packet) -> FFResult<()> {
 }
 
 pub fn announce_msg(pkt: Packet, clients: &HashMap<usize, FFClient>) -> FFResult<()> {
-    let pkt: sP_FE2LS_ANNOUNCE_MSG = *pkt.get(P_FE2LS_ANNOUNCE_MSG)?;
+    let pkt: &sP_FE2LS_ANNOUNCE_MSG = pkt.get(P_FE2LS_ANNOUNCE_MSG)?;
     clients.iter().for_each(|(_, client)| {
         if let ClientType::ShardServer(_) = client.get_client_type() {
-            client.send_packet(P_LS2FE_ANNOUNCE_MSG, &pkt);
+            client.send_packet(P_LS2FE_ANNOUNCE_MSG, pkt);
         }
     });
     Ok(())
@@ -272,7 +274,7 @@ pub fn pc_location(
     state: &mut LoginServerState,
 ) -> FFResult<()> {
     let server = clients.get(&shard_key).unwrap();
-    let pkt: sP_FE2LS_REQ_PC_LOCATION = *pkt.get(P_FE2LS_REQ_PC_LOCATION)?;
+    let pkt: &sP_FE2LS_REQ_PC_LOCATION = pkt.get(P_FE2LS_REQ_PC_LOCATION)?;
     let req_shard_id = server.get_shard_id()?;
     let request_key = (req_shard_id, pkt.iPC_ID);
     if state.player_search_reqeusts.contains_key(&request_key) {
@@ -326,7 +328,7 @@ pub fn pc_location_succ(
     clients: &HashMap<usize, FFClient>,
     state: &mut LoginServerState,
 ) -> FFResult<()> {
-    let pkt: sP_FE2LS_REP_PC_LOCATION_SUCC = *pkt.get(P_FE2LS_REP_PC_LOCATION_SUCC)?;
+    let pkt: &sP_FE2LS_REP_PC_LOCATION_SUCC = pkt.get(P_FE2LS_REP_PC_LOCATION_SUCC)?;
     let req_shard_id = pkt.iReqShard_ID;
     let request_key = (req_shard_id, pkt.iPC_ID);
 
@@ -368,7 +370,7 @@ pub fn pc_location_fail(
     state: &mut LoginServerState,
 ) -> FFResult<()> {
     let server = clients.get(&shard_key).unwrap();
-    let pkt: sP_FE2LS_REP_PC_LOCATION_FAIL = *pkt.get(P_FE2LS_REP_PC_LOCATION_FAIL)?;
+    let pkt: &sP_FE2LS_REP_PC_LOCATION_FAIL = pkt.get(P_FE2LS_REP_PC_LOCATION_FAIL)?;
     let req_shard_id = pkt.iReqShard_ID;
     let request_key = (req_shard_id, pkt.iPC_ID);
 
@@ -414,7 +416,7 @@ pub fn get_buddy_state(
     state: &mut LoginServerState,
 ) -> FFResult<()> {
     let server = clients.get(&shard_key).unwrap();
-    let pkt: sP_FE2LS_REQ_GET_BUDDY_STATE = *pkt.get(P_FE2LS_REQ_GET_BUDDY_STATE)?;
+    let pkt: &sP_FE2LS_REQ_GET_BUDDY_STATE = pkt.get(P_FE2LS_REQ_GET_BUDDY_STATE)?;
 
     let mut resp = sP_LS2FE_REP_GET_BUDDY_STATE {
         iPC_UID: pkt.iPC_UID,
@@ -455,7 +457,7 @@ pub fn buddy_freechat(
     clients: &HashMap<usize, FFClient>,
     state: &mut LoginServerState,
 ) -> FFResult<()> {
-    let pkt: sP_FE2LS_REQ_SEND_BUDDY_FREECHAT = *pkt.get(P_FE2LS_REQ_SEND_BUDDY_FREECHAT)?;
+    let pkt: &sP_FE2LS_REQ_SEND_BUDDY_FREECHAT = pkt.get(P_FE2LS_REQ_SEND_BUDDY_FREECHAT)?;
     let req = sP_LS2FE_REQ_SEND_BUDDY_FREECHAT {
         iFromPCUID: pkt.iFromPCUID,
         iToPCUID: pkt.iToPCUID,
@@ -493,8 +495,8 @@ pub fn buddy_freechat_succ(
     clients: &HashMap<usize, FFClient>,
     state: &mut LoginServerState,
 ) -> FFResult<()> {
-    let pkt: sP_FE2LS_REP_SEND_BUDDY_FREECHAT_SUCC =
-        *pkt.get(P_FE2LS_REP_SEND_BUDDY_FREECHAT_SUCC)?;
+    let pkt: &sP_FE2LS_REP_SEND_BUDDY_FREECHAT_SUCC =
+        pkt.get(P_FE2LS_REP_SEND_BUDDY_FREECHAT_SUCC)?;
 
     let succ_pkt = sP_LS2FE_REP_SEND_BUDDY_FREECHAT_SUCC {
         iFromPCUID: pkt.iFromPCUID,
@@ -520,7 +522,7 @@ pub fn buddy_menuchat(
     clients: &HashMap<usize, FFClient>,
     state: &mut LoginServerState,
 ) -> FFResult<()> {
-    let pkt: sP_FE2LS_REQ_SEND_BUDDY_MENUCHAT = *pkt.get(P_FE2LS_REQ_SEND_BUDDY_MENUCHAT)?;
+    let pkt: &sP_FE2LS_REQ_SEND_BUDDY_MENUCHAT = pkt.get(P_FE2LS_REQ_SEND_BUDDY_MENUCHAT)?;
     let req = sP_LS2FE_REQ_SEND_BUDDY_MENUCHAT {
         iFromPCUID: pkt.iFromPCUID,
         iToPCUID: pkt.iToPCUID,
@@ -558,8 +560,8 @@ pub fn buddy_menuchat_succ(
     clients: &HashMap<usize, FFClient>,
     state: &mut LoginServerState,
 ) -> FFResult<()> {
-    let pkt: sP_FE2LS_REP_SEND_BUDDY_MENUCHAT_SUCC =
-        *pkt.get(P_FE2LS_REP_SEND_BUDDY_MENUCHAT_SUCC)?;
+    let pkt: &sP_FE2LS_REP_SEND_BUDDY_MENUCHAT_SUCC =
+        pkt.get(P_FE2LS_REP_SEND_BUDDY_MENUCHAT_SUCC)?;
 
     let succ_pkt = sP_LS2FE_REP_SEND_BUDDY_MENUCHAT_SUCC {
         iFromPCUID: pkt.iFromPCUID,
@@ -586,7 +588,7 @@ pub fn buddy_warp(
     clients: &HashMap<usize, FFClient>,
     state: &mut LoginServerState,
 ) -> FFResult<()> {
-    let pkt: sP_FE2LS_REQ_BUDDY_WARP = *pkt.get(P_FE2LS_REQ_BUDDY_WARP)?;
+    let pkt: &sP_FE2LS_REQ_BUDDY_WARP = pkt.get(P_FE2LS_REQ_BUDDY_WARP)?;
 
     let fail_pkt = sP_LS2FE_REP_BUDDY_WARP_FAIL {
         iBuddyPCUID: pkt.iBuddyPCUID,
@@ -630,7 +632,7 @@ pub fn buddy_warp_succ(
     clients: &HashMap<usize, FFClient>,
     state: &mut LoginServerState,
 ) -> FFResult<()> {
-    let pkt: sP_FE2LS_REP_BUDDY_WARP_SUCC = *pkt.get(P_FE2LS_REP_BUDDY_WARP_SUCC)?;
+    let pkt: &sP_FE2LS_REP_BUDDY_WARP_SUCC = pkt.get(P_FE2LS_REP_BUDDY_WARP_SUCC)?;
 
     let buddy_pcuid = pkt.iBuddyPCUID;
 
@@ -682,7 +684,7 @@ pub fn buddy_warp_fail(
     clients: &HashMap<usize, FFClient>,
     state: &mut LoginServerState,
 ) -> FFResult<()> {
-    let pkt: sP_FE2LS_REP_BUDDY_WARP_FAIL = *pkt.get(P_FE2LS_REP_BUDDY_WARP_FAIL)?;
+    let pkt: &sP_FE2LS_REP_BUDDY_WARP_FAIL = pkt.get(P_FE2LS_REP_BUDDY_WARP_FAIL)?;
 
     let resp_pkt = sP_LS2FE_REP_BUDDY_WARP_FAIL {
         iBuddyPCUID: pkt.iBuddyPCUID,

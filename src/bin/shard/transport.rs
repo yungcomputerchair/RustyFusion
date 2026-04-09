@@ -218,9 +218,7 @@ pub fn warp_use_transportation(
             iCandy: new_taros as i32,
         };
 
-        clients
-            .get_self()
-            .send_packet(P_FE2CL_REP_PC_WARP_USE_TRANSPORTATION_SUCC, &resp);
+        client.send_packet(P_FE2CL_REP_PC_WARP_USE_TRANSPORTATION_SUCC, &resp);
 
         if trip.transportation_type == TransportationType::Wyvern {
             rusty_fusion::helpers::broadcast_monkey(pc_id, RideType::Wyvern, clients, state);

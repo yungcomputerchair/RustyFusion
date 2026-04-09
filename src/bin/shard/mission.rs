@@ -306,6 +306,7 @@ pub fn task_stop(pkt: Packet, client: &FFClient, state: &mut ShardServerState) -
             eIL: ItemLocation::QInven as i32,
             iSlotNum: qitem_slot as i32,
         };
+
         client.send_packet(P_FE2CL_REP_PC_ITEM_DELETE_SUCC, &pkt);
     }
 

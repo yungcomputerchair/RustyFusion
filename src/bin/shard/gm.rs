@@ -139,9 +139,7 @@ pub fn gm_pc_give_nano(
             iPC_Level: new_level,
         };
 
-        clients
-            .get_self()
-            .send_packet(P_FE2CL_REP_PC_NANO_CREATE_SUCC, &resp);
+        client.send_packet(P_FE2CL_REP_PC_NANO_CREATE_SUCC, &resp);
 
         let bcast = sP_FE2CL_REP_PC_CHANGE_LEVEL {
             iPC_ID: pc_id,
@@ -162,9 +160,7 @@ pub fn gm_pc_give_nano(
             iErrorCode: unused!(),
         };
 
-        clients
-            .get_self()
-            .send_packet(P_FE2CL_REP_PC_NANO_CREATE_FAIL, &resp);
+        client.send_packet(P_FE2CL_REP_PC_NANO_CREATE_FAIL, &resp);
     })
 }
 
@@ -177,6 +173,7 @@ pub fn gm_pc_goto(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState
         y: pkt.iToY,
         z: pkt.iToZ,
     };
+
     let player = state.get_player_mut(pc_id)?;
     player.set_position(new_pos);
     player.instance_id = InstanceID::default();
@@ -197,9 +194,7 @@ pub fn gm_pc_goto(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState
         Item: unused!(),
         iCandy: taros as i32,
     };
-    clients
-        .get_self()
-        .send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp);
+    client.send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp);
     Ok(())
 }
 
@@ -248,9 +243,8 @@ pub fn gm_pc_special_state_switch(
         .for_each_around(EntityID::Player(pkt.iPC_ID), clients, |c| {
             c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
         });
-    clients
-        .get_self()
-        .send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp);
+
+    client.send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp);
     Ok(())
 }
 
@@ -379,6 +373,7 @@ pub fn gm_pc_location(
         ),
         TargetSearchBy::PlayerUID => PlayerSearchQuery::ByUID(pkt.iTargetPC_UID),
     };
+
     if let Some(pc_id) = search_query.execute(state) {
         let player = state.get_player(pc_id)?;
         let pos = player.get_position();
@@ -400,9 +395,7 @@ pub fn gm_pc_location(
             szTargetPC_LastName: util::encode_utf16(&player.last_name).unwrap(),
         };
 
-        clients
-            .get_self()
-            .send_packet(P_FE2CL_GM_REP_PC_LOCATION, &resp);
+        client.send_packet(P_FE2CL_GM_REP_PC_LOCATION, &resp);
 
         Ok(())
     } else if search_mode != TargetSearchBy::PlayerID && clients.get_login_server().is_some() {
@@ -476,9 +469,7 @@ pub fn gm_target_pc_special_state_onoff(
             c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
         });
 
-    clients
-        .get_self()
-        .send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp);
+    client.send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp);
 
     Ok(())
 }
@@ -605,7 +596,7 @@ pub fn gm_kick_player(
 
     let pc_id = search_query
         .execute(state)
-        .ok_or_else(|| helpers::send_search_fail(clients.get_self(), search_query))?;
+        .ok_or_else(|| helpers::send_search_fail(client, search_query))?;
 
     let client = state
         .get_player(pc_id)

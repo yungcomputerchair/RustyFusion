@@ -105,6 +105,7 @@ pub fn item_delete(pkt: Packet, client: &FFClient, state: &mut ShardServerState)
             ),
         ));
     }
+
     player.set_item(location, pkt.iSlotNum as usize, None)?;
 
     let resp = sP_FE2CL_REP_PC_ITEM_DELETE_SUCC {
