@@ -565,7 +565,6 @@ pub fn pc_vehicle_on(clients: &ClientMap, state: &mut ShardServerState) -> FFRes
 
         let resp = sP_FE2CL_PC_VEHICLE_ON_SUCC { UNUSED: unused!() };
         client.send_packet(P_FE2CL_PC_VEHICLE_ON_SUCC, &resp);
-
         Ok(())
     })()
     .catch_fail(|| {
@@ -590,7 +589,6 @@ pub fn pc_vehicle_off(clients: &ClientMap, state: &mut ShardServerState) -> FFRe
 
         let resp = sP_FE2CL_PC_VEHICLE_OFF_SUCC { UNUSED: unused!() };
         client.send_packet(P_FE2CL_PC_VEHICLE_OFF_SUCC, &resp);
-
         Ok(())
     })()
     .catch_fail(|| {

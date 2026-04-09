@@ -236,7 +236,6 @@ pub fn trade_cash_register(
         let other_client = state.get_player(other_id)?.get_client(clients).unwrap();
         other_client.send_packet(P_FE2CL_REP_PC_TRADE_CASH_REGISTER_SUCC, &resp);
         client.send_packet(P_FE2CL_REP_PC_TRADE_CASH_REGISTER_SUCC, &resp);
-
         Ok(())
     })()
     .catch_fail(|| {
@@ -313,7 +312,6 @@ pub fn trade_item_register(
         let other_client = state.get_player(other_id)?.get_client(clients).unwrap();
         other_client.send_packet(P_FE2CL_REP_PC_TRADE_ITEM_REGISTER_SUCC, &resp);
         client.send_packet(P_FE2CL_REP_PC_TRADE_ITEM_REGISTER_SUCC, &resp);
-
         Ok(())
     })()
     .catch_fail(|| {
@@ -380,7 +378,6 @@ pub fn trade_item_unregister(
         let other_client = state.get_player(other_pc_id)?.get_client(clients).unwrap();
         other_client.send_packet(P_FE2CL_REP_PC_TRADE_ITEM_UNREGISTER_SUCC, &resp);
         client.send_packet(P_FE2CL_REP_PC_TRADE_ITEM_UNREGISTER_SUCC, &resp);
-
         Ok(())
     })()
     .catch_fail(|| {
@@ -502,7 +499,6 @@ pub async fn trade_confirm(clients: &ClientMap<'_>, state: &mut ShardServerState
         };
 
         client.send_packet(P_FE2CL_REP_PC_TRADE_CONFIRM_SUCC, &resp);
-
         Ok(())
     } else {
         let resp = sP_FE2CL_REP_PC_TRADE_CONFIRM_ABORT {

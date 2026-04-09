@@ -62,7 +62,6 @@ pub fn nano_equip(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState
     }
 
     client.send_packet(P_FE2CL_REP_NANO_EQUIP_SUCC, &resp);
-
     Ok(())
 }
 
