@@ -315,6 +315,7 @@ pub fn pc_move(
         y: pkt.iY,
         z: pkt.iZ,
     };
+
     let angle = pkt.iAngle;
 
     // TODO anticheat
@@ -365,6 +366,7 @@ pub fn pc_jump(
         y: pkt.iY,
         z: pkt.iZ,
     };
+
     let angle = pkt.iAngle;
 
     // TODO anticheat
@@ -458,6 +460,7 @@ pub fn pc_movetransportation(
         y: pkt.iY,
         z: pkt.iZ,
     };
+
     let angle = pkt.iAngle;
 
     let _slider = state.get_slider(pkt.iT_ID)?;
@@ -549,6 +552,7 @@ pub fn pc_vehicle_on(clients: &ClientMap, state: &mut ShardServerState) -> FFRes
                 ),
             ));
         }
+
         let vehicle = vehicle.as_ref().unwrap();
 
         if let Some(vehicle_speed) = vehicle.get_stats()?.speed {
@@ -556,6 +560,7 @@ pub fn pc_vehicle_on(clients: &ClientMap, state: &mut ShardServerState) -> FFRes
         } else {
             panic_log(&format!("Vehicle has no speed: {:?}", vehicle));
         }
+
         rusty_fusion::helpers::broadcast_state(pc_id, player.get_state_bit_flag(), clients, state);
 
         let resp = sP_FE2CL_PC_VEHICLE_ON_SUCC { UNUSED: unused!() };
