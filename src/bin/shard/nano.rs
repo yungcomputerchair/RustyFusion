@@ -61,9 +61,7 @@ pub fn nano_equip(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState
             });
     }
 
-    clients
-        .get_self()
-        .send_packet(P_FE2CL_REP_NANO_EQUIP_SUCC, &resp);
+    client.send_packet(P_FE2CL_REP_NANO_EQUIP_SUCC, &resp);
 
     Ok(())
 }
@@ -101,9 +99,7 @@ pub fn nano_unequip(
             });
     }
 
-    clients
-        .get_self()
-        .send_packet(P_FE2CL_REP_NANO_UNEQUIP_SUCC, &resp);
+    client.send_packet(P_FE2CL_REP_NANO_UNEQUIP_SUCC, &resp);
     Ok(())
 }
 
@@ -137,9 +133,7 @@ pub fn nano_active(pkt: Packet, clients: &ClientMap, state: &mut ShardServerStat
             c.send_packet(P_FE2CL_NANO_ACTIVE, &bcast);
         });
 
-    clients
-        .get_self()
-        .send_packet(P_FE2CL_REP_NANO_ACTIVE_SUCC, &resp);
+    client.send_packet(P_FE2CL_REP_NANO_ACTIVE_SUCC, &resp);
     Ok(())
 }
 

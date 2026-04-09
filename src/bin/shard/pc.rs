@@ -559,9 +559,7 @@ pub fn pc_vehicle_on(clients: &ClientMap, state: &mut ShardServerState) -> FFRes
         rusty_fusion::helpers::broadcast_state(pc_id, player.get_state_bit_flag(), clients, state);
 
         let resp = sP_FE2CL_PC_VEHICLE_ON_SUCC { UNUSED: unused!() };
-        clients
-            .get_self()
-            .send_packet(P_FE2CL_PC_VEHICLE_ON_SUCC, &resp);
+        client.send_packet(P_FE2CL_PC_VEHICLE_ON_SUCC, &resp);
 
         Ok(())
     })()
@@ -586,9 +584,7 @@ pub fn pc_vehicle_off(clients: &ClientMap, state: &mut ShardServerState) -> FFRe
         rusty_fusion::helpers::broadcast_state(pc_id, player.get_state_bit_flag(), clients, state);
 
         let resp = sP_FE2CL_PC_VEHICLE_OFF_SUCC { UNUSED: unused!() };
-        clients
-            .get_self()
-            .send_packet(P_FE2CL_PC_VEHICLE_OFF_SUCC, &resp);
+        client.send_packet(P_FE2CL_PC_VEHICLE_OFF_SUCC, &resp);
 
         Ok(())
     })()
@@ -642,9 +638,8 @@ pub fn pc_special_state_switch(
         .for_each_around(EntityID::Player(pc_id), clients, |c| {
             c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
         });
-    clients
-        .get_self()
-        .send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp);
+
+    client.send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp);
     Ok(())
 }
 
@@ -859,7 +854,8 @@ pub fn pc_warp_channel(
 
     let mut error_code = 0;
     (|| {
-        let pc_id = clients.get_self().get_player_id()?;
+        let client = clients.get_self();
+        let pc_id = client.get_player_id()?;
         let channel_num = pkt.iChannelNum as u8;
         let num_channels = config_get().shard.num_channels.get();
 
@@ -893,9 +889,7 @@ pub fn pc_warp_channel(
         let chunk_coords = player.get_chunk_coords();
 
         let resp = sP_FE2CL_REP_PC_WARP_CHANNEL_SUCC { UNUSED: unused!() };
-        clients
-            .get_self()
-            .send_packet(P_FE2CL_REP_PC_WARP_CHANNEL_SUCC, &resp);
+        client.send_packet(P_FE2CL_REP_PC_WARP_CHANNEL_SUCC, &resp);
 
         state
             .entity_map

@@ -43,7 +43,7 @@ Username must be 4-32 characters long and contain only letters, numbers, undersc
         "Invalid password
 Password must be 8-32 characters long and contain only letters, numbers, or special characters !@#$%^&*()_+.";
 
-    let pkt: sP_CL2LS_REQ_LOGIN = *pkt.get(P_CL2LS_REQ_LOGIN)?;
+    let pkt: &sP_CL2LS_REQ_LOGIN = pkt.get(P_CL2LS_REQ_LOGIN)?;
     let mut error_code = LoginError::LoginError;
     (async {
         let login_type = LoginType::try_from(pkt.iLoginType).map_err(|_| {
@@ -293,7 +293,7 @@ pub fn pc_exit_duplicate(
     state: &mut LoginServerState,
 ) -> FFResult<()> {
     let client = clients.get(&new_key).unwrap();
-    let client_type = client.get_client_type().clone();
+    let client_type = client.get_client_type();
     let ClientType::UnauthedClient {
         username,
         dup_pc_uid,
@@ -588,7 +588,7 @@ pub fn shard_select(
     time: SystemTime,
 ) -> FFResult<()> {
     let client = clients.get(&client_key).unwrap();
-    let pkt: sP_CL2LS_REQ_SHARD_SELECT = *pkt.get(P_CL2LS_REQ_SHARD_SELECT)?;
+    let pkt: &sP_CL2LS_REQ_SHARD_SELECT = pkt.get(P_CL2LS_REQ_SHARD_SELECT)?;
     let req_shard_id = pkt.ShardNum as i32;
     if let ClientType::GameClient { account_id, .. } = client.get_client_type() {
         let mut error_code = 1; // "Shard connection error"
@@ -617,7 +617,6 @@ pub fn shard_select(
             Ok(())
         })()
         .catch_fail(|| {
-            let client = clients.get(&client_key).unwrap();
             let resp = sP_LS2CL_REP_SHARD_SELECT_FAIL {
                 iErrorCode: error_code,
             };
