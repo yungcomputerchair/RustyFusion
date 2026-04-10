@@ -11,7 +11,7 @@ use crossterm::event::{self as ce, KeyCode};
 use futures::StreamExt as _;
 use rusty_fusion::{
     config::{config_get, config_init},
-    database::{db_get, db_init, Database as _},
+    database::{db_get, db_init, DbImpl as _},
     defines::*,
     entity::{Entity, Player},
     error::{log, log_error, log_if_failed, log_init, FFError, FFResult, Logger, Severity},

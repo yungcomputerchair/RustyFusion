@@ -495,7 +495,7 @@ mod commands {
 
     use rusty_fusion::{
         ai::AI,
-        database::{db_get, Database as _},
+        database::{db_get, DbImpl as _},
     };
 
     use super::*;
@@ -673,8 +673,7 @@ mod commands {
                 "No reason given".to_string()
             };
 
-            let ban_reason_clone = ban_reason.clone();
-            match db.ban_account(acc_id, banned_until, ban_reason_clone).await {
+            match db.ban_account(acc_id, banned_until, &ban_reason).await {
                 Ok(()) => {
                     let ban_msg = format!(
                         "Account {} banned for {}\n\

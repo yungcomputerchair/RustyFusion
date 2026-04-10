@@ -1,8 +1,9 @@
 #![allow(dead_code)]
 
 use std::fmt::Debug;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
 
@@ -16,40 +17,106 @@ mod postgresql;
 
 type Int = i32;
 type BigInt = i64;
-type Text = String;
 type Bytes = Vec<u8>;
 
 #[cfg(feature = "postgres")]
 type DbBackend = postgresql::PostgresDatabase;
 
-static DB: OnceLock<DbBackend> = OnceLock::new();
+static DB: OnceLock<Database<DbBackend>> = OnceLock::new();
 static DB_ERROR_SEVERITY: OnceLock<Severity> = OnceLock::new();
 
 pub fn db_error_severity() -> Severity {
     DB_ERROR_SEVERITY.get().copied().unwrap()
 }
 
-#[async_trait]
-pub trait Database: Send + Sync + Debug {
-    async fn find_account_from_username(&self, username: &Text) -> FFResult<Option<Account>>;
-    async fn find_account_from_player(&self, pc_uid: BigInt) -> FFResult<Option<Account>>;
-    async fn create_account(&self, username: &Text, password_hashed: &Text) -> FFResult<Account>;
-    async fn change_account_level(&self, acc_id: BigInt, new_level: Int) -> FFResult<()>;
-    async fn ban_account(
-        &self,
-        acc_id: BigInt,
-        banned_until: SystemTime,
-        ban_reason: Text,
-    ) -> FFResult<()>;
-    async fn unban_account(&self, acc_id: BigInt) -> FFResult<()>;
-    async fn init_player(&self, acc_id: BigInt, player: &Player) -> FFResult<()>;
-    async fn update_player_appearance(&self, player: &Player) -> FFResult<()>;
-    async fn update_selected_player(&self, acc_id: BigInt, slot_num: Int) -> FFResult<()>;
-    async fn save_player(&self, player: &Player) -> FFResult<()>;
-    async fn save_players(&self, players: &[&Player]) -> FFResult<()>;
-    async fn load_player(&self, acc_id: BigInt, pc_uid: BigInt) -> FFResult<Option<Player>>;
-    async fn load_players(&self, acc_id: BigInt) -> FFResult<Vec<Player>>;
-    async fn delete_player(&self, pc_uid: BigInt) -> FFResult<()>;
+#[derive(Debug)]
+pub struct Database<D> {
+    inner: D,
+    disconnected: AtomicBool,
+}
+impl<D> Database<D> {
+    fn new(inner: D) -> Self {
+        Self {
+            inner,
+            disconnected: AtomicBool::new(false),
+        }
+    }
+}
+
+/// Defines the `DbImpl` trait and generates a delegating implementation for `Database<D>`.
+macro_rules! define_db_api {
+    ($(
+        $method:ident(&self $(, $arg:ident : $arg_ty:ty)*) -> $ret:ty;
+    )*) => {
+        #[async_trait]
+        pub trait DbImpl: Send + Sync + Debug {
+            $(
+                async fn $method(&self $(, $arg: $arg_ty)*) -> FFResult<$ret>;
+            )*
+        }
+
+        #[async_trait]
+        impl<D: DbImpl> DbImpl for Database<D> {
+            $(
+                async fn $method(&self $(, $arg: $arg_ty)*) -> FFResult<$ret> {
+                    const MAX_TRIES: usize = 5;
+                    const RETRY_DELAY_BASE_MS: u64 = 250;
+
+                    let was_disconnected = self.disconnected.load(Ordering::Acquire);
+                    let tries = if was_disconnected { 1 } else { MAX_TRIES };
+
+                    let mut last_err = None;
+                    for attempt in 1..=tries {
+                        match self.inner.$method($($arg),*).await {
+                            Ok(result) => {
+                                self.disconnected.store(false, Ordering::Release);
+                                return Ok(result);
+                            }
+                            Err(e) => {
+                                log(Severity::Warning, &format!("Database operation failed: {} (attempt {}/{})", e.get_msg(), attempt, tries));
+                                if attempt == tries {
+                                    last_err = Some(e);
+                                    break;
+                                }
+                            }
+                        }
+
+                        // exponential backoff
+                        let delay_ms = RETRY_DELAY_BASE_MS * 2u64.pow((attempt - 1) as u32);
+                        tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+                    }
+
+                    if !was_disconnected {
+                        self.disconnected.store(true, Ordering::Release);
+                        return Err(FFError::build(
+                            db_error_severity(),
+                            "Database connection lost after multiple attempts".to_string(),
+                        )
+                        .with_parent(last_err.unwrap()));
+                    }
+
+                    return Err(last_err.unwrap());
+                }
+            )*
+        }
+    };
+}
+
+define_db_api! {
+    find_account_from_username(&self, username: &str) -> Option<Account>;
+    find_account_from_player(&self, pc_uid: BigInt) -> Option<Account>;
+    create_account(&self, username: &str, password_hashed: &str) -> Account;
+    change_account_level(&self, acc_id: BigInt, new_level: Int) -> ();
+    ban_account(&self, acc_id: BigInt, banned_until: SystemTime, ban_reason: &str) -> ();
+    unban_account(&self, acc_id: BigInt) -> ();
+    init_player(&self, acc_id: BigInt, player: &Player) -> ();
+    update_player_appearance(&self, player: &Player) -> ();
+    update_selected_player(&self, acc_id: BigInt, slot_num: Int) -> ();
+    save_player(&self, player: &Player) -> ();
+    save_players(&self, players: &[&Player]) -> ();
+    load_player(&self, acc_id: BigInt, pc_uid: BigInt) -> Option<Player>;
+    load_players(&self, acc_id: BigInt) -> Vec<Player>;
+    delete_player(&self, pc_uid: BigInt) -> ();
 }
 
 const DB_NAME: &str = "rustyfusion";
@@ -74,7 +141,7 @@ async fn db_connect(config: &GeneralConfig) -> FFResult<DbBackend> {
     }
 }
 
-pub async fn db_init(error_severity: Severity) -> FFResult<&'static DbBackend> {
+pub async fn db_init(error_severity: Severity) -> FFResult<&'static Database<DbBackend>> {
     if DB.get().is_some() {
         return Err(FFError::build(
             Severity::Warning,
@@ -98,10 +165,10 @@ pub async fn db_init(error_severity: Severity) -> FFResult<&'static DbBackend> {
         ),
     );
 
-    let _ = DB.set(db_impl);
+    let _ = DB.set(Database::new(db_impl));
     Ok(db_get())
 }
 
-pub fn db_get() -> &'static DbBackend {
+pub fn db_get() -> &'static Database<DbBackend> {
     DB.get().expect("Database not initialized")
 }

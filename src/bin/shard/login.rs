@@ -5,7 +5,7 @@ use uuid::Uuid;
 use rusty_fusion::{
     chunk::InstanceID,
     config::{self, config_get},
-    database::{db_get, Database as _},
+    database::{db_get, DbImpl as _},
     defines::*,
     entity::{Entity, EntityID, PlayerSearchQuery},
     enums::*,

@@ -503,7 +503,7 @@ impl PostgresDatabase {
     }
 }
 #[async_trait]
-impl Database for PostgresDatabase {
+impl DbImpl for PostgresDatabase {
     async fn init_player(&self, acc_id: BigInt, player: &Player) -> FFResult<()> {
         let mut client = self.get_client().await?;
         let updated = Self::exec(
@@ -564,9 +564,9 @@ impl Database for PostgresDatabase {
         Ok(())
     }
 
-    async fn find_account_from_username(&self, username: &Text) -> FFResult<Option<Account>> {
+    async fn find_account_from_username(&self, username: &str) -> FFResult<Option<Account>> {
         let mut client = self.get_client().await?;
-        let rows = Self::query(&client, "find_account", &[username]).await?;
+        let rows = Self::query(&client, "find_account", &[&username]).await?;
         assert!(rows.len() <= 1);
 
         let row = match rows.first() {
@@ -587,7 +587,7 @@ impl Database for PostgresDatabase {
 
         let account = Account {
             id: row.get("AccountId"),
-            username: username.clone(),
+            username: username.to_string(),
             password_hashed: row.get("Password"),
             cookie,
             selected_slot: row.get::<_, Int>("Selected") as u8,
@@ -621,7 +621,7 @@ impl Database for PostgresDatabase {
         }))
     }
 
-    async fn create_account(&self, username: &Text, password_hashed: &Text) -> FFResult<Account> {
+    async fn create_account(&self, username: &str, password_hashed: &str) -> FFResult<Account> {
         {
             let mut client = self.get_client().await?;
 
@@ -637,7 +637,7 @@ impl Database for PostgresDatabase {
             let updated = Self::exec(
                 &mut client,
                 "create_account",
-                &[username, password_hashed, &acc_level],
+                &[&username, &password_hashed, &acc_level],
             )
             .await?;
             assert_eq!(updated, 1);
@@ -667,7 +667,7 @@ impl Database for PostgresDatabase {
         &self,
         acc_id: BigInt,
         banned_until: SystemTime,
-        ban_reason: Text,
+        ban_reason: &str,
     ) -> FFResult<()> {
         let mut client = self.get_client().await?;
         let banned_since = util::get_timestamp_sec(SystemTime::now()) as Int;
