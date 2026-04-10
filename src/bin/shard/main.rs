@@ -29,14 +29,20 @@ use tokio::{sync::Mutex, task::JoinHandle};
 #[tokio::main]
 async fn main() -> FFResult<()> {
     color_eyre::install().unwrap();
-    let mut terminal = ratatui::init();
-    let mut tui = ShardTui::default();
-
     let _cleanup = Cleanup {};
 
     let log_rx = log_init();
     let config = config_init()?;
     let mut logger = Logger::new(log_rx, &config.shard.log_path.get());
+
+    let mut tui = if config.general.enable_tui.get() {
+        let terminal = ratatui::init();
+        let tui = ShardTui::default();
+        let ke = ce::EventStream::new();
+        Some((terminal, tui, ke))
+    } else {
+        None
+    };
 
     db_init(Severity::Fatal).await?;
     tdata_init()?;
@@ -82,7 +88,6 @@ async fn main() -> FFResult<()> {
         &format!("Shard server listening on {}", server.get_endpoint()),
     );
 
-    let mut key_event_stream = ce::EventStream::new();
     let mut fatal_error = None;
     let mut save_handle = None;
     loop {
@@ -100,13 +105,15 @@ async fn main() -> FFResult<()> {
                     log_error(e);
                 }
             }
-            ke = key_event_stream.next() => {
+            ke = async { tui.as_mut().unwrap().2.next().await }, if tui.is_some() => {
                 match ke {
                     Some(Ok(event)) => {
                         if let ce::Event::Key(key_event) = event {
                             if util::is_ctrl_c(&key_event) {
                                 break;
                             }
+
+                            let tui = &mut tui.as_mut().unwrap().1;
                             match key_event.code {
                                 KeyCode::Up => tui.state.scroll(1),
                                 KeyCode::Down => tui.state.scroll(-1),
@@ -129,13 +136,15 @@ async fn main() -> FFResult<()> {
             }
             _ = tui_timer.tick() => {
                 logger.drain();
-                let clients = server.get_clients().await;
-                let state = state.lock().await;
-                if let Err(e) = terminal.draw(|frame| tui.render(frame, &state, &clients, logger.buffer())) {
-                    log(
-                        Severity::Warning,
-                        &format!("Failed to draw TUI; skipping this frame: {}", e),
-                    );
+                if let Some((terminal, tui, _)) = &mut tui {
+                    let clients = server.get_clients().await;
+                    let state = state.lock().await;
+                    if let Err(e) = terminal.draw(|frame| tui.render(frame, &state, &clients, logger.buffer().unwrap())) {
+                        log(
+                            Severity::Warning,
+                            &format!("Failed to draw TUI; skipping this frame: {}", e),
+                        );
+                    }
                 }
             }
             _ = entity_timer.tick() => {
@@ -199,7 +208,10 @@ async fn main() -> FFResult<()> {
     let clients = server.get_clients().await;
     let state = state.lock().await;
 
-    let _ = terminal.draw(|frame| tui.render(frame, &state, &clients, logger.buffer()));
+    if let Some((terminal, tui, _)) = &mut tui {
+        let _ =
+            terminal.draw(|frame| tui.render(frame, &state, &clients, logger.buffer().unwrap()));
+    }
 
     // save players
     if let Some(handle) = do_save(&state) {

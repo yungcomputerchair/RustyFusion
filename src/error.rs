@@ -171,9 +171,15 @@ impl FFError {
     pub fn get_formatted(&self, colored: bool, with_time: bool) -> String {
         let mut msg = if with_time {
             let time_str = util::get_timestamp_str(self.timestamp);
+            let timestamp_formatted = if colored {
+                format!("\x1b[90m[{}]\x1b[0m", time_str)
+            } else {
+                format!("[{}]", time_str)
+            };
+
             format!(
-                "[{}] {} {}",
-                time_str,
+                "{} {} {}",
+                timestamp_formatted,
                 self.get_severity().get_label(colored),
                 self.msg
             )
@@ -182,10 +188,15 @@ impl FFError {
         };
 
         if let Some(parent) = self.parent.as_ref() {
-            msg.push_str(&format!(
-                "\n  from: {}",
-                parent.get_formatted(colored, with_time)
-            ));
+            let sub_formatted = if colored {
+                format!(
+                    "\n  \x1b[90mfrom:\x1b[0m {}",
+                    parent.get_formatted(true, with_time)
+                )
+            } else {
+                format!("\n  from: {}", parent.get_formatted(false, with_time))
+            };
+            msg.push_str(&sub_formatted);
         }
         msg
     }
@@ -222,7 +233,7 @@ pub fn log_error(err: FFError) {
 
 pub struct Logger {
     rx: UnboundedReceiver<FFError>,
-    buffer: RingBuffer<FFError>,
+    buffer: Option<RingBuffer<FFError>>,
     file_writer: Option<BufWriter<File>>,
 }
 impl Logger {
@@ -242,9 +253,15 @@ impl Logger {
             }
         };
 
+        let buffer = if config_get().general.enable_tui.get() {
+            Some(RingBuffer::new(LOG_BUFFER_SIZE))
+        } else {
+            None
+        };
+
         Self {
             rx,
-            buffer: RingBuffer::new(LOG_BUFFER_SIZE),
+            buffer,
             file_writer,
         }
     }
@@ -266,7 +283,13 @@ impl Logger {
 
             // store in console buffer
             if severity as usize <= threshold_console {
-                self.buffer.push(err);
+                if let Some(buffer) = &mut self.buffer {
+                    buffer.push(err);
+                } else {
+                    // If buffer is disabled, print to stdout immediately
+                    let msg = err.get_formatted(true, true);
+                    println!("{}", msg);
+                }
             }
         }
     }
@@ -277,8 +300,8 @@ impl Logger {
         }
     }
 
-    pub fn buffer(&self) -> &RingBuffer<FFError> {
-        &self.buffer
+    pub fn buffer(&self) -> Option<&RingBuffer<FFError>> {
+        self.buffer.as_ref()
     }
 }
 impl Drop for Logger {

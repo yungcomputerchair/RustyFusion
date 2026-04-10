@@ -4,6 +4,11 @@
 
 [general]
 
+#: bool
+enable_tui = true # whether the enhanced terminal UI should be enabled.
+                  # provides stats and a scrollable log.
+                  # the tradeoff is that the scrollback is limited to 1000 events
+
 #: usize
 logging_level_console = 2 # how verbose logging should be in the console...
 
