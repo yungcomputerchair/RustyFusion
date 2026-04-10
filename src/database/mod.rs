@@ -119,8 +119,6 @@ define_db_api! {
     delete_player(&self, pc_uid: BigInt) -> ();
 }
 
-const DB_NAME: &str = "rustyfusion";
-
 async fn db_connect(config: &GeneralConfig) -> FFResult<DbBackend> {
     let _db_impl: Option<FFResult<DbBackend>> = None;
 

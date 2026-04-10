@@ -57,7 +57,7 @@ impl PostgresDatabase {
         db_config.port = Some(config.db_port.get());
         db_config.user = Some(config.db_username.get());
         db_config.password = Some(config.db_password.get());
-        db_config.dbname = Some(DB_NAME.to_string());
+        db_config.dbname = Some(config.db_name.get());
         db_config.connect_timeout = Some(Duration::from_secs(5));
         db_config.manager = Some(ManagerConfig {
             recycling_method: RecyclingMethod::Fast,

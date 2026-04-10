@@ -32,6 +32,9 @@ server_key = "myserverkey" # CHANGE ME; what password the login server and shard
                            # will use to connect to each other. this must match between servers!!
 
 #: String
+db_name = "rustyfusion" # the database to use
+
+#: String
 db_username = "admin" # what username to connect to database with
 
 #: String
