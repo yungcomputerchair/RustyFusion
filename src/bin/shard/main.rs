@@ -692,7 +692,7 @@ fn shutdown_notify_clients(clients: &ClientMap, state: &ShardServerState) {
 
         let dc_pkt = sP_FE2CL_REP_PC_BUDDY_WARP_OTHER_SHARD_SUCC {
             iBuddyPCUID: unused!(),
-            iShardNum: state.shard_id.unwrap() as i8,
+            iShardNum: 0, // if this shard is going down, we should not tell clients to stay on it
             iChannelNum: channel_num.unwrap_or(0),
         };
 
