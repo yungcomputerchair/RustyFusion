@@ -56,6 +56,42 @@ impl ShardStatsCache {
     }
 }
 
+impl From<&FFError> for Vec<Line<'_>> {
+    fn from(value: &FFError) -> Self {
+        fn error_as_line<'a>(value: &FFError, is_sub_error: bool) -> Line<'a> {
+            let ts = util::get_timestamp_str(value.get_timestamp());
+            let text = value.get_msg().to_string();
+            let severity = value.get_severity();
+            let sev_span = Span::from(format!("[{}] ", severity));
+            Line::from(vec![
+                if is_sub_error {
+                    Span::from(format!("[{}] from: ", ts)).dark_gray()
+                } else {
+                    Span::from(format!("[{}] ", ts)).dark_gray()
+                },
+                match severity {
+                    Severity::Info => sev_span.green(),
+                    Severity::Warning => sev_span.yellow(),
+                    Severity::Fatal => sev_span.red(),
+                    Severity::Debug => sev_span.cyan(),
+                },
+                Span::from(text).white(),
+            ])
+        }
+
+        let main_line = error_as_line(value, false);
+        let mut lines = vec![main_line];
+        let mut sub_error = value.get_parent();
+        while let Some(parent) = sub_error {
+            let line = error_as_line(parent, true);
+            lines.push(line);
+            sub_error = parent.get_parent();
+        }
+
+        lines
+    }
+}
+
 enum ScrollMode {
     Follow,
     Scroll(usize), // scroll offset from the end, in lines
@@ -320,25 +356,7 @@ impl<'a> Widget for LogWidget<'a> {
 
         let footer = Line::from(" Press CTRL+C to stop the server ").centered();
         let events = self.log_buffer;
-        let lines: Vec<Line> = events
-            .iter()
-            .map(|fe| {
-                let ts = util::get_timestamp_str(fe.get_timestamp());
-                let text = fe.get_msg().to_string();
-                let severity = fe.get_severity();
-                let sev_span = Span::from(format!("[{}] ", severity));
-                Line::from(vec![
-                    Span::from(format!("[{}] ", ts)).dark_gray(),
-                    match severity {
-                        Severity::Info => sev_span.green(),
-                        Severity::Warning => sev_span.yellow(),
-                        Severity::Fatal => sev_span.red(),
-                        Severity::Debug => sev_span.cyan(),
-                    },
-                    Span::from(text).white(),
-                ])
-            })
-            .collect();
+        let lines: Vec<Line> = events.iter().flat_map(Vec::<Line>::from).collect();
 
         let mut block = Block::bordered()
             .padding(Padding::horizontal(1))

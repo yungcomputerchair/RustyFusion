@@ -189,6 +189,10 @@ impl FFError {
         }
         msg
     }
+
+    pub fn get_parent(&self) -> Option<&FFError> {
+        self.parent.as_deref()
+    }
 }
 
 static LOG_TX: OnceLock<UnboundedSender<FFError>> = OnceLock::new();

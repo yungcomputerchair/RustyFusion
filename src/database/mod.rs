@@ -90,7 +90,7 @@ macro_rules! define_db_api {
                         self.disconnected.store(true, Ordering::Release);
                         return Err(FFError::build(
                             db_error_severity(),
-                            "Database connection lost after multiple attempts".to_string(),
+                            format!("Database connection lost ({} failed attempts)", tries),
                         )
                         .with_parent(last_err.unwrap()));
                     }
