@@ -120,32 +120,27 @@ define_db_api! {
 }
 
 async fn db_connect(config: &GeneralConfig) -> FFResult<DbBackend> {
-    loop {
-        let _db_impl: Option<FFResult<DbBackend>> = None;
+    let _db_impl: Option<FFResult<DbBackend>> = None;
 
-        #[cfg(feature = "postgres")]
-        let _db_impl = Some(postgresql::PostgresDatabase::connect(config).await);
+    #[cfg(feature = "postgres")]
+    let _db_impl = Some(postgresql::PostgresDatabase::connect(config).await);
 
-        match _db_impl {
-            Some(Ok(db)) => return Ok(db),
-            Some(Err(_)) => {
-                log(Severity::Warning, "Failed to connect to DB. Retrying...");
-                tokio::time::sleep(Duration::from_secs(1)).await;
-            },
-            None => return Err(FFError::build(
-                Severity::Fatal,
-                "No database implementation enabled; please enable one through a feature".to_string(),
-            )),
-        }
+    match _db_impl {
+        Some(Ok(db)) => Ok(db),
+        Some(Err(_)) => Err(FFError::build(
+            Severity::Fatal,
+            "Failed to connect to database".to_string(),
+        )),
+        None => Err(FFError::build(
+            Severity::Fatal,
+            "No database implementation enabled; please enable one through a feature".to_string(),
+        )),
     }
 }
 
 pub async fn db_init(error_severity: Severity) -> FFResult<&'static Database<DbBackend>> {
     if DB.get().is_some() {
-        return Err(FFError::build(
-            Severity::Warning,
-            "Database already initialized".to_string(),
-        ));
+        return Ok(db_get());
     }
 
     let _ = DB_ERROR_SEVERITY.set(error_severity);

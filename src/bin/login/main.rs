@@ -33,8 +33,6 @@ async fn main() -> FFResult<()> {
     color_eyre::install().unwrap();
     let _cleanup = Cleanup {};
 
-    db_init(Severity::Warning).await?;
-
     let log_rx = log_init();
     let config = config_init()?;
     let mut logger = Logger::new(log_rx, &config.login.log_path.get());
@@ -56,6 +54,10 @@ async fn main() -> FFResult<()> {
         false,
     );
     let mut shard_conn_timer = util::make_timer(Duration::from_millis(250), false);
+    let mut db_conn_timer = util::make_timer(
+        Duration::from_secs(config.shard.login_server_conn_interval.get()), // TODO: config
+        true,
+    );
     let mut monitor_timer = util::make_timer(
         Duration::from_secs(config.login.monitor_interval.get()),
         false,
@@ -176,6 +178,9 @@ async fn main() -> FFResult<()> {
                 let clients = server.get_clients().await;
                 state.lock().await
                     .process_shard_connection_requests(&clients, SystemTime::now());
+            }
+            _ = db_conn_timer.tick() => {
+                log_if_failed(db_init(Severity::Fatal).await);
             }
             _ = monitor_timer.tick() => {
                 if monitor_enabled {
