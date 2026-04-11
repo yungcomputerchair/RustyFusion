@@ -33,7 +33,7 @@ pub fn gm_pc_set_value(
     let pc_id = pkt.iPC_ID;
     let value = pkt.iSetValue;
     let value_type = pkt.iSetValueType;
-    let player = state.get_player_mut(pc_id)?;
+    let mut player = state.get_player_mut(pc_id)?;
 
     let value = match value_type as u32 {
         CN_GM_SET_VALUE_TYPE__HP => player.set_hp(value),
@@ -72,7 +72,7 @@ pub fn gm_pc_give_item(
     (|| {
         let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
         let pkt: &sP_CL2FE_REQ_PC_GIVE_ITEM = pkt.get()?;
-        let player = state.get_player_mut(pc_id)?;
+        let mut player = state.get_player_mut(pc_id)?;
 
         let mut item: Option<Item> = pkt.Item.try_into()?;
         let time = pkt.iTimeLeft as u32;
@@ -126,7 +126,7 @@ pub fn gm_pc_give_nano(
         let client = clients.get_sender();
         let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
         let nano_id = pkt.iNanoID;
-        let player = state.get_player_mut(pc_id)?;
+        let mut player = state.get_player_mut(pc_id)?;
         let new_level = max(player.get_level(), nano_id);
         player.set_level(new_level)?;
         let nano = player.unlock_nano(nano_id)?.clone();
@@ -174,7 +174,7 @@ pub fn gm_pc_goto(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState
         z: pkt.iToZ,
     };
 
-    let player = state.get_player_mut(pc_id)?;
+    let mut player = state.get_player_mut(pc_id)?;
     player.set_position(new_pos);
     player.instance_id = InstanceID::default();
     let taros = player.get_taros();
@@ -207,7 +207,7 @@ pub fn gm_pc_special_state_switch(
     let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__GM as i16)?;
     let pkt: &sP_CL2FE_GM_REQ_PC_SPECIAL_STATE_SWITCH = pkt.get()?;
 
-    let player = state.get_player_mut(pc_id)?;
+    let mut player = state.get_player_mut(pc_id)?;
 
     match pkt.iSpecialStateFlag as u32 {
         CN_SPECIAL_STATE_FLAG__PRINT_GM => {
@@ -439,7 +439,7 @@ pub fn gm_target_pc_special_state_onoff(
         .execute(state)
         .ok_or_else(|| helpers::send_search_fail(client, search_query))?;
 
-    let player = state.get_player_mut(pc_id)?;
+    let mut player = state.get_player_mut(pc_id)?;
     let new_flag = pkt.iONOFF != 0;
     match pkt.iSpecialStateFlag as u32 {
         // this packet is only used for /mute
@@ -551,7 +551,7 @@ pub fn gm_target_pc_teleport(
         ),
     };
 
-    let player = state.get_player_mut(target_pc_id).unwrap();
+    let mut player = state.get_player_mut(target_pc_id).unwrap();
     player.set_pre_warp();
     player.set_position(dest_pos);
     player.instance_id = dest_inst_id;
@@ -622,7 +622,7 @@ pub fn gm_reward_rate(
 ) -> FFResult<()> {
     let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
     let pkt: &sP_CL2FE_GM_REQ_REWARD_RATE = pkt.get()?;
-    let player = state.get_player_mut(pc_id)?;
+    let mut player = state.get_player_mut(pc_id)?;
 
     if pkt.iGetSet != 0 {
         let reward_type: RewardType = pkt.iRewardType.try_into()?;
@@ -650,7 +650,7 @@ pub fn gm_pc_task_complete(
 ) -> FFResult<()> {
     let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
     let pkt: &sP_CL2FE_REQ_PC_TASK_COMPLETE = pkt.get()?;
-    let player = state.get_player_mut(pc_id)?;
+    let mut player = state.get_player_mut(pc_id)?;
     let task_id = pkt.iTaskNum;
     player.mission_journal.complete_task(task_id)?;
     let resp = sP_FE2CL_REP_PC_TASK_END_SUCC { iTaskNum: task_id };
@@ -665,7 +665,7 @@ pub fn gm_pc_mission_complete(
 ) -> FFResult<()> {
     let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
     let pkt: &sP_CL2FE_REQ_PC_MISSION_COMPLETE = pkt.get()?;
-    let player = state.get_player_mut(pc_id)?;
+    let mut player = state.get_player_mut(pc_id)?;
     let mission_id = pkt.iMissionNum;
     player.mission_journal.set_mission_completed(mission_id)?;
     let resp = sP_FE2CL_REP_PC_MISSION_COMPLETE_SUCC {
@@ -824,7 +824,7 @@ mod helpers {
         let entity_map = &mut state.entity_map;
         let eid = EntityID::NPC(npc_id);
         entity_map.update(eid, None, Some(clients));
-        let mut npc = entity_map.untrack(eid);
-        npc.cleanup(clients, state)
+        let handle = entity_map.untrack(eid);
+        handle.write().cleanup(clients, state)
     }
 }

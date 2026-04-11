@@ -52,7 +52,7 @@ pub fn trade_offer(pkt: Packet, clients: &ClientMap, state: &mut ShardServerStat
         other_client.send_packet(P_FE2CL_REP_PC_TRADE_OFFER, &resp);
 
         // to avoid other clients making offers on our behalf
-        let player = state.get_player_mut(pc_id)?;
+        let mut player = state.get_player_mut(pc_id)?;
         player.trade_offered_to = Some(other_pc_id);
         Ok(())
     })()
@@ -80,7 +80,7 @@ pub fn trade_offer_accept(
         let pc_id = clients.get_sender().get_player_id()?;
         let pc_id_other = pkt.iID_From;
 
-        let player_from = state.get_player_mut(pc_id_other)?;
+        let mut player_from = state.get_player_mut(pc_id_other)?;
         if player_from.trade_offered_to != Some(pc_id) {
             return Err(FFError::build(
                 Severity::Info,
@@ -100,7 +100,7 @@ pub fn trade_offer_accept(
         let other_client = player_from.get_client(clients).unwrap();
         other_client.send_packet(P_FE2CL_REP_PC_TRADE_OFFER_SUCC, &resp);
 
-        let player_to = state.get_player_mut(pc_id)?;
+        let mut player_to = state.get_player_mut(pc_id)?;
         player_to.trade_id = Some(trade_id);
 
         state
@@ -110,10 +110,10 @@ pub fn trade_offer_accept(
         Ok(())
     })()
     .catch_fail(|| {
-        if let Ok(player_from) = state.get_player_mut(pkt.iID_From) {
+        if let Ok(mut player_from) = state.get_player_mut(pkt.iID_From) {
             player_from.trade_id = None;
         }
-        if let Ok(player_to) = state.get_player_mut(pkt.iID_To) {
+        if let Ok(mut player_to) = state.get_player_mut(pkt.iID_To) {
             player_to.trade_id = None;
         }
 
@@ -141,7 +141,7 @@ pub fn trade_offer_refusal(
     let pc_id = client.get_player_id()?;
     let pc_id_other = pkt.iID_From;
 
-    let player_from = state.get_player_mut(pc_id_other)?;
+    let mut player_from = state.get_player_mut(pc_id_other)?;
     if player_from.trade_offered_to != Some(pc_id) {
         return Err(FFError::build(
             Severity::Info,
@@ -401,7 +401,7 @@ pub fn trade_confirm_cancel(
     let _pkt: &sP_CL2FE_REQ_PC_TRADE_CONFIRM_CANCEL = pkt.get()?;
 
     let pc_id = client.get_player_id()?;
-    let player = state.get_player_mut(pc_id)?;
+    let mut player = state.get_player_mut(pc_id)?;
     let trade_id = player.trade_id.ok_or(FFError::build(
         Severity::Warning,
         format!("Player {} is not trading", player.get_player_id()),
@@ -412,7 +412,7 @@ pub fn trade_confirm_cancel(
     let trade = state.ongoing_trades.remove(&trade_id).unwrap();
 
     let other_pc_id = trade.get_other_id(pc_id);
-    let other_player = state.get_player_mut(other_pc_id).unwrap();
+    let mut other_player = state.get_player_mut(other_pc_id).unwrap();
     other_player.trade_id = None;
 
     let resp = sP_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL {
@@ -429,11 +429,13 @@ pub fn trade_confirm_cancel(
 pub async fn trade_confirm(clients: &ClientMap<'_>, state: &mut ShardServerState) -> FFResult<()> {
     let client = clients.get_sender();
     let pc_id = client.get_player_id()?;
-    let player = state.get_player(pc_id)?;
-    let trade_id = player.trade_id.ok_or(FFError::build(
-        Severity::Warning,
-        format!("Player {} is not trading", player.get_player_id()),
-    ))?;
+    let trade_id = {
+        let player = state.get_player(pc_id)?;
+        player.trade_id.ok_or(FFError::build(
+            Severity::Warning,
+            format!("Player {} is not trading", player.get_player_id()),
+        ))?
+    };
 
     let trade = state.ongoing_trades.get_mut(&trade_id).unwrap();
     let pc_id_other = trade.get_other_id(pc_id);
@@ -455,13 +457,17 @@ pub async fn trade_confirm(clients: &ClientMap<'_>, state: &mut ShardServerState
 
     // carry out trade
 
-    let player = state.get_player_mut(pc_id).unwrap();
-    player.trade_id = None;
-    let mut player = player.clone();
+    let mut player = {
+        let mut guard = state.get_player_mut(pc_id).unwrap();
+        guard.trade_id = None;
+        guard.clone()
+    };
 
-    let player_other = state.get_player_mut(pc_id_other).unwrap();
-    player_other.trade_id = None;
-    let mut player_other = player_other.clone();
+    let mut player_other = {
+        let mut guard = state.get_player_mut(pc_id_other).unwrap();
+        guard.trade_id = None;
+        guard.clone()
+    };
 
     let trade = state.ongoing_trades.remove(&trade_id).unwrap();
     let id_from = trade.get_id_from();

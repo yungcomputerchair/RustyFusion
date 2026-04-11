@@ -61,7 +61,7 @@ pub fn pc_attack_npcs(
     }
 
     // consume weapon boosts
-    let player = state.get_player_mut(pc_id)?;
+    let mut player = state.get_player_mut(pc_id)?;
     let weapon_boosts = player.get_weapon_boosts();
     let charged = if weapon_boosts >= weapon_boosts_needed {
         player.set_weapon_boosts(weapon_boosts - weapon_boosts_needed);

@@ -1,10 +1,18 @@
-use std::{any::Any, collections::HashSet, time::SystemTime};
+use std::{
+    any::Any,
+    collections::HashSet,
+    fmt::{Display, Formatter},
+    marker::PhantomData,
+    ops::{Deref, DerefMut},
+    sync::Arc,
+    time::SystemTime,
+};
 
 use crate::{
     chunk::ChunkCoords,
     defines::*,
     enums::{CharType, CombatStyle, CombatantTeam},
-    error::{FFError, FFResult, Severity},
+    error::{panic_log, FFError, FFResult, Severity},
     net::{
         packet::{sNPCGroupMemberInfo, sPCGroupMemberInfo},
         ClientMap, FFClient,
@@ -25,6 +33,7 @@ pub use player::*;
 mod slider;
 use rand::rngs::ThreadRng;
 pub use slider::*;
+use tokio::sync::{OwnedRwLockReadGuard, OwnedRwLockWriteGuard, RwLock};
 use uuid::Uuid;
 
 #[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
@@ -35,7 +44,7 @@ pub enum EntityID {
     Egg(i32),
 }
 
-pub trait Entity: Send {
+pub trait Entity: Send + Sync {
     fn get_id(&self) -> EntityID;
     fn get_client<'a>(&self, client_map: &'a ClientMap) -> Option<&'a FFClient>;
     fn get_position(&self) -> Position;
@@ -56,11 +65,12 @@ pub trait Entity: Send {
     );
     fn cleanup(&mut self, clients: &ClientMap, state: &mut ShardServerState);
 
-    fn as_combatant(&self) -> Option<&dyn Combatant>;
-    fn as_combatant_mut(&mut self) -> Option<&mut dyn Combatant>;
+    fn as_combatant(&self) -> Option<&(dyn Combatant + 'static)>;
+    fn as_combatant_mut(&mut self) -> Option<&mut (dyn Combatant + 'static)>;
 
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
+    fn into_any(self: Box<Self>) -> Box<dyn Any>;
 }
 
 pub trait Combatant: Entity {
@@ -81,6 +91,140 @@ pub trait Combatant: Entity {
 
     fn take_damage(&mut self, damage: i32, source: EntityID) -> i32;
     fn reset(&mut self);
+}
+
+#[derive(Clone)]
+pub struct EntityHandle {
+    inner: Arc<RwLock<Box<dyn Entity>>>,
+}
+impl EntityHandle {
+    pub fn new(entity: Box<dyn Entity>) -> Self {
+        Self {
+            inner: Arc::new(RwLock::new(entity)),
+        }
+    }
+
+    pub fn read(&self) -> EntityReadGuard<dyn Entity> {
+        EntityReadGuard {
+            guard: self
+                .inner
+                .clone()
+                .try_read_owned()
+                .unwrap_or_else(|_| panic_log("Failed to read")),
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn write(&self) -> EntityWriteGuard<dyn Entity> {
+        EntityWriteGuard {
+            guard: self
+                .inner
+                .clone()
+                .try_write_owned()
+                .unwrap_or_else(|_| panic_log("Failed to write")),
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Read-lock and downcast to a concrete type.
+    pub fn read_as<T: Entity + 'static>(&self) -> EntityReadGuard<T> {
+        EntityReadGuard {
+            guard: self
+                .inner
+                .clone()
+                .try_read_owned()
+                .unwrap_or_else(|_| panic_log("Failed to read")),
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Write-lock and downcast to a concrete type.
+    pub fn write_as<T: Entity + 'static>(&self) -> EntityWriteGuard<T> {
+        EntityWriteGuard {
+            guard: self
+                .inner
+                .clone()
+                .try_write_owned()
+                .unwrap_or_else(|_| panic_log("Failed to write")),
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Consume the handle and extract the concrete entity.
+    /// Panics if other handles still exist or the type doesn't match.
+    pub fn unpack<T: Entity + 'static>(self) -> T {
+        let lock = Arc::try_unwrap(self.inner)
+            .unwrap_or_else(|_| panic_log("Failed to unwrap Arc in EntityHandle::unpack"));
+
+        let boxed: Box<dyn Entity> = lock.into_inner();
+        *boxed
+            .into_any()
+            .downcast::<T>()
+            .unwrap_or_else(|_| panic_log("Failed to downcast in EntityHandle::unpack"))
+    }
+}
+
+/// A self-contained read guard. Owns the `Arc` internally, so it has no
+/// lifetime dependency on `EntityMap` or `EntityHandle`.
+///
+/// - `EntityReadGuard<dyn Entity>` derefs to `&dyn Entity`.
+/// - `EntityReadGuard<Player>` derefs to `&Player` (downcasts on each deref).
+pub struct EntityReadGuard<T: ?Sized + 'static> {
+    guard: OwnedRwLockReadGuard<Box<dyn Entity>>,
+    _phantom: PhantomData<T>,
+}
+impl Deref for EntityReadGuard<dyn Entity> {
+    type Target = dyn Entity;
+    fn deref(&self) -> &Self::Target {
+        &**self.guard
+    }
+}
+impl<T: Entity + 'static> Deref for EntityReadGuard<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        self.guard.as_any().downcast_ref::<T>().unwrap()
+    }
+}
+impl<T: Entity + Display + 'static> Display for EntityReadGuard<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&**self, f)
+    }
+}
+
+/// A self-contained write guard, same Arc-owning pattern as `EntityReadGuard`.
+///
+/// - `EntityWriteGuard<dyn Entity>` derefs to `&mut dyn Entity`.
+/// - `EntityWriteGuard<Player>` derefs to `&mut Player`.
+pub struct EntityWriteGuard<T: ?Sized + 'static> {
+    guard: OwnedRwLockWriteGuard<Box<dyn Entity>>,
+    _phantom: PhantomData<T>,
+}
+impl Deref for EntityWriteGuard<dyn Entity> {
+    type Target = dyn Entity;
+    fn deref(&self) -> &Self::Target {
+        &**self.guard
+    }
+}
+impl DerefMut for EntityWriteGuard<dyn Entity> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut **self.guard
+    }
+}
+impl<T: Entity + 'static> Deref for EntityWriteGuard<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        self.guard.as_any().downcast_ref::<T>().unwrap()
+    }
+}
+impl<T: Entity + 'static> DerefMut for EntityWriteGuard<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.guard.as_any_mut().downcast_mut::<T>().unwrap()
+    }
+}
+impl<T: Entity + Display + 'static> Display for EntityWriteGuard<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&**self, f)
+    }
 }
 
 #[derive(Debug, Clone)]

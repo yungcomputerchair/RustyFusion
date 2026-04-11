@@ -19,7 +19,7 @@ pub fn pc_group_invite(
     (|| {
         let client = clients.get_sender();
         let pc_id = client.get_player_id()?;
-        let player = state.get_player_mut(pc_id)?;
+        let mut player = state.get_player_mut(pc_id)?;
         if player.group_offered_to.is_some() {
             return Err(FFError::build(
                 Severity::Debug,
@@ -63,7 +63,7 @@ pub fn pc_group_invite_refuse(
     let pc_id = client.get_player_id()?;
 
     let host_pc_id = pkt.iID_From;
-    let host_player = state.get_player_mut(host_pc_id)?;
+    let mut host_player = state.get_player_mut(host_pc_id)?;
     if host_player.group_offered_to != Some(pc_id) {
         return Err(FFError::build(
             Severity::Debug,
@@ -96,7 +96,7 @@ pub fn pc_group_join(
         }
 
         let host_pc_id = pkt.iID_From;
-        let host_player = state.get_player_mut(host_pc_id)?;
+        let mut host_player = state.get_player_mut(host_pc_id)?;
         if host_player.group_offered_to != Some(pc_id) {
             return Err(FFError::build(
                 Severity::Debug,
@@ -132,7 +132,8 @@ pub fn pc_group_join(
 
         if let Some(pkt) = log_if_failed(pkt.build()) {
             for eid in group.get_member_ids() {
-                let entity = state.entity_map.get_entity_raw(*eid).unwrap();
+                let handle = state.entity_map.get_handle(*eid).unwrap();
+                let entity = handle.read();
                 if let Some(client) = entity.get_client(clients) {
                     client.send_payload(pkt.clone());
                 }
@@ -160,7 +161,7 @@ pub fn pc_group_leave(clients: &ClientMap, state: &mut ShardServerState) -> FFRe
     (|| {
         let client = clients.get_sender();
         let leaver_pc_id = client.get_player_id()?;
-        let player = state.get_player_mut(leaver_pc_id)?;
+        let mut player = state.get_player_mut(leaver_pc_id)?;
         let group_id = player.group_id.take().ok_or_else(|| {
             FFError::build(
                 Severity::Warning,
@@ -242,7 +243,8 @@ pub fn npc_group_invite(
 
     if let Some(pkt) = log_if_failed(pkt.build()) {
         for eid in group.get_member_ids() {
-            let entity = state.entity_map.get_entity_raw(*eid).unwrap();
+            let handle = state.entity_map.get_handle(*eid).unwrap();
+            let entity = handle.read();
             if let Some(client) = entity.get_client(clients) {
                 client.send_payload(pkt.clone());
             }
@@ -273,7 +275,7 @@ pub fn npc_group_kick(
     })?;
 
     let target_npc_id = pkt.iNPC_ID;
-    let target_npc = state.get_npc_mut(target_npc_id)?;
+    let mut target_npc = state.get_npc_mut(target_npc_id)?;
     if target_npc.group_id != Some(group_id) {
         return Err(FFError::build(
             Severity::Warning,

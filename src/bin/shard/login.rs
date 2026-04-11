@@ -569,39 +569,48 @@ pub async fn login_buddy_warp_succ(
 ) -> FFResult<()> {
     let pkt: &sP_LS2FE_REP_BUDDY_WARP_SUCC = pkt.get()?;
     let player_pcuid = pkt.iFromPCUID;
-    let player = state.get_player_by_uid(player_pcuid).ok_or_else(|| {
-        FFError::build(
-            Severity::Warning,
-            format!("Couldn't find player with UID {}", player_pcuid),
-        )
-    })?;
+    let (pc_id, player_client) = {
+        let player = state.get_player_by_uid(player_pcuid).ok_or_else(|| {
+            FFError::build(
+                Severity::Warning,
+                format!("Couldn't find player with UID {}", player_pcuid),
+            )
+        })?;
 
-    let pc_id = player.get_player_id();
-    let player_client = player.get_client(clients).ok_or_else(|| {
-        FFError::build(
-            Severity::Warning,
-            format!("Couldn't find client for player UID {}", player_pcuid),
-        )
-    })?;
+        let pc_id = player.get_player_id();
+        let player_client = player
+            .get_client(clients)
+            .ok_or_else(|| {
+                FFError::build(
+                    Severity::Warning,
+                    format!("Couldn't find client for player UID {}", player_pcuid),
+                )
+            })?
+            .clone();
+        (pc_id, player_client)
+    };
 
     async {
-        let player = state.get_player_mut(pc_id).unwrap();
-        player.set_instance_id(InstanceID {
-            map_num: pkt.iMapNum,
-            channel_num: pkt.iChannelNum,
-            instance_num: None,
-        });
+        let player_saved = {
+            let mut player = state.get_player_mut(pc_id).unwrap();
+            player.set_instance_id(InstanceID {
+                map_num: pkt.iMapNum,
+                channel_num: pkt.iChannelNum,
+                instance_num: None,
+            });
 
-        player.set_position(Position {
-            x: pkt.iX,
-            y: pkt.iY,
-            z: pkt.iZ,
-        });
+            player.set_position(Position {
+                x: pkt.iX,
+                y: pkt.iY,
+                z: pkt.iZ,
+            });
 
-        player.buddy_warp_available_at =
-            Some(util::get_timestamp_sec(SystemTime::now()) + BUDDYWARP_INTERVAL);
+            player.buddy_warp_available_at =
+                Some(util::get_timestamp_sec(SystemTime::now()) + BUDDYWARP_INTERVAL);
 
-        let player_saved = player.clone();
+            player.clone()
+        };
+
         let db = db_get();
         log_if_failed(db.save_player(&player_saved).await);
 

@@ -216,7 +216,8 @@ pub fn send_group_freechat_message(
     if let Some(group_id) = player.group_id {
         let group = state.groups.get(&group_id).unwrap();
         for eid in group.get_member_ids() {
-            let entity = state.entity_map.get_entity_raw(*eid).unwrap();
+            let handle = state.entity_map.get_handle(*eid).unwrap();
+            let entity = handle.read();
             if let Some(client) = entity.get_client(clients) {
                 client.send_packet(P_FE2CL_REP_SEND_ALL_GROUP_FREECHAT_MESSAGE_SUCC, &pkt);
             }
@@ -270,7 +271,8 @@ pub fn send_group_menuchat_message(
     if let Some(group_id) = player.group_id {
         let group = state.groups.get(&group_id).unwrap();
         for eid in group.get_member_ids() {
-            let entity = state.entity_map.get_entity_raw(*eid).unwrap();
+            let handle = state.entity_map.get_handle(*eid).unwrap();
+            let entity = handle.read();
             if let Some(client) = entity.get_client(clients) {
                 client.send_packet(P_FE2CL_REP_SEND_ALL_GROUP_MENUCHAT_MESSAGE_SUCC, &pkt);
             }
@@ -619,10 +621,16 @@ mod commands {
             }
 
             let own_pc_id = client.get_player_id()?;
-            let player = state.get_player(own_pc_id)?;
-            if player.perms > CN_ACCOUNT_LEVEL__GM as i16 {
-                return send_system_message(client, "You do not have permission to ban players");
-            }
+            let own_player_display = {
+                let player = state.get_player(own_pc_id)?;
+                if player.perms > CN_ACCOUNT_LEVEL__GM as i16 {
+                    return send_system_message(
+                        client,
+                        "You do not have permission to ban players",
+                    );
+                }
+                format!("{}", &*player)
+            };
 
             let pc_id = match parse_pc_id(tokens[1]) {
                 Ok(Some(pc_id)) => pc_id,
@@ -637,11 +645,13 @@ mod commands {
             let db = db_get();
 
             let acc_id = if is_ban_i {
-                let Ok(player) = state.get_player(pc_id) else {
-                    return send_system_message(client, &format!("Player {} not found", pc_id));
+                let pc_uid = {
+                    let Ok(player) = state.get_player(pc_id) else {
+                        return send_system_message(client, &format!("Player {} not found", pc_id));
+                    };
+                    player.get_uid()
                 };
 
-                let pc_uid = player.get_uid();
                 let Some(acc) = db.find_account_from_player(pc_uid).await? else {
                     return send_system_message(
                         client,
@@ -685,7 +695,7 @@ mod commands {
                     log_if_failed(send_system_message(client, &ban_msg));
                     log(
                         Severity::Info,
-                        &format!("{}\nBanned by: {}", ban_msg, player),
+                        &format!("{}\nBanned by: {}", ban_msg, own_player_display),
                     );
                 }
                 Err(e) => {
@@ -729,8 +739,11 @@ mod commands {
                 );
             }
 
-            let player = state.get_player(client.get_player_id()?)?;
-            if player.perms > CN_ACCOUNT_LEVEL__GM as i16 {
+            let (perms, player_display) = {
+                let player = state.get_player(client.get_player_id()?)?;
+                (player.perms, format!("{}", &*player))
+            };
+            if perms > CN_ACCOUNT_LEVEL__GM as i16 {
                 return send_system_message(client, "You do not have permission to unban players");
             }
 
@@ -744,7 +757,7 @@ mod commands {
                     let unban_msg = format!("Account {} unbanned", acc_id);
                     log(
                         Severity::Info,
-                        &format!("{}\nUnbanned by: {}", unban_msg, player),
+                        &format!("{}\nUnbanned by: {}", unban_msg, player_display),
                     );
                     send_system_message(client, &unban_msg)
                 }
@@ -783,14 +796,14 @@ mod commands {
             }
 
             if let Some(npc_id) = closest_npc_id {
-                let npc = state.get_npc_mut(npc_id).unwrap();
+                let mut npc = state.get_npc_mut(npc_id).unwrap();
                 log_if_failed(send_system_message(
                     client,
                     &format!("{} is now following you", npc),
                 ));
                 npc.set_follow(EntityID::Player(pc_id));
                 if npc.ai.is_none() {
-                    let (ai, new_tick_mode) = AI::make_for_npc(npc, true);
+                    let (ai, new_tick_mode) = AI::make_for_npc(&npc, true);
                     npc.ai = ai;
                     state
                         .entity_map
@@ -834,7 +847,7 @@ mod commands {
             }
 
             if let Some(npc_id) = closest_npc_id {
-                let npc = state.get_npc_mut(npc_id).unwrap();
+                let mut npc = state.get_npc_mut(npc_id).unwrap();
                 if npc.loose_follow == Some(EntityID::Player(pc_id)) {
                     npc.loose_follow = None;
                     send_system_message(client, &format!("{} is no longer following you", npc))
@@ -868,8 +881,10 @@ mod commands {
             }
 
             let pc_id = client.get_player_id()?;
-            let player = state.get_player(pc_id)?;
-            let own_perms = player.perms;
+            let own_perms = {
+                let player = state.get_player(pc_id)?;
+                player.perms
+            };
 
             let target_pc_id = match parse_pc_id(tokens[1]) {
                 Ok(Some(pc_id)) => pc_id,
@@ -877,16 +892,24 @@ mod commands {
                 Err(_) => return send_system_message(client, "Invalid player ID"),
             };
 
-            let Ok(target_player) = state.get_player_mut(target_pc_id) else {
-                return send_system_message(client, &format!("Player {} not found", target_pc_id));
+            let (target_perms, target_uid, target_display) = {
+                let Ok(target_player) = state.get_player_mut(target_pc_id) else {
+                    return send_system_message(
+                        client,
+                        &format!("Player {} not found", target_pc_id),
+                    );
+                };
+                (
+                    target_player.perms,
+                    target_player.get_uid(),
+                    format!("{}", &*target_player),
+                )
             };
-            let target_perms = target_player.perms;
-            let target_uid = target_player.get_uid();
 
             if tokens.len() < 3 {
                 return send_system_message(
                     client,
-                    &format!("{} has permissions level {}", target_player, target_perms),
+                    &format!("{} has permissions level {}", target_display, target_perms),
                 );
             }
 
@@ -917,12 +940,15 @@ mod commands {
             );
             }
 
-            target_player.perms = new_perms;
+            {
+                let mut target_player = state.get_player_mut(target_pc_id).unwrap();
+                target_player.perms = new_perms;
+            }
             log_if_failed(send_system_message(
                 client,
                 &format!(
                     "Permissions level changed to {} for {}",
-                    new_perms, target_player
+                    new_perms, target_display
                 ),
             ));
 

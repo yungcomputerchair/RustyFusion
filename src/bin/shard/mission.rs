@@ -199,7 +199,7 @@ pub fn task_start(pkt: Packet, client: &FFClient, state: &mut ShardServerState) 
         // start escort path (non-destructive if start_task fails)
         if task_def.obj_escort_npc_type.is_some() {
             let escort_npc_id = pkt.iEscortNPC_ID;
-            let escort_npc = state.get_npc_mut(pkt.iEscortNPC_ID).unwrap();
+            let mut escort_npc = state.get_npc_mut(pkt.iEscortNPC_ID).unwrap();
             if let Some(ref mut path) = escort_npc.path {
                 path.start();
             } else {
@@ -215,7 +215,7 @@ pub fn task_start(pkt: Packet, client: &FFClient, state: &mut ShardServerState) 
             task.escort_npc_id = Some(escort_npc_id);
         }
 
-        let player = state.get_player_mut(pc_id).unwrap();
+        let mut player = state.get_player_mut(pc_id).unwrap();
         if player.mission_journal.start_task(task)? {
             log(
                 Severity::Info,
@@ -286,7 +286,7 @@ pub fn task_start(pkt: Packet, client: &FFClient, state: &mut ShardServerState) 
 pub fn task_stop(pkt: Packet, client: &FFClient, state: &mut ShardServerState) -> FFResult<()> {
     let pkt: &sP_CL2FE_REQ_PC_TASK_STOP = pkt.get()?;
     let pc_id = client.get_player_id()?;
-    let player = state.get_player_mut(pc_id)?;
+    let mut player = state.get_player_mut(pc_id)?;
 
     let task_def = tdata_get().get_task_definition(pkt.iTaskNum)?;
     let mission_def = tdata_get().get_mission_definition(task_def.mission_id)?;
@@ -460,15 +460,15 @@ pub fn task_end(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
         }
 
         // all clear, mark the task completed. it'll be overwritten by the next task
-        let player = state.get_player_mut(pc_id).unwrap();
+        let mut player = state.get_player_mut(pc_id).unwrap();
         player.mission_journal.complete_task(pkt.iTaskNum)?;
 
         // if escort following, stop it
         if let Some(escort_npc_id) = task.escort_npc_id {
-            let escort_npc = state.get_npc_mut(escort_npc_id).unwrap();
+            let mut escort_npc = state.get_npc_mut(escort_npc_id).unwrap();
             escort_npc.loose_follow = None;
         }
-        let player = state.get_player_mut(pc_id).unwrap();
+        let mut player = state.get_player_mut(pc_id).unwrap();
 
         // success qitem changes
         if !task_def.succ_qitems.is_empty() {
@@ -573,10 +573,8 @@ pub fn task_end(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
                 let player_stats = tdata_get().get_player_stats(player.get_level()).unwrap();
                 match player.unlock_nano(nano_id).cloned() {
                     Ok(nano) => {
-                        player.set_fusion_matter(
-                            player.get_fusion_matter() - player_stats.req_fm_nano_create,
-                            None,
-                        );
+                        let fm = player.get_fusion_matter();
+                        player.set_fusion_matter(fm - player_stats.req_fm_nano_create, None);
                         let new_level = std::cmp::max(player.get_level(), nano_id);
                         let resp = sP_FE2CL_REP_PC_NANO_CREATE_SUCC {
                             iPC_FusionMatter: player.get_fusion_matter() as i32,
@@ -641,7 +639,7 @@ pub fn set_current_mission_id(
 
     (|| {
         let pc_id = client.get_player_id()?;
-        let player = state.get_player_mut(pc_id)?;
+        let mut player = state.get_player_mut(pc_id)?;
         let active_mission_slot = player
             .mission_journal
             .set_active_mission_id(pkt.iCurrentMissionID)?;

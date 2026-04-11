@@ -107,7 +107,7 @@ pub fn request_make_buddy(
     let buddy_client = buddy.get_client(clients).unwrap();
     buddy_client.send_packet(P_FE2CL_REP_REQUEST_MAKE_BUDDY_SUCC_TO_ACCEPTER, &req_pkt);
 
-    let player = state.get_player_mut(pc_id).unwrap();
+    let mut player = state.get_player_mut(pc_id).unwrap();
     player.buddy_offered_to = Some(buddy_uid);
 
     Ok(())
@@ -165,7 +165,7 @@ pub fn find_name_make_buddy(
     }
 
     let buddy_client = buddy.get_client(clients).unwrap();
-    let player = state.get_player_mut(pc_id).unwrap();
+    let mut player = state.get_player_mut(pc_id).unwrap();
     player.buddy_offered_to = Some(buddy_uid);
     let req_pkt = sP_FE2CL_REP_PC_FIND_NAME_MAKE_BUDDY_SUCC {
         szFirstName: util::encode_utf16(&player.first_name).unwrap(),
@@ -187,12 +187,12 @@ pub fn accept_make_buddy(
 
     let pc_id = client.get_player_id()?;
     let player = state.get_player(pc_id)?;
-    let player_buddy_info = BuddyListEntry::new(player);
+    let player_buddy_info = BuddyListEntry::new(&player);
     let pc_uid = state.get_player(pc_id)?.get_uid();
     let buddy_id = pkt.iBuddyID;
     let accepted = pkt.iAcceptFlag == 1;
 
-    let buddy = state.get_player_mut(buddy_id)?;
+    let mut buddy = state.get_player_mut(buddy_id)?;
     let buddy_uid = buddy.get_uid();
     if buddy.buddy_offered_to != Some(pc_uid) {
         return Err(FFError::build(
@@ -204,7 +204,7 @@ pub fn accept_make_buddy(
     buddy.buddy_offered_to = None;
 
     (|| {
-        let buddy = state.get_player_mut(buddy_id).unwrap(); // re-borrow
+        let mut buddy = state.get_player_mut(buddy_id).unwrap(); // re-borrow
         if !accepted {
             // this failure will be caught and the deny packet will be sent
             return Err(FFError::build(
@@ -225,8 +225,8 @@ pub fn accept_make_buddy(
             .send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC, &pkt_buddy);
 
         // buddy -> player
-        let buddy_buddy_info = BuddyListEntry::new(buddy);
-        let player = state.get_player_mut(pc_id).unwrap();
+        let buddy_buddy_info = BuddyListEntry::new(&buddy);
+        let mut player = state.get_player_mut(pc_id).unwrap();
         let pkt_player = sP_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC {
             iBuddySlot: player.add_buddy(buddy_buddy_info.clone())? as i8,
             BuddyInfo: buddy_buddy_info.into(),
@@ -239,10 +239,10 @@ pub fn accept_make_buddy(
         Ok(())
     })()
     .catch_fail(|| {
-        let player = state.get_player_mut(pc_id).unwrap();
+        let mut player = state.get_player_mut(pc_id).unwrap();
         let _ = player.remove_buddy(buddy_uid);
 
-        let buddy = state.get_player_mut(buddy_id).unwrap();
+        let mut buddy = state.get_player_mut(buddy_id).unwrap();
         let _ = buddy.remove_buddy(pc_uid);
 
         // we send the deny packet to the buddy in case of failure
@@ -269,7 +269,7 @@ pub fn find_name_accept_buddy(
 
     let pc_id = client.get_player_id()?;
     let player = state.get_player(pc_id)?;
-    let player_buddy_info = BuddyListEntry::new(player);
+    let player_buddy_info = BuddyListEntry::new(&player);
     let pc_uid = player.get_uid();
     if player.get_num_buddies() >= SIZEOF_BUDDYLIST_SLOT as usize {
         return Err(FFError::build(
@@ -287,7 +287,7 @@ pub fn find_name_accept_buddy(
     }
     let buddy_id = res.unwrap();
 
-    let buddy = state.get_player_mut(buddy_id)?;
+    let mut buddy = state.get_player_mut(buddy_id)?;
     if buddy.buddy_offered_to != Some(pc_uid) {
         return Err(FFError::build(
             Severity::Warning,
@@ -297,7 +297,7 @@ pub fn find_name_accept_buddy(
     buddy.buddy_offered_to = None;
 
     (|| {
-        let buddy = state.get_player_mut(buddy_id).unwrap(); // re-borrow
+        let mut buddy = state.get_player_mut(buddy_id).unwrap(); // re-borrow
         if !accepted {
             // this failure will be caught and the deny packet will be sent
             return Err(FFError::build(
@@ -318,8 +318,8 @@ pub fn find_name_accept_buddy(
             .send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC, &pkt_buddy);
 
         // buddy -> player
-        let buddy_buddy_info = BuddyListEntry::new(buddy);
-        let player = state.get_player_mut(pc_id).unwrap();
+        let buddy_buddy_info = BuddyListEntry::new(&buddy);
+        let mut player = state.get_player_mut(pc_id).unwrap();
         let pkt_player = sP_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC {
             iBuddySlot: player.add_buddy(buddy_buddy_info.clone())? as i8,
             BuddyInfo: buddy_buddy_info.into(),
@@ -332,10 +332,10 @@ pub fn find_name_accept_buddy(
         Ok(())
     })()
     .catch_fail(|| {
-        let player = state.get_player_mut(pc_id).unwrap();
+        let mut player = state.get_player_mut(pc_id).unwrap();
         let _ = player.remove_buddy(buddy_uid);
 
-        let buddy = state.get_player_mut(buddy_id).unwrap();
+        let mut buddy = state.get_player_mut(buddy_id).unwrap();
         let _ = buddy.remove_buddy(pc_uid);
 
         // we send the deny packet to the buddy in case of failure
@@ -456,7 +456,7 @@ pub fn pc_buddy_warp(
     }
 
     {
-        let player = state.get_player_mut(pc_id).unwrap();
+        let mut player = state.get_player_mut(pc_id).unwrap();
         player.set_position(buddy_position);
         player.set_instance_id(InstanceID {
             map_num: buddy_instance_id.map_num,

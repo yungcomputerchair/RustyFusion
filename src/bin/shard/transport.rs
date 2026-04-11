@@ -26,7 +26,7 @@ pub fn regist_transportation_location(
                 .entity_map
                 .validate_proximity(&[EntityID::Player(pc_id), npc.get_id()], RANGE_INTERACT)?;
 
-            let player = state.get_player_mut(pc_id)?;
+            let mut player = state.get_player_mut(pc_id)?;
             let transport_type: TransportationType = pkt.eTT.try_into()?;
             match transport_type {
                 TransportationType::Warp => {
@@ -102,7 +102,7 @@ pub fn warp_use_transportation(
             .entity_map
             .validate_proximity(&[EntityID::Player(pc_id), npc.get_id()], RANGE_INTERACT)?;
 
-        let player = state.get_player_mut(pc_id)?;
+        let mut player = state.get_player_mut(pc_id)?;
         let trip_id = pkt.iTransporationID;
         let trip = tdata_get().get_trip_data(trip_id)?;
         if player.get_taros() < trip.cost {
@@ -208,8 +208,12 @@ pub fn warp_use_transportation(
         }
 
         let new_pos = player.get_position();
+        let trip_type = trip.transportation_type;
+        // drop the write guard before broadcast_monkey to avoid deadlock
+        std::mem::drop(player);
+
         let resp = sP_FE2CL_REP_PC_WARP_USE_TRANSPORTATION_SUCC {
-            eTT: trip.transportation_type as i32,
+            eTT: trip_type as i32,
             iX: new_pos.x,
             iY: new_pos.y,
             iZ: new_pos.z,
@@ -218,7 +222,7 @@ pub fn warp_use_transportation(
 
         client.send_packet(P_FE2CL_REP_PC_WARP_USE_TRANSPORTATION_SUCC, &resp);
 
-        if trip.transportation_type == TransportationType::Wyvern {
+        if trip_type == TransportationType::Wyvern {
             rusty_fusion::helpers::broadcast_monkey(pc_id, RideType::Wyvern, clients, state);
         }
 
@@ -447,7 +451,7 @@ mod helpers {
         }
 
         // good to warp
-        let player = state.get_player_mut(pc_id)?;
+        let mut player = state.get_player_mut(pc_id)?;
 
         let mut item_consumed = None;
         if let Some((item_type, item_id)) = warp_data.req_item_consumed {
@@ -471,7 +475,8 @@ mod helpers {
             Item::split_items(item, 1); // consume item
             item_consumed = *item;
         }
-        player.set_taros(player.get_taros() - warp_data.cost);
+        let taros = player.get_taros();
+        player.set_taros(taros - warp_data.cost);
 
         let mut pc_ids_to_warp = vec![pc_id];
         if warp_data.is_group_warp {
@@ -494,7 +499,7 @@ mod helpers {
             None
         };
         for warping_pc_id in pc_ids_to_warp {
-            let player = state.get_player_mut(warping_pc_id)?;
+            let mut player = state.get_player_mut(warping_pc_id)?;
             let client = player.get_client(clients).unwrap();
             player.set_pre_warp();
             player.set_position(warp_data.pos);
@@ -544,12 +549,11 @@ mod helpers {
                 client.send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp);
             }
 
-            rusty_fusion::helpers::broadcast_state(
-                pc_id,
-                player.get_state_bit_flag(),
-                clients,
-                state,
-            );
+            let state_bit_flag = player.get_state_bit_flag();
+            // drop write guard before broadcast to avoid deadlock
+            std::mem::drop(player);
+
+            rusty_fusion::helpers::broadcast_state(pc_id, state_bit_flag, clients, state);
 
             // we remove the player from the chunk here and wait for PC_LOADING_COMPLETE to put them back.
             // it needs to be done this way or the client will miss the PC/NPC_ENTER packets.

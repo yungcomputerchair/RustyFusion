@@ -21,7 +21,7 @@ use crate::{
     Position,
 };
 
-trait AINode: std::fmt::Debug + Send {
+trait AINode: std::fmt::Debug + Send + Sync {
     fn clone_node(&self) -> Box<dyn AINode>;
     fn tick(
         &mut self,
@@ -395,8 +395,8 @@ impl AINode for FollowEntityLoose {
 
         match target_id {
             Some(eid) => {
-                let entity = match state.entity_map.get_entity_raw(eid) {
-                    Some(entity) => entity,
+                let entity = match state.entity_map.get_handle(eid) {
+                    Some(h) => h.read(),
                     None => return NodeStatus::Failure,
                 };
 
@@ -457,8 +457,8 @@ impl AINode for FollowEntityTight {
             None => return NodeStatus::Failure,
         };
 
-        let leader = match state.entity_map.get_entity_raw(leader_id) {
-            Some(leader) => leader,
+        let leader = match state.entity_map.get_handle(leader_id) {
+            Some(h) => h.read(),
             None => return NodeStatus::Failure,
         };
 
@@ -774,7 +774,7 @@ impl AINode for SyncPackLeaderTarget {
             _ => return NodeStatus::Success,
         };
 
-        let leader_npc = match state.get_npc_mut(leader_npc_id) {
+        let mut leader_npc = match state.get_npc_mut(leader_npc_id) {
             Ok(leader_npc) => leader_npc,
             Err(_) => return NodeStatus::Success,
         };
@@ -866,7 +866,8 @@ impl AINode for ScanForTargets {
 
         // gain aggro
         for eid in state.entity_map.get_around_entity(npc.get_id()) {
-            let entity = state.entity_map.get_entity_raw(eid).unwrap();
+            let handle = state.entity_map.get_handle(eid).unwrap();
+            let entity = handle.read();
             let cb = match entity.as_combatant() {
                 Some(cb) => cb,
                 None => continue,
@@ -972,8 +973,9 @@ impl AINode for CheckRetreat {
                     }
                 };
 
-                let should_retreat = match state.entity_map.get_entity_raw(target_id) {
-                    Some(target) => {
+                let should_retreat = match state.entity_map.get_handle(target_id) {
+                    Some(handle) => {
+                        let target = handle.read();
                         let cb = target.as_combatant().unwrap();
                         cb.is_dead() // target dead
                         // or no longer aggroable
@@ -1062,7 +1064,7 @@ impl AINode for CheckAttack {
             }
         };
 
-        if target.is_dead() {
+        if target.as_combatant().unwrap().is_dead() {
             npc.target_id = None;
             return NodeStatus::Failure;
         }
@@ -1127,12 +1129,12 @@ fn on_mob_defeated(
 ) -> FFResult<()> {
     let defeated_type = state.get_npc(npc_id).unwrap().ty;
     if let EntityID::Player(pc_id) = defeater_id {
-        let player = state.get_player_mut(pc_id)?;
-        helpers::give_defeat_rewards(player, defeated_type, clients, rng);
+        let mut player = state.get_player_mut(pc_id)?;
+        helpers::give_defeat_rewards(&mut player, defeated_type, clients, rng);
     }
 
     let defeater = state.get_combatant(defeater_id)?;
-    if let Some(group_id) = defeater.get_group_id() {
+    if let Some(group_id) = defeater.as_combatant().unwrap().get_group_id() {
         let position = defeater.get_position();
         let group = state.groups.get(&group_id).unwrap().clone();
         for eid in group.get_member_ids() {
@@ -1141,9 +1143,9 @@ fn on_mob_defeated(
                     // already rewarded
                     continue;
                 }
-                let player = state.get_player_mut(member_pc_id).unwrap();
+                let mut player = state.get_player_mut(member_pc_id).unwrap();
                 if player.get_position().distance_to(&position) < RANGE_GROUP_PARTICIPATE {
-                    helpers::give_defeat_rewards(player, defeated_type, clients, rng);
+                    helpers::give_defeat_rewards(&mut player, defeated_type, clients, rng);
                 }
             }
         }

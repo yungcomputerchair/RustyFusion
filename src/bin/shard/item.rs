@@ -26,7 +26,7 @@ pub fn item_move(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState)
     let pkt: &sP_CL2FE_REQ_ITEM_MOVE = pkt.get()?;
 
     let pc_id = client.get_player_id()?;
-    let player = state.get_player_mut(pc_id)?;
+    let mut player = state.get_player_mut(pc_id)?;
 
     let location_from = pkt.eFrom.try_into()?;
     let mut item_from = player.set_item(location_from, pkt.iFromSlotNum as usize, None)?;
@@ -75,13 +75,20 @@ pub fn item_move(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState)
     }
 
     // dismount vehicle
-    let player = state.get_player_mut(pc_id).unwrap();
-    if ((location_from == ItemLocation::Equip && pkt.iFromSlotNum == EQUIP_SLOT_VEHICLE as i32)
-        || (location_to == ItemLocation::Equip && pkt.iToSlotNum == EQUIP_SLOT_VEHICLE as i32))
-        && player.vehicle_speed.is_some()
-    {
-        player.vehicle_speed = None;
-        rusty_fusion::helpers::broadcast_state(pc_id, player.get_state_bit_flag(), clients, state);
+    let dismount_state = {
+        let mut player = state.get_player_mut(pc_id).unwrap();
+        if ((location_from == ItemLocation::Equip && pkt.iFromSlotNum == EQUIP_SLOT_VEHICLE as i32)
+            || (location_to == ItemLocation::Equip && pkt.iToSlotNum == EQUIP_SLOT_VEHICLE as i32))
+            && player.vehicle_speed.is_some()
+        {
+            player.vehicle_speed = None;
+            Some(player.get_state_bit_flag())
+        } else {
+            None
+        }
+    };
+    if let Some(state_bit_flag) = dismount_state {
+        rusty_fusion::helpers::broadcast_state(pc_id, state_bit_flag, clients, state);
         let pkt = sP_FE2CL_PC_VEHICLE_OFF_SUCC { UNUSED: unused!() };
         clients
             .get_sender()
@@ -94,7 +101,7 @@ pub fn item_move(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState)
 pub fn item_delete(pkt: Packet, client: &FFClient, state: &mut ShardServerState) -> FFResult<()> {
     let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_ITEM_DELETE = pkt.get()?;
-    let player = state.get_player_mut(pc_id)?;
+    let mut player = state.get_player_mut(pc_id)?;
     let location = pkt.eIL.try_into()?;
     if location != ItemLocation::Inven {
         return Err(FFError::build(
@@ -123,7 +130,7 @@ pub fn item_combination(
 ) -> FFResult<()> {
     let pkt: &sP_CL2FE_REQ_PC_ITEM_COMBINATION = pkt.get()?;
     (|| {
-        let player = state.get_player_mut(client.get_player_id()?)?;
+        let mut player = state.get_player_mut(client.get_player_id()?)?;
 
         let looks_item = player
             .get_item(ItemLocation::Inven, pkt.iCostumeItemSlot as usize)?
@@ -173,7 +180,8 @@ pub fn item_combination(
                 ),
             ));
         }
-        let taros_left = player.set_taros(player.get_taros() - cost);
+        let taros = player.get_taros();
+        let taros_left = player.set_taros(taros - cost);
 
         let looks_item = player
             .set_item(ItemLocation::Inven, pkt.iCostumeItemSlot as usize, None)
@@ -251,7 +259,7 @@ pub fn item_chest_open(
 ) -> FFResult<()> {
     let pkt: &sP_CL2FE_REQ_ITEM_CHEST_OPEN = pkt.get()?;
     (|| {
-        let player = state.get_player_mut(client.get_player_id()?)?;
+        let mut player = state.get_player_mut(client.get_player_id()?)?;
         let location: ItemLocation = pkt.eIL.try_into()?;
         if location != ItemLocation::Inven {
             return Err(FFError::build(
@@ -404,7 +412,7 @@ pub fn vendor_item_buy(
 
         let stats = item.get_stats()?;
         let price = stats.buy_price * item.quantity as u32;
-        let player = state.get_player_mut(client.get_player_id()?)?;
+        let mut player = state.get_player_mut(client.get_player_id()?)?;
         if player.get_taros() < price {
             Err(FFError::build(
                 Severity::Warning,
@@ -416,7 +424,8 @@ pub fn vendor_item_buy(
             ))
         } else {
             player.set_item(ItemLocation::Inven, pkt.iInvenSlotNum as usize, Some(item))?;
-            player.set_taros(player.get_taros() - price);
+            let taros = player.get_taros();
+            player.set_taros(taros - price);
 
             let resp = sP_FE2CL_REP_PC_VENDOR_ITEM_BUY_SUCC {
                 iCandy: player.get_taros() as i32,
@@ -444,7 +453,7 @@ pub fn vendor_item_sell(
     (|| {
         let pkt: &sP_CL2FE_REQ_PC_VENDOR_ITEM_SELL = pkt.get()?;
         let pc_id = client.get_player_id()?;
-        let player = state.get_player_mut(pc_id)?;
+        let mut player = state.get_player_mut(pc_id)?;
 
         let item = player
             .get_item(ItemLocation::Inven, pkt.iInvenSlotNum as usize)?
@@ -474,7 +483,8 @@ pub fn vendor_item_sell(
             .unwrap();
 
         let sell_price = stats.sell_price * quantity as u32;
-        let new_taros = player.set_taros(player.get_taros() + sell_price);
+        let taros = player.get_taros();
+        let new_taros = player.set_taros(taros + sell_price);
         let buyback_list = state.buyback_lists.entry(pc_id).or_default();
         buyback_list.push(item.unwrap());
 
@@ -534,7 +544,7 @@ pub fn vendor_item_restore_buy(
 
         let item = buyback_list.remove(found_idx);
         let cost = item.get_stats()?.sell_price * item.quantity as u32; // sell price is cost for buyback
-        let player = state.get_player_mut(pc_id)?;
+        let mut player = state.get_player_mut(pc_id)?;
 
         if player.get_taros() < cost {
             Err(FFError::build(
@@ -547,7 +557,8 @@ pub fn vendor_item_restore_buy(
             ))
         } else {
             player.set_item(ItemLocation::Inven, pkt.iInvenSlotNum as usize, Some(item))?;
-            let new_taros = player.set_taros(player.get_taros() - cost);
+            let taros = player.get_taros();
+            let new_taros = player.set_taros(taros - cost);
 
             let resp = sP_FE2CL_REP_PC_VENDOR_ITEM_RESTORE_BUY_SUCC {
                 iCandy: new_taros as i32,
@@ -583,7 +594,7 @@ pub fn vendor_battery_buy(
         let battery_type = pkt.Item.iID;
         let mut quantity = pkt.Item.iOpt as u32 * 100;
 
-        let player = state.get_player_mut(client.get_player_id()?)?;
+        let mut player = state.get_player_mut(client.get_player_id()?)?;
         match battery_type {
             BATTERY_TYPE_BOOST => {
                 quantity = min(player.get_weapon_boosts() + quantity, PC_BATTERY_MAX)
@@ -615,10 +626,12 @@ pub fn vendor_battery_buy(
 
         match battery_type {
             BATTERY_TYPE_BOOST => {
-                player.set_weapon_boosts(player.get_weapon_boosts() + quantity);
+                let boosts = player.get_weapon_boosts();
+                player.set_weapon_boosts(boosts + quantity);
             }
             BATTERY_TYPE_POTION => {
-                player.set_nano_potions(player.get_nano_potions() + quantity);
+                let potions = player.get_nano_potions();
+                player.set_nano_potions(potions + quantity);
             }
             other => {
                 return Err(FFError::build(
@@ -627,7 +640,8 @@ pub fn vendor_battery_buy(
                 ));
             }
         }
-        let taros_new = player.set_taros(player.get_taros() - cost);
+        let taros = player.get_taros();
+        let taros_new = player.set_taros(taros - cost);
 
         let resp = sP_FE2CL_REP_PC_VENDOR_BATTERY_BUY_SUCC {
             iCandy: taros_new as i32,

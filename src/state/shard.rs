@@ -11,7 +11,9 @@ use crate::{
     chunk::{EntityMap, InstanceID, TickMode},
     config::config_get,
     defines::*,
-    entity::{Combatant, Egg, Entity, EntityID, Group, Player, Slider, NPC},
+    entity::{
+        Egg, Entity, EntityID, EntityReadGuard, EntityWriteGuard, Group, Player, Slider, NPC,
+    },
     enums::ItemType,
     error::{log, log_if_failed, FFError, FFResult, Severity},
     helpers,
@@ -135,101 +137,130 @@ impl Default for ShardServerState {
     }
 }
 impl ShardServerState {
-    pub fn get_npc(&self, npc_id: i32) -> FFResult<&NPC> {
+    pub fn get_npc(&self, npc_id: i32) -> FFResult<EntityReadGuard<NPC>> {
         let id = EntityID::NPC(npc_id);
-        self.entity_map.get_entity(id).ok_or(FFError::build(
-            Severity::Warning,
-            format!("NPC with ID {} doesn't exist", npc_id),
-        ))
+        self.entity_map
+            .get_handle(id)
+            .map(|h| h.read_as::<NPC>())
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("NPC with ID {} doesn't exist", npc_id),
+            ))
     }
 
-    pub fn get_npc_mut(&mut self, npc_id: i32) -> FFResult<&mut NPC> {
+    pub fn get_npc_mut(&self, npc_id: i32) -> FFResult<EntityWriteGuard<NPC>> {
         let id = EntityID::NPC(npc_id);
-        self.entity_map.get_entity_mut(id).ok_or(FFError::build(
-            Severity::Warning,
-            format!("NPC with ID {} doesn't exist", npc_id),
-        ))
+        self.entity_map
+            .get_handle(id)
+            .map(|h| h.write_as::<NPC>())
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("NPC with ID {} doesn't exist", npc_id),
+            ))
     }
 
-    pub fn get_player(&self, pc_id: i32) -> FFResult<&Player> {
+    pub fn get_player(&self, pc_id: i32) -> FFResult<EntityReadGuard<Player>> {
         let id = EntityID::Player(pc_id);
-        self.entity_map.get_entity(id).ok_or(FFError::build(
-            Severity::Warning,
-            format!("Player with ID {} doesn't exist", pc_id),
-        ))
+        self.entity_map
+            .get_handle(id)
+            .map(|h| h.read_as::<Player>())
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Player with ID {} doesn't exist", pc_id),
+            ))
     }
 
-    pub fn get_player_mut(&mut self, pc_id: i32) -> FFResult<&mut Player> {
+    pub fn get_player_mut(&self, pc_id: i32) -> FFResult<EntityWriteGuard<Player>> {
         let id = EntityID::Player(pc_id);
-        self.entity_map.get_entity_mut(id).ok_or(FFError::build(
-            Severity::Warning,
-            format!("Player with ID {} doesn't exist", pc_id),
-        ))
+        self.entity_map
+            .get_handle(id)
+            .map(|h| h.write_as::<Player>())
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Player with ID {} doesn't exist", pc_id),
+            ))
     }
 
-    pub fn get_player_by_uid(&self, pc_uid: i64) -> Option<&Player> {
+    pub fn get_player_by_uid(&self, pc_uid: i64) -> Option<EntityReadGuard<Player>> {
         self.player_uid_to_id
             .get(&pc_uid)
             .and_then(|pc_id| self.get_player(*pc_id).ok())
     }
 
-    pub fn get_slider(&self, slider_id: i32) -> FFResult<&Slider> {
+    pub fn get_slider(&self, slider_id: i32) -> FFResult<EntityReadGuard<Slider>> {
         let id = EntityID::Slider(slider_id);
-        self.entity_map.get_entity(id).ok_or(FFError::build(
-            Severity::Warning,
-            format!("Slider with ID {} doesn't exist", slider_id),
-        ))
+        self.entity_map
+            .get_handle(id)
+            .map(|h| h.read_as::<Slider>())
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Slider with ID {} doesn't exist", slider_id),
+            ))
     }
 
-    pub fn get_slider_mut(&mut self, slider_id: i32) -> FFResult<&mut Slider> {
+    pub fn get_slider_mut(&self, slider_id: i32) -> FFResult<EntityWriteGuard<Slider>> {
         let id = EntityID::Slider(slider_id);
-        self.entity_map.get_entity_mut(id).ok_or(FFError::build(
-            Severity::Warning,
-            format!("Slider with ID {} doesn't exist", slider_id),
-        ))
+        self.entity_map
+            .get_handle(id)
+            .map(|h| h.write_as::<Slider>())
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Slider with ID {} doesn't exist", slider_id),
+            ))
     }
 
-    pub fn get_egg(&self, egg_id: i32) -> FFResult<&Egg> {
+    pub fn get_egg(&self, egg_id: i32) -> FFResult<EntityReadGuard<Egg>> {
         let id = EntityID::Egg(egg_id);
-        self.entity_map.get_entity(id).ok_or(FFError::build(
-            Severity::Warning,
-            format!("Egg with ID {} doesn't exist", egg_id),
-        ))
+        self.entity_map
+            .get_handle(id)
+            .map(|h| h.read_as::<Egg>())
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Egg with ID {} doesn't exist", egg_id),
+            ))
     }
 
-    pub fn get_egg_mut(&mut self, egg_id: i32) -> FFResult<&mut Egg> {
+    pub fn get_egg_mut(&self, egg_id: i32) -> FFResult<EntityWriteGuard<Egg>> {
         let id = EntityID::Egg(egg_id);
-        self.entity_map.get_entity_mut(id).ok_or(FFError::build(
-            Severity::Warning,
-            format!("Egg with ID {} doesn't exist", egg_id),
-        ))
+        self.entity_map
+            .get_handle(id)
+            .map(|h| h.write_as::<Egg>())
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Egg with ID {} doesn't exist", egg_id),
+            ))
     }
 
-    pub fn get_combatant(&self, id: EntityID) -> FFResult<&dyn Combatant> {
-        let entity = self.entity_map.get_entity_raw(id).ok_or(FFError::build(
+    pub fn get_combatant(&self, id: EntityID) -> FFResult<EntityReadGuard<dyn Entity>> {
+        let handle = self.entity_map.get_handle(id).ok_or(FFError::build(
             Severity::Warning,
             format!("Entity with ID {:?} doesn't exist", id),
         ))?;
 
-        entity.as_combatant().ok_or(FFError::build(
-            Severity::Warning,
-            format!("Entity with ID {:?} isn't a combatant", id),
-        ))
+        let guard = handle.read();
+        if guard.as_combatant().is_none() {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Entity with ID {:?} isn't a combatant", id),
+            ));
+        }
+        Ok(guard)
     }
 
-    pub fn get_combatant_mut(&mut self, id: EntityID) -> FFResult<&mut dyn Combatant> {
-        let entity = self
-            .entity_map
-            .get_entity_raw_mut(id)
-            .ok_or(FFError::build(
-                Severity::Warning,
-                format!("Entity with ID {:?} doesn't exist", id),
-            ))?;
-
-        entity.as_combatant_mut().ok_or(FFError::build(
+    pub fn get_combatant_mut(&self, id: EntityID) -> FFResult<EntityWriteGuard<dyn Entity>> {
+        let handle = self.entity_map.get_handle(id).ok_or(FFError::build(
             Severity::Warning,
-            format!("Entity with ID {:?} isn't a combatant", id),
-        ))
+            format!("Entity with ID {:?} doesn't exist", id),
+        ))?;
+
+        let guard = handle.write();
+        if guard.as_combatant().is_none() {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Entity with ID {:?} isn't a combatant", id),
+            ));
+        }
+        Ok(guard)
     }
 
     pub fn check_for_expired_vehicles(&mut self, time: SystemTime, clients: &ClientMap) {
@@ -237,7 +268,7 @@ impl ShardServerState {
         let pc_ids: Vec<i32> = self.entity_map.get_player_ids().collect();
         let mut pc_ids_dismounted = Vec::with_capacity(pc_ids.len());
         for pc_id in pc_ids {
-            let player = self.get_player_mut(pc_id).unwrap();
+            let mut player = self.get_player_mut(pc_id).unwrap();
             for (location, slot_num) in player.find_items_any(|item| item.ty == ItemType::Vehicle) {
                 let vehicle_slot = player.get_item_mut(location, slot_num).unwrap();
                 if let Some(expiry_time) = vehicle_slot.unwrap().get_expiry_time() {
@@ -279,8 +310,8 @@ impl ShardServerState {
     pub fn tick_garbage_collection(&mut self, clients: &ClientMap) {
         let mut removed_entities = self.entity_map.garbage_collect_instances();
         removed_entities.extend(self.entity_map.garbage_collect_entities());
-        for entity in removed_entities.iter_mut() {
-            entity.cleanup(clients, self);
+        for handle in &removed_entities {
+            handle.write().cleanup(clients, self);
         }
 
         if !removed_entities.is_empty() {
@@ -311,7 +342,8 @@ impl ShardServerState {
 
             if let Some(pkt) = log_if_failed(pkt.build()) {
                 for eid in group.get_member_ids() {
-                    let entity = self.entity_map.get_entity_raw(*eid).unwrap();
+                    let handle = self.entity_map.get_handle(*eid).unwrap();
+                    let entity = handle.read();
                     if let Some(client) = entity.get_client(clients) {
                         client.send_payload(pkt.clone());
                     }

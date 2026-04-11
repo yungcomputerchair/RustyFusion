@@ -70,13 +70,14 @@ pub async fn pc_enter(
                 ),
             );
 
-            let existing_player = state.get_player(existing_pc_id).unwrap();
-            let existing_client = existing_player.get_client(clients).unwrap();
-            let pkt = sP_FE2CL_REP_PC_EXIT_DUPLICATE {
-                iErrorCode: unused!(),
-            };
-
-            existing_client.send_packet(P_FE2CL_REP_PC_EXIT_DUPLICATE, &pkt);
+            {
+                let existing_player = state.get_player(existing_pc_id).unwrap();
+                let existing_client = existing_player.get_client(clients).unwrap();
+                let pkt = sP_FE2CL_REP_PC_EXIT_DUPLICATE {
+                    iErrorCode: unused!(),
+                };
+                existing_client.send_packet(P_FE2CL_REP_PC_EXIT_DUPLICATE, &pkt);
+            }
             Some(Player::disconnect(existing_pc_id, &mut state, clients))
         } else {
             None
@@ -236,12 +237,17 @@ pub fn pc_loading_complete(
 
     let resp = sP_FE2CL_REP_PC_LOADING_COMPLETE_SUCC { iPC_ID: unused!() };
     let pc_id = clients.get_sender().get_player_id()?;
-    let player = state.get_player(pc_id)?;
-    let map_num = player.instance_id.map_num;
-    let chunk = player.get_chunk_coords();
+    let (map_num, chunk, entity_id) = {
+        let player = state.get_player(pc_id)?;
+        (
+            player.instance_id.map_num,
+            player.get_chunk_coords(),
+            player.get_id(),
+        )
+    };
     state
         .entity_map
-        .update(player.get_id(), Some(chunk), Some(clients));
+        .update(entity_id, Some(chunk), Some(clients));
     let client = clients.get_sender();
     client.send_packet(P_FE2CL_REP_PC_LOADING_COMPLETE_SUCC, &resp);
 
@@ -276,7 +282,7 @@ pub fn pc_loading_complete(
 
     // buddy list sync.
     // we only want to do this once and we can't do it on initial load
-    let player = state.get_player_mut(pc_id).unwrap();
+    let mut player = state.get_player_mut(pc_id).unwrap();
     if !player.buddy_list_synced {
         let buddy_info = player.get_all_buddy_info();
         let mut buddy_list_pkt = PacketBuilder::new(P_FE2CL_REP_PC_BUDDYLIST_INFO_SUCC).with(
@@ -341,7 +347,7 @@ pub fn pc_move(
             client.send_packet(P_FE2CL_PC_MOVE, &resp);
         });
 
-    let player = state.get_player_mut(pc_id)?;
+    let mut player = state.get_player_mut(pc_id)?;
     let entity_id = player.get_id();
     player.set_position(pos);
     player.set_rotation(angle);
@@ -392,7 +398,7 @@ pub fn pc_jump(
             client.send_packet(P_FE2CL_PC_JUMP, &resp);
         });
 
-    let player = state.get_player_mut(pc_id)?;
+    let mut player = state.get_player_mut(pc_id)?;
     let entity_id = player.get_id();
     player.set_position(pos);
     player.set_rotation(angle);
@@ -435,7 +441,7 @@ pub fn pc_stop(
             client.send_packet(P_FE2CL_PC_STOP, &resp);
         });
 
-    let player = state.get_player_mut(pc_id)?;
+    let mut player = state.get_player_mut(pc_id)?;
     let entity_id = player.get_id();
     player.set_position(pos);
     let chunk = player.get_chunk_coords();
@@ -491,7 +497,7 @@ pub fn pc_movetransportation(
             client.send_packet(P_FE2CL_PC_MOVETRANSPORTATION, &resp);
         });
 
-    let player = state.get_player_mut(pc_id)?;
+    let mut player = state.get_player_mut(pc_id)?;
 
     // TODO anticheat
 
@@ -528,40 +534,44 @@ pub fn pc_vehicle_on(clients: &ClientMap, state: &mut ShardServerState) -> FFRes
     (|| {
         let client = clients.get_sender();
         let pc_id = client.get_player_id()?;
-        let player = state.get_player_mut(pc_id)?;
+        let state_bit_flag = {
+            let mut player = state.get_player_mut(pc_id)?;
 
-        if player.instance_id.map_num != ID_OVERWORLD {
-            return Err(FFError::build(
-                Severity::Warning,
-                format!(
-                    "Player {} tried to mount a vehicle outside the overworld: {}",
-                    pc_id, player.instance_id
-                ),
-            ));
-        }
+            if player.instance_id.map_num != ID_OVERWORLD {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!(
+                        "Player {} tried to mount a vehicle outside the overworld: {}",
+                        pc_id, player.instance_id
+                    ),
+                ));
+            }
 
-        let vehicle = player
-            .get_item(ItemLocation::Equip, EQUIP_SLOT_VEHICLE as usize)
-            .unwrap();
-        if vehicle.is_none() {
-            return Err(FFError::build(
-                Severity::Warning,
-                format!(
-                    "Player {} tried to mount a vehicle without one equipped",
-                    pc_id
-                ),
-            ));
-        }
+            let vehicle = player
+                .get_item(ItemLocation::Equip, EQUIP_SLOT_VEHICLE as usize)
+                .unwrap();
+            if vehicle.is_none() {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!(
+                        "Player {} tried to mount a vehicle without one equipped",
+                        pc_id
+                    ),
+                ));
+            }
 
-        let vehicle = vehicle.as_ref().unwrap();
+            let vehicle = vehicle.as_ref().unwrap();
 
-        if let Some(vehicle_speed) = vehicle.get_stats()?.speed {
-            player.vehicle_speed = Some(vehicle_speed);
-        } else {
-            panic_log(&format!("Vehicle has no speed: {:?}", vehicle));
-        }
+            if let Some(vehicle_speed) = vehicle.get_stats()?.speed {
+                player.vehicle_speed = Some(vehicle_speed);
+            } else {
+                panic_log(&format!("Vehicle has no speed: {:?}", vehicle));
+            }
 
-        rusty_fusion::helpers::broadcast_state(pc_id, player.get_state_bit_flag(), clients, state);
+            player.get_state_bit_flag()
+        };
+
+        rusty_fusion::helpers::broadcast_state(pc_id, state_bit_flag, clients, state);
 
         let resp = sP_FE2CL_PC_VEHICLE_ON_SUCC { UNUSED: unused!() };
         client.send_packet(P_FE2CL_PC_VEHICLE_ON_SUCC, &resp);
@@ -582,10 +592,12 @@ pub fn pc_vehicle_off(clients: &ClientMap, state: &mut ShardServerState) -> FFRe
     (|| {
         let client = clients.get_sender();
         let pc_id = client.get_player_id()?;
-        let player = state.get_player_mut(pc_id)?;
-
-        player.vehicle_speed = None;
-        rusty_fusion::helpers::broadcast_state(pc_id, player.get_state_bit_flag(), clients, state);
+        let state_bit_flag = {
+            let mut player = state.get_player_mut(pc_id)?;
+            player.vehicle_speed = None;
+            player.get_state_bit_flag()
+        };
+        rusty_fusion::helpers::broadcast_state(pc_id, state_bit_flag, clients, state);
 
         let resp = sP_FE2CL_PC_VEHICLE_OFF_SUCC { UNUSED: unused!() };
         client.send_packet(P_FE2CL_PC_VEHICLE_OFF_SUCC, &resp);
@@ -611,7 +623,7 @@ pub fn pc_special_state_switch(
     let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_SPECIAL_STATE_SWITCH = pkt.get()?;
 
-    let player = state.get_player_mut(pc_id)?;
+    let mut player = state.get_player_mut(pc_id)?;
 
     match pkt.iSpecialStateFlag as u32 {
         CN_SPECIAL_STATE_FLAG__FULL_UI => {
@@ -653,7 +665,7 @@ pub fn pc_combat_begin_end(
     let client = clients.get_sender();
     let pc_id = client.get_player_id()?;
 
-    let player = state.get_player_mut(pc_id)?;
+    let mut player = state.get_player_mut(pc_id)?;
     player.in_combat = in_combat; // TODO anticheat
     if !in_combat {
         player.reset();
@@ -693,7 +705,7 @@ pub fn pc_regen(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
     let pkt: &sP_CL2FE_REQ_PC_REGEN = pkt.get()?;
     let revive_type: PCRegenType = pkt.iRegenType.try_into()?;
 
-    let player = state.get_player_mut(pc_id)?;
+    let mut player = state.get_player_mut(pc_id)?;
     let new_chunk_coords = match revive_type {
         PCRegenType::Xcom => {
             if !player.is_dead() {
@@ -702,10 +714,8 @@ pub fn pc_regen(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
                     format!("{} tried to revive while not dead", player),
                 ));
             }
-            player.set_position(get_respawn_point(
-                player.get_position(),
-                player.instance_id.map_num,
-            ));
+            let respawn = get_respawn_point(player.get_position(), player.instance_id.map_num);
+            player.set_position(respawn);
             Some(player.get_chunk_coords())
         }
         PCRegenType::HereByPhoenix => todo!(),
@@ -725,10 +735,8 @@ pub fn pc_regen(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
                 }
             }
 
-            player.set_position(get_respawn_point(
-                player.get_position(),
-                player.instance_id.map_num,
-            ));
+            let respawn = get_respawn_point(player.get_position(), player.instance_id.map_num);
+            player.set_position(respawn);
             Some(player.get_chunk_coords())
         }
         other => {
@@ -776,7 +784,7 @@ pub fn pc_first_use_flag_set(
     let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_PC_FIRST_USE_FLAG_SET = pkt.get()?;
 
-    let player = state.get_player_mut(pc_id)?;
+    let mut player = state.get_player_mut(pc_id)?;
     player.update_first_use_flag(pkt.iFlagCode)?;
     Ok(())
 }
@@ -788,7 +796,7 @@ pub fn pc_change_mentor(
 ) -> FFResult<()> {
     let pkt: &sP_CL2FE_REQ_PC_CHANGE_MENTOR = pkt.get()?;
     (|| {
-        let player = state.get_player_mut(client.get_player_id()?)?;
+        let mut player = state.get_player_mut(client.get_player_id()?)?;
         if player.get_level() < 4 {
             return Err(FFError::build(
                 Severity::Warning,
@@ -878,7 +886,7 @@ pub fn pc_warp_channel(
             ));
         }
 
-        let player = state.get_player_mut(pc_id)?;
+        let mut player = state.get_player_mut(pc_id)?;
         if player.instance_id.channel_num == channel_num {
             error_code = 2; // "you're already in the channel."
             return Err(FFError::build(

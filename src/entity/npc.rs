@@ -251,14 +251,14 @@ impl Entity for NPC {
         }
     }
 
-    fn as_combatant(&self) -> Option<&dyn Combatant> {
+    fn as_combatant(&self) -> Option<&(dyn Combatant + 'static)> {
         if !self.can_fight() {
             return None;
         }
         Some(self)
     }
 
-    fn as_combatant_mut(&mut self) -> Option<&mut dyn Combatant> {
+    fn as_combatant_mut(&mut self) -> Option<&mut (dyn Combatant + 'static)> {
         if !self.can_fight() {
             return None;
         }
@@ -270,6 +270,9 @@ impl Entity for NPC {
     }
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
         self
     }
 }

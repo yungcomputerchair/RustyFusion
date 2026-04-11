@@ -35,7 +35,7 @@ pub fn nano_equip(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState
         }
     }
 
-    let player = state.get_player_mut(pc_id)?;
+    let mut player = state.get_player_mut(pc_id)?;
     player.change_nano(pkt.iNanoSlotNum as usize, Some(pkt.iNanoID))?;
 
     let deactivate = player.get_active_nano_slot() == Some(pkt.iNanoSlotNum as usize);
@@ -74,7 +74,7 @@ pub fn nano_unequip(
     let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_NANO_UNEQUIP = pkt.get()?;
 
-    let player = state.get_player_mut(pc_id)?;
+    let mut player = state.get_player_mut(pc_id)?;
     player.change_nano(pkt.iNanoSlotNum as usize, None)?;
 
     let deactivate = player.get_active_nano_slot() == Some(pkt.iNanoSlotNum as usize);
@@ -107,7 +107,7 @@ pub fn nano_active(pkt: Packet, clients: &ClientMap, state: &mut ShardServerStat
     let pc_id = client.get_player_id()?;
     let pkt: &sP_CL2FE_REQ_NANO_ACTIVE = pkt.get()?;
 
-    let player = state.get_player_mut(pc_id)?;
+    let mut player = state.get_player_mut(pc_id)?;
     if pkt.iNanoSlotNum == -1 {
         player.set_active_nano_slot(None).unwrap();
     } else {
@@ -140,7 +140,7 @@ pub fn nano_tune(pkt: Packet, client: &FFClient, state: &mut ShardServerState) -
     let pkt: &sP_CL2FE_REQ_NANO_TUNE = pkt.get()?;
     let pc_id = client.get_player_id()?;
     (|| {
-        let player = state.get_player_mut(pc_id)?;
+        let mut player = state.get_player_mut(pc_id)?;
         let tuning = tdata_get().get_nano_tuning(pkt.iTuneID)?;
         let skill_id = tuning.skill_id;
 

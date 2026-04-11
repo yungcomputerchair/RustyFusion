@@ -19,7 +19,7 @@ pub fn npc_interaction(
     let pc_id = client.get_player_id()?;
     let npc_id = pkt.iNPC_ID;
 
-    let npc = state.get_npc_mut(npc_id)?;
+    let mut npc = state.get_npc_mut(npc_id)?;
     if pkt.bFlag == 0 {
         if !npc.interacting_pcs.remove(&pc_id) {
             log(

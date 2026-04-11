@@ -82,7 +82,8 @@ pub fn remove_group_member(
         // (except the leaver; that is the caller's job)
         let leaver_pkt = sP_FE2CL_PC_GROUP_LEAVE_SUCC { UNUSED: unused!() };
         for eid in group.get_member_ids() {
-            let entity = state.entity_map.get_entity_raw(*eid).unwrap();
+            let handle = state.entity_map.get_handle(*eid).unwrap();
+            let entity = handle.read();
             if let Some(client) = entity.get_client(clients) {
                 client.send_packet(P_FE2CL_PC_GROUP_LEAVE_SUCC, &leaver_pkt);
             }
@@ -122,7 +123,8 @@ pub fn remove_group_member(
 
             if let Some(update_pkt) = log_if_failed(update_pkt.build()) {
                 for eid in group.get_member_ids() {
-                    let entity = state.entity_map.get_entity_raw(*eid).unwrap();
+                    let handle = state.entity_map.get_handle(*eid).unwrap();
+                    let entity = handle.read();
                     if let Some(client) = entity.get_client(clients) {
                         client.send_payload(update_pkt.clone());
                     }
@@ -148,7 +150,8 @@ pub fn remove_group_member(
 
             if let Some(update_pkt) = log_if_failed(update_pkt.build()) {
                 for eid in group.get_member_ids() {
-                    let entity = state.entity_map.get_entity_raw(*eid).unwrap();
+                    let handle = state.entity_map.get_handle(*eid).unwrap();
+                    let entity = handle.read();
                     if let Some(client) = entity.get_client(clients) {
                         client.send_payload(update_pkt.clone());
                     }
