@@ -120,22 +120,23 @@ define_db_api! {
 }
 
 async fn db_connect(config: &GeneralConfig) -> FFResult<DbBackend> {
-    let _db_impl: Option<FFResult<DbBackend>> = None;
+    loop {
+        let _db_impl: Option<FFResult<DbBackend>> = None;
 
-    #[cfg(feature = "postgres")]
-    let _db_impl = Some(postgresql::PostgresDatabase::connect(config).await);
+        #[cfg(feature = "postgres")]
+        let _db_impl = Some(postgresql::PostgresDatabase::connect(config).await);
 
-    match _db_impl {
-        Some(Ok(db)) => Ok(db),
-        Some(Err(e)) => Err(FFError::build(
-            Severity::Fatal,
-            "Failed to connect to database".to_string(),
-        )
-        .with_parent(e)),
-        None => Err(FFError::build(
-            Severity::Fatal,
-            "No database implementation enabled; please enable one through a feature".to_string(),
-        )),
+        match _db_impl {
+            Some(Ok(db)) => return Ok(db),
+            Some(Err(_)) => {
+                log(Severity::Warning, "Failed to connect to DB. Retrying...");
+                tokio::time::sleep(Duration::from_secs(1)).await;
+            },
+            None => return Err(FFError::build(
+                Severity::Fatal,
+                "No database implementation enabled; please enable one through a feature".to_string(),
+            )),
+        }
     }
 }
 

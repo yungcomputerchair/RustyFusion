@@ -35,6 +35,8 @@ async fn main() -> FFResult<()> {
     color_eyre::install().unwrap();
     let _cleanup = Cleanup {};
 
+    db_init(Severity::Fatal).await?;
+
     let log_rx = log_init();
     let config = config_init()?;
     let mut logger = Logger::new(log_rx, &config.shard.log_path.get());
@@ -48,7 +50,6 @@ async fn main() -> FFResult<()> {
         None
     };
 
-    db_init(Severity::Fatal).await?;
     tdata_init()?;
     scripting_init()?;
 
