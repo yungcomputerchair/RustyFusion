@@ -33,6 +33,8 @@ async fn main() -> FFResult<()> {
     color_eyre::install().unwrap();
     let _cleanup = Cleanup {};
 
+    db_init(Severity::Warning).await?;
+
     let log_rx = log_init();
     let config = config_init()?;
     let mut logger = Logger::new(log_rx, &config.login.log_path.get());
@@ -46,7 +48,6 @@ async fn main() -> FFResult<()> {
         None
     };
 
-    db_init(Severity::Warning).await?;
     tdata_init()?;
 
     let mut tui_timer = util::make_timer(Duration::from_millis(100), true);
