@@ -58,58 +58,61 @@ pub fn request_make_buddy(
         RANGE_INTERACT,
     )?;
 
-    let player = state.get_player(pc_id)?;
-    if player.is_buddies_with(buddy_uid) {
-        return Err(FFError::build(
-            Severity::Warning,
-            format!("{} is already buddies with player {}", player, buddy_uid),
-        ));
-    }
+    let req_pkt = {
+        let player = state.get_player(pc_id)?;
+        if player.is_buddies_with(buddy_uid) {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("{} is already buddies with player {}", player, buddy_uid),
+            ));
+        }
 
-    if player.get_num_buddies() >= SIZEOF_BUDDYLIST_SLOT as usize {
-        return Err(FFError::build(
-            Severity::Warning,
-            format!("{} has too many buddies", player),
-        ));
-    }
+        if player.get_num_buddies() >= SIZEOF_BUDDYLIST_SLOT as usize {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("{} has too many buddies", player),
+            ));
+        }
 
-    let req_pkt = sP_FE2CL_REP_REQUEST_MAKE_BUDDY_SUCC_TO_ACCEPTER {
-        iRequestID: pc_id,
-        iBuddyID: buddy_id,
-        szFirstName: util::encode_utf16(&player.first_name).unwrap(),
-        szLastName: util::encode_utf16(&player.last_name).unwrap(),
+        sP_FE2CL_REP_REQUEST_MAKE_BUDDY_SUCC_TO_ACCEPTER {
+            iRequestID: pc_id,
+            iBuddyID: buddy_id,
+            szFirstName: util::encode_utf16(&player.first_name).unwrap(),
+            szLastName: util::encode_utf16(&player.last_name).unwrap(),
+        }
     };
 
-    let buddy = state.get_player(buddy_id)?;
-    if buddy.get_uid() != buddy_uid {
-        return Err(FFError::build(
-            Severity::Warning,
-            format!(
-                "Buddy UID mismatch (client: {}, server: {})",
-                buddy_uid,
-                buddy.get_uid()
-            ),
-        ));
+    {
+        let buddy = state.get_player(buddy_id)?;
+        if buddy.get_uid() != buddy_uid {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Buddy UID mismatch (client: {}, server: {})",
+                    buddy_uid,
+                    buddy.get_uid()
+                ),
+            ));
+        }
+
+        if buddy.get_num_buddies() >= SIZEOF_BUDDYLIST_SLOT as usize {
+            // instant deny
+            let deny_pkt = sP_FE2CL_REP_ACCEPT_MAKE_BUDDY_FAIL {
+                iBuddyID: buddy_id,
+                iBuddyPCUID: buddy_uid,
+                iErrorCode: ERROR_CODE_BUDDY_DENY,
+            };
+
+            client.send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_FAIL, &deny_pkt);
+            return Ok(());
+        }
+
+        let buddy_client = buddy.get_client().unwrap();
+        buddy_client.send_packet(P_FE2CL_REP_REQUEST_MAKE_BUDDY_SUCC_TO_ACCEPTER, &req_pkt);
     }
 
-    if buddy.get_num_buddies() >= SIZEOF_BUDDYLIST_SLOT as usize {
-        // instant deny
-        let deny_pkt = sP_FE2CL_REP_ACCEPT_MAKE_BUDDY_FAIL {
-            iBuddyID: buddy_id,
-            iBuddyPCUID: buddy_uid,
-            iErrorCode: ERROR_CODE_BUDDY_DENY,
-        };
-
-        client.send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_FAIL, &deny_pkt);
-        return Ok(());
-    }
-
-    let buddy_client = buddy.get_client().unwrap();
-    buddy_client.send_packet(P_FE2CL_REP_REQUEST_MAKE_BUDDY_SUCC_TO_ACCEPTER, &req_pkt);
-
-    let player = state.get_player_mut(pc_id).unwrap();
+    let mut player = state.get_player_mut(pc_id).unwrap();
     player.buddy_offered_to = Some(buddy_uid);
-
     Ok(())
 }
 
@@ -122,50 +125,47 @@ pub fn find_name_make_buddy(
     let pkt: &sP_CL2FE_REQ_PC_FIND_NAME_MAKE_BUDDY = pkt.get()?;
 
     let pc_id = client.get_player_id()?;
-    let player = state.get_player(pc_id)?;
-    let pc_uid = player.get_uid();
-    if player.get_num_buddies() >= SIZEOF_BUDDYLIST_SLOT as usize {
-        return Err(FFError::build(
-            Severity::Warning,
-            format!("{} has too many buddies", player),
-        ));
-    }
+    let (pc_uid, buddy_uid, buddy_client) = {
+        let player = state.get_player(pc_id)?;
+        let pc_uid = player.get_uid();
+        let first_name = util::parse_utf16(&pkt.szFirstName)?;
+        let last_name = util::parse_utf16(&pkt.szLastName)?;
 
-    let first_name = util::parse_utf16(&pkt.szFirstName)?;
-    let last_name = util::parse_utf16(&pkt.szLastName)?;
+        let search = PlayerSearchQuery::ByName(first_name, last_name);
+        let res = search.execute(state);
+        if res.is_none() {
+            // TODO cross-shard
+            return Ok(());
+        }
 
-    let search = PlayerSearchQuery::ByName(first_name, last_name);
-    let res = search.execute(state);
-    if res.is_none() {
-        // TODO cross-shard
-        return Ok(());
-    }
-    let buddy_id = res.unwrap();
+        let buddy_id = res.unwrap();
+        let buddy = state.get_player(buddy_id).unwrap();
+        let buddy_uid = buddy.get_uid();
+        if buddy.is_buddies_with(pc_uid) {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("{} is already buddies with player {}", player, buddy_id),
+            ));
+        }
 
-    let buddy = state.get_player(buddy_id).unwrap();
-    let buddy_uid = buddy.get_uid();
-    if buddy.is_buddies_with(pc_uid) {
-        return Err(FFError::build(
-            Severity::Warning,
-            format!("{} is already buddies with player {}", player, buddy_id),
-        ));
-    }
+        if buddy.get_num_buddies() >= SIZEOF_BUDDYLIST_SLOT as usize {
+            // instant deny
+            let deny_pkt = sP_FE2CL_REP_PC_FIND_NAME_MAKE_BUDDY_FAIL {
+                iErrorCode: ERROR_CODE_BUDDY_DENY,
+                szFirstName: pkt.szFirstName,
+                szLastName: pkt.szLastName,
+            };
 
-    if buddy.get_num_buddies() >= SIZEOF_BUDDYLIST_SLOT as usize {
-        // instant deny
-        let deny_pkt = sP_FE2CL_REP_PC_FIND_NAME_MAKE_BUDDY_FAIL {
-            iErrorCode: ERROR_CODE_BUDDY_DENY,
-            szFirstName: pkt.szFirstName,
-            szLastName: pkt.szLastName,
-        };
+            let client = clients.get_sender();
+            client.send_packet(P_FE2CL_REP_PC_FIND_NAME_MAKE_BUDDY_FAIL, &deny_pkt);
+            return Ok(());
+        }
 
-        let client = clients.get_sender();
-        client.send_packet(P_FE2CL_REP_PC_FIND_NAME_MAKE_BUDDY_FAIL, &deny_pkt);
-        return Ok(());
-    }
+        let buddy_client = buddy.get_client().unwrap();
+        (pc_uid, buddy_uid, buddy_client)
+    };
 
-    let buddy_client = buddy.get_client().unwrap();
-    let player = state.get_player_mut(pc_id).unwrap();
+    let mut player = state.get_player_mut(pc_id).unwrap();
     player.buddy_offered_to = Some(buddy_uid);
     let req_pkt = sP_FE2CL_REP_PC_FIND_NAME_MAKE_BUDDY_SUCC {
         szFirstName: util::encode_utf16(&player.first_name).unwrap(),
@@ -173,6 +173,7 @@ pub fn find_name_make_buddy(
         iPCUID: pc_uid,
         iNameCheckFlag: player.flags.name_check as i8,
     };
+
     buddy_client.send_packet(P_FE2CL_REP_PC_FIND_NAME_MAKE_BUDDY_SUCC, &req_pkt);
     Ok(())
 }
@@ -182,29 +183,32 @@ pub fn accept_make_buddy(
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let client = clients.get_sender();
     let pkt: &sP_CL2FE_REQ_ACCEPT_MAKE_BUDDY = pkt.get()?;
-
-    let pc_id = client.get_player_id()?;
-    let player = state.get_player(pc_id)?;
-    let player_buddy_info = BuddyListEntry::new(player);
-    let pc_uid = state.get_player(pc_id)?.get_uid();
     let buddy_id = pkt.iBuddyID;
     let accepted = pkt.iAcceptFlag == 1;
 
-    let buddy = state.get_player_mut(buddy_id)?;
-    let buddy_uid = buddy.get_uid();
-    if buddy.buddy_offered_to != Some(pc_uid) {
-        return Err(FFError::build(
-            Severity::Warning,
-            format!("{} did not send buddy request to player {}", buddy, pc_id),
-        ));
-    }
+    let client = clients.get_sender();
+    let pc_id = client.get_player_id()?;
+    
+    let (player_buddy_info, pc_uid) = {
+        let player = state.get_player(pc_id)?;
+        (BuddyListEntry::new(&player), player.get_uid())
+    };
 
-    buddy.buddy_offered_to = None;
+    let buddy_uid = {
+        let mut buddy = state.get_player_mut(buddy_id)?;
+        if buddy.buddy_offered_to != Some(pc_uid) {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("{} did not send buddy request to player {}", buddy, pc_id),
+            ));
+        }
+        buddy.buddy_offered_to = None;
+        buddy.get_uid()
+    };
 
     (|| {
-        let buddy = state.get_player_mut(buddy_id).unwrap(); // re-borrow
+        let mut buddy = state.get_player_mut(buddy_id).unwrap();
         if !accepted {
             // this failure will be caught and the deny packet will be sent
             return Err(FFError::build(
@@ -225,24 +229,21 @@ pub fn accept_make_buddy(
             .send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC, &pkt_buddy);
 
         // buddy -> player
-        let buddy_buddy_info = BuddyListEntry::new(buddy);
-        let player = state.get_player_mut(pc_id).unwrap();
+        let buddy_buddy_info = BuddyListEntry::new(&buddy);
+        let mut player = state.get_player_mut(pc_id).unwrap();
         let pkt_player = sP_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC {
             iBuddySlot: player.add_buddy(buddy_buddy_info.clone())? as i8,
             BuddyInfo: buddy_buddy_info.into(),
         };
 
-        clients
-            .get_sender()
-            .send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC, &pkt_player);
-
+        client.send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC, &pkt_player);
         Ok(())
     })()
     .catch_fail(|| {
-        let player = state.get_player_mut(pc_id).unwrap();
+        let mut player = state.get_player_mut(pc_id).unwrap();
         let _ = player.remove_buddy(buddy_uid);
 
-        let buddy = state.get_player_mut(buddy_id).unwrap();
+        let mut buddy = state.get_player_mut(buddy_id).unwrap();
         let _ = buddy.remove_buddy(pc_uid);
 
         // we send the deny packet to the buddy in case of failure
@@ -269,7 +270,7 @@ pub fn find_name_accept_buddy(
 
     let pc_id = client.get_player_id()?;
     let player = state.get_player(pc_id)?;
-    let player_buddy_info = BuddyListEntry::new(player);
+    let player_buddy_info = BuddyListEntry::new(&player);
     let pc_uid = player.get_uid();
     if player.get_num_buddies() >= SIZEOF_BUDDYLIST_SLOT as usize {
         return Err(FFError::build(
@@ -285,19 +286,21 @@ pub fn find_name_accept_buddy(
         // TODO cross-shard
         return Ok(());
     }
-    let buddy_id = res.unwrap();
 
-    let buddy = state.get_player_mut(buddy_id)?;
-    if buddy.buddy_offered_to != Some(pc_uid) {
-        return Err(FFError::build(
-            Severity::Warning,
-            format!("{} did not send buddy request to player {}", buddy, pc_id),
-        ));
+    let buddy_id = res.unwrap();
+    {
+        let mut buddy = state.get_player_mut(buddy_id)?;
+        if buddy.buddy_offered_to != Some(pc_uid) {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("{} did not send buddy request to player {}", buddy, pc_id),
+            ));
+        }
+        buddy.buddy_offered_to = None;
     }
-    buddy.buddy_offered_to = None;
 
     (|| {
-        let buddy = state.get_player_mut(buddy_id).unwrap(); // re-borrow
+        let mut buddy = state.get_player_mut(buddy_id).unwrap();
         if !accepted {
             // this failure will be caught and the deny packet will be sent
             return Err(FFError::build(
@@ -318,7 +321,7 @@ pub fn find_name_accept_buddy(
             .send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC, &pkt_buddy);
 
         // buddy -> player
-        let buddy_buddy_info = BuddyListEntry::new(buddy);
+        let buddy_buddy_info = BuddyListEntry::new(&buddy);
         let player = state.get_player_mut(pc_id).unwrap();
         let pkt_player = sP_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC {
             iBuddySlot: player.add_buddy(buddy_buddy_info.clone())? as i8,
@@ -332,10 +335,10 @@ pub fn find_name_accept_buddy(
         Ok(())
     })()
     .catch_fail(|| {
-        let player = state.get_player_mut(pc_id).unwrap();
+        let mut player = state.get_player_mut(pc_id).unwrap();
         let _ = player.remove_buddy(buddy_uid);
 
-        let buddy = state.get_player_mut(buddy_id).unwrap();
+        let mut buddy = state.get_player_mut(buddy_id).unwrap();
         let _ = buddy.remove_buddy(pc_uid);
 
         // we send the deny packet to the buddy in case of failure
@@ -456,7 +459,7 @@ pub fn pc_buddy_warp(
     }
 
     {
-        let player = state.get_player_mut(pc_id).unwrap();
+        let mut player = state.get_player_mut(pc_id).unwrap();
         player.set_position(buddy_position);
         player.set_instance_id(InstanceID {
             map_num: buddy_instance_id.map_num,
@@ -486,7 +489,6 @@ pub fn pc_buddy_warp(
         );
 
         client.send_packet(P_FE2CL_REP_PC_GOTO_SUCC, &goto_succ_pkt);
-
         Ok(())
     }
     .catch_fail(|| {

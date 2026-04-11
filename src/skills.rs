@@ -27,29 +27,31 @@ pub fn do_basic_attack(
     let attacker = state.get_combatant(attacker_id)?;
     let mut attacker_client = attacker.get_client();
 
+    let attacker_cb = attacker.as_combatant().unwrap();
     let power = if target_ids.len() == 1 {
-        attacker.get_single_power()
+        attacker_cb.get_single_power()
     } else {
-        attacker.get_multi_power()
+        attacker_cb.get_multi_power()
     };
     let basic_attack = BasicAttack {
         power,
         crit_chance: Some(CRIT_CHANCE),
-        attack_style: attacker.get_style(),
+        attack_style: attacker_cb.get_style(),
         charged,
     };
 
     let mut pc_attack_results = Vec::new();
     let mut npc_attack_results = Vec::new();
     for target_id in target_ids {
-        let target = match state.get_combatant_mut(*target_id) {
+        let mut target = match state.get_combatant_mut(*target_id) {
             Ok(target) => target,
             Err(e) => {
                 log_error(e);
                 continue;
             }
         };
-        if target.is_dead() {
+        let target_cb = target.as_combatant().unwrap();
+        if target_cb.is_dead() {
             log(
                 Severity::Warning,
                 &format!(
@@ -59,7 +61,11 @@ pub fn do_basic_attack(
             );
             continue;
         }
-        let result = handle_basic_attack(attacker_id, target, &basic_attack);
+        let result = handle_basic_attack(
+            attacker_id,
+            target.as_combatant_mut().unwrap(),
+            &basic_attack,
+        );
         match target_id {
             EntityID::Player(_) => pc_attack_results.push(result),
             EntityID::NPC(_) => npc_attack_results.push(result),

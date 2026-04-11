@@ -1302,7 +1302,18 @@ impl Player {
     }
 
     pub fn disconnect(pc_id: i32, state: &mut ShardServerState) -> Player {
-        let player = state.get_player(pc_id).unwrap();
+        let id = EntityID::Player(pc_id);
+        let entity_map = &mut state.entity_map;
+        let mut player: Player = entity_map.untrack(id).unpack();
+        let uid = player.get_uid();
+        let client = player.get_client().unwrap();
+
+        player.cleanup(state);
+        state.player_uid_to_id.remove(&uid);
+
+        let _ = client.clear_player_id();
+        client.disconnect();
+
         log(
             Severity::Info,
             &format!(
@@ -1311,21 +1322,7 @@ impl Player {
             ),
         );
 
-        let uid = player.get_uid();
-        let client = player.get_client().unwrap();
-        let player_snapshot = player.clone();
-
-        state.player_uid_to_id.remove(&uid);
-
-        let id = EntityID::Player(pc_id);
-        let entity_map = &mut state.entity_map;
-        entity_map.update(id, None, true);
-        let mut player = entity_map.untrack(id);
-        player.cleanup(state);
-
-        let _ = client.clear_player_id();
-        client.disconnect();
-        player_snapshot
+        player
     }
 
     fn tick_skyway_ride(&mut self, time: &SystemTime, state: &mut ShardServerState) {
@@ -1740,7 +1737,7 @@ impl Entity for Player {
         if let Some(trade_id) = self.trade_id {
             let trade = state.ongoing_trades.remove(&trade_id).unwrap();
             let pc_id_other = trade.get_other_id(pc_id);
-            let player_other = state.get_player_mut(pc_id_other).unwrap();
+            let mut player_other = state.get_player_mut(pc_id_other).unwrap();
             player_other.trade_id = None;
             let client_other = player_other.get_client().unwrap();
             let pkt_cancel = sP_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL {
@@ -1783,11 +1780,11 @@ impl Entity for Player {
             .send_packet(P_FE2CL_REP_PC_TICK, &pkt);
     }
 
-    fn as_combatant(&self) -> Option<&dyn Combatant> {
+    fn as_combatant(&self) -> Option<&(dyn Combatant + 'static)> {
         Some(self)
     }
 
-    fn as_combatant_mut(&mut self) -> Option<&mut dyn Combatant> {
+    fn as_combatant_mut(&mut self) -> Option<&mut (dyn Combatant + 'static)> {
         Some(self)
     }
 
@@ -1796,6 +1793,9 @@ impl Entity for Player {
     }
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
         self
     }
 }

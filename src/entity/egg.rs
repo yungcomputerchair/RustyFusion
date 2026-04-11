@@ -113,11 +113,11 @@ impl Entity for Egg {
 
     fn cleanup(&mut self, _state: &mut ShardServerState) {}
 
-    fn as_combatant(&self) -> Option<&dyn Combatant> {
+    fn as_combatant(&self) -> Option<&(dyn Combatant + 'static)> {
         None
     }
 
-    fn as_combatant_mut(&mut self) -> Option<&mut dyn Combatant> {
+    fn as_combatant_mut(&mut self) -> Option<&mut (dyn Combatant + 'static)> {
         None
     }
 
@@ -126,6 +126,9 @@ impl Entity for Egg {
     }
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
         self
     }
 }

@@ -9,7 +9,7 @@ use std::{
 use crate::{
     config::config_get,
     defines::ID_OVERWORLD,
-    entity::{Entity, EntityID, Player, NPC},
+    entity::{Entity, EntityHandle, EntityID, EntityReadGuard, Player, NPC},
     error::{log, panic_log, FFError, FFResult, Severity},
     net::FFClient,
     Position,
@@ -91,7 +91,7 @@ pub enum TickMode {
 }
 
 struct RegistryEntry {
-    entity: Box<dyn Entity>,
+    entity: EntityHandle,
     chunk: Option<ChunkCoords>,
     tick_mode: TickMode,
 }
@@ -132,30 +132,14 @@ pub struct EntityMap {
 }
 
 impl EntityMap {
-    pub fn get_entity<T: Entity + 'static>(&self, id: EntityID) -> Option<&T> {
-        self.registry.get(&id).and_then(|entry| {
-            let any_ref = entry.entity.as_ref().as_any();
-            any_ref.downcast_ref()
-        })
+    /// Get a cloneable handle to an entity. The handle owns an `Arc`,
+    /// so its lock guards don't borrow from `EntityMap`.
+    pub fn get_handle(&self, id: EntityID) -> Option<EntityHandle> {
+        self.registry.get(&id).map(|entry| entry.entity.clone())
     }
 
-    pub fn get_entity_mut<T: Entity + 'static>(&mut self, id: EntityID) -> Option<&mut T> {
-        self.registry.get_mut(&id).and_then(|entry| {
-            let any_ref = entry.entity.as_mut().as_any_mut();
-            any_ref.downcast_mut()
-        })
-    }
-
-    pub fn get_entity_raw(&self, id: EntityID) -> Option<&dyn Entity> {
-        self.registry.get(&id).map(|entry| entry.entity.as_ref())
-    }
-
-    pub fn get_entity_raw_mut(&mut self, id: EntityID) -> Option<&mut dyn Entity> {
-        // compiler doesn't like the use of a closure here
-        match self.registry.get_mut(&id) {
-            Some(entry) => Some(entry.entity.as_mut()),
-            None => None,
-        }
+    fn get_entity_raw(&self, id: EntityID) -> Option<EntityReadGuard<dyn Entity>> {
+        self.registry.get(&id).map(|entry| entry.entity.read())
     }
 
     pub fn get_all_ids(&self) -> impl Iterator<Item = EntityID> + '_ {
@@ -187,7 +171,7 @@ impl EntityMap {
             })
     }
 
-    pub fn get_around_entity(&mut self, id: EntityID) -> HashSet<EntityID> {
+    pub fn get_around_entity(&self, id: EntityID) -> HashSet<EntityID> {
         let mut entities = HashSet::new();
         if let Some(coords) = self.registry.get(&id).and_then(|entry| entry.chunk) {
             for coords in Self::get_coords_around(coords, get_visibility_range()) {
@@ -211,13 +195,12 @@ impl EntityMap {
 
     pub fn find_players(&self, f: impl Fn(&Player) -> bool) -> Vec<i32> {
         self.registry
-            .values()
-            .filter_map(|entry| {
-                let entity_id = entry.entity.get_id();
-                if let EntityID::Player(pc_id) = entity_id {
-                    let pc = self.get_entity(entity_id).unwrap();
-                    if f(pc) {
-                        return Some(pc_id);
+            .iter()
+            .filter_map(|(id, entry)| {
+                if let EntityID::Player(pc_id) = id {
+                    let guard = entry.entity.read_as::<Player>();
+                    if f(&guard) {
+                        return Some(*pc_id);
                     }
                 }
                 None
@@ -237,13 +220,12 @@ impl EntityMap {
 
     pub fn find_npcs(&self, f: impl Fn(&NPC) -> bool) -> Vec<i32> {
         self.registry
-            .values()
-            .filter_map(|entry| {
-                let entity_id = entry.entity.get_id();
-                if let EntityID::NPC(npc_id) = entity_id {
-                    let npc = self.get_entity(entity_id).unwrap();
-                    if f(npc) {
-                        return Some(npc_id);
+            .iter()
+            .filter_map(|(id, entry)| {
+                if let EntityID::NPC(npc_id) = id {
+                    let guard = entry.entity.read_as::<NPC>();
+                    if f(&guard) {
+                        return Some(*npc_id);
                     }
                 }
                 None
@@ -255,10 +237,8 @@ impl EntityMap {
         let mut locations = Vec::with_capacity(ids.len());
         for id in ids {
             if let Some(entry) = self.registry.get(id) {
-                locations.push((
-                    entry.entity.get_position(),
-                    entry.entity.get_chunk_coords().i,
-                ));
+                let guard = entry.entity.read();
+                locations.push((guard.get_position(), guard.get_chunk_coords().i));
             } else {
                 return Err(FFError::build(
                     Severity::Warning,
@@ -340,7 +320,7 @@ impl EntityMap {
             panic_log(&format!("Already tracking entity with id {:?}", id));
         }
         let entry = RegistryEntry {
-            entity,
+            entity: EntityHandle::new(entity),
             chunk: None,
             tick_mode,
         };
@@ -348,7 +328,8 @@ impl EntityMap {
         id
     }
 
-    pub fn untrack(&mut self, id: EntityID) -> Box<dyn Entity> {
+    pub fn untrack(&mut self, id: EntityID) -> EntityHandle {
+        self.update(id, None, true);
         self.registry
             .remove(&id)
             .unwrap_or_else(|| {
@@ -442,7 +423,7 @@ impl EntityMap {
 
     pub fn for_each_around(&mut self, id: EntityID, mut f: impl FnMut(&FFClient)) {
         for eid in self.get_around_entity(id).iter() {
-            let e = self.registry.get(eid).unwrap().entity.as_ref();
+            let e = self.registry.get(eid).unwrap().entity.read();
             if let Some(client) = e.get_client() {
                 f(&client);
             }
@@ -655,7 +636,10 @@ impl EntityMap {
                     for id in template_chunk.get_all().clone() {
                         let tick_mode = self.registry[&id].tick_mode;
                         if let EntityID::NPC(_) = id {
-                            let mut npc = self.get_entity::<NPC>(id).unwrap().clone();
+                            let mut npc = {
+                                let handle = self.get_handle(id).unwrap();
+                                handle.read_as::<NPC>().clone()
+                            };
                             npc.instance_id = instance_id;
                             let new_id = self.gen_next_npc_id();
                             id_mappings.insert(id, EntityID::NPC(new_id));
@@ -678,7 +662,8 @@ impl EntityMap {
 
             // update leaders
             for (new_npc_id, (old_leader_id, offset)) in tight_follow_mappings {
-                let npc: &mut NPC = self.get_entity_mut(EntityID::NPC(new_npc_id)).unwrap();
+                let handle = self.get_handle(EntityID::NPC(new_npc_id)).unwrap();
+                let mut npc = handle.write_as::<NPC>();
                 let new_leader_id = id_mappings[&old_leader_id];
                 npc.tight_follow = Some((new_leader_id, offset));
             }
@@ -691,7 +676,7 @@ impl EntityMap {
         self.chunk_maps.get_mut(&instance_id).unwrap()
     }
 
-    pub fn garbage_collect_instances(&mut self) -> Vec<Box<dyn Entity>> {
+    pub fn garbage_collect_instances(&mut self) -> Vec<EntityHandle> {
         let mut entities = Vec::new();
         let instances_to_cleanup = self.instances_to_cleanup.clone();
         for instance_id in instances_to_cleanup {
@@ -701,7 +686,7 @@ impl EntityMap {
         entities
     }
 
-    pub fn garbage_collect_entities(&mut self) -> Vec<Box<dyn Entity>> {
+    pub fn garbage_collect_entities(&mut self) -> Vec<EntityHandle> {
         let mut entities = Vec::new();
         let entities_to_cleanup = self.entities_to_cleanup.clone();
         for id in entities_to_cleanup {
@@ -711,7 +696,7 @@ impl EntityMap {
         entities
     }
 
-    fn cleanup_instance(&mut self, instance_id: InstanceID) -> Vec<Box<dyn Entity>> {
+    fn cleanup_instance(&mut self, instance_id: InstanceID) -> Vec<EntityHandle> {
         let mut entities = Vec::new();
         let chunk_map = self.chunk_maps.get(&instance_id).unwrap();
         for id in chunk_map.get_ids() {
@@ -844,16 +829,19 @@ mod tests {
         fn send_exit(&self, _: &FFClient) {}
         fn tick(&mut self, _: &SystemTime, _: &mut ShardServerState, _: &mut ThreadRng) {}
         fn cleanup(&mut self, _: &mut ShardServerState) {}
-        fn as_combatant(&self) -> Option<&dyn Combatant> {
+        fn as_combatant(&self) -> Option<&(dyn Combatant + 'static)> {
             None
         }
-        fn as_combatant_mut(&mut self) -> Option<&mut dyn Combatant> {
+        fn as_combatant_mut(&mut self) -> Option<&mut (dyn Combatant + 'static)> {
             None
         }
         fn as_any(&self) -> &dyn Any {
             self
         }
         fn as_any_mut(&mut self) -> &mut dyn Any {
+            self
+        }
+        fn into_any(self: Box<Self>) -> Box<dyn Any> {
             self
         }
     }
