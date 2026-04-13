@@ -248,7 +248,7 @@ impl<'a, 'b, 'c> Widget for ShardListWidget<'a, 'b, 'c> {
                     current as f64 / max as f64
                 };
 
-                let bar_color = if ratio > 1.0 {
+                let bar_color = if current >= max {
                     Color::Red
                 } else if ratio >= 0.5 {
                     Color::Yellow
