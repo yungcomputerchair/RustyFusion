@@ -1301,7 +1301,7 @@ impl Player {
             .is_some_and(|available_at| util::get_timestamp_sec(SystemTime::now()) < available_at)
     }
 
-    pub fn disconnect(pc_id: i32, state: &mut ShardServerState) -> Player {
+    pub fn remove_from_state(pc_id: i32, state: &mut ShardServerState) -> Player {
         let player = state.get_player(pc_id).unwrap();
         log(
             Severity::Info,
@@ -1312,7 +1312,6 @@ impl Player {
         );
 
         let uid = player.get_uid();
-        let client = player.get_client().unwrap();
         let player_snapshot = player.clone();
 
         state.player_uid_to_id.remove(&uid);
@@ -1322,9 +1321,6 @@ impl Player {
         entity_map.update(id, None, true);
         let mut player = entity_map.untrack(id);
         player.cleanup(state);
-
-        let _ = client.clear_player_id();
-        client.disconnect();
         player_snapshot
     }
 

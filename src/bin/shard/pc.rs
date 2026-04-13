@@ -57,10 +57,11 @@ pub async fn pc_enter(
 
         // check if this player is already in the shard and kick if so.
         // take ownership of the existing Player to avoid a redundant DB load.
-        let existing_player = if let Some(existing_pc_id) = state
+        let existing_player = if let Some(existing_client) = state
             .get_player_by_uid(login_data.iPC_UID)
-            .map(|p| p.get_player_id())
+            .map(|p| p.get_client().unwrap())
         {
+            let existing_pc_id = existing_client.get_player_id().unwrap();
             log(
                 Severity::Warning,
                 &format!(
@@ -69,14 +70,16 @@ pub async fn pc_enter(
                 ),
             );
 
-            let existing_player = state.get_player(existing_pc_id).unwrap();
-            let existing_client = existing_player.get_client().unwrap();
             let pkt = sP_FE2CL_REP_PC_EXIT_DUPLICATE {
                 iErrorCode: unused!(),
             };
 
             existing_client.send_packet(P_FE2CL_REP_PC_EXIT_DUPLICATE, &pkt);
-            Some(Player::disconnect(existing_pc_id, &mut state))
+            existing_client.clear_player_id().unwrap();
+            existing_client.disconnect();
+
+            let existing_player = Player::remove_from_state(existing_pc_id, &mut state);
+            Some(existing_player)
         } else {
             None
         };
@@ -103,6 +106,7 @@ pub async fn pc_enter(
                         .await
                         .pending_entering_uids
                         .remove(&player_uid);
+
                     return Err(FFError::build(
                         Severity::Warning,
                         format!(
@@ -118,6 +122,7 @@ pub async fn pc_enter(
                         .await
                         .pending_entering_uids
                         .remove(&player_uid);
+
                     return Err(e);
                 }
             }
@@ -210,18 +215,18 @@ pub async fn pc_exit(clients: &ClientMap<'_>, state: Arc<Mutex<ShardServerState>
         iExitCode: exit_code as i32,
     };
 
-    // need to send this before disconnecting so it actually goes through
-    client.send_packet(P_FE2CL_REP_PC_EXIT_SUCC, &resp);
-
     let player = {
         let mut state = state.lock().await;
-        Player::disconnect(pc_id, &mut state)
+        Player::remove_from_state(pc_id, &mut state)
     };
 
     // save to db
     let db = db_get();
-    db.save_player(&player).await?;
+    log_if_failed(db.save_player(&player).await);
 
+    client.send_packet(P_FE2CL_REP_PC_EXIT_SUCC, &resp);
+    client.clear_player_id().unwrap();
+    client.disconnect();
     Ok(())
 }
 

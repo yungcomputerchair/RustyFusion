@@ -244,7 +244,7 @@ fn handle_disconnect(key: usize, clients: &HashMap<usize, FFClient>, state: &mut
             pc_id: Some(pc_id), ..
         } => {
             // dirty exit; clean exit happens in P_CL2FE_REQ_PC_EXIT handler
-            let player = Player::disconnect(pc_id, state);
+            let player = Player::remove_from_state(pc_id, state);
             tokio::spawn(async move {
                 let db = db_get();
                 log_if_failed(db.save_player(&player).await);
