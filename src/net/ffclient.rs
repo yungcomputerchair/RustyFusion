@@ -1,5 +1,5 @@
 use std::{
-    fmt::Display,
+    fmt::{Debug, Display},
     net::{IpAddr, SocketAddr},
     sync::{atomic::AtomicU64, Arc},
 };
@@ -73,6 +73,15 @@ impl ClientMetadata {
 pub struct FFClient {
     tx: UnboundedSender<ClientMessage>,
     pub meta: Arc<RwLock<ClientMetadata>>,
+}
+impl Debug for FFClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let meta = self.meta.read();
+        f.debug_struct("FFClient")
+            .field("addr", &meta.addr)
+            .field("client_type", &meta.client_type)
+            .finish()
+    }
 }
 impl FFClient {
     pub fn new(tx: UnboundedSender<ClientMessage>, meta: ClientMetadata) -> Self {

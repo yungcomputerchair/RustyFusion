@@ -37,7 +37,7 @@ pub fn pc_group_invite(
             ));
         }
 
-        let target_client = target_player.get_client(clients).unwrap();
+        let target_client = target_player.get_client().unwrap();
         let pkt = sP_FE2CL_PC_GROUP_INVITE { iHostID: pc_id };
         target_client.send_packet(P_FE2CL_PC_GROUP_INVITE, &pkt);
         Ok(())
@@ -71,7 +71,7 @@ pub fn pc_group_invite_refuse(
         ));
     }
 
-    let host_client = host_player.get_client(clients).unwrap();
+    let host_client = host_player.get_client().unwrap();
     let pkt = sP_FE2CL_PC_GROUP_INVITE_REFUSE { iID_To: pc_id };
     host_client.send_packet(P_FE2CL_PC_GROUP_INVITE_REFUSE, &pkt);
     host_player.group_offered_to = None;
@@ -133,7 +133,7 @@ pub fn pc_group_join(
         if let Some(pkt) = log_if_failed(pkt.build()) {
             for eid in group.get_member_ids() {
                 let entity = state.entity_map.get_entity_raw(*eid).unwrap();
-                if let Some(client) = entity.get_client(clients) {
+                if let Some(client) = entity.get_client() {
                     client.send_payload(pkt.clone());
                 }
             }
@@ -172,7 +172,6 @@ pub fn pc_group_leave(clients: &ClientMap, state: &mut ShardServerState) -> FFRe
             EntityID::Player(leaver_pc_id),
             group_id,
             state,
-            clients,
         )?;
 
         // leaver needs the leave success packet too, thx client
@@ -243,7 +242,7 @@ pub fn npc_group_invite(
     if let Some(pkt) = log_if_failed(pkt.build()) {
         for eid in group.get_member_ids() {
             let entity = state.entity_map.get_entity_raw(*eid).unwrap();
-            if let Some(client) = entity.get_client(clients) {
+            if let Some(client) = entity.get_client() {
                 client.send_payload(pkt.clone());
             }
         }
@@ -282,5 +281,5 @@ pub fn npc_group_kick(
     }
 
     target_npc.group_id = None;
-    rusty_fusion::helpers::remove_group_member(target_npc.get_id(), group_id, state, clients)
+    rusty_fusion::helpers::remove_group_member(target_npc.get_id(), group_id, state)
 }

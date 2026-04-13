@@ -39,9 +39,7 @@ pub fn gm_pc_set_value(
         CN_GM_SET_VALUE_TYPE__HP => player.set_hp(value),
         CN_GM_SET_VALUE_TYPE__WEAPON_BATTERY => player.set_weapon_boosts(value as u32) as i32,
         CN_GM_SET_VALUE_TYPE__NANO_BATTERY => player.set_nano_potions(value as u32) as i32,
-        CN_GM_SET_VALUE_TYPE__FUSION_MATTER => {
-            player.set_fusion_matter(value as u32, Some(clients)) as i32
-        }
+        CN_GM_SET_VALUE_TYPE__FUSION_MATTER => player.set_fusion_matter(value as u32) as i32,
         CN_GM_SET_VALUE_TYPE__CANDY => player.set_taros(value as u32) as i32,
         CN_GM_SET_VALUE_TYPE__SPEED => placeholder!(value),
         CN_GM_SET_VALUE_TYPE__JUMP => placeholder!(value),
@@ -148,7 +146,7 @@ pub fn gm_pc_give_nano(
 
         state
             .entity_map
-            .for_each_around(EntityID::Player(pc_id), clients, |c| {
+            .for_each_around(EntityID::Player(pc_id), |c| {
                 c.send_packet(P_FE2CL_REP_PC_CHANGE_LEVEL, &bcast);
             });
         Ok(())
@@ -179,9 +177,7 @@ pub fn gm_pc_goto(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState
     player.instance_id = InstanceID::default();
     let taros = player.get_taros();
 
-    state
-        .entity_map
-        .update(EntityID::Player(pc_id), None, Some(clients));
+    state.entity_map.update(EntityID::Player(pc_id), None, true);
 
     // sP_FE2CL_REP_PC_GOTO_SUCC doesn't reset the clientside instance state,
     // but we need that to happen so we use the NPC warp packet instead
@@ -239,7 +235,7 @@ pub fn gm_pc_special_state_switch(
     };
     state
         .entity_map
-        .for_each_around(EntityID::Player(pkt.iPC_ID), clients, |c| {
+        .for_each_around(EntityID::Player(pkt.iPC_ID), |c| {
             c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
         });
 
@@ -307,7 +303,7 @@ pub fn gm_pc_announce(
         AreaType::Local => {
             state
                 .entity_map
-                .for_each_around(EntityID::Player(pc_id), clients, |c| {
+                .for_each_around(EntityID::Player(pc_id), |c| {
                     c.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
                 });
         }
@@ -317,7 +313,7 @@ pub fn gm_pc_announce(
             .iter()
             .for_each(|pc_id| {
                 let player = state.get_player(*pc_id).unwrap();
-                let client = player.get_client(clients).unwrap();
+                let client = player.get_client().unwrap();
                 client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
             }),
         AreaType::Shard => state
@@ -326,7 +322,7 @@ pub fn gm_pc_announce(
             .iter()
             .for_each(|pc_id| {
                 let player = state.get_player(*pc_id).unwrap();
-                let client = player.get_client(clients).unwrap();
+                let client = player.get_client().unwrap();
                 client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
             }),
         AreaType::Global => {
@@ -466,7 +462,7 @@ pub fn gm_target_pc_special_state_onoff(
 
     state
         .entity_map
-        .for_each_around(EntityID::Player(pc_id), clients, |c| {
+        .for_each_around(EntityID::Player(pc_id), |c| {
             c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
         });
 
@@ -566,13 +562,13 @@ pub fn gm_target_pc_teleport(
         iCandy: player.get_taros() as i32,
     };
 
-    let client = player.get_client(clients).unwrap();
+    let client = player.get_client().unwrap();
     client.send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp);
 
     // see transport::helpers::do_warp to see why we use None for the chunk here
     state
         .entity_map
-        .update(EntityID::Player(target_pc_id), None, Some(clients));
+        .update(EntityID::Player(target_pc_id), None, true);
 
     Ok(())
 }
@@ -599,11 +595,7 @@ pub fn gm_kick_player(
         .execute(state)
         .ok_or_else(|| helpers::send_search_fail(client, search_query))?;
 
-    let client = state
-        .get_player(pc_id)
-        .unwrap()
-        .get_client(clients)
-        .unwrap();
+    let client = state.get_player(pc_id).unwrap().get_client().unwrap();
 
     let pkt = sP_FE2CL_REP_PC_EXIT_SUCC {
         iID: pc_id,
@@ -699,7 +691,7 @@ pub fn gm_shiny_summon(
     let egg = Egg::new(egg_id, egg_type, egg_pos, egg_instance_id, true);
     let chunk_coords = egg.get_chunk_coords();
     let eid = entity_map.track(Box::new(egg), TickMode::Always);
-    entity_map.update(eid, Some(chunk_coords), Some(clients));
+    entity_map.update(eid, Some(chunk_coords), true);
     Ok(())
 }
 
@@ -725,7 +717,7 @@ pub fn gm_npc_summon(
     for _ in 0..count {
         let npc_id = entity_map.gen_next_npc_id();
         let npc = NPC::new(npc_id, npc_type, spawn_pos, spawn_angle, spawn_instance_id).unwrap();
-        helpers::spawn_temp_npc(clients, entity_map, npc);
+        helpers::spawn_temp_npc(entity_map, npc);
     }
 
     Ok(())
@@ -752,7 +744,7 @@ pub fn gm_npc_group_summon(
         npc.set_position(spawn_pos);
         npc.set_rotation(spawn_angle);
         npc.instance_id = spawn_instance_id;
-        helpers::spawn_temp_npc(clients, entity_map, npc);
+        helpers::spawn_temp_npc(entity_map, npc);
     }
 
     Ok(())
@@ -772,7 +764,7 @@ pub fn gm_npc_unsummon(
         return Ok(());
     }
 
-    helpers::remove_temp_npc(clients, state, npc_id);
+    helpers::remove_temp_npc(state, npc_id);
     Ok(())
 }
 
@@ -811,20 +803,20 @@ mod helpers {
         FFError::build(Severity::Warning, err_msg)
     }
 
-    pub fn spawn_temp_npc(clients: &ClientMap, entity_map: &mut EntityMap, mut npc: NPC) {
+    pub fn spawn_temp_npc(entity_map: &mut EntityMap, mut npc: NPC) {
         npc.summoned = true;
         let (ai, tick_mode) = AI::make_for_npc(&npc, true);
         npc.ai = ai;
         let chunk_coords = npc.get_chunk_coords();
         let eid = entity_map.track(Box::new(npc), tick_mode);
-        entity_map.update(eid, Some(chunk_coords), Some(clients));
+        entity_map.update(eid, Some(chunk_coords), true);
     }
 
-    pub fn remove_temp_npc(clients: &ClientMap, state: &mut ShardServerState, npc_id: i32) {
+    pub fn remove_temp_npc(state: &mut ShardServerState, npc_id: i32) {
         let entity_map = &mut state.entity_map;
         let eid = EntityID::NPC(npc_id);
-        entity_map.update(eid, None, Some(clients));
+        entity_map.update(eid, None, true);
         let mut npc = entity_map.untrack(eid);
-        npc.cleanup(clients, state)
+        npc.cleanup(state)
     }
 }

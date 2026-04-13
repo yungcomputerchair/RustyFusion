@@ -11,7 +11,7 @@ use crate::{
     defines::ID_OVERWORLD,
     entity::{Entity, EntityID, Player, NPC},
     error::{log, panic_log, FFError, FFResult, Severity},
-    net::{ClientMap, FFClient},
+    net::FFClient,
     Position,
 };
 
@@ -361,12 +361,7 @@ impl EntityMap {
         self.entities_to_cleanup.insert(id);
     }
 
-    pub fn update(
-        &mut self,
-        id: EntityID,
-        to_chunk: Option<ChunkCoords>,
-        client_map: Option<&ClientMap>,
-    ) {
+    pub fn update(&mut self, id: EntityID, to_chunk: Option<ChunkCoords>, broadcast: bool) {
         let entry = self.registry.get_mut(&id).unwrap_or_else(|| {
             panic_log(&format!("Entity with id {:?} untracked", id));
         });
@@ -383,29 +378,27 @@ impl EntityMap {
             }
         }
 
-        // if there's no client map, nobody needs to be notified
-        if client_map.is_none() {
+        if !broadcast {
             return;
         }
-        let client_map = client_map.unwrap();
 
         let removed = around_from.difference(&around_to);
         for e in removed {
             // us to them
             let from = self.get_entity_raw(id).unwrap();
-            if let Some(from_client) = from.get_client(client_map) {
+            if let Some(from_client) = from.get_client() {
                 // possible for the ID to be unregistered if the instance was cleaned up
                 if let Some(to) = self.get_entity_raw(*e) {
-                    to.send_exit(from_client);
+                    to.send_exit(&from_client);
                 }
             }
 
             // them to us
             // possible for the ID to be unregistered if the instance was cleaned up
             if let Some(from) = self.get_entity_raw(*e) {
-                if let Some(from_client) = from.get_client(client_map) {
+                if let Some(from_client) = from.get_client() {
                     let to = self.get_entity_raw(id).unwrap();
-                    to.send_exit(from_client);
+                    to.send_exit(&from_client);
                 }
             }
         }
@@ -414,16 +407,16 @@ impl EntityMap {
         for e in added {
             // us to them
             let from = self.get_entity_raw(id).unwrap();
-            if let Some(from_client) = from.get_client(client_map) {
+            if let Some(from_client) = from.get_client() {
                 let to = self.get_entity_raw(*e).unwrap();
-                to.send_enter(from_client);
+                to.send_enter(&from_client);
             }
 
             // them to us
             let from = self.get_entity_raw(*e).unwrap();
-            if let Some(from_client) = from.get_client(client_map) {
+            if let Some(from_client) = from.get_client() {
                 let to = self.get_entity_raw(id).unwrap();
-                to.send_enter(from_client);
+                to.send_enter(&from_client);
             }
         }
 
@@ -447,16 +440,11 @@ impl EntityMap {
         Ok(())
     }
 
-    pub fn for_each_around(
-        &mut self,
-        id: EntityID,
-        clients: &ClientMap,
-        mut f: impl FnMut(&FFClient),
-    ) {
+    pub fn for_each_around(&mut self, id: EntityID, mut f: impl FnMut(&FFClient)) {
         for eid in self.get_around_entity(id).iter() {
             let e = self.registry.get(eid).unwrap().entity.as_ref();
-            if let Some(client) = e.get_client(clients) {
-                f(client);
+            if let Some(client) = e.get_client() {
+                f(&client);
             }
         }
     }
@@ -681,7 +669,7 @@ impl EntityMap {
 
                             let chunk_pos = npc.get_chunk_coords();
                             let new_npc_id = self.track(Box::new(npc), tick_mode);
-                            self.update(new_npc_id, Some(chunk_pos), None);
+                            self.update(new_npc_id, Some(chunk_pos), false);
                             npc_count += 1;
                         }
                     }
@@ -801,7 +789,7 @@ mod tests {
     use super::*;
     use crate::{
         entity::{Combatant, Entity, EntityID},
-        net::{ClientMap, FFClient},
+        net::FFClient,
         state::ShardServerState,
         Position,
     };
@@ -833,7 +821,7 @@ mod tests {
         fn get_id(&self) -> EntityID {
             self.id
         }
-        fn get_client<'a>(&self, _: &'a ClientMap) -> Option<&'a FFClient> {
+        fn get_client(&self) -> Option<FFClient> {
             None
         }
         fn get_position(&self) -> Position {
@@ -854,15 +842,8 @@ mod tests {
         fn set_rotation(&mut self, _: i32) {}
         fn send_enter(&self, _: &FFClient) {}
         fn send_exit(&self, _: &FFClient) {}
-        fn tick(
-            &mut self,
-            _: &SystemTime,
-            _: &ClientMap,
-            _: &mut ShardServerState,
-            _: &mut ThreadRng,
-        ) {
-        }
-        fn cleanup(&mut self, _: &ClientMap, _: &mut ShardServerState) {}
+        fn tick(&mut self, _: &SystemTime, _: &mut ShardServerState, _: &mut ThreadRng) {}
+        fn cleanup(&mut self, _: &mut ShardServerState) {}
         fn as_combatant(&self) -> Option<&dyn Combatant> {
             None
         }
@@ -897,7 +878,7 @@ mod tests {
         let id = entity.get_id();
         let chunk = entity.get_chunk_coords();
         map.track(Box::new(entity), TickMode::WhenLoaded);
-        map.update(id, Some(chunk), None);
+        map.update(id, Some(chunk), false);
         (id, chunk)
     }
 
@@ -957,7 +938,7 @@ mod tests {
         assert_eq!(map.get_num_loaded_entities(), 1);
 
         // Remove player from the map
-        map.update(player_id, None, None);
+        map.update(player_id, None, false);
 
         assert_eq!(map.get_num_loaded_chunks(), 0);
         assert_eq!(map.get_num_loaded_entities(), 0);
@@ -993,7 +974,7 @@ mod tests {
         place_entity(&mut map, p2);
 
         // Remove one player — chunks still loaded by the other
-        map.update(p1_id, None, None);
+        map.update(p1_id, None, false);
         assert_eq!(map.get_num_loaded_chunks(), 9);
         // Only p2 remains
         assert_eq!(map.get_num_loaded_entities(), 1);
@@ -1034,7 +1015,7 @@ mod tests {
         assert_eq!(map.get_num_loaded_entities(), 2);
 
         // Remove NPC — player still loaded, count goes to 1
-        map.update(npc_id, None, None);
+        map.update(npc_id, None, false);
         assert_eq!(map.get_num_loaded_entities(), 1);
         assert_eq!(map.get_num_loaded_chunks(), 9);
     }
@@ -1052,7 +1033,7 @@ mod tests {
         // Move player to a distant chunk (no overlap with the old 3x3)
         let pos2 = pos_for_chunk(80, 80);
         let new_coords = ChunkCoords::from_pos_inst(pos2, inst);
-        map.update(player_id, Some(new_coords), None);
+        map.update(player_id, Some(new_coords), false);
 
         // Old chunks unloaded, new 3x3 loaded
         assert_eq!(map.get_num_loaded_chunks(), 9);
@@ -1078,7 +1059,7 @@ mod tests {
         assert_eq!(map.get_num_loaded_entities(), 6); // 5 NPCs + 1 player
 
         // Player leaves — all unloaded again
-        map.update(EntityID::Player(1), None, None);
+        map.update(EntityID::Player(1), None, false);
         assert_eq!(map.get_num_loaded_entities(), 0);
         assert_eq!(map.get_num_loaded_chunks(), 0);
     }

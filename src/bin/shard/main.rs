@@ -148,23 +148,17 @@ async fn main() -> FFResult<()> {
                 }
             }
             _ = entity_timer.tick() => {
-                let clients = server.get_clients().await;
-                let client_map = ClientMap::new(0, &clients);
                 state.lock().await
-                    .tick_entities(SystemTime::now(), &client_map);
+                    .tick_entities(SystemTime::now());
             }
             _ = slow_timer.tick() => {
-                let clients = server.get_clients().await;
-                let client_map = ClientMap::new(0, &clients);
                 let mut state = state.lock().await;
-                state.tick_garbage_collection(&client_map);
-                state.tick_groups(&client_map);
+                state.tick_garbage_collection();
+                state.tick_groups();
             }
             _ = vehicle_timer.tick() => {
-                let clients = server.get_clients().await;
-                let client_map = ClientMap::new(0, &clients);
                 state.lock().await
-                    .check_for_expired_vehicles(SystemTime::now(), &client_map);
+                    .check_for_expired_vehicles(SystemTime::now());
             }
             _ = login_conn_timer.tick() => {
                 log_if_failed(connect_to_login_server(&mut server, &mut *state.lock().await).await);
@@ -250,7 +244,7 @@ fn handle_disconnect(key: usize, clients: &HashMap<usize, FFClient>, state: &mut
             pc_id: Some(pc_id), ..
         } => {
             // dirty exit; clean exit happens in P_CL2FE_REQ_PC_EXIT handler
-            let player = Player::disconnect(pc_id, state, &clients);
+            let player = Player::disconnect(pc_id, state);
             tokio::spawn(async move {
                 let db = db_get();
                 log_if_failed(db.save_player(&player).await);
@@ -301,7 +295,7 @@ fn handle_packet<'a>(
 
         // These packet handlers use the state lock directly for efficiency with the DB
         if pkt_id == P_CL2FE_REQ_PC_ENTER {
-            return pc::pc_enter(pkt, &clients, key, state, time).await;
+            return pc::pc_enter(pkt, &clients, state, time).await;
         }
 
         if pkt_id == P_CL2FE_REQ_PC_EXIT {
@@ -318,24 +312,20 @@ fn handle_packet<'a>(
                 login::login_update_info(pkt, clients.get_sender(), state)
             }
             P_LS2FE_REQ_LIVE_CHECK => login::login_live_check(clients.get_sender()),
-            P_LS2FE_REP_MOTD => login::login_motd(pkt, &clients, state),
+            P_LS2FE_REP_MOTD => login::login_motd(pkt, state),
             P_LS2FE_ANNOUNCE_MSG => login::login_announce_msg(pkt, &clients),
             P_LS2FE_REQ_PC_LOCATION => login::login_pc_location(pkt, &clients, state),
-            P_LS2FE_REP_PC_LOCATION_SUCC => login::login_pc_location_succ(pkt, &clients, state),
-            P_LS2FE_REP_PC_LOCATION_FAIL => login::login_pc_location_fail(pkt, &clients, state),
-            P_LS2FE_REQ_PC_EXIT_DUPLICATE => login::login_pc_exit_duplicate(pkt, &clients, state),
-            P_LS2FE_REP_GET_BUDDY_STATE => login::login_get_buddy_state(pkt, &clients, state),
+            P_LS2FE_REP_PC_LOCATION_SUCC => login::login_pc_location_succ(pkt, state),
+            P_LS2FE_REP_PC_LOCATION_FAIL => login::login_pc_location_fail(pkt, state),
+            P_LS2FE_REQ_PC_EXIT_DUPLICATE => login::login_pc_exit_duplicate(pkt, state),
+            P_LS2FE_REP_GET_BUDDY_STATE => login::login_get_buddy_state(pkt, state),
             P_LS2FE_REQ_SEND_BUDDY_FREECHAT => login::login_buddy_freechat(pkt, &clients, state),
-            P_LS2FE_REP_SEND_BUDDY_FREECHAT_SUCC => {
-                login::buddy_freechat_succ(pkt, &clients, state)
-            }
+            P_LS2FE_REP_SEND_BUDDY_FREECHAT_SUCC => login::buddy_freechat_succ(pkt, state),
             P_LS2FE_REQ_SEND_BUDDY_MENUCHAT => login::login_buddy_menuchat(pkt, &clients, state),
-            P_LS2FE_REP_SEND_BUDDY_MENUCHAT_SUCC => {
-                login::buddy_menuchat_succ(pkt, &clients, state)
-            }
+            P_LS2FE_REP_SEND_BUDDY_MENUCHAT_SUCC => login::buddy_menuchat_succ(pkt, state),
             P_LS2FE_REQ_BUDDY_WARP => login::login_buddy_warp(pkt, &clients, state),
-            P_LS2FE_REP_BUDDY_WARP_SUCC => login::login_buddy_warp_succ(pkt, &clients, state).await,
-            P_LS2FE_REP_BUDDY_WARP_FAIL => login::login_buddy_warp_fail(pkt, &clients, state),
+            P_LS2FE_REP_BUDDY_WARP_SUCC => login::login_buddy_warp_succ(pkt, state).await,
+            P_LS2FE_REP_BUDDY_WARP_FAIL => login::login_buddy_warp_fail(pkt, state),
             P_LS2FE_REP_LIVE_CHECK => {
                 clients.get_sender().clear_live_check();
                 Ok(())

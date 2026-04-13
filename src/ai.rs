@@ -12,7 +12,6 @@ use crate::{
     enums::CombatantTeam,
     error::*,
     helpers,
-    net::ClientMap,
     path::Path,
     skills,
     state::ShardServerState,
@@ -27,7 +26,6 @@ trait AINode: std::fmt::Debug + Send {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        clients: &ClientMap,
         time: &SystemTime,
         rng: &mut ThreadRng,
     ) -> NodeStatus;
@@ -207,11 +205,10 @@ impl AI {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        clients: &ClientMap,
         time: &SystemTime,
         rng: &mut ThreadRng,
     ) {
-        self.root.tick(npc, state, clients, time, rng);
+        self.root.tick(npc, state, time, rng);
     }
 }
 
@@ -245,12 +242,11 @@ impl AINode for SequenceNode {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        clients: &ClientMap,
         time: &SystemTime,
         rng: &mut ThreadRng,
     ) -> NodeStatus {
         while self.cursor < self.children.len() {
-            let status = self.children[self.cursor].tick(npc, state, clients, time, rng);
+            let status = self.children[self.cursor].tick(npc, state, time, rng);
             match status {
                 NodeStatus::Success => {
                     self.cursor += 1;
@@ -291,12 +287,11 @@ impl AINode for SelectorNode {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        clients: &ClientMap,
         time: &SystemTime,
         rng: &mut ThreadRng,
     ) -> NodeStatus {
         while self.cursor < self.children.len() {
-            let status = self.children[self.cursor].tick(npc, state, clients, time, rng);
+            let status = self.children[self.cursor].tick(npc, state, time, rng);
             match status {
                 NodeStatus::Success => {
                     self.cursor = 0;
@@ -331,14 +326,13 @@ impl AINode for FollowAssignedPath {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        clients: &ClientMap,
         _time: &SystemTime,
         _rng: &mut ThreadRng,
     ) -> NodeStatus {
         let path = npc.path.take();
         match path {
             Some(mut path) => {
-                npc.tick_movement_along_path(&mut path, clients, state);
+                npc.tick_movement_along_path(&mut path, state);
                 npc.path = Some(path);
                 NodeStatus::Success
             }
@@ -384,7 +378,6 @@ impl AINode for FollowEntityLoose {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        clients: &ClientMap,
         _time: &SystemTime,
         _rng: &mut ThreadRng,
     ) -> NodeStatus {
@@ -418,7 +411,7 @@ impl AINode for FollowEntityLoose {
 
                 let mut path = Path::new_single(target_pos, self.speed);
                 path.start();
-                npc.tick_movement_along_path(&mut path, clients, state);
+                npc.tick_movement_along_path(&mut path, state);
                 NodeStatus::Success
             }
             None => NodeStatus::Failure,
@@ -448,7 +441,6 @@ impl AINode for FollowEntityTight {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        clients: &ClientMap,
         _time: &SystemTime,
         _rng: &mut ThreadRng,
     ) -> NodeStatus {
@@ -475,7 +467,7 @@ impl AINode for FollowEntityTight {
         let speed = clamp_max(distance as i32, self.max_speed);
         let mut path = Path::new_single(pack_pos, speed);
         path.start();
-        npc.tick_movement_along_path(&mut path, clients, state);
+        npc.tick_movement_along_path(&mut path, state);
         NodeStatus::Success
     }
 }
@@ -517,7 +509,6 @@ impl AINode for PatrolPoint {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        clients: &ClientMap,
         time: &SystemTime,
         rng: &mut ThreadRng,
     ) -> NodeStatus {
@@ -540,7 +531,7 @@ impl AINode for PatrolPoint {
                 }
             }
             RoamState::Moving(ref mut path) => {
-                npc.tick_movement_along_path(path, clients, state);
+                npc.tick_movement_along_path(path, state);
                 if path.is_done() {
                     self.roam_state = RoamState::Idle;
                 }
@@ -589,7 +580,6 @@ impl AINode for CheckDead {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        clients: &ClientMap,
         time: &SystemTime,
         rng: &mut ThreadRng,
     ) -> NodeStatus {
@@ -599,14 +589,14 @@ impl AINode for CheckDead {
                     return NodeStatus::Success;
                 }
                 if let Some(defeater_id) = npc.last_attacked_by {
-                    log_if_failed(on_mob_defeated(npc.id, defeater_id, state, clients, rng));
+                    log_if_failed(on_mob_defeated(npc.id, defeater_id, state, rng));
                 }
                 let dechunk_time = *time + self.dechunk_after;
                 self.dead_state = DeadState::Dying(dechunk_time);
             }
             DeadState::Dying(dechunk_time) => {
                 if *time > dechunk_time {
-                    state.entity_map.update(npc.get_id(), None, Some(clients));
+                    state.entity_map.update(npc.get_id(), None, true);
                     if npc.summoned {
                         state.entity_map.mark_for_cleanup(npc.get_id());
                         self.dead_state = DeadState::PermaDead;
@@ -629,9 +619,7 @@ impl AINode for CheckDead {
                 // because the NPC state doesn't get written
                 // to the entity map until after the tick
                 let chunk_pos = npc.get_chunk_coords();
-                state
-                    .entity_map
-                    .update(npc.get_id(), Some(chunk_pos), Some(clients));
+                state.entity_map.update(npc.get_id(), Some(chunk_pos), true);
                 self.dead_state = DeadState::Alive;
                 return NodeStatus::Success;
             }
@@ -666,7 +654,6 @@ impl AINode for CheckLeaderRetreat {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        _clients: &ClientMap,
         _time: &SystemTime,
         _rng: &mut ThreadRng,
     ) -> NodeStatus {
@@ -719,7 +706,6 @@ impl AINode for SyncPlayerTarget {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        _clients: &ClientMap,
         _time: &SystemTime,
         _rng: &mut ThreadRng,
     ) -> NodeStatus {
@@ -765,7 +751,6 @@ impl AINode for SyncPackLeaderTarget {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        _clients: &ClientMap,
         _time: &SystemTime,
         _rng: &mut ThreadRng,
     ) -> NodeStatus {
@@ -854,7 +839,6 @@ impl AINode for ScanForTargets {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        _clients: &ClientMap,
         _time: &SystemTime,
         _rng: &mut ThreadRng,
     ) -> NodeStatus {
@@ -957,7 +941,6 @@ impl AINode for CheckRetreat {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        clients: &ClientMap,
         _time: &SystemTime,
         _rng: &mut ThreadRng,
     ) -> NodeStatus {
@@ -1000,7 +983,7 @@ impl AINode for CheckRetreat {
                 }
             }
             RetreatState::Retreating(path) => {
-                npc.tick_movement_along_path(path, clients, state);
+                npc.tick_movement_along_path(path, state);
                 if path.is_done() {
                     self.retreat_state = RetreatState::Idle;
                     npc.reset();
@@ -1045,7 +1028,6 @@ impl AINode for CheckAttack {
         &mut self,
         npc: &mut NPC,
         state: &mut ShardServerState,
-        clients: &ClientMap,
         time: &SystemTime,
         _rng: &mut ThreadRng,
     ) -> NodeStatus {
@@ -1086,7 +1068,6 @@ impl AINode for CheckAttack {
                         target_ids,
                         false,
                         state,
-                        clients,
                     ));
 
                     let wait_time = *time + self.attack_cooldown;
@@ -1122,13 +1103,12 @@ fn on_mob_defeated(
     npc_id: i32,
     defeater_id: EntityID,
     state: &mut ShardServerState,
-    clients: &ClientMap,
     rng: &mut ThreadRng,
 ) -> FFResult<()> {
     let defeated_type = state.get_npc(npc_id).unwrap().ty;
     if let EntityID::Player(pc_id) = defeater_id {
         let player = state.get_player_mut(pc_id)?;
-        helpers::give_defeat_rewards(player, defeated_type, clients, rng);
+        helpers::give_defeat_rewards(player, defeated_type, rng);
     }
 
     let defeater = state.get_combatant(defeater_id)?;
@@ -1143,7 +1123,7 @@ fn on_mob_defeated(
                 }
                 let player = state.get_player_mut(member_pc_id).unwrap();
                 if player.get_position().distance_to(&position) < RANGE_GROUP_PARTICIPATE {
-                    helpers::give_defeat_rewards(player, defeated_type, clients, rng);
+                    helpers::give_defeat_rewards(player, defeated_type, rng);
                 }
             }
         }

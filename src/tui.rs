@@ -329,7 +329,6 @@ impl Tui<ShardServerState> for ShardTui {
 
         let player_list_widget = PlayerListWidget {
             shard_state: server_state,
-            clients: &clients,
         };
         frame.render_widget(player_list_widget, outer_layout[1]);
 
@@ -388,11 +387,10 @@ impl<'a> Widget for LogWidget<'a> {
     }
 }
 
-struct PlayerListWidget<'a, 'b, 'c> {
+struct PlayerListWidget<'a> {
     shard_state: &'a ShardServerState,
-    clients: &'b ClientMap<'c>,
 }
-impl<'a, 'b, 'c> Widget for PlayerListWidget<'a, 'b, 'c> {
+impl<'a> Widget for PlayerListWidget<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let title = Line::from(" Players ").white().bold().centered();
         let block = Block::bordered()
@@ -409,7 +407,7 @@ impl<'a, 'b, 'c> Widget for PlayerListWidget<'a, 'b, 'c> {
             .iter()
             .map(|pid| {
                 let player = self.shard_state.get_player(*pid).unwrap();
-                let client = player.get_client(self.clients).unwrap();
+                let client = player.get_client().unwrap();
                 let ping = {
                     let meta = client.meta.read();
                     meta.ping_ms.as_ref().map(|p| p.load(Ordering::Relaxed))

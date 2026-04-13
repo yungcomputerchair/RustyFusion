@@ -22,7 +22,7 @@ use crate::{
             PacketID::{self, *},
             *,
         },
-        ClientMap, FFClient,
+        FFClient,
     },
     path::Path,
     state::ShardServerState,
@@ -402,7 +402,7 @@ pub struct Player {
     uid: i64,
     pub first_name: String,
     pub last_name: String,
-    client_id: Option<usize>,
+    client: Option<FFClient>,
     pub perms: i16,
     pub show_gm_marker: bool,
     pub invisible: bool,
@@ -475,12 +475,8 @@ impl Player {
         self.id = Some(pc_id);
     }
 
-    pub fn set_client_id(&mut self, client_id: usize) {
-        self.client_id = Some(client_id);
-    }
-
-    pub fn get_client_id(&self) -> Option<usize> {
-        self.client_id
+    pub fn set_client(&mut self, client: FFClient) {
+        self.client = Some(client);
     }
 
     pub fn get_style(&self) -> sPCStyle {
@@ -1146,59 +1142,59 @@ impl Player {
         Ok(self.level)
     }
 
-    pub fn set_fusion_matter(&mut self, fusion_matter: u32, clients: Option<&ClientMap>) -> u32 {
+    pub fn set_fusion_matter(&mut self, fusion_matter: u32) -> u32 {
         let player_stats = tdata_get().get_player_stats(self.level).unwrap();
         let fm_max = if self.perms <= CN_ACCOUNT_LEVEL__DEVELOPER as i16 {
             PC_FUSIONMATTER_MAX
         } else {
             player_stats.fm_limit
         };
+
         self.fusion_matter = clamp(fusion_matter, 0, fm_max);
 
-        if let Some(clients) = clients {
-            let level_up_fusion_matter = player_stats.req_fm_nano_create;
-            let Some(level_up_task_id) = player_stats.nano_quest_task_id else {
-                // no level up task
+        let level_up_fusion_matter = player_stats.req_fm_nano_create;
+        let Some(level_up_task_id) = player_stats.nano_quest_task_id else {
+            // no level up task
+            return self.fusion_matter;
+        };
+
+        if self.fusion_matter >= level_up_fusion_matter && !self.mission_journal.has_nano_mission()
+        {
+            let Ok(level_up_task_def) = tdata_get().get_task_definition(level_up_task_id) else {
+                log(
+                    Severity::Warning,
+                    &format!("Level up task with ID {} doesn't exist!", level_up_task_id),
+                );
                 return self.fusion_matter;
             };
 
-            if self.fusion_matter >= level_up_fusion_matter
-                && !self.mission_journal.has_nano_mission()
-            {
-                let Ok(level_up_task_def) = tdata_get().get_task_definition(level_up_task_id)
-                else {
-                    log(
-                        Severity::Warning,
-                        &format!("Level up task with ID {} doesn't exist!", level_up_task_id),
-                    );
-                    return self.fusion_matter;
-                };
-                let level_up_mission_def = tdata_get()
-                    .get_mission_definition(level_up_task_def.mission_id)
-                    .unwrap();
-                log(
-                    Severity::Info,
-                    &format!(
-                        "{} started nano mission: {} [{}]",
-                        self, level_up_mission_def.mission_name, level_up_mission_def.mission_id
-                    ),
-                );
-                self.mission_journal
-                    .start_task(level_up_task_def.into())
-                    .unwrap();
+            let level_up_mission_def = tdata_get()
+                .get_mission_definition(level_up_task_def.mission_id)
+                .unwrap();
 
-                let pkt = sP_FE2CL_REP_PC_TASK_START_SUCC {
-                    iTaskNum: level_up_task_id,
-                    iRemainTime: level_up_task_def
-                        .obj_time_limit
-                        .map(|d| d.as_secs() as i32)
-                        .unwrap_or(unused!()),
-                };
+            log(
+                Severity::Info,
+                &format!(
+                    "{} started nano mission: {} [{}]",
+                    self, level_up_mission_def.mission_name, level_up_mission_def.mission_id
+                ),
+            );
 
-                self.get_client(clients)
-                    .unwrap()
-                    .send_packet(P_FE2CL_REP_PC_TASK_START_SUCC, &pkt);
-            }
+            self.mission_journal
+                .start_task(level_up_task_def.into())
+                .unwrap();
+
+            let pkt = sP_FE2CL_REP_PC_TASK_START_SUCC {
+                iTaskNum: level_up_task_id,
+                iRemainTime: level_up_task_def
+                    .obj_time_limit
+                    .map(|d| d.as_secs() as i32)
+                    .unwrap_or(unused!()),
+            };
+
+            self.get_client()
+                .unwrap()
+                .send_packet(P_FE2CL_REP_PC_TASK_START_SUCC, &pkt);
         }
 
         self.fusion_matter
@@ -1305,7 +1301,7 @@ impl Player {
             .is_some_and(|available_at| util::get_timestamp_sec(SystemTime::now()) < available_at)
     }
 
-    pub fn disconnect(pc_id: i32, state: &mut ShardServerState, clients: &ClientMap) -> Player {
+    pub fn disconnect(pc_id: i32, state: &mut ShardServerState) -> Player {
         let player = state.get_player(pc_id).unwrap();
         log(
             Severity::Info,
@@ -1316,28 +1312,23 @@ impl Player {
         );
 
         let uid = player.get_uid();
-        let client = player.get_client(clients).unwrap().clone();
+        let client = player.get_client().unwrap();
         let player_snapshot = player.clone();
 
         state.player_uid_to_id.remove(&uid);
 
         let id = EntityID::Player(pc_id);
         let entity_map = &mut state.entity_map;
-        entity_map.update(id, None, Some(clients));
+        entity_map.update(id, None, true);
         let mut player = entity_map.untrack(id);
-        player.cleanup(clients, state);
+        player.cleanup(state);
 
         let _ = client.clear_player_id();
         client.disconnect();
         player_snapshot
     }
 
-    fn tick_skyway_ride(
-        &mut self,
-        time: &SystemTime,
-        clients: &ClientMap,
-        state: &mut ShardServerState,
-    ) {
+    fn tick_skyway_ride(&mut self, time: &SystemTime, state: &mut ShardServerState) {
         let pc_id = self.id.unwrap();
         // Skyway ride
         if let Some(ref mut ride) = self.skyway_ride {
@@ -1352,7 +1343,7 @@ impl Player {
                 self.set_taros(self.taros - cost);
                 self.set_position(final_pos);
                 self.skyway_ride = None;
-                crate::helpers::broadcast_monkey(pc_id, RideType::None, clients, state);
+                crate::helpers::broadcast_monkey(pc_id, RideType::None, state);
                 return;
             }
 
@@ -1381,7 +1372,7 @@ impl Player {
             let chunk_coords = ChunkCoords::from_pos_inst(ride.monkey_pos, self.instance_id);
             state
                 .entity_map
-                .update(EntityID::Player(pc_id), Some(chunk_coords), Some(clients));
+                .update(EntityID::Player(pc_id), Some(chunk_coords), true);
 
             // send the move packet
             let pkt = sP_FE2CL_PC_BROOMSTICK_MOVE {
@@ -1393,7 +1384,7 @@ impl Player {
             };
             state
                 .entity_map
-                .for_each_around(EntityID::Player(pc_id), clients, |c| {
+                .for_each_around(EntityID::Player(pc_id), |c| {
                     c.send_packet(PacketID::P_FE2CL_PC_BROOMSTICK_MOVE, &pkt)
                 });
 
@@ -1402,12 +1393,7 @@ impl Player {
         }
     }
 
-    fn tick_missions(
-        &mut self,
-        time: &SystemTime,
-        clients: &ClientMap,
-        state: &mut ShardServerState,
-    ) {
+    fn tick_missions(&mut self, time: &SystemTime, state: &mut ShardServerState) {
         let check_task_failure = |player: &Player, task: &Task, task_def: &TaskDefinition| {
             if task_def.obj_time_limit.is_some() {
                 match task.fail_time {
@@ -1469,7 +1455,7 @@ impl Player {
             Some(*qitem_id)
         };
 
-        let client = self.get_client(clients).unwrap();
+        let client = self.get_client().unwrap();
         for task in self.mission_journal.get_current_tasks() {
             let task_def = tdata_get().get_task_definition(task.get_task_id()).unwrap();
 
@@ -1691,8 +1677,8 @@ impl Combatant for Player {
     }
 }
 impl Entity for Player {
-    fn get_client<'a>(&self, client_map: &'a ClientMap) -> Option<&'a FFClient> {
-        self.client_id.and_then(|key| client_map.get(key))
+    fn get_client(&self) -> Option<FFClient> {
+        self.client.clone()
     }
 
     fn get_id(&self) -> EntityID {
@@ -1742,7 +1728,7 @@ impl Entity for Player {
         client.send_packet(PacketID::P_FE2CL_PC_EXIT, &pkt);
     }
 
-    fn cleanup(&mut self, clients: &ClientMap, state: &mut ShardServerState) {
+    fn cleanup(&mut self, state: &mut ShardServerState) {
         let pc_id = self.get_player_id();
 
         // cleanup the buyback list
@@ -1756,7 +1742,7 @@ impl Entity for Player {
             let pc_id_other = trade.get_other_id(pc_id);
             let player_other = state.get_player_mut(pc_id_other).unwrap();
             player_other.trade_id = None;
-            let client_other = player_other.get_client(clients).unwrap();
+            let client_other = player_other.get_client().unwrap();
             let pkt_cancel = sP_FE2CL_REP_PC_TRADE_CONFIRM_CANCEL {
                 iID_Request: pc_id,
                 iID_From: trade.get_id_from(),
@@ -1768,24 +1754,17 @@ impl Entity for Player {
 
         // cleanup group
         if let Some(group_id) = self.group_id {
-            crate::helpers::remove_group_member(EntityID::Player(pc_id), group_id, state, clients)
-                .unwrap();
+            crate::helpers::remove_group_member(EntityID::Player(pc_id), group_id, state).unwrap();
         }
     }
 
-    fn tick(
-        &mut self,
-        time: &SystemTime,
-        clients: &ClientMap,
-        state: &mut ShardServerState,
-        _rng: &mut ThreadRng,
-    ) {
+    fn tick(&mut self, time: &SystemTime, state: &mut ShardServerState, _rng: &mut ThreadRng) {
         if self.is_dead() {
             return;
         }
 
-        self.tick_skyway_ride(time, clients, state);
-        self.tick_missions(time, clients, state);
+        self.tick_skyway_ride(time, state);
+        self.tick_missions(time, state);
 
         let transmit = self.tick_regen(time);
         if !transmit {
@@ -1799,7 +1778,7 @@ impl Entity for Player {
             bResetMissionFlag: unused!(),
         };
 
-        self.get_client(clients)
+        self.get_client()
             .unwrap()
             .send_packet(P_FE2CL_REP_PC_TICK, &pkt);
     }

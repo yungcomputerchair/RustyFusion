@@ -219,7 +219,7 @@ pub fn warp_use_transportation(
         client.send_packet(P_FE2CL_REP_PC_WARP_USE_TRANSPORTATION_SUCC, &resp);
 
         if trip.transportation_type == TransportationType::Wyvern {
-            rusty_fusion::helpers::broadcast_monkey(pc_id, RideType::Wyvern, clients, state);
+            rusty_fusion::helpers::broadcast_monkey(pc_id, RideType::Wyvern, state);
         }
 
         Ok(())
@@ -495,7 +495,7 @@ mod helpers {
         };
         for warping_pc_id in pc_ids_to_warp {
             let player = state.get_player_mut(warping_pc_id)?;
-            let client = player.get_client(clients).unwrap();
+            let client = player.get_client().unwrap();
             player.set_pre_warp();
             player.set_position(warp_data.pos);
             let instance_id = InstanceID {
@@ -544,18 +544,11 @@ mod helpers {
                 client.send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp);
             }
 
-            rusty_fusion::helpers::broadcast_state(
-                pc_id,
-                player.get_state_bit_flag(),
-                clients,
-                state,
-            );
+            rusty_fusion::helpers::broadcast_state(pc_id, player.get_state_bit_flag(), state);
 
             // we remove the player from the chunk here and wait for PC_LOADING_COMPLETE to put them back.
             // it needs to be done this way or the client will miss the PC/NPC_ENTER packets.
-            state
-                .entity_map
-                .update(EntityID::Player(pc_id), None, Some(clients));
+            state.entity_map.update(EntityID::Player(pc_id), None, true);
         }
 
         Ok(item_consumed)

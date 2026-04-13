@@ -51,7 +51,7 @@ pub fn item_move(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState)
 
     let entity_id = player.get_id();
     if location_from == ItemLocation::Equip {
-        state.entity_map.for_each_around(entity_id, clients, |c| {
+        state.entity_map.for_each_around(entity_id, |c| {
             let pkt = sP_FE2CL_PC_EQUIP_CHANGE {
                 iPC_ID: pc_id,
                 iEquipSlotNum: pkt.iFromSlotNum,
@@ -63,7 +63,7 @@ pub fn item_move(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState)
     }
 
     if location_to == ItemLocation::Equip {
-        state.entity_map.for_each_around(entity_id, clients, |c| {
+        state.entity_map.for_each_around(entity_id, |c| {
             let pkt = sP_FE2CL_PC_EQUIP_CHANGE {
                 iPC_ID: pc_id,
                 iEquipSlotNum: pkt.iToSlotNum,
@@ -81,7 +81,7 @@ pub fn item_move(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState)
         && player.vehicle_speed.is_some()
     {
         player.vehicle_speed = None;
-        rusty_fusion::helpers::broadcast_state(pc_id, player.get_state_bit_flag(), clients, state);
+        rusty_fusion::helpers::broadcast_state(pc_id, player.get_state_bit_flag(), state);
         let pkt = sP_FE2CL_PC_VEHICLE_OFF_SUCC { UNUSED: unused!() };
         clients
             .get_sender()

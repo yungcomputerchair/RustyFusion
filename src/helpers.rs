@@ -7,36 +7,26 @@ use crate::{
     error::*,
     net::{
         packet::{PacketID::*, *},
-        ClientMap, FFClient,
+        FFClient,
     },
     state::ShardServerState,
     tabledata::tdata_get,
     util,
 };
 
-pub fn broadcast_state(
-    pc_id: i32,
-    player_sbf: i8,
-    clients: &ClientMap,
-    state: &mut ShardServerState,
-) {
+pub fn broadcast_state(pc_id: i32, player_sbf: i8, state: &mut ShardServerState) {
     let bcast = sP_FE2CL_PC_STATE_CHANGE {
         iPC_ID: pc_id,
         iState: player_sbf,
     };
     state
         .entity_map
-        .for_each_around(EntityID::Player(pc_id), clients, |client| {
+        .for_each_around(EntityID::Player(pc_id), |client| {
             client.send_packet(P_FE2CL_PC_STATE_CHANGE, &bcast);
         });
 }
 
-pub fn broadcast_monkey(
-    pc_id: i32,
-    ride_type: RideType,
-    clients: &ClientMap,
-    state: &mut ShardServerState,
-) {
+pub fn broadcast_monkey(pc_id: i32, ride_type: RideType, state: &mut ShardServerState) {
     let player = state.get_player(pc_id).unwrap();
 
     // monkey activate packet
@@ -57,12 +47,12 @@ pub fn broadcast_monkey(
         eCSTB___Add: 0,
     };
 
-    let client = player.get_client(clients).unwrap();
+    let client = player.get_client().unwrap();
     client.send_packet(P_FE2CL_REP_PC_RIDING_SUCC, &pkt_monkey);
     client.send_packet(P_FE2CL_REP_NANO_ACTIVE_SUCC, &pkt_nano);
     state
         .entity_map
-        .for_each_around(EntityID::Player(pc_id), clients, |c| {
+        .for_each_around(EntityID::Player(pc_id), |c| {
             c.send_packet(P_FE2CL_PC_RIDING, &pkt_monkey);
             c.send_packet(P_FE2CL_NANO_ACTIVE, &pkt_nano_bcast);
         });
@@ -72,7 +62,6 @@ pub fn remove_group_member(
     leaver_id: EntityID,
     group_id: Uuid,
     state: &mut ShardServerState,
-    clients: &ClientMap,
 ) -> FFResult<()> {
     let mut group = state.groups.get(&group_id).unwrap().clone();
     group.remove_member(leaver_id)?;
@@ -83,7 +72,7 @@ pub fn remove_group_member(
         let leaver_pkt = sP_FE2CL_PC_GROUP_LEAVE_SUCC { UNUSED: unused!() };
         for eid in group.get_member_ids() {
             let entity = state.entity_map.get_entity_raw(*eid).unwrap();
-            if let Some(client) = entity.get_client(clients) {
+            if let Some(client) = entity.get_client() {
                 client.send_packet(P_FE2CL_PC_GROUP_LEAVE_SUCC, &leaver_pkt);
             }
             match eid {
@@ -123,7 +112,7 @@ pub fn remove_group_member(
             if let Some(update_pkt) = log_if_failed(update_pkt.build()) {
                 for eid in group.get_member_ids() {
                     let entity = state.entity_map.get_entity_raw(*eid).unwrap();
-                    if let Some(client) = entity.get_client(clients) {
+                    if let Some(client) = entity.get_client() {
                         client.send_payload(update_pkt.clone());
                     }
                 }
@@ -149,7 +138,7 @@ pub fn remove_group_member(
             if let Some(update_pkt) = log_if_failed(update_pkt.build()) {
                 for eid in group.get_member_ids() {
                     let entity = state.entity_map.get_entity_raw(*eid).unwrap();
-                    if let Some(client) = entity.get_client(clients) {
+                    if let Some(client) = entity.get_client() {
                         client.send_payload(update_pkt.clone());
                     }
                 }
@@ -172,14 +161,9 @@ pub fn send_system_message(client: &FFClient, msg: &str) -> FFResult<()> {
     Ok(())
 }
 
-pub fn give_defeat_rewards(
-    player: &mut Player,
-    defeated_type: i32,
-    clients: &ClientMap,
-    rng: &mut ThreadRng,
-) {
+pub fn give_defeat_rewards(player: &mut Player, defeated_type: i32, rng: &mut ThreadRng) {
     let active_task_id = player.mission_journal.get_active_task_id().unwrap_or(0);
-    let client = player.get_client(clients).unwrap();
+    let client = player.get_client().unwrap();
     let mut item_rewards = Vec::new();
     let (enemy_in_tasks, count_updated) = player.mission_journal.mark_enemy_defeated(defeated_type);
 
@@ -289,8 +273,7 @@ pub fn give_defeat_rewards(
     let mut reward_pkt =
         PacketBuilder::new(P_FE2CL_REP_REWARD_ITEM).with(&sP_FE2CL_REP_REWARD_ITEM {
             m_iCandy: player.set_taros(player.get_taros() + gained_taros) as i32,
-            m_iFusionMatter: player
-                .set_fusion_matter(player.get_fusion_matter() + gained_fm, Some(clients))
+            m_iFusionMatter: player.set_fusion_matter(player.get_fusion_matter() + gained_fm)
                 as i32,
             m_iBatteryN: player.set_nano_potions(player.get_nano_potions() + gained_potions) as i32,
             m_iBatteryW: player.set_weapon_boosts(player.get_weapon_boosts() + gained_boosts)
@@ -307,7 +290,7 @@ pub fn give_defeat_rewards(
     }
 
     if let Some(reward_pkt) = log_if_failed(reward_pkt.build()) {
-        let client = player.get_client(clients).unwrap();
+        let client = player.get_client().unwrap();
         client.send_payload(reward_pkt);
     }
 }

@@ -18,7 +18,7 @@ use crate::{
     item::Item,
     net::{
         packet::{PacketID::*, *},
-        ClientMap, LoginData,
+        LoginData,
     },
     tabledata::tdata_get,
     trade::TradeContext,
@@ -66,14 +66,14 @@ impl Default for ShardServerState {
                 let chunk_pos = npc.get_chunk_coords();
                 let entity_map = &mut state.entity_map;
                 let id = entity_map.track(Box::new(npc), tick_mode);
-                entity_map.update(id, Some(chunk_pos), None);
+                entity_map.update(id, Some(chunk_pos), false);
             }
 
             for egg in tdata_get().make_eggs(&mut state.entity_map, channel_num) {
                 let chunk_pos = egg.get_chunk_coords();
                 let entity_map = &mut state.entity_map;
                 let id = entity_map.track(Box::new(egg), TickMode::Always);
-                entity_map.update(id, Some(chunk_pos), None);
+                entity_map.update(id, Some(chunk_pos), false);
             }
 
             // spawn sliders uniformly across the circuit
@@ -120,7 +120,7 @@ impl Default for ShardServerState {
                 sliders_spawned += 1;
                 let chunk_pos = slider.get_chunk_coords();
                 let id = entity_map.track(Box::new(slider), TickMode::Always);
-                entity_map.update(id, Some(chunk_pos), None);
+                entity_map.update(id, Some(chunk_pos), false);
                 dist_to_next = slider_gap_size;
                 if sliders_spawned as usize == num_sliders {
                     break;
@@ -232,7 +232,7 @@ impl ShardServerState {
         ))
     }
 
-    pub fn check_for_expired_vehicles(&mut self, time: SystemTime, clients: &ClientMap) {
+    pub fn check_for_expired_vehicles(&mut self, time: SystemTime) {
         log(Severity::Debug, "Checking for expired vehicles");
         let pc_ids: Vec<i32> = self.entity_map.get_player_ids().collect();
         let mut pc_ids_dismounted = Vec::with_capacity(pc_ids.len());
@@ -245,7 +245,7 @@ impl ShardServerState {
                         vehicle_slot.take();
 
                         // dismount
-                        let client = player.get_client(clients).unwrap();
+                        let client = player.get_client().unwrap();
                         if player.vehicle_speed.is_some() {
                             player.vehicle_speed = None;
                             let pkt = sP_FE2CL_PC_VEHICLE_OFF_SUCC { UNUSED: unused!() };
@@ -272,15 +272,15 @@ impl ShardServerState {
 
         for pc_id in pc_ids_dismounted {
             let player = self.get_player(pc_id).unwrap();
-            helpers::broadcast_state(pc_id, player.get_state_bit_flag(), clients, self);
+            helpers::broadcast_state(pc_id, player.get_state_bit_flag(), self);
         }
     }
 
-    pub fn tick_garbage_collection(&mut self, clients: &ClientMap) {
+    pub fn tick_garbage_collection(&mut self) {
         let mut removed_entities = self.entity_map.garbage_collect_instances();
         removed_entities.extend(self.entity_map.garbage_collect_entities());
         for entity in removed_entities.iter_mut() {
-            entity.cleanup(clients, self);
+            entity.cleanup(self);
         }
 
         if !removed_entities.is_empty() {
@@ -291,7 +291,7 @@ impl ShardServerState {
         }
     }
 
-    pub fn tick_groups(&mut self, clients: &ClientMap) {
+    pub fn tick_groups(&mut self) {
         for group in self.groups.values() {
             let (pc_group_data, npc_group_data) = group.get_member_data(self);
             let mut pkt = PacketBuilder::new(P_FE2CL_PC_GROUP_JOIN_SUCC).with(
@@ -312,7 +312,7 @@ impl ShardServerState {
             if let Some(pkt) = log_if_failed(pkt.build()) {
                 for eid in group.get_member_ids() {
                     let entity = self.entity_map.get_entity_raw(*eid).unwrap();
-                    if let Some(client) = entity.get_client(clients) {
+                    if let Some(client) = entity.get_client() {
                         client.send_payload(pkt.clone());
                     }
                 }
@@ -320,7 +320,7 @@ impl ShardServerState {
         }
     }
 
-    pub fn tick_entities(&mut self, time: SystemTime, clients: &ClientMap) {
+    pub fn tick_entities(&mut self, time: SystemTime) {
         let mut rng = thread_rng();
         let eids: Vec<EntityID> = self.entity_map.get_tickable_ids().collect();
         for eid in eids {
@@ -329,22 +329,22 @@ impl ShardServerState {
                 // we put it back when we're done.
                 EntityID::Player(pc_id) => {
                     let mut player = self.get_player_mut(pc_id).unwrap().clone();
-                    player.tick(&time, clients, self, &mut rng);
+                    player.tick(&time, self, &mut rng);
                     *self.get_player_mut(pc_id).unwrap() = player;
                 }
                 EntityID::NPC(npc_id) => {
                     let mut npc = self.get_npc_mut(npc_id).unwrap().clone();
-                    npc.tick(&time, clients, self, &mut rng);
+                    npc.tick(&time, self, &mut rng);
                     *self.get_npc_mut(npc_id).unwrap() = npc;
                 }
                 EntityID::Slider(slider_id) => {
                     let mut slider = self.get_slider_mut(slider_id).unwrap().clone();
-                    slider.tick(&time, clients, self, &mut rng);
+                    slider.tick(&time, self, &mut rng);
                     *self.get_slider_mut(slider_id).unwrap() = slider;
                 }
                 EntityID::Egg(egg_id) => {
                     let mut egg = self.get_egg_mut(egg_id).unwrap().clone();
-                    egg.tick(&time, clients, self, &mut rng);
+                    egg.tick(&time, self, &mut rng);
                     *self.get_egg_mut(egg_id).unwrap() = egg;
                 }
             }

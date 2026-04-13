@@ -72,7 +72,7 @@ pub fn pc_attack_npcs(
     };
 
     // attack handler
-    skills::do_basic_attack(player.get_id(), &target_ids, charged, state, clients)?;
+    skills::do_basic_attack(player.get_id(), &target_ids, charged, state)?;
 
     Ok(())
 }

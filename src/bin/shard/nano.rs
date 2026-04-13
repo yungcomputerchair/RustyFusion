@@ -56,7 +56,7 @@ pub fn nano_equip(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState
 
         state
             .entity_map
-            .for_each_around(EntityID::Player(pc_id), clients, |c| {
+            .for_each_around(EntityID::Player(pc_id), |c| {
                 c.send_packet(P_FE2CL_NANO_ACTIVE, &bcast);
             });
     }
@@ -93,7 +93,7 @@ pub fn nano_unequip(
         };
         state
             .entity_map
-            .for_each_around(EntityID::Player(pc_id), clients, |c| {
+            .for_each_around(EntityID::Player(pc_id), |c| {
                 c.send_packet(P_FE2CL_NANO_ACTIVE, &bcast);
             });
     }
@@ -128,7 +128,7 @@ pub fn nano_active(pkt: Packet, clients: &ClientMap, state: &mut ShardServerStat
 
     state
         .entity_map
-        .for_each_around(EntityID::Player(pc_id), clients, |c| {
+        .for_each_around(EntityID::Player(pc_id), |c| {
             c.send_packet(P_FE2CL_NANO_ACTIVE, &bcast);
         });
 
@@ -197,10 +197,8 @@ pub fn nano_tune(pkt: Packet, client: &FFClient, state: &mut ShardServerState) -
                     ),
                 ));
             }
-            player_working.set_fusion_matter(
-                player_working.get_fusion_matter() - tuning.fusion_matter_cost,
-                None, // no broadcast since there's no chance of leveling up
-            );
+            player_working
+                .set_fusion_matter(player_working.get_fusion_matter() - tuning.fusion_matter_cost);
         }
 
         player_working.tune_nano(pkt.iNanoID, Some(skill_id))?;

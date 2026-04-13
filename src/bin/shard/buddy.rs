@@ -104,7 +104,7 @@ pub fn request_make_buddy(
         return Ok(());
     }
 
-    let buddy_client = buddy.get_client(clients).unwrap();
+    let buddy_client = buddy.get_client().unwrap();
     buddy_client.send_packet(P_FE2CL_REP_REQUEST_MAKE_BUDDY_SUCC_TO_ACCEPTER, &req_pkt);
 
     let player = state.get_player_mut(pc_id).unwrap();
@@ -164,7 +164,7 @@ pub fn find_name_make_buddy(
         return Ok(());
     }
 
-    let buddy_client = buddy.get_client(clients).unwrap();
+    let buddy_client = buddy.get_client().unwrap();
     let player = state.get_player_mut(pc_id).unwrap();
     player.buddy_offered_to = Some(buddy_uid);
     let req_pkt = sP_FE2CL_REP_PC_FIND_NAME_MAKE_BUDDY_SUCC {
@@ -220,7 +220,7 @@ pub fn accept_make_buddy(
         };
 
         buddy
-            .get_client(clients)
+            .get_client()
             .unwrap()
             .send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC, &pkt_buddy);
 
@@ -252,7 +252,7 @@ pub fn accept_make_buddy(
             iErrorCode: ERROR_CODE_BUDDY_DENY,
         };
 
-        let buddy_client = buddy.get_client(clients).unwrap();
+        let buddy_client = buddy.get_client().unwrap();
         buddy_client.send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_FAIL, &deny_pkt);
     })
 }
@@ -313,7 +313,7 @@ pub fn find_name_accept_buddy(
         };
 
         buddy
-            .get_client(clients)
+            .get_client()
             .unwrap()
             .send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_SUCC, &pkt_buddy);
 
@@ -345,7 +345,7 @@ pub fn find_name_accept_buddy(
             iErrorCode: ERROR_CODE_BUDDY_DENY,
         };
 
-        let buddy_client = buddy.get_client(clients).unwrap();
+        let buddy_client = buddy.get_client().unwrap();
         buddy_client.send_packet(P_FE2CL_REP_ACCEPT_MAKE_BUDDY_FAIL, &deny_pkt);
     })
 }
@@ -466,9 +466,7 @@ pub fn pc_buddy_warp(
         player.buddy_warp_available_at =
             Some(util::get_timestamp_sec(SystemTime::now()) + BUDDYWARP_INTERVAL);
 
-        state
-            .entity_map
-            .update(EntityID::Player(pc_id), None, Some(clients));
+        state.entity_map.update(EntityID::Player(pc_id), None, true);
 
         // this packet in client code seems to just leave group
         let same_shard_succ_pkt = sP_FE2CL_REP_PC_BUDDY_WARP_SAME_SHARD_SUCC { UNUSED: 0 };

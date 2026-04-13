@@ -12,7 +12,7 @@ use crate::{
             sP_FE2CL_TRANSPORTATION_ENTER, sP_FE2CL_TRANSPORTATION_EXIT,
             sP_FE2CL_TRANSPORTATION_MOVE, sTransportationAppearanceData, PacketID::*,
         },
-        ClientMap, FFClient,
+        FFClient,
     },
     path::Path,
     state::ShardServerState,
@@ -65,7 +65,7 @@ impl Entity for Slider {
         EntityID::Slider(self.id)
     }
 
-    fn get_client<'a>(&self, _client_map: &'a ClientMap) -> Option<&'a FFClient> {
+    fn get_client(&self) -> Option<FFClient> {
         None
     }
 
@@ -112,20 +112,14 @@ impl Entity for Slider {
         client.send_packet(P_FE2CL_TRANSPORTATION_EXIT, &pkt);
     }
 
-    fn tick(
-        &mut self,
-        _time: &SystemTime,
-        clients: &ClientMap,
-        state: &mut ShardServerState,
-        _rng: &mut ThreadRng,
-    ) {
+    fn tick(&mut self, _time: &SystemTime, state: &mut ShardServerState, _rng: &mut ThreadRng) {
         if let Some(path) = self.path.as_mut() {
             let speed = path.get_speed();
             path.tick(&mut self.position);
             let chunk_pos = self.get_chunk_coords();
             state
                 .entity_map
-                .update(self.get_id(), Some(chunk_pos), Some(clients));
+                .update(self.get_id(), Some(chunk_pos), true);
 
             let pkt = sP_FE2CL_TRANSPORTATION_MOVE {
                 eTT: TransportationType::Bus as i32,
@@ -136,15 +130,13 @@ impl Entity for Slider {
                 iSpeed: speed,
                 iMoveStyle: unused!(),
             };
-            state
-                .entity_map
-                .for_each_around(self.get_id(), clients, |c| {
-                    c.send_packet(P_FE2CL_TRANSPORTATION_MOVE, &pkt)
-                });
+            state.entity_map.for_each_around(self.get_id(), |c| {
+                c.send_packet(P_FE2CL_TRANSPORTATION_MOVE, &pkt)
+            });
         }
     }
 
-    fn cleanup(&mut self, _clients: &ClientMap, _state: &mut ShardServerState) {}
+    fn cleanup(&mut self, _state: &mut ShardServerState) {}
 
     fn as_combatant(&self) -> Option<&dyn Combatant> {
         None

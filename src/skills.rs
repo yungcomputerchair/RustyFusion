@@ -5,10 +5,7 @@ use crate::{
     entity::{Combatant, EntityID},
     enums::CombatStyle,
     error::*,
-    net::{
-        packet::{PacketID::*, *},
-        ClientMap,
-    },
+    net::packet::{PacketID::*, *},
     state::ShardServerState,
 };
 
@@ -24,12 +21,11 @@ pub fn do_basic_attack(
     target_ids: &[EntityID],
     charged: bool,
     state: &mut ShardServerState,
-    clients: &ClientMap,
 ) -> FFResult<()> {
     const CRIT_CHANCE: f32 = 0.05;
 
     let attacker = state.get_combatant(attacker_id)?;
-    let mut attacker_client = attacker.get_client(clients);
+    let mut attacker_client = attacker.get_client();
 
     let power = if target_ids.len() == 1 {
         attacker.get_single_power()
@@ -179,7 +175,7 @@ pub fn do_basic_attack(
         None
     };
 
-    state.entity_map.for_each_around(attacker_id, clients, |c| {
+    state.entity_map.for_each_around(attacker_id, |c| {
         if let Some(pkt) = &pc_bcast {
             c.send_payload(pkt.clone());
         }

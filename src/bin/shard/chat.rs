@@ -84,7 +84,7 @@ pub async fn send_freechat_message(
 
         state
             .entity_map
-            .for_each_around(EntityID::Player(pc_id), clients, |client| {
+            .for_each_around(EntityID::Player(pc_id), |client| {
                 client.send_packet(P_FE2CL_REP_SEND_FREECHAT_MESSAGE_SUCC, &resp);
             });
         Ok(())
@@ -146,7 +146,7 @@ pub fn send_menuchat_message(
         };
         state
             .entity_map
-            .for_each_around(EntityID::Player(pc_id), clients, |client| {
+            .for_each_around(EntityID::Player(pc_id), |client| {
                 client.send_packet(P_FE2CL_REP_SEND_MENUCHAT_MESSAGE_SUCC, &resp);
             });
         Ok(())
@@ -217,7 +217,7 @@ pub fn send_group_freechat_message(
         let group = state.groups.get(&group_id).unwrap();
         for eid in group.get_member_ids() {
             let entity = state.entity_map.get_entity_raw(*eid).unwrap();
-            if let Some(client) = entity.get_client(clients) {
+            if let Some(client) = entity.get_client() {
                 client.send_packet(P_FE2CL_REP_SEND_ALL_GROUP_FREECHAT_MESSAGE_SUCC, &pkt);
             }
         }
@@ -271,7 +271,7 @@ pub fn send_group_menuchat_message(
         let group = state.groups.get(&group_id).unwrap();
         for eid in group.get_member_ids() {
             let entity = state.entity_map.get_entity_raw(*eid).unwrap();
-            if let Some(client) = entity.get_client(clients) {
+            if let Some(client) = entity.get_client() {
                 client.send_packet(P_FE2CL_REP_SEND_ALL_GROUP_MENUCHAT_MESSAGE_SUCC, &pkt);
             }
         }
@@ -335,7 +335,7 @@ pub fn send_buddy_freechat_message(
             );
         }
 
-        if let Some(buddy_client) = buddy.get_client(clients) {
+        if let Some(buddy_client) = buddy.get_client() {
             buddy_client.send_packet(P_FE2CL_REP_SEND_BUDDY_FREECHAT_MESSAGE_SUCC, &response_pkt);
         }
 
@@ -425,7 +425,7 @@ pub fn send_buddy_menuchat_message(
             );
         }
 
-        if let Some(buddy_client) = buddy.get_client(clients) {
+        if let Some(buddy_client) = buddy.get_client() {
             buddy_client.send_packet(P_FE2CL_REP_SEND_BUDDY_MENUCHAT_MESSAGE_SUCC, &response_pkt);
         }
 
@@ -471,7 +471,7 @@ pub fn pc_avatar_emotes_chat(
 
     state
         .entity_map
-        .for_each_around(EntityID::Player(pc_id), clients, |client| {
+        .for_each_around(EntityID::Player(pc_id), |client| {
             client.send_packet(P_FE2CL_REP_PC_AVATAR_EMOTES_CHAT, &resp);
         });
 
@@ -695,7 +695,7 @@ mod commands {
 
             if is_ban_i {
                 let banned_player = state.get_player(pc_id)?;
-                let banned_client = banned_player.get_client(clients).unwrap();
+                let banned_client = banned_player.get_client().unwrap();
                 let pkt = sP_FE2CL_REP_PC_EXIT_SUCC {
                     iID: pc_id,
                     iExitCode: EXIT_CODE_REQ_BY_GM as i32,
@@ -985,13 +985,14 @@ mod commands {
             let pc_id = clients.get_sender().get_player_id()?;
             let player = state.get_player(pc_id)?;
             let chunk_coords = player.get_chunk_coords();
-            state
-                .entity_map
-                .update(EntityID::Player(pc_id), None, Some(clients));
 
+            // remove from chunk completely; pulls all entities out of view
+            state.entity_map.update(EntityID::Player(pc_id), None, true);
+
+            // re-add to chunk; pushes all entities back into view
             state
                 .entity_map
-                .update(EntityID::Player(pc_id), Some(chunk_coords), Some(clients));
+                .update(EntityID::Player(pc_id), Some(chunk_coords), true);
 
             Ok(())
         })

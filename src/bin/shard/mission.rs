@@ -518,7 +518,7 @@ pub fn task_end(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
                     let mut reward_pkt = PacketBuilder::new(P_FE2CL_REP_REWARD_ITEM).with(
                         &sP_FE2CL_REP_REWARD_ITEM {
                             m_iCandy: player.set_taros(taros_new) as i32,
-                            m_iFusionMatter: player.set_fusion_matter(fm_new, Some(clients)) as i32,
+                            m_iFusionMatter: player.set_fusion_matter(fm_new) as i32,
                             m_iBatteryN: player.get_nano_potions() as i32,
                             m_iBatteryW: player.get_weapon_boosts() as i32,
                             iItemCnt: reward.items.len() as i8,
@@ -575,7 +575,6 @@ pub fn task_end(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
                     Ok(nano) => {
                         player.set_fusion_matter(
                             player.get_fusion_matter() - player_stats.req_fm_nano_create,
-                            None,
                         );
                         let new_level = std::cmp::max(player.get_level(), nano_id);
                         let resp = sP_FE2CL_REP_PC_NANO_CREATE_SUCC {
@@ -601,7 +600,7 @@ pub fn task_end(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
                         };
                         state
                             .entity_map
-                            .for_each_around(EntityID::Player(pc_id), clients, |c| {
+                            .for_each_around(EntityID::Player(pc_id), |c| {
                                 c.send_packet(P_FE2CL_REP_PC_CHANGE_LEVEL, &bcast)
                             });
                     }

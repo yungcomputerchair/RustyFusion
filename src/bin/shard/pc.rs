@@ -25,7 +25,6 @@ use tokio::sync::Mutex;
 pub async fn pc_enter(
     pkt: Packet,
     clients: &ClientMap<'_>,
-    key: usize,
     state_lock: Arc<Mutex<ShardServerState>>,
     time: SystemTime,
 ) -> FFResult<()> {
@@ -71,13 +70,13 @@ pub async fn pc_enter(
             );
 
             let existing_player = state.get_player(existing_pc_id).unwrap();
-            let existing_client = existing_player.get_client(clients).unwrap();
+            let existing_client = existing_player.get_client().unwrap();
             let pkt = sP_FE2CL_REP_PC_EXIT_DUPLICATE {
                 iErrorCode: unused!(),
             };
 
             existing_client.send_packet(P_FE2CL_REP_PC_EXIT_DUPLICATE, &pkt);
-            Some(Player::disconnect(existing_pc_id, &mut state, clients))
+            Some(Player::disconnect(existing_pc_id, &mut state))
         } else {
             None
         };
@@ -129,8 +128,14 @@ pub async fn pc_enter(
     let mut state = state_lock.lock().await;
     state.pending_entering_uids.remove(&player_uid);
 
+    let client = clients.get_sender();
     player.set_player_id(pc_id);
-    player.set_client_id(key);
+    player.set_client(client.clone());
+    client.set_client_type(ClientType::GameClient {
+        account_id: login_data.iAccountID,
+        serial_key: enter_serial_key,
+        pc_id: Some(pc_id),
+    });
 
     // set buddy warp timestamp from login data if present
     if login_data.iBuddyWarpTime > 0 {
@@ -150,13 +155,6 @@ pub async fn pc_enter(
         PCLoadData2CL: player.get_load_data(),
         uiSvrTime: util::get_timestamp_ms(time),
     };
-
-    let client = clients.get_sender();
-    client.set_client_type(ClientType::GameClient {
-        account_id: login_data.iAccountID,
-        serial_key: enter_serial_key,
-        pc_id: Some(pc_id),
-    });
 
     let iv1: i32 = resp.iID + 1;
     let iv2: i32 = resp.PCLoadData2CL.iFusionMatter + 1;
@@ -217,7 +215,7 @@ pub async fn pc_exit(clients: &ClientMap<'_>, state: Arc<Mutex<ShardServerState>
 
     let player = {
         let mut state = state.lock().await;
-        Player::disconnect(pc_id, &mut state, clients)
+        Player::disconnect(pc_id, &mut state)
     };
 
     // save to db
@@ -239,9 +237,7 @@ pub fn pc_loading_complete(
     let player = state.get_player(pc_id)?;
     let map_num = player.instance_id.map_num;
     let chunk = player.get_chunk_coords();
-    state
-        .entity_map
-        .update(player.get_id(), Some(chunk), Some(clients));
+    state.entity_map.update(player.get_id(), Some(chunk), true);
     let client = clients.get_sender();
     client.send_packet(P_FE2CL_REP_PC_LOADING_COMPLETE_SUCC, &resp);
 
@@ -337,7 +333,7 @@ pub fn pc_move(
 
     state
         .entity_map
-        .for_each_around(EntityID::Player(pc_id), clients, |client| {
+        .for_each_around(EntityID::Player(pc_id), |client| {
             client.send_packet(P_FE2CL_PC_MOVE, &resp);
         });
 
@@ -346,9 +342,7 @@ pub fn pc_move(
     player.set_position(pos);
     player.set_rotation(angle);
     let chunk = player.get_chunk_coords();
-    state
-        .entity_map
-        .update(entity_id, Some(chunk), Some(clients));
+    state.entity_map.update(entity_id, Some(chunk), true);
     Ok(())
 }
 
@@ -388,7 +382,7 @@ pub fn pc_jump(
 
     state
         .entity_map
-        .for_each_around(EntityID::Player(pc_id), clients, |client| {
+        .for_each_around(EntityID::Player(pc_id), |client| {
             client.send_packet(P_FE2CL_PC_JUMP, &resp);
         });
 
@@ -397,9 +391,8 @@ pub fn pc_jump(
     player.set_position(pos);
     player.set_rotation(angle);
     let chunk = player.get_chunk_coords();
-    state
-        .entity_map
-        .update(entity_id, Some(chunk), Some(clients));
+    state.entity_map.update(entity_id, Some(chunk), true);
+
     Ok(())
 }
 
@@ -431,7 +424,7 @@ pub fn pc_stop(
 
     state
         .entity_map
-        .for_each_around(EntityID::Player(pc_id), clients, |client| {
+        .for_each_around(EntityID::Player(pc_id), |client| {
             client.send_packet(P_FE2CL_PC_STOP, &resp);
         });
 
@@ -439,9 +432,7 @@ pub fn pc_stop(
     let entity_id = player.get_id();
     player.set_position(pos);
     let chunk = player.get_chunk_coords();
-    state
-        .entity_map
-        .update(entity_id, Some(chunk), Some(clients));
+    state.entity_map.update(entity_id, Some(chunk), true);
 
     Ok(())
 }
@@ -487,7 +478,7 @@ pub fn pc_movetransportation(
 
     state
         .entity_map
-        .for_each_around(EntityID::Player(pc_id), clients, |client| {
+        .for_each_around(EntityID::Player(pc_id), |client| {
             client.send_packet(P_FE2CL_PC_MOVETRANSPORTATION, &resp);
         });
 
@@ -499,9 +490,7 @@ pub fn pc_movetransportation(
     player.set_position(pos);
     player.set_rotation(angle);
     let chunk = player.get_chunk_coords();
-    state
-        .entity_map
-        .update(entity_id, Some(chunk), Some(clients));
+    state.entity_map.update(entity_id, Some(chunk), true);
     Ok(())
 }
 
@@ -561,7 +550,7 @@ pub fn pc_vehicle_on(clients: &ClientMap, state: &mut ShardServerState) -> FFRes
             panic_log(&format!("Vehicle has no speed: {:?}", vehicle));
         }
 
-        rusty_fusion::helpers::broadcast_state(pc_id, player.get_state_bit_flag(), clients, state);
+        rusty_fusion::helpers::broadcast_state(pc_id, player.get_state_bit_flag(), state);
 
         let resp = sP_FE2CL_PC_VEHICLE_ON_SUCC { UNUSED: unused!() };
         client.send_packet(P_FE2CL_PC_VEHICLE_ON_SUCC, &resp);
@@ -585,7 +574,7 @@ pub fn pc_vehicle_off(clients: &ClientMap, state: &mut ShardServerState) -> FFRe
         let player = state.get_player_mut(pc_id)?;
 
         player.vehicle_speed = None;
-        rusty_fusion::helpers::broadcast_state(pc_id, player.get_state_bit_flag(), clients, state);
+        rusty_fusion::helpers::broadcast_state(pc_id, player.get_state_bit_flag(), state);
 
         let resp = sP_FE2CL_PC_VEHICLE_OFF_SUCC { UNUSED: unused!() };
         client.send_packet(P_FE2CL_PC_VEHICLE_OFF_SUCC, &resp);
@@ -637,7 +626,7 @@ pub fn pc_special_state_switch(
     };
     state
         .entity_map
-        .for_each_around(EntityID::Player(pc_id), clients, |c| {
+        .for_each_around(EntityID::Player(pc_id), |c| {
             c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
         });
 
@@ -668,7 +657,7 @@ pub fn pc_combat_begin_end(
     };
     state
         .entity_map
-        .for_each_around(EntityID::Player(pc_id), clients, |c| {
+        .for_each_around(EntityID::Player(pc_id), |c| {
             c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
         });
     Ok(())
@@ -754,7 +743,7 @@ pub fn pc_regen(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
     if let Some(new_chunk) = new_chunk_coords {
         state
             .entity_map
-            .update(EntityID::Player(pc_id), Some(new_chunk), Some(clients));
+            .update(EntityID::Player(pc_id), Some(new_chunk), true);
     }
 
     let bcast = sP_FE2CL_PC_REGEN {
@@ -762,7 +751,7 @@ pub fn pc_regen(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
     };
     state
         .entity_map
-        .for_each_around(EntityID::Player(pc_id), clients, |c| {
+        .for_each_around(EntityID::Player(pc_id), |c| {
             c.send_packet(P_FE2CL_PC_REGEN, &bcast);
         });
     Ok(())
@@ -895,7 +884,7 @@ pub fn pc_warp_channel(
 
         state
             .entity_map
-            .update(EntityID::Player(pc_id), Some(chunk_coords), Some(clients));
+            .update(EntityID::Player(pc_id), Some(chunk_coords), true);
 
         Ok(())
     })()

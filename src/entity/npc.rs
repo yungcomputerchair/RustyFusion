@@ -19,7 +19,7 @@ use crate::{
             sNPCAppearanceData, sNPCGroupMemberInfo, sP_FE2CL_NPC_ENTER, sP_FE2CL_NPC_EXIT,
             sP_FE2CL_NPC_MOVE, PacketID,
         },
-        ClientMap, FFClient,
+        FFClient,
     },
     path::Path,
     state::ShardServerState,
@@ -113,12 +113,7 @@ impl NPC {
         }
     }
 
-    pub fn tick_movement_along_path(
-        &mut self,
-        path: &mut Path,
-        clients: &ClientMap,
-        state: &mut ShardServerState,
-    ) {
+    pub fn tick_movement_along_path(&mut self, path: &mut Path, state: &mut ShardServerState) {
         let speed = path.get_speed();
         let old_pos = self.position;
         if path.tick(&mut self.position) {
@@ -127,7 +122,7 @@ impl NPC {
             let chunk_pos = self.get_chunk_coords();
             state
                 .entity_map
-                .update(self.get_id(), Some(chunk_pos), Some(clients));
+                .update(self.get_id(), Some(chunk_pos), true);
 
             let run_speed = tdata_get().get_npc_stats(self.ty).unwrap().run_speed;
             let pkt = sP_FE2CL_NPC_MOVE {
@@ -138,11 +133,9 @@ impl NPC {
                 iSpeed: speed,
                 iMoveStyle: if speed >= run_speed { 1 } else { 0 },
             };
-            state
-                .entity_map
-                .for_each_around(self.get_id(), clients, |c| {
-                    c.send_packet(PacketID::P_FE2CL_NPC_MOVE, &pkt)
-                });
+            state.entity_map.for_each_around(self.get_id(), |c| {
+                c.send_packet(PacketID::P_FE2CL_NPC_MOVE, &pkt)
+            });
         }
     }
 
@@ -172,7 +165,7 @@ impl Entity for NPC {
         EntityID::NPC(self.id)
     }
 
-    fn get_client<'a>(&self, _client_map: &'a ClientMap) -> Option<&'a FFClient> {
+    fn get_client(&self) -> Option<FFClient> {
         None
     }
 
@@ -217,13 +210,7 @@ impl Entity for NPC {
         client.send_packet(PacketID::P_FE2CL_NPC_EXIT, &pkt);
     }
 
-    fn tick(
-        &mut self,
-        time: &SystemTime,
-        clients: &ClientMap,
-        state: &mut ShardServerState,
-        rng: &mut ThreadRng,
-    ) {
+    fn tick(&mut self, time: &SystemTime, state: &mut ShardServerState, rng: &mut ThreadRng) {
         let pc_ids: Vec<i32> = self.interacting_pcs.iter().copied().collect();
         for pc_id in pc_ids {
             let pc_eid = EntityID::Player(pc_id);
@@ -238,16 +225,16 @@ impl Entity for NPC {
         if self.interacting_pcs.is_empty() {
             // we take the AI object out during tick to satisfy the borrow checker
             if let Some(mut ai) = self.ai.take() {
-                ai.tick(self, state, clients, time, rng);
+                ai.tick(self, state, time, rng);
                 self.ai = Some(ai);
             }
         }
     }
 
-    fn cleanup(&mut self, clients: &ClientMap, state: &mut ShardServerState) {
+    fn cleanup(&mut self, state: &mut ShardServerState) {
         // cleanup group
         if let Some(group_id) = self.group_id {
-            crate::helpers::remove_group_member(self.get_id(), group_id, state, clients).unwrap();
+            crate::helpers::remove_group_member(self.get_id(), group_id, state).unwrap();
         }
     }
 
