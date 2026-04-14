@@ -495,6 +495,7 @@ mod commands {
 
     use rusty_fusion::{
         ai,
+        chunk::TickMode,
         database::{db_get, DbImpl as _},
     };
 
@@ -515,13 +516,15 @@ mod commands {
 
     fn init_commands() -> HashMap<&'static str, Command> {
         #[rustfmt::skip]
-        let commands: [(&'static str, &'static str, CommandHandler); 10] = [
+        let commands: [(&'static str, &'static str, CommandHandler); 12] = [
             ("about", "Show information about the server", cmd_about),
             ("ban_a", "Ban an account", cmd_ban),
             ("ban_i", "Ban a player and their account", cmd_ban),
             ("unban", "Unban an account", cmd_unban),
             ("followme", "Make the nearest NPC start following you", cmd_followme),
             ("unfollowme", "Stop the nearest NPC from following you", cmd_unfollowme),
+            ("changeai", "Change the AI script of an NPC", cmd_changeai),
+            ("queryai", "Query the AI script of an NPC", cmd_queryai),
             ("perms", "View or change a player's permissions level", cmd_perms),
             ("ping", "View your current ping to the server", cmd_ping),
             ("refresh", "Reinsert the player into the current chunk", cmd_refresh),
@@ -753,6 +756,133 @@ mod commands {
         })
     }
 
+    fn cmd_queryai<'a>(
+        tokens: Vec<&'a str>,
+        clients: &'a ClientMap<'a>,
+        state: &'a mut ShardServerState,
+    ) -> Pin<Box<dyn Future<Output = FFResult<()>> + Send + 'a>> {
+        Box::pin(async move {
+            let client = clients.get_sender();
+            let pc_id = client.get_player_id()?;
+            let player = state.get_player(pc_id)?;
+            if player.perms > CN_ACCOUNT_LEVEL__GM as i16 {
+                return send_system_message(client, "You do not have permission to change AI");
+            }
+
+            let npc_id = if tokens.len() < 2 {
+                let player_pos = player.get_position();
+                let candidates = state.entity_map.get_around_entity(EntityID::Player(pc_id));
+                let mut closest_npc_id = None;
+                let mut closest_distance = u32::MAX;
+                for eid in candidates {
+                    if let EntityID::NPC(npcid) = eid {
+                        let npc = state.get_npc(npcid).unwrap();
+                        let npc_pos = npc.get_position();
+                        let distance = player_pos.distance_to(&npc_pos);
+                        if distance < RANGE_INTERACT && distance < closest_distance {
+                            closest_npc_id = Some(npc.id);
+                            closest_distance = distance;
+                        }
+                    }
+                }
+                closest_npc_id
+            } else {
+                match tokens[1].parse::<i32>() {
+                    Ok(id) => Some(id),
+                    Err(_) => return send_system_message(client, "Invalid NPC ID"),
+                }
+            };
+
+            if let Some(npc_id) = npc_id {
+                let npc = state.get_npc(npc_id).unwrap();
+                match npc.ai.as_ref() {
+                    Some(ai_script_name) => send_system_message(
+                        client,
+                        &format!("NPC {} has AI script: {}", npc, ai_script_name),
+                    ),
+                    None => send_system_message(
+                        client,
+                        &format!("NPC {} has no AI script assigned", npc),
+                    ),
+                }
+            } else {
+                send_system_message(client, "No NPCs nearby")
+            }
+        })
+    }
+
+    fn cmd_changeai<'a>(
+        tokens: Vec<&'a str>,
+        clients: &'a ClientMap<'a>,
+        state: &'a mut ShardServerState,
+    ) -> Pin<Box<dyn Future<Output = FFResult<()>> + Send + 'a>> {
+        Box::pin(async move {
+            let client = clients.get_sender();
+            let pc_id = client.get_player_id()?;
+            let player = state.get_player(pc_id)?;
+            if player.perms > CN_ACCOUNT_LEVEL__GM as i16 {
+                return send_system_message(client, "You do not have permission to change AI");
+            }
+
+            let ai_script_name = if tokens.len() < 2 {
+                return send_system_message(
+                    client,
+                    &format!("Usage: {}changeai <ai_script_name> [tick_mode]\ntick_mode: when_loaded (default) | always", CUSTOM_COMMAND_PREFIX));
+            } else {
+                tokens[1]
+            };
+
+            let tick_mode = if tokens.len() < 3 {
+                TickMode::WhenLoaded
+            } else {
+                match tokens[2].to_lowercase().as_str() {
+                    "when_loaded" => TickMode::WhenLoaded,
+                    "always" => TickMode::Always,
+                    _ => {
+                        return send_system_message(
+                            client,
+                            "Invalid tick mode. Valid options: when_loaded | always",
+                        );
+                    }
+                }
+            };
+
+            let player_pos = player.get_position();
+            let candidates = state.entity_map.get_around_entity(EntityID::Player(pc_id));
+            let mut closest_npc_id = None;
+            let mut closest_distance = u32::MAX;
+            for eid in candidates {
+                if let EntityID::NPC(npcid) = eid {
+                    let npc = state.get_npc(npcid).unwrap();
+                    let npc_pos = npc.get_position();
+                    let distance = player_pos.distance_to(&npc_pos);
+                    if distance < RANGE_INTERACT && distance < closest_distance {
+                        closest_npc_id = Some(npc.id);
+                        closest_distance = distance;
+                    }
+                }
+            }
+
+            if let Some(npc_id) = closest_npc_id {
+                let npc = state.get_npc_mut(npc_id).unwrap();
+                send_system_message(
+                    client,
+                    &format!("Changing AI of {} to {}", npc, ai_script_name),
+                )?;
+
+                npc.ai = Some(ai_script_name.to_string());
+                state
+                    .entity_map
+                    .set_tick(EntityID::NPC(npc_id), tick_mode)
+                    .unwrap();
+
+                Ok(())
+            } else {
+                send_system_message(client, "No NPCs nearby")
+            }
+        })
+    }
+
     fn cmd_followme<'a>(
         _tokens: Vec<&'a str>,
         clients: &'a ClientMap<'a>,
@@ -765,8 +895,8 @@ mod commands {
             if player.perms > CN_ACCOUNT_LEVEL__GM as i16 {
                 return send_system_message(client, "You do not have permission to move NPCs");
             }
-            let player_pos = player.get_position();
 
+            let player_pos = player.get_position();
             let candidates = state.entity_map.get_around_entity(EntityID::Player(pc_id));
             let mut closest_npc_id = None;
             let mut closest_distance = u32::MAX;
