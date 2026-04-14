@@ -35,8 +35,8 @@ struct XDTData {
     nano_data: NanoData,
     mission_data: MissionData,
     respawn_data: Vec<RespawnPoint>,
-    player_data: HashMap<i16, PlayerStats>,
-    npc_data: HashMap<i32, NPCStats>,
+    player_data: HashMap<i16, PlayerData>,
+    npc_data: HashMap<i32, NPCData>,
 }
 impl XDTData {
     fn load() -> Result<Self, String> {
@@ -172,6 +172,11 @@ pub struct PlayerStats {
     pub nano_id: i16,
 }
 
+#[derive(Debug, Default)]
+struct PlayerData {
+    stats: PlayerStats,
+}
+
 #[derive(Debug)]
 pub struct NPCStats {
     pub team: CombatantTeam,
@@ -191,6 +196,12 @@ pub struct NPCStats {
     pub delay_time: u64, // generic value for various delays
     pub ai_type: u8,     // TODO investigate further
     pub bark_type: Option<usize>,
+}
+
+#[derive(Debug)]
+struct NPCData {
+    name: String,
+    stats: NPCStats,
 }
 
 pub struct EggStats {
@@ -801,17 +812,36 @@ impl TableData {
     }
 
     pub fn get_player_stats(&self, level: i16) -> FFResult<&PlayerStats> {
-        self.xdt_data.player_data.get(&level).ok_or(FFError::build(
-            Severity::Warning,
-            format!("Player stats for level {} don't exist", level),
-        ))
+        self.xdt_data
+            .player_data
+            .get(&level)
+            .map(|d| &d.stats)
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Player stats for level {} don't exist", level),
+            ))
+    }
+
+    pub fn get_npc_name(&self, npc_type: i32) -> FFResult<&str> {
+        self.xdt_data
+            .npc_data
+            .get(&npc_type)
+            .map(|d| d.name.as_str())
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("NPC name for type {} doesn't exist", npc_type),
+            ))
     }
 
     pub fn get_npc_stats(&self, npc_type: i32) -> FFResult<&NPCStats> {
-        self.xdt_data.npc_data.get(&npc_type).ok_or(FFError::build(
-            Severity::Warning,
-            format!("NPC stats for type {} don't exist", npc_type),
-        ))
+        self.xdt_data
+            .npc_data
+            .get(&npc_type)
+            .map(|d| &d.stats)
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("NPC stats for type {} don't exist", npc_type),
+            ))
     }
 
     pub fn get_mission_reward(&self, reward_id: i32) -> FFResult<Reward> {
@@ -1755,7 +1785,7 @@ fn load_respawn_data(root: &Map<std::string::String, Value>) -> Result<Vec<Respa
 
 fn load_player_data(
     root: &Map<std::string::String, Value>,
-) -> Result<HashMap<i16, PlayerStats>, String> {
+) -> Result<HashMap<i16, PlayerData>, String> {
     const PLAYER_TABLE_KEY: &str = "m_pAvatarTable";
     const PLAYER_TABLE_PLAYER_DATA_KEY: &str = "m_pAvatarGrowData";
 
@@ -1780,10 +1810,11 @@ fn load_player_data(
 
     let table = get_object(root, PLAYER_TABLE_KEY)?;
     let player_data = get_array(table, PLAYER_TABLE_PLAYER_DATA_KEY)?;
-    let mut player_stats_table = HashMap::new();
+    let mut player_data_table = HashMap::new();
     for v in player_data {
         let entry: PlayerStatsEntry = serde_json::from_value(v.clone())
             .map_err(|e| format!("Malformed player data entry: {} {}", e, v))?;
+
         let key = entry.m_iLevel;
         let player_stats = PlayerStats {
             hp_up: entry.m_iHpUp,
@@ -1797,18 +1828,26 @@ fn load_player_data(
             },
             nano_id: entry.m_iNanoID,
         };
-        player_stats_table.insert(key, player_stats);
+
+        let player_data = PlayerData {
+            stats: player_stats,
+        };
+
+        player_data_table.insert(key, player_data);
     }
-    Ok(player_stats_table)
+
+    Ok(player_data_table)
 }
 
-fn load_npc_data(root: &Map<std::string::String, Value>) -> Result<HashMap<i32, NPCStats>, String> {
+fn load_npc_data(root: &Map<std::string::String, Value>) -> Result<HashMap<i32, NPCData>, String> {
     const NPC_TABLE_KEY: &str = "m_pNpcTable";
     const NPC_TABLE_NPC_DATA_KEY: &str = "m_pNpcData";
+    const NPC_TABLE_NPC_STRINGS_KEY: &str = "m_pNpcStringData";
 
     #[derive(Deserialize)]
     struct NPCStatsEntry {
         m_iNpcNumber: i32,
+        m_iNpcName: i32,
         m_iTeam: i32,
         m_iNpcLevel: i16,
         m_iHP: u32,
@@ -1828,9 +1867,15 @@ fn load_npc_data(root: &Map<std::string::String, Value>) -> Result<HashMap<i32, 
         m_iBarkerType: usize,
     }
 
+    #[derive(Deserialize)]
+    struct NPCStringsEntry {
+        m_strName: String,
+    }
+
     let table = get_object(root, NPC_TABLE_KEY)?;
     let npc_data = get_array(table, NPC_TABLE_NPC_DATA_KEY)?;
-    let mut npc_stats_table = HashMap::new();
+    let npc_strings = get_array(table, NPC_TABLE_NPC_STRINGS_KEY)?;
+    let mut npc_data_table = HashMap::new();
     for v in npc_data {
         let entry: NPCStatsEntry = serde_json::from_value(v.clone())
             .map_err(|e| format!("Malformed NPC data entry: {} {}", e, v))?;
@@ -1863,10 +1908,24 @@ fn load_npc_data(root: &Map<std::string::String, Value>) -> Result<HashMap<i32, 
                 x => Some(x),
             },
         };
-        npc_stats_table.insert(key, npc_stats);
+
+        let npc_strings = npc_strings.get(entry.m_iNpcName as usize).ok_or(format!(
+            "NPC string for ID {} doesn't exist",
+            entry.m_iNpcName
+        ))?;
+
+        let npc_string_entry: NPCStringsEntry = serde_json::from_value(npc_strings.clone())
+            .map_err(|e| format!("Malformed NPC string entry: {} {}", e, npc_strings))?;
+
+        let npc_data = NPCData {
+            stats: npc_stats,
+            name: npc_string_entry.m_strName,
+        };
+
+        npc_data_table.insert(key, npc_data);
     }
 
-    Ok(npc_stats_table)
+    Ok(npc_data_table)
 }
 
 fn load_npcs() -> Result<Vec<NPCSpawnData>, String> {

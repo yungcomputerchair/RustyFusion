@@ -101,6 +101,10 @@ impl NPC {
         }
     }
 
+    pub fn get_name(&self) -> &'static str {
+        tdata_get().get_npc_name(self.ty).unwrap()
+    }
+
     fn get_appearance_data(&self) -> sNPCAppearanceData {
         sNPCAppearanceData {
             iNPC_ID: self.id,
@@ -159,7 +163,7 @@ impl NPC {
 }
 impl Display for NPC {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}, type {}", self.get_id(), self.ty)
+        write!(f, "{} (id {}, type {})", self.get_name(), self.id, self.ty)
     }
 }
 impl Entity for NPC {
