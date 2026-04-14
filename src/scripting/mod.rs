@@ -185,19 +185,13 @@ impl ScriptingEngine {
         }
 
         // Load lib modules (available via require("@lib/<name>"))
-        let lib_dir = ai_dir.join("lib");
+        let lib_dir = scripts_dir.join("lib");
         if lib_dir.exists() {
             self.load_lib_modules(&lib_dir)?;
         }
 
-        // Load base scripts
+        // Load AI scripts
         self.load_scripts_from_dir(&ai_dir)?;
-
-        // Load custom overrides (these replace base scripts with the same name)
-        let custom_dir = ai_dir.join("custom");
-        if custom_dir.exists() {
-            self.load_scripts_from_dir(&custom_dir)?;
-        }
 
         log(
             Severity::Info,
@@ -265,8 +259,12 @@ impl ScriptingEngine {
             })?;
 
             log(
-                Severity::Debug,
-                &format!("Registered Lua module '{}'", module_name),
+                Severity::Info,
+                &format!(
+                    "Registered Lua module '{}' from {}",
+                    module_name,
+                    path.display()
+                ),
             );
         }
 
@@ -338,6 +336,11 @@ impl ScriptingEngine {
                 log(
                     Severity::Info,
                     &format!("Overriding AI script '{}' with {}", stem, path.display()),
+                );
+            } else {
+                log(
+                    Severity::Info,
+                    &format!("Loaded AI script '{}' from {}", stem, path.display()),
                 );
             }
 

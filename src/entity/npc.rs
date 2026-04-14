@@ -238,7 +238,7 @@ impl Entity for NPC {
         }
 
         // we don't tick AI while PCs are interacting with the NPC
-        if self.interacting_pcs.is_empty() {
+        if self.ai.is_some() && self.interacting_pcs.is_empty() {
             let scripting = scripting_get();
             scripting.lock().tick_npc(self, state);
         }
