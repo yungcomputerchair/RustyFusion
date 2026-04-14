@@ -94,6 +94,19 @@ impl LuaUserData for NpcHandle {
             Ok(this.npc().target_id.is_some())
         });
 
+        methods.add_method("is_target_alive", |_, this, ()| {
+            let npc = this.npc();
+            let target_id = match npc.target_id {
+                Some(id) => id,
+                None => return Ok(false),
+            };
+            let state = this.state_mut();
+            match state.get_combatant(target_id) {
+                Ok(target) => Ok(!target.is_dead()),
+                Err(_) => Ok(false),
+            }
+        });
+
         methods.add_method("is_moving", |_, this, ()| Ok(this.npc().path.is_some()));
 
         // ---- Stats ----
