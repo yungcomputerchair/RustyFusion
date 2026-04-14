@@ -253,6 +253,10 @@ impl Entity for NPC {
         if let Some(group_id) = self.group_id {
             crate::helpers::remove_group_member(self.get_id(), group_id, state).unwrap();
         }
+
+        // cleanup coroutine
+        let scripting = scripting_get();
+        scripting.lock().remove_npc(self.id);
     }
 
     fn as_combatant(&self) -> Option<&dyn Combatant> {

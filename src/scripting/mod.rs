@@ -5,7 +5,7 @@ use parking_lot::Mutex;
 
 use crate::{
     config::config_get,
-    entity::{EntityID, NPC},
+    entity::{Combatant as _, EntityID, NPC},
     error::{log, log_error, FFError, FFResult, Severity},
     state::ShardServerState,
 };
@@ -361,12 +361,13 @@ impl ScriptingEngine {
     pub fn tick_npc(&mut self, npc: &mut NPC, state: &mut ShardServerState) {
         let npc_id = npc.id;
 
-        // Check wait timer
+        // Check wait timer (skip if dead so death handling runs immediately)
         if let Some(co_state) = self.coroutines.get_mut(&npc_id) {
-            if co_state.wait_ticks > 0 {
+            if co_state.wait_ticks > 0 && !npc.is_dead() {
                 co_state.wait_ticks -= 1;
                 return;
             }
+            co_state.wait_ticks = 0;
         }
 
         // Get or create coroutine
