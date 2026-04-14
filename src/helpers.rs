@@ -2,6 +2,7 @@ use rand::{rngs::ThreadRng, Rng};
 use uuid::Uuid;
 
 use crate::{
+    defines::RANGE_GROUP_PARTICIPATE,
     entity::{Combatant, Entity, EntityID, Player},
     enums::*,
     error::*,
@@ -293,4 +294,36 @@ pub fn give_defeat_rewards(player: &mut Player, defeated_type: i32, rng: &mut Th
         let client = player.get_client().unwrap();
         client.send_payload(reward_pkt);
     }
+}
+
+pub fn on_mob_defeated(
+    npc_id: i32,
+    defeater_id: EntityID,
+    state: &mut ShardServerState,
+    rng: &mut ThreadRng,
+) -> FFResult<()> {
+    let defeated_type = state.get_npc(npc_id).unwrap().ty;
+    if let EntityID::Player(pc_id) = defeater_id {
+        let player = state.get_player_mut(pc_id)?;
+        give_defeat_rewards(player, defeated_type, rng);
+    }
+
+    let defeater = state.get_combatant(defeater_id)?;
+    if let Some(group_id) = defeater.get_group_id() {
+        let position = defeater.get_position();
+        let group = state.groups.get(&group_id).unwrap().clone();
+        for eid in group.get_member_ids() {
+            if let EntityID::Player(member_pc_id) = *eid {
+                if defeater_id == *eid {
+                    // already rewarded
+                    continue;
+                }
+                let player = state.get_player_mut(member_pc_id).unwrap();
+                if player.get_position().distance_to(&position) < RANGE_GROUP_PARTICIPATE {
+                    give_defeat_rewards(player, defeated_type, rng);
+                }
+            }
+        }
+    }
+    Ok(())
 }

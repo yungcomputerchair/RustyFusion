@@ -31,6 +31,7 @@ tokio = { version = "1.50.0", features = ["full"] }
 async-trait = "0.1"
 parking_lot = "0.12.5"
 futures = "0.3.32"
+mlua = { version = "0.11.6", features = ["luau", "send"] }
 
 [features]
 default = ["postgres"]

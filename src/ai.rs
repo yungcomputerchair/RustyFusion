@@ -7,7 +7,7 @@ use rand::{rngs::ThreadRng, Rng};
 
 use crate::{
     chunk::TickMode,
-    defines::{RANGE_GROUP_PARTICIPATE, SHARD_TICKS_PER_SECOND},
+    defines::SHARD_TICKS_PER_SECOND,
     entity::{Combatant, Entity, EntityID, NPC},
     enums::CombatantTeam,
     error::*,
@@ -41,6 +41,28 @@ pub struct AI {
     root: Box<dyn AINode>,
 }
 impl AI {
+    /// Returns the script name for this NPC based on its properties.
+    /// Used by the scripting engine to look up the correct Lua script.
+    pub fn get_script_name(npc: &NPC) -> &'static str {
+        let is_combatant = npc.as_combatant().is_some();
+        if !is_combatant {
+            return "basic";
+        }
+
+        let stats = tdata_get().get_npc_stats(npc.ty).unwrap();
+        match stats.team {
+            CombatantTeam::Friendly => "friendly_combatant",
+            CombatantTeam::Mob => {
+                if npc.tight_follow.is_some() {
+                    "mob_pack_member"
+                } else {
+                    "mob"
+                }
+            }
+            _ => "basic",
+        }
+    }
+
     pub fn make_for_npc(npc: &NPC, force: bool) -> (Option<Self>, TickMode) {
         const DECHUNK_DELAY_MS: u64 = 2000;
 
@@ -589,7 +611,7 @@ impl AINode for CheckDead {
                     return NodeStatus::Success;
                 }
                 if let Some(defeater_id) = npc.last_attacked_by {
-                    log_if_failed(on_mob_defeated(npc.id, defeater_id, state, rng));
+                    log_if_failed(helpers::on_mob_defeated(npc.id, defeater_id, state, rng));
                 }
                 let dechunk_time = *time + self.dechunk_after;
                 self.dead_state = DeadState::Dying(dechunk_time);
@@ -1097,36 +1119,4 @@ impl AINode for CheckAttack {
             }
         }
     }
-}
-
-fn on_mob_defeated(
-    npc_id: i32,
-    defeater_id: EntityID,
-    state: &mut ShardServerState,
-    rng: &mut ThreadRng,
-) -> FFResult<()> {
-    let defeated_type = state.get_npc(npc_id).unwrap().ty;
-    if let EntityID::Player(pc_id) = defeater_id {
-        let player = state.get_player_mut(pc_id)?;
-        helpers::give_defeat_rewards(player, defeated_type, rng);
-    }
-
-    let defeater = state.get_combatant(defeater_id)?;
-    if let Some(group_id) = defeater.get_group_id() {
-        let position = defeater.get_position();
-        let group = state.groups.get(&group_id).unwrap().clone();
-        for eid in group.get_member_ids() {
-            if let EntityID::Player(member_pc_id) = *eid {
-                if defeater_id == *eid {
-                    // already rewarded
-                    continue;
-                }
-                let player = state.get_player_mut(member_pc_id).unwrap();
-                if player.get_position().distance_to(&position) < RANGE_GROUP_PARTICIPATE {
-                    helpers::give_defeat_rewards(player, defeated_type, rng);
-                }
-            }
-        }
-    }
-    Ok(())
 }

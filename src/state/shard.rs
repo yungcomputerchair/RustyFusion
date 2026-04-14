@@ -20,6 +20,7 @@ use crate::{
         packet::{PacketID::*, *},
         LoginData,
     },
+    scripting::scripting_get,
     tabledata::tdata_get,
     trade::TradeContext,
 };
@@ -334,7 +335,8 @@ impl ShardServerState {
                 }
                 EntityID::NPC(npc_id) => {
                     let mut npc = self.get_npc_mut(npc_id).unwrap().clone();
-                    npc.tick(&time, self, &mut rng);
+                    let scripting = scripting_get();
+                    scripting.lock().tick_npc(&mut npc, self);
                     *self.get_npc_mut(npc_id).unwrap() = npc;
                 }
                 EntityID::Slider(slider_id) => {

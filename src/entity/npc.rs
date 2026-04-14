@@ -32,6 +32,7 @@ use crate::{
 pub struct NPC {
     pub id: i32,
     pub ty: i32,
+    pub spawn_position: Position,
     position: Position,
     rotation: i32,
     hp: i32,
@@ -60,6 +61,7 @@ impl NPC {
         Ok(Self {
             id,
             ty,
+            spawn_position: position,
             position,
             rotation: angle % 360,
             hp: stats.max_hp as i32,

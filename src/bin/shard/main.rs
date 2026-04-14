@@ -22,6 +22,7 @@ use rusty_fusion::{
         packet::{PacketID::*, *},
         ClientMap, ClientType, FFClient, FFServer,
     },
+    scripting::scripting_init,
     state::ShardServerState,
     tabledata::tdata_init,
     tui::{ShardTui, Tui as _},
@@ -49,6 +50,7 @@ async fn main() -> FFResult<()> {
 
     db_init(Severity::Fatal).await?;
     tdata_init()?;
+    scripting_init()?;
 
     let mut tui_timer = util::make_timer(Duration::from_millis(250), true);
     let mut logger_timer = util::make_timer(
