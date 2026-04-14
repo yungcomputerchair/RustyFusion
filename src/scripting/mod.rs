@@ -4,7 +4,6 @@ use mlua::prelude::*;
 use parking_lot::Mutex;
 
 use crate::{
-    config::config_get,
     entity::{Combatant as _, EntityID, NPC},
     error::{log, log_error, FFError, FFResult, Severity},
     state::ShardServerState,
@@ -189,8 +188,8 @@ impl ScriptingEngine {
     }
 
     fn load_scripts(&mut self) -> FFResult<()> {
-        let scripts_dir = config_get().shard.scripts_path.get();
-        let scripts_path = Path::new(&scripts_dir);
+        const SCRIPTS_PATH: &str = "scripts";
+        let scripts_path = Path::new(SCRIPTS_PATH);
 
         let ai_dir = scripts_path.join("ai");
         if !ai_dir.exists() {

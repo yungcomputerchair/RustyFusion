@@ -97,9 +97,6 @@ monitor_interval = 5 # how long (seconds) between monitor updates
 #: String
 log_path = "shard.log" # path to log file, or blank for console logging only
 
-#: String
-scripts_path = "scripts" # path to the Lua scripts directory
-
 #: SocketAddr
 listen_addr = "127.0.0.1:23001" # address to bind to
 
