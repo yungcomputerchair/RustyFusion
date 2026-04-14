@@ -351,17 +351,24 @@ impl ScriptingEngine {
         match co.resume::<LuaValue>(handle) {
             Ok(value) => {
                 let co_state = self.coroutines.get_mut(&npc_id).unwrap();
-                match value {
-                    // wait(seconds) yields with a number
-                    LuaValue::Number(seconds) => {
-                        let ticks =
-                            (seconds * crate::defines::SHARD_TICKS_PER_SECOND as f64).ceil() as u32;
-                        co_state.wait_ticks = ticks;
+                // Extract wait duration from yield value
+                let wait_seconds = match &value {
+                    LuaValue::Number(n) => Some(*n),
+                    LuaValue::Integer(n) => Some(*n as f64),
+                    LuaValue::Nil => None, // yield() with no wait
+                    other => {
+                        log(
+                            Severity::Warning,
+                            &format!("Unexpected yield value from NPC {} coroutine: {:?}", npc_id, other),
+                        );
+                        None
                     }
-                    // yield() yields with nil
-                    _ => {
-                        co_state.wait_ticks = 0;
-                    }
+                };
+
+                if let Some(seconds) = wait_seconds {
+                    let ticks =
+                        (seconds * crate::defines::SHARD_TICKS_PER_SECOND as f64).ceil() as u32;
+                    co_state.wait_ticks = ticks;
                 }
 
                 // If coroutine finished, restart it
