@@ -497,6 +497,7 @@ mod commands {
         ai,
         chunk::TickMode,
         database::{db_get, DbImpl as _},
+        scripting::scripting_get,
     };
 
     use super::*;
@@ -516,7 +517,7 @@ mod commands {
 
     fn init_commands() -> HashMap<&'static str, Command> {
         #[rustfmt::skip]
-        let commands: [(&'static str, &'static str, CommandHandler); 12] = [
+        let commands: [(&'static str, &'static str, CommandHandler); 13] = [
             ("about", "Show information about the server", cmd_about),
             ("ban_a", "Ban an account", cmd_ban),
             ("ban_i", "Ban a player and their account", cmd_ban),
@@ -525,6 +526,7 @@ mod commands {
             ("unfollowme", "Stop the nearest NPC from following you", cmd_unfollowme),
             ("changeai", "Change the AI script of an NPC", cmd_changeai),
             ("queryai", "Query the AI script of an NPC", cmd_queryai),
+            ("reload", "Reload all Lua scripts", cmd_reload),
             ("perms", "View or change a player's permissions level", cmd_perms),
             ("ping", "View your current ping to the server", cmd_ping),
             ("refresh", "Reinsert the player into the current chunk", cmd_refresh),
@@ -880,6 +882,25 @@ mod commands {
             } else {
                 send_system_message(client, "No NPCs nearby")
             }
+        })
+    }
+
+    fn cmd_reload<'a>(
+        _tokens: Vec<&'a str>,
+        clients: &'a ClientMap<'a>,
+        state: &'a mut ShardServerState,
+    ) -> Pin<Box<dyn Future<Output = FFResult<()>> + Send + 'a>> {
+        Box::pin(async move {
+            let client = clients.get_sender();
+            let pc_id = client.get_player_id()?;
+            let player = state.get_player(pc_id)?;
+            if player.perms > CN_ACCOUNT_LEVEL__GM as i16 {
+                return send_system_message(client, "You do not have permission to reload scripts");
+            }
+
+            let mut scripting = scripting_get().lock();
+            scripting.reload()?;
+            send_system_message(client, "Scripts reloaded")
         })
     }
 

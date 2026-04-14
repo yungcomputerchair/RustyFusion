@@ -45,9 +45,7 @@ luau_type!("Position", "{ x: number, y: number, z: number }");
 static SCRIPTING: OnceLock<Mutex<ScriptingEngine>> = OnceLock::new();
 
 pub fn scripting_init() -> FFResult<()> {
-    let scripts_dir = config_get().shard.scripts_path.get();
-    let scripts_path = Path::new(&scripts_dir);
-    let engine = ScriptingEngine::new(scripts_path)?;
+    let engine = ScriptingEngine::new()?;
     SCRIPTING.set(Mutex::new(engine)).map_err(|_| {
         FFError::build(
             Severity::Warning,
@@ -116,7 +114,7 @@ pub struct ScriptingEngine {
     coroutines: HashMap<i32, NpcCoroutine>,
 }
 impl ScriptingEngine {
-    pub fn new(scripts_dir: &Path) -> FFResult<Self> {
+    pub fn new() -> FFResult<Self> {
         let vm = Lua::new();
 
         // Register global yield/wait functions
@@ -128,15 +126,22 @@ impl ScriptingEngine {
             coroutines: HashMap::new(),
         };
 
-        engine.load_scripts(scripts_dir)?;
+        engine.load_scripts()?;
         Ok(engine)
+    }
+
+    pub fn reload(&mut self) -> FFResult<()> {
+        self.scripts.clear();
+        self.coroutines.clear();
+        self.vm.expire_registry_values();
+        self.load_scripts()
     }
 
     fn register_globals(vm: &Lua) -> FFResult<()> {
         luau_function!("yield", "(): ()");
         luau_function!("wait", "(seconds: number): ()");
         luau_function!("log", "(message: string): ()");
-        // yield() - suspend for exactly one tick (wraps coroutine.yield)
+
         vm.load(
             r#"
             function yield()
@@ -175,8 +180,11 @@ impl ScriptingEngine {
         Ok(())
     }
 
-    fn load_scripts(&mut self, scripts_dir: &Path) -> FFResult<()> {
-        let ai_dir = scripts_dir.join("ai");
+    fn load_scripts(&mut self) -> FFResult<()> {
+        let scripts_dir = config_get().shard.scripts_path.get();
+        let scripts_path = Path::new(&scripts_dir);
+
+        let ai_dir = scripts_path.join("ai");
         if !ai_dir.exists() {
             return Err(FFError::build(
                 Severity::Warning,
@@ -185,7 +193,7 @@ impl ScriptingEngine {
         }
 
         // Load lib modules (available via require("@lib/<name>"))
-        let lib_dir = scripts_dir.join("lib");
+        let lib_dir = scripts_path.join("lib");
         if lib_dir.exists() {
             self.load_lib_modules(&lib_dir)?;
         }
