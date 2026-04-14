@@ -8,7 +8,7 @@ local behaviors = {}
 
 -- Death & respawn
 -- Returns true if the NPC was dead and handled
-function behaviors.handle_death(npc)
+function behaviors.handle_death(npc: Npc)
     if not npc:is_dead() then
         return false
     end
@@ -28,7 +28,7 @@ end
 
 -- Retreat to spawn if target is dead, gone, or too far away.
 -- Returns true if retreating (caller should skip other behaviors).
-function behaviors.check_retreat(npc)
+function behaviors.check_retreat(npc: Npc)
     if not npc:has_target() then
         return false
     end
@@ -52,7 +52,7 @@ end
 
 -- Scan for nearest enemy within sight range.
 -- Sets the target if found.
-function behaviors.scan_for_target(npc)
+function behaviors.scan_for_target(npc: Npc)
     if npc:has_target() then
         return
     end
@@ -66,7 +66,7 @@ end
 -- Attack the current target if in range.
 -- Returns true if an attack was performed.
 -- Clears target if it is dead or gone.
-function behaviors.try_attack(npc)
+function behaviors.try_attack(npc: Npc)
     if not npc:has_target() then
         return false
     end
@@ -86,7 +86,7 @@ function behaviors.try_attack(npc)
 end
 
 -- Chase the current target at run speed.
-function behaviors.chase_target(npc)
+function behaviors.chase_target(npc: Npc)
     if not npc:has_target() then
         return
     end
@@ -96,7 +96,7 @@ end
 
 -- Follow the assigned path (for NPCs with preset routes).
 -- Ticks the path forward one step.
-function behaviors.follow_path(npc)
+function behaviors.follow_path(npc: Npc)
     -- The path is ticked on the Rust side via move_to;
     -- for path-following NPCs the path is managed natively.
     -- This is a no-op yield to let the native path tick happen.
@@ -105,7 +105,7 @@ end
 
 -- Idle roam: pick a random point near spawn, walk to it, wait.
 -- Returns early if the NPC dies or acquires a target.
-function behaviors.idle_roam(npc)
+function behaviors.idle_roam(npc: Npc)
     local idle_range = npc:idle_range()
     if idle_range <= 0 then
         yield()

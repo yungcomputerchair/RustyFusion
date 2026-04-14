@@ -39,3 +39,6 @@ postgres = ["dep:tokio-postgres", "dep:deadpool-postgres"]
 
 [profile.dev.package.backtrace]
 opt-level = 3
+
+[build-dependencies]
+regex = "1.11.1"

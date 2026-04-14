@@ -10,8 +10,37 @@ use crate::{
     state::ShardServerState,
 };
 
+/// Emits `export type <Name> = <Definition>` in `scripts/globals.d.luau`.
+macro_rules! luau_type {
+    ($name:literal, $def:literal) => {};
+}
+
+/// Emits `declare function <name>(<params>): <ret>` in `scripts/globals.d.luau`.
+macro_rules! luau_function {
+    ($name:literal, $sig:literal) => {};
+}
+
+/// Marks a block of `luau_method!` calls as belonging to a Luau class.
+/// build.rs emits `declare class <Name>` ... `end` around the methods.
+macro_rules! luau_class {
+    ($class:literal, { $($body:tt)* }) => {
+        $($body)*
+    };
+}
+
+/// Registers a Lua method and encodes its Luau return type for build.rs.
+/// build.rs scans for invocations to auto-generate `scripts/globals.d.luau`,
+/// deriving parameter types from the closure signature.
+macro_rules! luau_method {
+    ($methods:ident, $name:literal -> $ret:literal, $($body:tt)+) => {
+        $methods.add_method($name, $($body)+);
+    };
+}
+
 mod npc;
 use npc::*;
+
+luau_type!("Position", "{ x: number, y: number, z: number }");
 
 static SCRIPTING: OnceLock<Mutex<ScriptingEngine>> = OnceLock::new();
 
@@ -40,26 +69,28 @@ impl FromLua for LuaEntityID {
                 let eid = ud.borrow::<Self>()?;
                 Ok(*eid)
             }
-            _ => Err(LuaError::runtime("expected EntityID")),
+            _ => Err(LuaError::runtime("expected Entity")),
         }
     }
 }
 impl LuaUserData for LuaEntityID {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        methods.add_method("is_player", |_, this, ()| {
-            Ok(matches!(this.0, EntityID::Player(_)))
-        });
+        luau_class!("Entity", {
+            luau_method!(methods, "is_player" -> "boolean", |_, this, ()| {
+                Ok(matches!(this.0, EntityID::Player(_)))
+            });
 
-        methods.add_method("is_npc", |_, this, ()| {
-            Ok(matches!(this.0, EntityID::NPC(_)))
-        });
+            luau_method!(methods, "is_npc" -> "boolean", |_, this, ()| {
+                Ok(matches!(this.0, EntityID::NPC(_)))
+            });
 
-        methods.add_method("is_slider", |_, this, ()| {
-            Ok(matches!(this.0, EntityID::Slider(_)))
-        });
+            luau_method!(methods, "is_slider" -> "boolean", |_, this, ()| {
+                Ok(matches!(this.0, EntityID::Slider(_)))
+            });
 
-        methods.add_method("is_egg", |_, this, ()| {
-            Ok(matches!(this.0, EntityID::Egg(_)))
+            luau_method!(methods, "is_egg" -> "boolean", |_, this, ()| {
+                Ok(matches!(this.0, EntityID::Egg(_)))
+            });
         });
 
         methods.add_meta_method(LuaMetaMethod::Eq, |_, this, other: LuaEntityID| {
@@ -102,6 +133,9 @@ impl ScriptingEngine {
     }
 
     fn register_globals(vm: &Lua) -> FFResult<()> {
+        luau_function!("yield", "(): ()");
+        luau_function!("wait", "(seconds: number): ()");
+        luau_function!("log", "(message: string): ()");
         // yield() - suspend for exactly one tick (wraps coroutine.yield)
         vm.load(
             r#"
@@ -359,7 +393,10 @@ impl ScriptingEngine {
                     other => {
                         log(
                             Severity::Warning,
-                            &format!("Unexpected yield value from NPC {} coroutine: {:?}", npc_id, other),
+                            &format!(
+                                "Unexpected yield value from NPC {} coroutine: {:?}",
+                                npc_id, other
+                            ),
                         );
                         None
                     }

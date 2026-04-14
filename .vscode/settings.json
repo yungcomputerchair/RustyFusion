@@ -1,5 +1,10 @@
 {
-    "luau-lsp.types.definitionFiles": [
-        "scripts/globals.d.luau"
+    "luau-lsp.sourcemap.autogenerate": false,
+    "luau-lsp.sourcemap.enabled": false,
+    "luau-lsp.types.definitionFiles": {
+        "globals": "scripts/globals.d.luau"
+    },
+    "luau-lsp.ignoreGlobs": [
+        "**/*.d.luau"
     ]
 }
