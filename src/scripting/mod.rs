@@ -137,6 +137,14 @@ impl ScriptingEngine {
         self.load_scripts()
     }
 
+    pub fn get_script_count(&self) -> usize {
+        self.scripts.len()
+    }
+
+    pub fn get_coroutine_count(&self) -> usize {
+        self.coroutines.len()
+    }
+
     fn register_globals(vm: &Lua) -> FFResult<()> {
         luau_function!("yield", "(): ()");
         luau_function!("wait", "(seconds: number): ()");

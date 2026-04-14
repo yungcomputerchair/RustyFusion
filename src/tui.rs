@@ -14,6 +14,7 @@ use crate::{
     entity::Entity,
     error::{FFError, Severity},
     net::{ClientMap, FFClient},
+    scripting::scripting_get,
     state::{LoginServerState, ShardServerState},
     tabledata::tdata_get,
     util::{self, RingBuffer},
@@ -29,6 +30,8 @@ struct ShardStatsCache {
     loaded_chunk_count: usize,
     loaded_entity_count: usize,
     tickable_entity_count: usize,
+    loaded_script_count: usize,
+    running_coroutines_count: usize,
 }
 impl ShardStatsCache {
     fn new() -> Self {
@@ -40,10 +43,13 @@ impl ShardStatsCache {
             loaded_chunk_count: 0,
             loaded_entity_count: 0,
             tickable_entity_count: 0,
+            loaded_script_count: 0,
+            running_coroutines_count: 0,
         }
     }
 
     fn refresh_if_needed(&mut self, shard_state: &ShardServerState) {
+        let scripting = scripting_get().lock();
         if self.last_updated.elapsed() >= STATS_CACHE_INTERVAL {
             self.total_instance_count = shard_state.entity_map.get_num_instances();
             self.base_instance_count = shard_state.entity_map.get_num_base_instances();
@@ -52,6 +58,8 @@ impl ShardStatsCache {
             self.loaded_entity_count = shard_state.entity_map.get_num_loaded_entities();
             self.tickable_entity_count = shard_state.entity_map.get_tickable_ids().count();
             self.last_updated = Instant::now();
+            self.loaded_script_count = scripting.get_script_count();
+            self.running_coroutines_count = scripting.get_coroutine_count();
         }
     }
 }
@@ -513,6 +521,10 @@ impl<'a, 'b, 'c> Widget for ShardStatsWidget<'a, 'b, 'c> {
             Line::from(format!(
                 "Entities: {} ticking, {} chunk-loaded",
                 cache.tickable_entity_count, cache.loaded_entity_count
+            )),
+            Line::from(format!(
+                "Scripting: {} loaded scripts, {} running coroutines",
+                cache.loaded_script_count, cache.running_coroutines_count
             )),
         ];
 
