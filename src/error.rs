@@ -207,7 +207,7 @@ impl FFError {
 }
 
 static LOG_TX: OnceLock<UnboundedSender<FFError>> = OnceLock::new();
-const LOG_BUFFER_SIZE: usize = 1000;
+pub const LOG_BUFFER_SIZE: usize = 1000;
 
 pub fn log_init() -> UnboundedReceiver<FFError> {
     assert!(LOG_TX.get().is_none());

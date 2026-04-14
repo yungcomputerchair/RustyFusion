@@ -14,7 +14,10 @@ use rusty_fusion::{
     database::{db_get, db_init, DbImpl as _},
     defines::*,
     entity::{Entity, Player},
-    error::{log, log_error, log_if_failed, log_init, FFError, FFResult, Logger, Severity},
+    error::{
+        log, log_error, log_if_failed, log_init, FFError, FFResult, Logger, Severity,
+        LOG_BUFFER_SIZE,
+    },
     net::{
         packet::{PacketID::*, *},
         ClientMap, ClientType, FFClient, FFServer,
@@ -47,7 +50,7 @@ async fn main() -> FFResult<()> {
     db_init(Severity::Fatal).await?;
     tdata_init()?;
 
-    let mut tui_timer = util::make_timer(Duration::from_millis(100), true);
+    let mut tui_timer = util::make_timer(Duration::from_millis(250), true);
     let mut logger_timer = util::make_timer(
         Duration::from_secs(config.general.log_write_interval.get()),
         false,
@@ -120,6 +123,14 @@ async fn main() -> FFResult<()> {
                                 KeyCode::PageUp => tui.state.scroll(10),
                                 KeyCode::PageDown => tui.state.scroll(-10),
                                 KeyCode::Esc => tui.state.reset_scroll(),
+                                KeyCode::Char('`') => {
+                                    #[cfg(debug_assertions)]
+                                    {
+                                        for _ in 1..=LOG_BUFFER_SIZE {
+                                            log(Severity::Debug, "Test debug message");
+                                        }
+                                    }
+                                }
                                 _ => {}
                             }
                         }

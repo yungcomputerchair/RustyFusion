@@ -355,7 +355,6 @@ impl<'a> Widget for LogWidget<'a> {
 
         let footer = Line::from(" Press CTRL+C to stop the server ").centered();
         let events = self.log_buffer;
-        let lines: Vec<Line> = events.iter().flat_map(Vec::<Line>::from).collect();
 
         let mut block = Block::bordered()
             .padding(Padding::horizontal(1))
@@ -371,6 +370,17 @@ impl<'a> Widget for LogWidget<'a> {
         }
 
         let inner_area = block.inner(area);
+        let scroll_offset = self.state.get_scroll_offset();
+
+        // Only convert the tail of the log buffer that could be visible,
+        // avoiding allocation + formatting for the entire history every frame.
+        let max_entries = (area.height as usize + scroll_offset) * 2;
+        let skip = events.len().saturating_sub(max_entries);
+        let lines: Vec<Line> = events
+            .iter()
+            .skip(skip)
+            .flat_map(Vec::<Line>::from)
+            .collect();
 
         let pg = Paragraph::new(lines)
             .block(block)
@@ -380,7 +390,7 @@ impl<'a> Widget for LogWidget<'a> {
         let lines_to_scroll = pg
             .line_count(inner_area.width)
             .saturating_sub(area.height as usize)
-            .saturating_sub(self.state.get_scroll_offset());
+            .saturating_sub(scroll_offset);
 
         let pg = pg.scroll((lines_to_scroll as u16, 0));
         pg.render(area, buf);
