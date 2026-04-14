@@ -769,7 +769,7 @@ pub fn gm_npc_unsummon(
 }
 
 mod helpers {
-    use rusty_fusion::ai::AI;
+    use rusty_fusion::ai;
 
     use super::*;
 
@@ -805,7 +805,7 @@ mod helpers {
 
     pub fn spawn_temp_npc(entity_map: &mut EntityMap, mut npc: NPC) {
         npc.summoned = true;
-        let (ai, tick_mode) = AI::make_for_npc(&npc, true);
+        let (ai, tick_mode) = ai::make_for_npc(&npc, true);
         npc.ai = ai;
         let chunk_coords = npc.get_chunk_coords();
         let eid = entity_map.track(Box::new(npc), tick_mode);

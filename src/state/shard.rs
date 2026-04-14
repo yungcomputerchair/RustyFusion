@@ -7,7 +7,7 @@ use rand::thread_rng;
 use uuid::Uuid;
 
 use crate::{
-    ai::AI,
+    ai,
     chunk::{EntityMap, InstanceID, TickMode},
     config::config_get,
     defines::*,
@@ -20,7 +20,6 @@ use crate::{
         packet::{PacketID::*, *},
         LoginData,
     },
-    scripting::scripting_get,
     tabledata::tdata_get,
     trade::TradeContext,
 };
@@ -61,7 +60,7 @@ impl Default for ShardServerState {
                     npc.path = Some(path);
                 }
 
-                let (ai, tick_mode) = AI::make_for_npc(&npc, false);
+                let (ai, tick_mode) = ai::make_for_npc(&npc, false);
                 npc.ai = ai;
 
                 let chunk_pos = npc.get_chunk_coords();
@@ -335,8 +334,7 @@ impl ShardServerState {
                 }
                 EntityID::NPC(npc_id) => {
                     let mut npc = self.get_npc_mut(npc_id).unwrap().clone();
-                    let scripting = scripting_get();
-                    scripting.lock().tick_npc(&mut npc, self);
+                    npc.tick(&time, self, &mut rng);
                     *self.get_npc_mut(npc_id).unwrap() = npc;
                 }
                 EntityID::Slider(slider_id) => {

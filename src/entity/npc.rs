@@ -8,7 +8,6 @@ use rand::rngs::ThreadRng;
 use uuid::Uuid;
 
 use crate::{
-    ai::AI,
     chunk::{ChunkCoords, InstanceID},
     defines::RANGE_INTERACT,
     entity::{Combatant, Entity, EntityID},
@@ -22,6 +21,7 @@ use crate::{
         FFClient,
     },
     path::Path,
+    scripting::scripting_get,
     state::ShardServerState,
     tabledata::tdata_get,
     util::{self, clamp_min},
@@ -47,7 +47,7 @@ pub struct NPC {
     pub loose_follow: Option<EntityID>,
     pub interacting_pcs: HashSet<i32>,
     pub summoned: bool,
-    pub ai: Option<AI>,
+    pub ai: Option<String>,
 }
 impl NPC {
     pub fn new(
@@ -159,7 +159,7 @@ impl NPC {
 }
 impl Display for NPC {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.get_id())
+        write!(f, "{:?}, type {}", self.get_id(), self.ty)
     }
 }
 impl Entity for NPC {
@@ -212,7 +212,7 @@ impl Entity for NPC {
         client.send_packet(PacketID::P_FE2CL_NPC_EXIT, &pkt);
     }
 
-    fn tick(&mut self, time: &SystemTime, state: &mut ShardServerState, rng: &mut ThreadRng) {
+    fn tick(&mut self, _time: &SystemTime, state: &mut ShardServerState, _rng: &mut ThreadRng) {
         let pc_ids: Vec<i32> = self.interacting_pcs.iter().copied().collect();
         for pc_id in pc_ids {
             let pc_eid = EntityID::Player(pc_id);
@@ -224,12 +224,23 @@ impl Entity for NPC {
                 self.interacting_pcs.remove(&pc_id);
             }
         }
-        if self.interacting_pcs.is_empty() {
-            // we take the AI object out during tick to satisfy the borrow checker
-            if let Some(mut ai) = self.ai.take() {
-                ai.tick(self, state, time, rng);
-                self.ai = Some(ai);
+
+        // tick path
+        if let Some(mut path) = self.path.take() {
+            if !self.is_dead() {
+                if !path.is_done() {
+                    self.tick_movement_along_path(&mut path, state);
+                }
+                if !path.is_done() {
+                    self.path = Some(path);
+                }
             }
+        }
+
+        // we don't tick AI while PCs are interacting with the NPC
+        if self.interacting_pcs.is_empty() {
+            let scripting = scripting_get();
+            scripting.lock().tick_npc(self, state);
         }
     }
 

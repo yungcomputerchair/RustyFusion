@@ -494,7 +494,7 @@ mod commands {
     use std::{collections::HashMap, future::Future, pin::Pin, sync::OnceLock, time::SystemTime};
 
     use rusty_fusion::{
-        ai::AI,
+        ai,
         database::{db_get, DbImpl as _},
     };
 
@@ -790,7 +790,7 @@ mod commands {
                 ));
                 npc.set_follow(EntityID::Player(pc_id));
                 if npc.ai.is_none() {
-                    let (ai, new_tick_mode) = AI::make_for_npc(npc, true);
+                    let (ai, new_tick_mode) = ai::make_for_npc(npc, true);
                     npc.ai = ai;
                     state
                         .entity_map
