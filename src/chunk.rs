@@ -158,6 +158,15 @@ impl EntityMap {
         }
     }
 
+    /// # Safety
+    /// The caller must ensure the returned pointer is not used to alias
+    /// with any other mutable reference to the same entity.
+    pub fn get_entity_raw_ptr(&mut self, id: EntityID) -> Option<*mut dyn Entity> {
+        self.registry
+            .get_mut(&id)
+            .map(|entry| entry.entity.as_mut() as *mut dyn Entity)
+    }
+
     pub fn get_all_ids(&self) -> impl Iterator<Item = EntityID> + '_ {
         self.registry.keys().cloned()
     }

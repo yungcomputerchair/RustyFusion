@@ -324,29 +324,12 @@ impl ShardServerState {
         let mut rng = thread_rng();
         let eids: Vec<EntityID> = self.entity_map.get_tickable_ids().collect();
         for eid in eids {
-            match eid {
-                // we copy the entity here so we can mutably borrow the state.
-                // we put it back when we're done.
-                EntityID::Player(pc_id) => {
-                    let mut player = self.get_player_mut(pc_id).unwrap().clone();
-                    player.tick(&time, self, &mut rng);
-                    *self.get_player_mut(pc_id).unwrap() = player;
-                }
-                EntityID::NPC(npc_id) => {
-                    let mut npc = self.get_npc_mut(npc_id).unwrap().clone();
-                    npc.tick(&time, self, &mut rng);
-                    *self.get_npc_mut(npc_id).unwrap() = npc;
-                }
-                EntityID::Slider(slider_id) => {
-                    let mut slider = self.get_slider_mut(slider_id).unwrap().clone();
-                    slider.tick(&time, self, &mut rng);
-                    *self.get_slider_mut(slider_id).unwrap() = slider;
-                }
-                EntityID::Egg(egg_id) => {
-                    let mut egg = self.get_egg_mut(egg_id).unwrap().clone();
-                    egg.tick(&time, self, &mut rng);
-                    *self.get_egg_mut(egg_id).unwrap() = egg;
-                }
+            if let Some(entity_ptr) = self.entity_map.get_entity_raw_ptr(eid) {
+                // SAFETY: The entity stays in the registry so other operations
+                // (e.g. update/broadcast) work normally. No other code holds a
+                // mutable reference to this specific entity during tick().
+                let entity = unsafe { &mut *entity_ptr };
+                entity.tick(&time, self, &mut rng);
             }
         }
     }
