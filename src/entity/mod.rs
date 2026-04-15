@@ -1,4 +1,4 @@
-use std::{any::Any, collections::HashSet, time::SystemTime};
+use std::{any::Any, collections::HashSet, fmt::Display, time::SystemTime};
 
 use crate::{
     chunk::ChunkCoords,
@@ -35,7 +35,7 @@ pub enum EntityID {
     Egg(i32),
 }
 
-pub trait Entity: Send {
+pub trait Entity: Send + Display {
     fn get_id(&self) -> EntityID;
     fn get_client(&self) -> Option<FFClient>;
     fn get_position(&self) -> Position;

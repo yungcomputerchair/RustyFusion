@@ -795,6 +795,7 @@ mod tests {
     };
 
     /// Minimal mock entity for testing chunk operations.
+    #[derive(Debug)]
     struct MockEntity {
         id: EntityID,
         position: Position,
@@ -815,6 +816,11 @@ mod tests {
                 position: pos,
                 instance_id,
             }
+        }
+    }
+    impl Display for MockEntity {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            write!(f, "MockEntity {:?}", self)
         }
     }
     impl Entity for MockEntity {

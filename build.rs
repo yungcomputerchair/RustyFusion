@@ -336,13 +336,14 @@ fn rust_type_to_luau(ty: &str) -> &str {
         "i32" | "u32" | "i64" | "u64" | "f32" | "f64" | "usize" | "isize" => "number",
         "bool" => "boolean",
         "String" | "&str" => "string",
-        "LuaEntityID" => "Entity",
+        "EntityScriptContext" => "Entity",
+        "NpcScriptContext" => "Npc",
         _ => ty,
     }
 }
 
 /// Parse a closure parameter list like `(x, y, z): (i32, i32, i32)` or
-/// `target: LuaEntityID` or `()` and return Luau-formatted params (excluding `self`).
+/// `target: EntityScriptContext` or `()` and return Luau-formatted params (excluding `self`).
 fn parse_closure_params(params_str: &str) -> Vec<String> {
     let params_str = params_str.trim();
     if params_str == "()" || params_str.is_empty() {
@@ -386,7 +387,18 @@ fn collect_rs_files(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
             }
         }
     }
+
     files.sort();
+
+    // mod.rs should always come first.
+    files.sort_by_key(|p| {
+        if p.file_name().and_then(|n| n.to_str()) == Some("mod.rs") {
+            0
+        } else {
+            1
+        }
+    });
+
     files
 }
 
@@ -492,14 +504,21 @@ fn generate_luau_declarations() {
 
         fragments.sort_by_key(|(offset, _)| *offset);
         let mut prev_was_end = false;
+        let mut prev_was_type = false;
         for (_, fragment) in &fragments {
             let is_class_start = fragment.starts_with("declare class ");
             let is_top_level = !fragment.starts_with("    ") && fragment.trim() != "end";
-            if (is_class_start && !out.ends_with("\n\n")) || (prev_was_end && is_top_level) {
+            let is_type = fragment.starts_with("export type ");
+            let is_function = fragment.starts_with("declare function ");
+            if (is_class_start && !out.ends_with("\n\n"))
+                || (prev_was_end && is_top_level)
+                || (prev_was_type && is_function)
+            {
                 out.push('\n');
             }
             out.push_str(fragment);
             prev_was_end = fragment.trim() == "end";
+            prev_was_type = is_type;
         }
     }
 

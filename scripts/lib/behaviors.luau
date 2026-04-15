@@ -26,7 +26,8 @@ function behaviors.handle_death(npc: Npc)
     return true
 end
 
--- Retreat to spawn if target is dead, gone, or too far away.
+-- Retreat to spawn if target is dead, gone, or too far from spawn.
+-- After retreat, fully heals the NPC (matching native reset behavior).
 -- Returns true if retreating (caller should skip other behaviors).
 function behaviors.check_retreat(npc: Npc)
     if not npc:has_target() then
@@ -34,23 +35,50 @@ function behaviors.check_retreat(npc: Npc)
     end
 
     local spawn = npc:spawn_position()
-    local dist_to_spawn = npc:distance_to(spawn.x, spawn.y, spawn.z)
-    if dist_to_spawn <= npc:combat_range() then
+    local combat_range = npc:combat_range()
+    local should_retreat = false
+
+    if not npc:is_target_alive() then
+        -- Target dead or gone
+        should_retreat = true
+    else
+        -- NPC too far from spawn
+        local npc_dist = npc:distance_to(spawn.x, spawn.y, spawn.z)
+        if npc_dist > combat_range then
+            should_retreat = true
+        else
+            -- Target too far from spawn
+            local target = npc:get_target()
+            if target then
+                local tpos = target:position()
+                if tpos then
+                    local dx = tpos.x - spawn.x
+                    local dy = tpos.y - spawn.y
+                    local dz = tpos.z - spawn.z
+                    if math.sqrt(dx*dx + dy*dy + dz*dz) > combat_range then
+                        should_retreat = true
+                    end
+                end
+            end
+        end
+    end
+
+    if not should_retreat then
         return false
     end
 
-    -- Too far from spawn; retreat
+    -- Retreat to spawn
     npc:clear_target()
     npc:set_retreating(true)
     npc:move_to(spawn.x, spawn.y, spawn.z, npc:run_speed() * 2)
     while npc:is_moving() do
         yield()
     end
-    npc:set_retreating(false)
+    npc:reset() -- full heal + clear state
     return true
 end
 
--- Scan for nearest enemy within sight range.
+-- Scan for nearest enemy within sight range (simple version).
 -- Sets the target if found.
 function behaviors.scan_for_target(npc: Npc)
     if npc:has_target() then
@@ -60,6 +88,33 @@ function behaviors.scan_for_target(npc: Npc)
     local enemy = npc:find_nearest_enemy(npc:sight_range())
     if enemy then
         npc:set_target(enemy)
+    end
+end
+
+-- Scan for enemies within aggro distance.
+function behaviors.scan_for_target_aggro(npc: Npc)
+    if npc:has_target() then
+        return
+    end
+
+    local sight_range = npc:sight_range()
+    local npc_pos = npc:position()
+    local enemies = npc:find_enemies_in_range(sight_range)
+
+    -- TODO: Make this more dynamic
+    for _, enemy in ipairs(enemies) do
+        local epos = enemy:position()
+        if epos then
+            local dx = epos.x - npc_pos.x
+            local dy = epos.y - npc_pos.y
+            local dz = (epos.z - npc_pos.z) * 2 -- z counts double to discourage vertical aggro
+            local distance = math.sqrt(dx*dx + dy*dy + dz*dz)
+
+            if distance <= sight_range then
+                npc:set_target(enemy)
+                return
+            end
+        end
     end
 end
 
@@ -91,16 +146,12 @@ function behaviors.chase_target(npc: Npc)
         return
     end
 
-    npc:move_toward_target(npc:run_speed())
-end
-
--- Follow the assigned path (for NPCs with preset routes).
--- Ticks the path forward one step.
-function behaviors.follow_path(npc: Npc)
-    -- The path is ticked on the Rust side via move_to;
-    -- for path-following NPCs the path is managed natively.
-    -- This is a no-op yield to let the native path tick happen.
-    yield()
+    local target = npc:get_target()
+    if not target then
+        return
+    end
+    
+    npc:move_toward_entity(target, npc:run_speed())
 end
 
 -- Idle roam: pick a random point near spawn, walk to it, wait.
@@ -113,7 +164,7 @@ function behaviors.idle_roam(npc: Npc)
     end
 
     local roam_radius = idle_range / 2
-    local point = npc:random_point_in_range(roam_radius)
+    local point = random_point_in_range(npc:position(), roam_radius)
     npc:move_to(point.x, point.y, point.z, npc:walk_speed())
     while npc:is_moving() do
         if npc:is_dead() or npc:has_target() then return end

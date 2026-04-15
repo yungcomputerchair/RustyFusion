@@ -1,4 +1,4 @@
-use std::{any::Any, time::SystemTime};
+use std::{any::Any, fmt::Display, time::SystemTime};
 
 use rand::rngs::ThreadRng;
 
@@ -48,6 +48,11 @@ impl Egg {
 
     pub fn is_summoned(&self) -> bool {
         self.summoned
+    }
+}
+impl Display for Egg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Egg({})", self.id)
     }
 }
 impl Entity for Egg {

@@ -1,4 +1,4 @@
-use std::{any::Any, time::SystemTime};
+use std::{any::Any, fmt::Display, time::SystemTime};
 
 use rand::rngs::ThreadRng;
 
@@ -58,6 +58,11 @@ impl Slider {
             iY: self.position.y,
             iZ: self.position.z,
         }
+    }
+}
+impl Display for Slider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Slider({})", self.id)
     }
 }
 impl Entity for Slider {

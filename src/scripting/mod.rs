@@ -4,9 +4,11 @@ use mlua::prelude::*;
 use parking_lot::Mutex;
 
 use crate::{
-    entity::{Combatant as _, EntityID, NPC},
+    defines::SHARD_TICKS_PER_SECOND,
+    entity::{Combatant as _, NPC},
     error::{log, log_error, FFError, FFResult, Severity},
     state::ShardServerState,
+    Position,
 };
 
 /// Emits `export type <Name> = <Definition>` in `scripts/globals.d.luau`.
@@ -35,10 +37,35 @@ macro_rules! luau_method {
     };
 }
 
+mod entity;
+use entity::*;
+
 mod npc;
 use npc::*;
 
 luau_type!("Position", "{ x: number, y: number, z: number }");
+impl IntoLua for Position {
+    fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
+        let table = lua.create_table()?;
+        table.set("x", self.x)?;
+        table.set("y", self.y)?;
+        table.set("z", self.z)?;
+        Ok(LuaValue::Table(table))
+    }
+}
+impl FromLua for Position {
+    fn from_lua(value: LuaValue, _: &Lua) -> LuaResult<Self> {
+        match value {
+            LuaValue::Table(table) => {
+                let x = table.get("x")?;
+                let y = table.get("y")?;
+                let z = table.get("z")?;
+                Ok(Position { x, y, z })
+            }
+            _ => Err(LuaError::runtime("expected Position")),
+        }
+    }
+}
 
 static SCRIPTING: OnceLock<Mutex<ScriptingEngine>> = OnceLock::new();
 
@@ -54,49 +81,6 @@ pub fn scripting_init() -> FFResult<()> {
 
 pub fn scripting_get() -> &'static Mutex<ScriptingEngine> {
     SCRIPTING.get().expect("Scripting engine not initialized")
-}
-
-#[derive(Debug, Clone, Copy)]
-struct LuaEntityID(EntityID);
-impl FromLua for LuaEntityID {
-    fn from_lua(value: LuaValue, _: &Lua) -> LuaResult<Self> {
-        match value {
-            LuaValue::UserData(ud) => {
-                let eid = ud.borrow::<Self>()?;
-                Ok(*eid)
-            }
-            _ => Err(LuaError::runtime("expected Entity")),
-        }
-    }
-}
-impl LuaUserData for LuaEntityID {
-    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
-        luau_class!("Entity", {
-            luau_method!(methods, "is_player" -> "boolean", |_, this, ()| {
-                Ok(matches!(this.0, EntityID::Player(_)))
-            });
-
-            luau_method!(methods, "is_npc" -> "boolean", |_, this, ()| {
-                Ok(matches!(this.0, EntityID::NPC(_)))
-            });
-
-            luau_method!(methods, "is_slider" -> "boolean", |_, this, ()| {
-                Ok(matches!(this.0, EntityID::Slider(_)))
-            });
-
-            luau_method!(methods, "is_egg" -> "boolean", |_, this, ()| {
-                Ok(matches!(this.0, EntityID::Egg(_)))
-            });
-        });
-
-        methods.add_meta_method(LuaMetaMethod::Eq, |_, this, other: LuaEntityID| {
-            Ok(this.0 == other.0)
-        });
-
-        methods.add_meta_method(LuaMetaMethod::ToString, |_, this, ()| {
-            Ok(format!("{:?}", this.0))
-        });
-    }
 }
 
 struct NpcCoroutine {
@@ -143,8 +127,12 @@ impl ScriptingEngine {
     fn register_globals(vm: &Lua) -> FFResult<()> {
         luau_function!("yield", "(): ()");
         luau_function!("wait", "(seconds: number): ()");
-        luau_function!("log", "(message: string): ()");
         luau_function!("wait_noint", "(seconds: number): ()");
+        luau_function!("log", "(message: string): ()");
+        luau_function!(
+            "random_point_in_range",
+            "(from: Position, range: number): Position"
+        );
 
         vm.load(
             r#"
@@ -175,7 +163,18 @@ impl ScriptingEngine {
             })
             .unwrap();
 
+        // random_point_in_range(from, range)
+        let rand_pt_fn = vm
+            .create_function(|_, (from, range): (Position, f64)| {
+                let new_pos = from.get_random_around(range as u32, range as u32, 0);
+                Ok(new_pos)
+            })
+            .unwrap();
+
         vm.globals().set("log", log_fn).unwrap();
+        vm.globals()
+            .set("random_point_in_range", rand_pt_fn)
+            .unwrap();
 
         Ok(())
     }
@@ -217,59 +216,86 @@ impl ScriptingEngine {
         Ok(())
     }
 
-    fn load_lib_modules(&mut self, lib_dir: &Path) -> FFResult<()> {
-        let entries = fs::read_dir(lib_dir)?;
-        for entry in entries {
-            let Ok(entry) = entry else {
-                continue;
-            };
+    fn load_lib_module(&mut self, path: &Path) -> FFResult<()> {
+        let stem = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_string();
 
-            let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) != Some("luau") {
-                continue;
-            }
+        if stem.is_empty() {
+            return Ok(());
+        }
 
-            let stem = path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("")
-                .to_string();
-
-            if stem.is_empty() {
-                continue;
-            }
-
-            let source = fs::read_to_string(&path)?;
-            let module_name = format!("@lib/{}", stem);
-            let value = self
-                .vm
-                .load(&source)
-                .set_name(&module_name)
-                .eval::<LuaValue>()
-                .map_err(|e| {
-                    FFError::build(
-                        Severity::Warning,
-                        format!("Failed to load module '{}'", module_name),
-                    )
-                    .with_parent(e.into())
-                })?;
-
-            self.vm.register_module(&module_name, value).map_err(|e| {
+        let source = fs::read_to_string(path)?;
+        let module_name = format!("@lib/{}", stem);
+        let value = self
+            .vm
+            .load(&source)
+            .set_name(&module_name)
+            .eval::<LuaValue>()
+            .map_err(|e| {
                 FFError::build(
                     Severity::Warning,
-                    format!("Failed to register module '{}'", module_name),
+                    format!("Failed to load module '{}'", module_name),
                 )
                 .with_parent(e.into())
             })?;
 
-            log(
-                Severity::Info,
-                &format!(
-                    "Registered Lua module '{}' from {}",
-                    module_name,
-                    path.display()
-                ),
-            );
+        self.vm.register_module(&module_name, value).map_err(|e| {
+            FFError::build(
+                Severity::Warning,
+                format!("Failed to register module '{}'", module_name),
+            )
+            .with_parent(e.into())
+        })?;
+
+        log(
+            Severity::Info,
+            &format!(
+                "Registered Lua module '{}' from {}",
+                module_name,
+                path.display()
+            ),
+        );
+
+        Ok(())
+    }
+
+    fn load_lib_modules(&mut self, lib_dir: &Path) -> FFResult<()> {
+        let mut pending: Vec<_> = fs::read_dir(lib_dir)?
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("luau"))
+            .collect();
+
+        let mut retry = Vec::with_capacity(pending.len());
+
+        // Retry loop: modules may depend on each other, so keep retrying
+        // until either all succeed or no progress is made.
+        loop {
+            let mut failed = Vec::new();
+            let prev_count = pending.len();
+
+            for path in pending.drain(..) {
+                if let Err(e) = self.load_lib_module(&path) {
+                    // Probably a dependency not yet loaded; retry later
+                    failed.push(e);
+                    retry.push(path);
+                }
+            }
+
+            if failed.is_empty() {
+                break;
+            }
+
+            if failed.len() == prev_count {
+                // No progress — report the first failure
+                let e = failed.remove(0);
+                return Err(e);
+            }
+
+            pending.append(&mut retry);
         }
 
         Ok(())
@@ -388,8 +414,7 @@ impl ScriptingEngine {
 
                 if let Some(seconds) = wait_seconds {
                     let uninterruptible = seconds < 0.0;
-                    let ticks = (seconds.abs() * crate::defines::SHARD_TICKS_PER_SECOND as f64)
-                        .ceil() as u32;
+                    let ticks = (seconds.abs() * SHARD_TICKS_PER_SECOND as f64).ceil() as u32;
 
                     co_state.wait_ticks = ticks;
                     co_state.wait_noint = uninterruptible;

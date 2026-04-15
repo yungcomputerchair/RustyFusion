@@ -10,10 +10,10 @@ return function(npc: Npc)
     while true do
         if not b.handle_death(npc) then
             local leader = npc:get_follow_target()
-            if leader then
+            if leader and not leader:is_dead() then
                 -- Sync target from the entity we're following
                 if not npc:has_target() then
-                    local leader_target = npc:get_entity_target(leader)
+                    local leader_target = leader:get_target()
                     if leader_target then
                         npc:set_target(leader_target)
                     end
