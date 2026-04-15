@@ -494,7 +494,6 @@ mod commands {
     use std::{collections::HashMap, future::Future, pin::Pin, sync::OnceLock, time::SystemTime};
 
     use rusty_fusion::{
-        ai,
         chunk::TickMode,
         database::{db_get, DbImpl as _},
         scripting::scripting_get,
@@ -935,18 +934,29 @@ mod commands {
 
             if let Some(npc_id) = closest_npc_id {
                 let npc = state.get_npc_mut(npc_id).unwrap();
-                log_if_failed(send_system_message(
-                    client,
-                    &format!("{} is now following you", npc),
-                ));
                 npc.set_follow(EntityID::Player(pc_id));
-                if npc.ai.is_none() {
-                    let (ai, new_tick_mode) = ai::make_for_npc(npc, true);
-                    npc.ai = ai;
-                    state
-                        .entity_map
-                        .set_tick(EntityID::NPC(npc_id), new_tick_mode)
-                        .unwrap();
+                match &npc.ai {
+                    None => {
+                        npc.ai = Some("follow".to_string());
+                        log_if_failed(send_system_message(
+                            client,
+                            &format!("{} is now following you", npc),
+                        ));
+
+                        state
+                            .entity_map
+                            .set_tick(EntityID::NPC(npc_id), TickMode::WhenLoaded)
+                            .unwrap();
+                    }
+                    Some(ai_script) => {
+                        log_if_failed(send_system_message(
+                            client,
+                            &format!(
+                                "{} is unable to follow you (already running AI script: {})",
+                                npc, ai_script
+                            ),
+                        ));
+                    }
                 }
                 Ok(())
             } else {
@@ -988,7 +998,18 @@ mod commands {
                 let npc = state.get_npc_mut(npc_id).unwrap();
                 if npc.loose_follow == Some(EntityID::Player(pc_id)) {
                     npc.loose_follow = None;
-                    send_system_message(client, &format!("{} is no longer following you", npc))
+                    npc.ai = None;
+                    log_if_failed(send_system_message(
+                        client,
+                        &format!("{} is no longer following you", npc),
+                    ));
+
+                    state
+                        .entity_map
+                        .set_tick(EntityID::NPC(npc_id), TickMode::Never)
+                        .unwrap();
+
+                    Ok(())
                 } else {
                     send_system_message(client, &format!("{} is not following you!", npc))
                 }

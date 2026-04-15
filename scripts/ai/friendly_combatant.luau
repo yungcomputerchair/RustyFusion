@@ -8,18 +8,26 @@ local b = require("@lib/behaviors")
 
 return function(npc)
     while true do
-        -- 1. Handle death & respawn
         if not b.handle_death(npc) then
-            -- 2. Attack current target if we have one
-            if npc:has_target() then
-                if not b.try_attack(npc) then
-                    b.chase_target(npc)
+            local leader = npc:get_follow_target()
+            if leader then
+                -- Sync target from the entity we're following
+                if not npc:has_target() then
+                    local leader_target = npc:get_entity_target(leader)
+                    if leader_target then
+                        npc:set_target(leader_target)
+                    end
+                end
+
+                -- Attack or chase target; otherwise follow leader
+                if npc:has_target() then
+                    if not b.try_attack(npc) then
+                        b.chase_target(npc)
+                    end
+                else
+                    npc:move_toward_entity(leader, npc:walk_speed())
                 end
             end
-
-            -- Friendly NPCs don't scan; they get targets from
-            -- the player they follow (handled on the Rust side
-            -- via SyncPlayerTarget / loose_follow).
         end
 
         yield()

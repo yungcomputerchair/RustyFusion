@@ -227,16 +227,50 @@ impl LuaUserData for NpcScriptContext {
                     Some(id) => id,
                     None => return Err(LuaError::runtime("No target to move toward")),
                 };
+
                 let target_pos = match state.entity_map.get_entity_raw(target_id) {
                     Some(entity) => entity.get_position(),
                     None => return Err(LuaError::runtime("Target entity not found")),
                 };
+
                 let stats = tdata_get()
                     .get_npc_stats(npc.ty)
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
+
                 let following_distance = stats.radius;
-                let (target_pos, _too_close) =
+                let (target_pos, too_close) =
                     target_pos.interpolate(&npc.get_position(), following_distance as f32);
+
+                if too_close {
+                    return Ok(());
+                }
+
+                let mut path = NpcPath::new_single(target_pos, speed);
+                path.start();
+                npc.tick_movement_along_path(&mut path, state);
+                Ok(())
+            });
+
+            luau_method!(methods, "move_toward_entity" -> "()", |_, this, (target, speed): (LuaEntityID, i32)| {
+                let npc = this.npc_mut();
+                let state = this.state_mut();
+                let target_pos = match state.entity_map.get_entity_raw(target.0) {
+                    Some(entity) => entity.get_position(),
+                    None => return Err(LuaError::runtime("Entity not found")),
+                };
+
+                let stats = tdata_get()
+                    .get_npc_stats(npc.ty)
+                    .map_err(|e| LuaError::runtime(e.to_string()))?;
+
+                let following_distance = stats.radius;
+                let (target_pos, too_close) =
+                    target_pos.interpolate(&npc.get_position(), following_distance as f32);
+
+                if too_close {
+                    return Ok(());
+                }
+
                 let mut path = NpcPath::new_single(target_pos, speed);
                 path.start();
                 npc.tick_movement_along_path(&mut path, state);
@@ -366,6 +400,27 @@ impl LuaUserData for NpcScriptContext {
                 match nearest_id {
                     Some(eid) => Ok(Some(LuaEntityID(eid))),
                     None => Ok(None),
+                }
+            });
+
+            luau_method!(methods, "get_follow_target" -> "Entity?", |_, this, ()| {
+                Ok(this.npc().loose_follow.map(LuaEntityID))
+            });
+
+            luau_method!(methods, "get_entity_target" -> "Entity?", |_, this, target: LuaEntityID| {
+                let state = this.state_mut();
+                match target.0 {
+                    EntityID::NPC(npc_id) => {
+                        let npc = state.get_npc(npc_id)
+                            .map_err(|e| LuaError::runtime(e.to_string()))?;
+                        Ok(npc.target_id.map(LuaEntityID))
+                    }
+                    EntityID::Player(pc_id) => {
+                        let player = state.get_player(pc_id)
+                            .map_err(|e| LuaError::runtime(e.to_string()))?;
+                        Ok(player.last_attacked_by.map(LuaEntityID))
+                    }
+                    _ => Ok(None),
                 }
             });
 
