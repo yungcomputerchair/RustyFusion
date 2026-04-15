@@ -2245,8 +2245,8 @@ fn load_path_data() -> Result<PathData, String> {
 
         #[derive(Deserialize)]
         struct NPCPathEntry {
-            aNPCTypes: Vec<i32>,
-            aNPCIDs: Vec<i64>,
+            aNPCTypes: Option<Vec<i32>>,
+            aNPCIDs: Option<Vec<i64>>,
             iBaseSpeed: i32,
             aPoints: Vec<PathPointEntry>,
         }
@@ -2277,7 +2277,7 @@ fn load_path_data() -> Result<PathData, String> {
                 false
             };
             let npc_path = Path::new(points, cycle);
-            for npc_type in &npc_path_entry.aNPCTypes {
+            for npc_type in &npc_path_entry.aNPCTypes.unwrap_or_default() {
                 // currently, OpenFusion tabledata for paths does not
                 // have a field for initial path state; however,
                 // we really only want non-cyclic paths to wait,
