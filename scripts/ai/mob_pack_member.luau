@@ -6,7 +6,7 @@
 
 local b = require("@lib/behaviors")
 
-return function(npc)
+return function(npc: Npc)
     while true do
         if not b.handle_death(npc) then
             if not b.check_retreat(npc) then

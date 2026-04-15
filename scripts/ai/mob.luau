@@ -5,7 +5,7 @@
 
 local b = require("@lib/behaviors")
 
-return function(npc)
+return function(npc: Npc)
     while true do
         -- 1. Handle death & respawn
         if not b.handle_death(npc) then
