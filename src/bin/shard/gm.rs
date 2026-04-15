@@ -741,6 +741,7 @@ pub fn gm_npc_group_summon(
     let entity_map = &mut state.entity_map;
     let npcs = tdata_get().make_group_npcs(entity_map, unused!(), group_id);
     for mut npc in npcs {
+        npc.spawn_position = spawn_pos;
         npc.set_position(spawn_pos);
         npc.set_rotation(spawn_angle);
         npc.instance_id = spawn_instance_id;

@@ -8,19 +8,35 @@ local b = require("@lib/behaviors")
 
 return function(npc)
     while true do
-        -- 1. Handle death & respawn
         if not b.handle_death(npc) then
-            -- 2. Retreat if too far from spawn
             if not b.check_retreat(npc) then
-                -- 3. Combat (target is synced from leader on the Rust side)
+                -- Sync target from leader
+                local leader = npc:get_pack_leader()
+                if leader and not npc:has_target() then
+                    local leader_target = npc:get_entity_target(leader)
+                    if leader_target then
+                        npc:set_target(leader_target)
+                    end
+                end
+
+                -- Combat or follow leader
                 if npc:has_target() then
                     if not b.try_attack(npc) then
                         b.chase_target(npc)
                     end
+                elseif leader then
+                    -- Tight follow: stay at leader position + offset
+                    local leader_pos = npc:entity_position(leader)
+                    if leader_pos then
+                        local offset = npc:get_pack_offset()
+                        npc:move_to(
+                            leader_pos.x + offset.x,
+                            leader_pos.y + offset.y,
+                            leader_pos.z + offset.z,
+                            npc:run_speed()
+                        )
+                    end
                 end
-
-                -- Pack members don't idle roam; they follow their
-                -- leader via tight_follow (handled on the Rust side).
             end
         end
 

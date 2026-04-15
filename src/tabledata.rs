@@ -486,6 +486,7 @@ impl TableData {
                 return npcs;
             }
         };
+
         for follower_data in &dat.followers {
             let id = entity_map.gen_next_npc_id();
             let mut follower = match NPC::new(
@@ -508,6 +509,7 @@ impl TableData {
                     continue;
                 }
             };
+
             follower.tight_follow = Some((EntityID::NPC(npc.id), follower_data.offset));
             npcs.push(follower);
         }

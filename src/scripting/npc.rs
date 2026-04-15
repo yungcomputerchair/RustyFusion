@@ -407,6 +407,37 @@ impl LuaUserData for NpcScriptContext {
                 Ok(this.npc().loose_follow.map(LuaEntityID))
             });
 
+            luau_method!(methods, "get_pack_leader" -> "Entity?", |_, this, ()| {
+                Ok(this.npc().tight_follow.map(|(eid, _)| LuaEntityID(eid)))
+            });
+
+            luau_method!(methods, "get_pack_offset" -> "Position", |lua, this, ()| {
+                let offset = this.npc().tight_follow
+                    .map(|(_, off)| off)
+                    .unwrap_or_default();
+
+                let table = lua.create_table()?;
+                table.set("x", offset.x)?;
+                table.set("y", offset.y)?;
+                table.set("z", offset.z)?;
+                Ok(table)
+            });
+
+            luau_method!(methods, "entity_position" -> "Position?", |lua, this, target: LuaEntityID| {
+                let state = this.state_mut();
+                match state.entity_map.get_entity_raw(target.0) {
+                    Some(entity) => {
+                        let pos = entity.get_position();
+                        let table = lua.create_table()?;
+                        table.set("x", pos.x)?;
+                        table.set("y", pos.y)?;
+                        table.set("z", pos.z)?;
+                        Ok(Some(table))
+                    }
+                    None => Ok(None),
+                }
+            });
+
             luau_method!(methods, "get_entity_target" -> "Entity?", |_, this, target: LuaEntityID| {
                 let state = this.state_mut();
                 match target.0 {
