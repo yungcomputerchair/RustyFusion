@@ -156,7 +156,8 @@ end
 
 -- Idle roam: pick a random point near spawn, walk to it, wait.
 -- Returns early if the NPC dies or acquires a target.
-function behaviors.idle_roam(npc: Npc)
+-- Optional on_tick callback is called each tick (e.g. to scan for targets).
+function behaviors.idle_roam(npc: Npc, on_tick: (() -> ())?)
     local idle_range = npc:idle_range()
     if idle_range <= 0 then
         yield()
@@ -164,9 +165,10 @@ function behaviors.idle_roam(npc: Npc)
     end
 
     local roam_radius = idle_range / 2
-    local point = random_point_in_range(npc:position(), roam_radius)
+    local point = random_point_in_range(npc:spawn_position(), roam_radius)
     npc:move_to(point.x, point.y, point.z, npc:walk_speed())
     while npc:is_moving() do
+        if on_tick then on_tick() end
         if npc:is_dead() or npc:has_target() then return end
         yield()
     end
@@ -175,6 +177,7 @@ function behaviors.idle_roam(npc: Npc)
     local delay_max = npc:delay_time() * 10
     local delay_ticks = math.ceil(math.random() * delay_max * 8)
     for i = 1, delay_ticks do
+        if on_tick then on_tick() end
         if npc:is_dead() or npc:has_target() then return end
         yield()
     end

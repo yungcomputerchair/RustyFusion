@@ -13,7 +13,9 @@ function mob_base.run(npc: Npc)
                         b.chase_target(npc)
                     end
                 else
-                    b.idle_roam(npc)
+                    b.idle_roam(npc, function()
+                        b.scan_for_target_aggro(npc)
+                    end)
                 end
             end
         end
