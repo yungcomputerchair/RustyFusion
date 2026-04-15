@@ -420,9 +420,11 @@ fn generate_luau_declarations() {
 
     // Regexes for the luau macros:
     //   luau_type!("Name", "Definition");
-    let type_re = regex::Regex::new(r#"luau_type!\("([^"]+)"\s*,\s*"([^"]+)"\)"#).unwrap();
+    let type_re =
+        regex::Regex::new(r#"(?s)luau_type!\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)"#).unwrap();
     //   luau_function!("name", "(params): ret");
-    let func_re = regex::Regex::new(r#"luau_function!\("([^"]+)"\s*,\s*"([^"]+)"\)"#).unwrap();
+    let func_re =
+        regex::Regex::new(r#"(?s)luau_function!\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)"#).unwrap();
     //   luau_class!("ClassName", { ... });
     let class_re = regex::Regex::new(r#"luau_class!\("([^"]+)"\s*,"#).unwrap();
     //   luau_method!(ident, "name" -> "RetType", |_, this, params| { ... });

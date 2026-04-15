@@ -5,7 +5,7 @@ use parking_lot::Mutex;
 
 use crate::{
     defines::SHARD_TICKS_PER_SECOND,
-    entity::{Combatant as _, NPC},
+    entity::NPC,
     error::{log, log_error, FFError, FFResult, Severity},
     state::ShardServerState,
     Position,
@@ -86,7 +86,6 @@ pub fn scripting_get() -> &'static Mutex<ScriptingEngine> {
 struct NpcCoroutine {
     co_key: LuaRegistryKey,
     wait_ticks: u32,
-    wait_noint: bool,
 }
 
 pub struct ScriptingEngine {
@@ -126,27 +125,33 @@ impl ScriptingEngine {
 
     fn register_globals(vm: &Lua) -> FFResult<()> {
         luau_function!("yield", "(): ()");
-        luau_function!("wait", "(seconds: number): ()");
-        luau_function!("wait_noint", "(seconds: number): ()");
+        luau_function!("wait", "(seconds: number, predicate: (() -> boolean)?): ()");
         luau_function!("log", "(message: string): ()");
         luau_function!(
             "random_point_in_range",
             "(from: Position, range: number): Position"
         );
 
-        vm.load(
+        vm.load(format!(
             r#"
+            local TICKS_PER_SECOND = {}
             function yield()
                 coroutine.yield(nil)
             end
-            function wait(seconds)
-                coroutine.yield(seconds)
-            end
-            function wait_noint(seconds)
-                coroutine.yield(-seconds)
+            function wait(seconds, predicate)
+                if predicate then
+                    local ticks = math.ceil(seconds * TICKS_PER_SECOND)
+                    for i = 1, ticks do
+                        if predicate() then return end
+                        coroutine.yield(nil)
+                    end
+                else
+                    coroutine.yield(seconds)
+                end
             end
         "#,
-        )
+            SHARD_TICKS_PER_SECOND
+        ))
         .exec()
         .map_err(|e| {
             FFError::build(
@@ -361,11 +366,10 @@ impl ScriptingEngine {
 
         // Check wait timer (skip if dead unless uninterruptible)
         if let Some(co_state) = self.coroutines.get_mut(&npc_id) {
-            if co_state.wait_ticks > 0 && (co_state.wait_noint || !npc.is_dead()) {
+            if co_state.wait_ticks > 0 {
                 co_state.wait_ticks -= 1;
                 return;
             }
-            co_state.wait_ticks = 0;
         }
 
         // Get or create coroutine
@@ -413,11 +417,8 @@ impl ScriptingEngine {
                 };
 
                 if let Some(seconds) = wait_seconds {
-                    let uninterruptible = seconds < 0.0;
-                    let ticks = (seconds.abs() * SHARD_TICKS_PER_SECOND as f64).ceil() as u32;
-
+                    let ticks = (seconds * SHARD_TICKS_PER_SECOND as f64).ceil() as u32;
                     co_state.wait_ticks = ticks;
-                    co_state.wait_noint = uninterruptible;
                 }
             }
             Err(e) => {
@@ -479,7 +480,6 @@ impl ScriptingEngine {
             NpcCoroutine {
                 co_key,
                 wait_ticks: 0,
-                wait_noint: false,
             },
         );
 

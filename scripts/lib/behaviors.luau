@@ -17,7 +17,7 @@ function behaviors.handle_death(npc: Npc)
     wait(2.0) -- brief delay before despawn
 
     npc:despawn()
-    wait_noint(npc:regen_time()) -- non-interruptible wait for regen time
+    wait(npc:regen_time()) -- non-interruptible wait for regen time
 
     -- Reset position to spawn and respawn
     local spawn = npc:spawn_position()
@@ -136,7 +136,10 @@ function behaviors.try_attack(npc: Npc)
     end
 
     npc:attack()
-    wait(npc:delay_time())
+    wait(npc:delay_time(), function()
+        -- Interrupt delay if npc dies
+        return npc:is_dead()
+    end)
     return true
 end
 
