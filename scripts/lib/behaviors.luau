@@ -17,7 +17,7 @@ function behaviors.handle_death(npc: Npc)
     wait(2.0) -- brief delay before despawn
 
     npc:despawn()
-    wait(npc:regen_time())
+    wait_noint(npc:regen_time()) -- non-interruptible wait for regen time
 
     -- Reset position to spawn and respawn
     local spawn = npc:spawn_position()
@@ -41,12 +41,12 @@ function behaviors.check_retreat(npc: Npc)
 
     -- Too far from spawn; retreat
     npc:clear_target()
+    npc:set_retreating(true)
     npc:move_to(spawn.x, spawn.y, spawn.z, npc:run_speed() * 2)
     while npc:is_moving() do
-        if npc:is_dead() then return true end
         yield()
     end
-    npc:clear_target()
+    npc:set_retreating(false)
     return true
 end
 

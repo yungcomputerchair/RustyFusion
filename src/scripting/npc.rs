@@ -248,6 +248,11 @@ impl LuaUserData for NpcScriptContext {
                 Ok(())
             });
 
+            luau_method!(methods, "set_retreating" -> "()", |_, this, retreating: bool| {
+                this.npc_mut().retreating = retreating;
+                Ok(())
+            });
+
             luau_method!(methods, "begin_death" -> "()", |_, this, ()| {
                 let npc = this.npc();
                 let state = this.state_mut();
@@ -366,7 +371,7 @@ impl LuaUserData for NpcScriptContext {
 
             luau_method!(methods, "random_point_in_range" -> "Position", |lua, this, range: u32| {
                 let npc = this.npc();
-                let pos = npc.get_position();
+                let pos = npc.spawn_position;
                 let target = pos.get_random_around(range, range, 0);
                 let table = lua.create_table()?;
                 table.set("x", target.x)?;

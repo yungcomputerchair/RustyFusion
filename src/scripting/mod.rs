@@ -102,6 +102,7 @@ impl LuaUserData for LuaEntityID {
 struct NpcCoroutine {
     co_key: LuaRegistryKey,
     wait_ticks: u32,
+    wait_noint: bool,
 }
 
 pub struct ScriptingEngine {
@@ -143,6 +144,7 @@ impl ScriptingEngine {
         luau_function!("yield", "(): ()");
         luau_function!("wait", "(seconds: number): ()");
         luau_function!("log", "(message: string): ()");
+        luau_function!("wait_noint", "(seconds: number): ()");
 
         vm.load(
             r#"
@@ -151,6 +153,9 @@ impl ScriptingEngine {
             end
             function wait(seconds)
                 coroutine.yield(seconds)
+            end
+            function wait_noint(seconds)
+                coroutine.yield(-seconds)
             end
         "#,
         )
@@ -328,9 +333,9 @@ impl ScriptingEngine {
     pub fn tick_npc(&mut self, npc: &mut NPC, state: &mut ShardServerState) {
         let npc_id = npc.id;
 
-        // Check wait timer (skip if dead so death handling runs immediately)
+        // Check wait timer (skip if dead unless uninterruptible)
         if let Some(co_state) = self.coroutines.get_mut(&npc_id) {
-            if co_state.wait_ticks > 0 && !npc.is_dead() {
+            if co_state.wait_ticks > 0 && (co_state.wait_noint || !npc.is_dead()) {
                 co_state.wait_ticks -= 1;
                 return;
             }
@@ -381,10 +386,12 @@ impl ScriptingEngine {
                 };
 
                 if let Some(seconds) = wait_seconds {
-                    let ticks =
-                        (seconds * crate::defines::SHARD_TICKS_PER_SECOND as f64).ceil() as u32;
+                    let uninterruptible = seconds < 0.0;
+                    let ticks = (seconds.abs() * crate::defines::SHARD_TICKS_PER_SECOND as f64)
+                        .ceil() as u32;
 
                     co_state.wait_ticks = ticks;
+                    co_state.wait_noint = uninterruptible;
                 }
             }
             Err(e) => {
@@ -446,6 +453,7 @@ impl ScriptingEngine {
             NpcCoroutine {
                 co_key,
                 wait_ticks: 0,
+                wait_noint: false,
             },
         );
 
