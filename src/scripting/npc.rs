@@ -14,21 +14,17 @@ use crate::{
 
 use super::LuaEntityID;
 
-// ==================== NPC Handle (Lua UserData) ====================
-
-/// Lightweight proxy passed to Lua scripts during a single tick.
-/// This holds raw pointers because mlua's scope API requires 'static,
-/// and we guarantee the references are valid for the duration of resume().
-pub(super) struct NpcHandle {
+/// NPC context used in Lua script. Provides bindings to Lua.
+pub(super) struct NpcScriptContext {
     npc: *mut NPC,
     state: *mut ShardServerState,
 }
 
-// SAFETY: NpcHandle is only used within a single synchronous resume() call.
+// SAFETY: NpcScriptContext is only used within a single synchronous resume() call.
 // The pointers are guaranteed valid for that duration.
-unsafe impl Send for NpcHandle {}
+unsafe impl Send for NpcScriptContext {}
 
-impl NpcHandle {
+impl NpcScriptContext {
     pub(super) fn new(npc: &mut NPC, state: &mut ShardServerState) -> Self {
         Self {
             npc: npc as *mut NPC,
@@ -36,7 +32,7 @@ impl NpcHandle {
         }
     }
 
-    // SAFETY for all three accessors: NpcHandle is only created from valid
+    // SAFETY for all three accessors: NpcScriptContext is only created from valid
     // &mut references in tick_npc() and only used within a single synchronous
     // resume() call. No aliasing is possible during that window.
 
@@ -55,10 +51,10 @@ impl NpcHandle {
     }
 }
 
-impl LuaUserData for NpcHandle {
+impl LuaUserData for NpcScriptContext {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         luau_class!("Npc", {
-            // ---- Properties (read-only) ----
+            // Properties
 
             luau_method!(methods, "id" -> "number", |_, this, ()| Ok(this.npc().id));
 
@@ -66,6 +62,15 @@ impl LuaUserData for NpcHandle {
 
             luau_method!(methods, "position" -> "Position", |lua, this, ()| {
                 let pos = this.npc().get_position();
+                let table = lua.create_table()?;
+                table.set("x", pos.x)?;
+                table.set("y", pos.y)?;
+                table.set("z", pos.z)?;
+                Ok(table)
+            });
+
+            luau_method!(methods, "spawn_position" -> "Position", |lua, this, ()| {
+                let pos = this.npc().spawn_position;
                 let table = lua.create_table()?;
                 table.set("x", pos.x)?;
                 table.set("y", pos.y)?;
@@ -110,12 +115,13 @@ impl LuaUserData for NpcHandle {
 
             luau_method!(methods, "is_moving" -> "boolean", |_, this, ()| Ok(this.npc().path.is_some()));
 
-            // ---- Stats ----
+            // Stats
 
             luau_method!(methods, "walk_speed" -> "number", |_, this, ()| {
                 let stats = tdata_get()
                     .get_npc_stats(this.npc().ty)
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
+
                 Ok(stats.walk_speed)
             });
 
@@ -123,6 +129,7 @@ impl LuaUserData for NpcHandle {
                 let stats = tdata_get()
                     .get_npc_stats(this.npc().ty)
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
+
                 Ok(stats.run_speed)
             });
 
@@ -130,6 +137,7 @@ impl LuaUserData for NpcHandle {
                 let stats = tdata_get()
                     .get_npc_stats(this.npc().ty)
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
+
                 Ok(stats.sight_range)
             });
 
@@ -137,6 +145,7 @@ impl LuaUserData for NpcHandle {
                 let stats = tdata_get()
                     .get_npc_stats(this.npc().ty)
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
+
                 Ok(stats.idle_range)
             });
 
@@ -144,6 +153,7 @@ impl LuaUserData for NpcHandle {
                 let stats = tdata_get()
                     .get_npc_stats(this.npc().ty)
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
+
                 Ok(stats.combat_range)
             });
 
@@ -151,6 +161,7 @@ impl LuaUserData for NpcHandle {
                 let stats = tdata_get()
                     .get_npc_stats(this.npc().ty)
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
+
                 Ok(stats.attack_range)
             });
 
@@ -158,6 +169,7 @@ impl LuaUserData for NpcHandle {
                 let stats = tdata_get()
                     .get_npc_stats(this.npc().ty)
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
+
                 // Convert from 100ms units to seconds
                 Ok(stats.regen_time as f64 / 10.0)
             });
@@ -166,11 +178,12 @@ impl LuaUserData for NpcHandle {
                 let stats = tdata_get()
                     .get_npc_stats(this.npc().ty)
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
+
                 // Convert from 100ms units to seconds
                 Ok(stats.delay_time as f64 / 10.0)
             });
 
-            // ---- Actions ----
+            // Actions
 
             luau_method!(methods, "clear_target" -> "()", |_, this, ()| {
                 this.npc_mut().target_id = None;
@@ -281,20 +294,7 @@ impl LuaUserData for NpcHandle {
                 }
             );
 
-            // ---- World Queries ----
-
-            luau_method!(methods, "spawn_position" -> "Position", |lua, this, ()| {
-                // The spawn position is stored per-NPC in tabledata;
-                // for now we expose the current position as a fallback.
-                // The actual spawn position will be set when the coroutine is created.
-                let npc = this.npc();
-                let pos = npc.spawn_position;
-                let table = lua.create_table()?;
-                table.set("x", pos.x)?;
-                table.set("y", pos.y)?;
-                table.set("z", pos.z)?;
-                Ok(table)
-            });
+            // Helpers
 
             luau_method!(methods, "distance_to" -> "number", |_, this, (x, y, z): (i32, i32, i32)| {
                 let npc = this.npc();

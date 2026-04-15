@@ -108,6 +108,12 @@ impl From<bcrypt::BcryptError> for FFError {
             .with_parent(Self::build(Severity::Debug, error.to_string()))
     }
 }
+impl From<mlua::Error> for FFError {
+    fn from(error: mlua::Error) -> Self {
+        Self::new(Severity::Warning, "Lua error".to_string(), false)
+            .with_parent(Self::build(Severity::Debug, error.to_string()))
+    }
+}
 impl FFError {
     fn new(severity: Severity, msg: String, should_dc: bool) -> Self {
         Self {

@@ -28,8 +28,7 @@ macro_rules! luau_class {
 }
 
 /// Registers a Lua method and encodes its Luau return type for build.rs.
-/// build.rs scans for invocations to auto-generate `scripts/globals.d.luau`,
-/// deriving parameter types from the closure signature.
+/// build.rs derives parameter types from the closure signature.
 macro_rules! luau_method {
     ($methods:ident, $name:literal -> $ret:literal, $($body:tt)+) => {
         $methods.add_method($name, $($body)+);
@@ -107,16 +106,12 @@ struct NpcCoroutine {
 
 pub struct ScriptingEngine {
     vm: Lua,
-    /// script name -> compiled script function
     scripts: HashMap<String, LuaRegistryKey>,
-    /// npc_id -> live coroutine
     coroutines: HashMap<i32, NpcCoroutine>,
 }
 impl ScriptingEngine {
     pub fn new() -> FFResult<Self> {
         let vm = Lua::new();
-
-        // Register global yield/wait functions
         Self::register_globals(&vm)?;
 
         let mut engine = Self {
@@ -173,40 +168,41 @@ impl ScriptingEngine {
                 log(Severity::Info, &format!("[Lua] {}", msg));
                 Ok(())
             })
-            .map_err(|e| {
-                FFError::build(
-                    Severity::Fatal,
-                    format!("Failed to create log function: {}", e),
-                )
-            })?;
+            .unwrap();
 
-        vm.globals()
-            .set("log", log_fn)
-            .map_err(|e| FFError::build(Severity::Fatal, format!("Failed to set log: {}", e)))?;
+        vm.globals().set("log", log_fn).unwrap();
 
         Ok(())
     }
 
     fn load_scripts(&mut self) -> FFResult<()> {
         const SCRIPTS_PATH: &str = "scripts";
-        let scripts_path = Path::new(SCRIPTS_PATH);
 
-        let ai_dir = scripts_path.join("ai");
-        if !ai_dir.exists() {
-            return Err(FFError::build(
-                Severity::Warning,
-                format!("AI scripts directory not found: {}", ai_dir.display()),
-            ));
-        }
+        let scripts_path = Path::new(SCRIPTS_PATH);
 
         // Load lib modules (available via require("@lib/<name>"))
         let lib_dir = scripts_path.join("lib");
         if lib_dir.exists() {
-            self.load_lib_modules(&lib_dir)?;
+            self.load_lib_modules(&lib_dir).map_err(|e| {
+                FFError::build(
+                    Severity::Warning,
+                    format!("Failed to load Lua lib modules from {}", lib_dir.display()),
+                )
+                .with_parent(e)
+            })?;
         }
 
         // Load AI scripts
-        self.load_scripts_from_dir(&ai_dir)?;
+        let ai_dir = scripts_path.join("ai");
+        if ai_dir.exists() {
+            self.load_scripts_from_dir(&ai_dir).map_err(|e| {
+                FFError::build(
+                    Severity::Warning,
+                    format!("Failed to load AI scripts from {}", ai_dir.display()),
+                )
+                .with_parent(e)
+            })?;
+        }
 
         log(
             Severity::Info,
@@ -217,20 +213,11 @@ impl ScriptingEngine {
     }
 
     fn load_lib_modules(&mut self, lib_dir: &Path) -> FFResult<()> {
-        let entries = fs::read_dir(lib_dir).map_err(|e| {
-            FFError::build(
-                Severity::Warning,
-                format!("Failed to read {}: {}", lib_dir.display(), e),
-            )
-        })?;
-
+        let entries = fs::read_dir(lib_dir)?;
         for entry in entries {
-            let entry = entry.map_err(|e| {
-                FFError::build(
-                    Severity::Warning,
-                    format!("Failed to read dir entry: {}", e),
-                )
-            })?;
+            let Ok(entry) = entry else {
+                continue;
+            };
 
             let path = entry.path();
             if path.extension().and_then(|e| e.to_str()) != Some("luau") {
@@ -242,17 +229,12 @@ impl ScriptingEngine {
                 .and_then(|s| s.to_str())
                 .unwrap_or("")
                 .to_string();
+
             if stem.is_empty() {
                 continue;
             }
 
-            let source = fs::read_to_string(&path).map_err(|e| {
-                FFError::build(
-                    Severity::Warning,
-                    format!("Failed to read {}: {}", path.display(), e),
-                )
-            })?;
-
+            let source = fs::read_to_string(&path)?;
             let module_name = format!("@lib/{}", stem);
             let value = self
                 .vm
@@ -262,15 +244,17 @@ impl ScriptingEngine {
                 .map_err(|e| {
                     FFError::build(
                         Severity::Warning,
-                        format!("Failed to load module {}: {}", path.display(), e),
+                        format!("Failed to load module '{}'", module_name),
                     )
+                    .with_parent(e.into())
                 })?;
 
             self.vm.register_module(&module_name, value).map_err(|e| {
                 FFError::build(
                     Severity::Warning,
-                    format!("Failed to register module {}: {}", module_name, e),
+                    format!("Failed to register module '{}'", module_name),
                 )
+                .with_parent(e.into())
             })?;
 
             log(
@@ -287,20 +271,11 @@ impl ScriptingEngine {
     }
 
     fn load_scripts_from_dir(&mut self, dir: &Path) -> FFResult<()> {
-        let entries = fs::read_dir(dir).map_err(|e| {
-            FFError::build(
-                Severity::Warning,
-                format!("Failed to read {}: {}", dir.display(), e),
-            )
-        })?;
-
+        let entries = fs::read_dir(dir)?;
         for entry in entries {
-            let entry = entry.map_err(|e| {
-                FFError::build(
-                    Severity::Warning,
-                    format!("Failed to read dir entry: {}", e),
-                )
-            })?;
+            let Ok(entry) = entry else {
+                continue;
+            };
 
             let path = entry.path();
             if path.is_dir() {
@@ -321,31 +296,16 @@ impl ScriptingEngine {
                 continue;
             }
 
-            let source = fs::read_to_string(&path).map_err(|e| {
-                FFError::build(
-                    Severity::Warning,
-                    format!("Failed to read {}: {}", path.display(), e),
-                )
-            })?;
+            let source = fs::read_to_string(&path)?;
 
             let func = self
                 .vm
                 .load(&source)
                 .set_name(&stem)
                 .eval::<LuaFunction>()
-                .map_err(|e| {
-                    FFError::build(
-                        Severity::Warning,
-                        format!("Failed to compile {}: {}", path.display(), e),
-                    )
-                })?;
+                .map_err(FFError::from)?;
 
-            let key = self.vm.create_registry_value(func).map_err(|e| {
-                FFError::build(
-                    Severity::Warning,
-                    format!("Failed to register {}: {}", path.display(), e),
-                )
-            })?;
+            let key = self.vm.create_registry_value(func).map_err(FFError::from)?;
 
             if self.scripts.contains_key(&stem) {
                 log(
@@ -389,26 +349,25 @@ impl ScriptingEngine {
         let co: LuaThread = match self.vm.registry_value(&co_state.co_key) {
             Ok(co) => co,
             Err(e) => {
-                log_error(FFError::build(
-                    Severity::Warning,
-                    format!("Failed to get coroutine for NPC {}: {}", npc_id, e),
-                ));
+                log_error(FFError::from(e));
                 self.coroutines.remove(&npc_id);
                 return;
             }
         };
 
-        // Create NPC handle for this tick
-        let handle = NpcHandle::new(npc, state);
+        let status = co.status();
+        if status == LuaThreadStatus::Finished || status == LuaThreadStatus::Error {
+            return;
+        }
 
+        let handle = NpcScriptContext::new(npc, state);
         match co.resume::<LuaValue>(handle) {
             Ok(value) => {
                 let co_state = self.coroutines.get_mut(&npc_id).unwrap();
-                // Extract wait duration from yield value
                 let wait_seconds = match &value {
                     LuaValue::Number(n) => Some(*n),
                     LuaValue::Integer(n) => Some(*n as f64),
-                    LuaValue::Nil => None, // yield() with no wait
+                    LuaValue::Nil => None, // yield()
                     other => {
                         log(
                             Severity::Warning,
@@ -424,21 +383,18 @@ impl ScriptingEngine {
                 if let Some(seconds) = wait_seconds {
                     let ticks =
                         (seconds * crate::defines::SHARD_TICKS_PER_SECOND as f64).ceil() as u32;
-                    co_state.wait_ticks = ticks;
-                }
 
-                // If coroutine finished, restart it
-                if co.status() == LuaThreadStatus::Finished {
-                    self.coroutines.remove(&npc_id);
+                    co_state.wait_ticks = ticks;
                 }
             }
             Err(e) => {
-                log_error(FFError::build(
-                    Severity::Warning,
-                    format!("AI script error for NPC {}: {}", npc_id, e),
-                ));
-                // Remove broken coroutine; it will be recreated next tick
-                self.coroutines.remove(&npc_id);
+                log_error(
+                    FFError::build(
+                        Severity::Warning,
+                        format!("AI script error for NPC {}", npc),
+                    )
+                    .with_parent(e.into()),
+                );
             }
         }
     }
@@ -464,22 +420,25 @@ impl ScriptingEngine {
         let func: LuaFunction = self.vm.registry_value(script_key).map_err(|e| {
             FFError::build(
                 Severity::Warning,
-                format!("Failed to get script function: {}", e),
+                format!("Failed to get script function for NPC {}", npc),
             )
+            .with_parent(e.into())
         })?;
 
         let co = self.vm.create_thread(func).map_err(|e| {
             FFError::build(
                 Severity::Warning,
-                format!("Failed to create coroutine: {}", e),
+                format!("Failed to create coroutine for NPC {}", npc),
             )
+            .with_parent(e.into())
         })?;
 
         let co_key = self.vm.create_registry_value(co).map_err(|e| {
             FFError::build(
                 Severity::Warning,
-                format!("Failed to register coroutine: {}", e),
+                format!("Failed to register coroutine for NPC {}", npc),
             )
+            .with_parent(e.into())
         })?;
 
         self.coroutines.insert(
