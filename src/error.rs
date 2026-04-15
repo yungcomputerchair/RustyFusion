@@ -110,8 +110,21 @@ impl From<bcrypt::BcryptError> for FFError {
 }
 impl From<mlua::Error> for FFError {
     fn from(error: mlua::Error) -> Self {
+        // sanitize the Lua error message to avoid breaking the TUI
+        let control_character_range = '\x00'..='\x1F';
+        let sanitized_msg = format!("{}", error)
+            .chars()
+            .map(|c| {
+                if control_character_range.contains(&c) || c == '\n' || c == '\r' {
+                    '?'
+                } else {
+                    c
+                }
+            })
+            .collect::<String>();
+
         Self::new(Severity::Warning, "Lua error".to_string(), false)
-            .with_parent(Self::build(Severity::Debug, error.to_string()))
+            .with_parent(Self::build(Severity::Debug, sanitized_msg))
     }
 }
 impl FFError {
