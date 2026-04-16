@@ -151,14 +151,15 @@ impl NPC {
         // we check the stats instead of self.ai since the
         // AI object is taken out during tick.
 
-        if self.path.is_some() {
-            // exception: some NPCs have AI type 0, but are still combatants
-            return true;
-        }
+        // if self.path.is_some() {
+        //     // exception: some NPCs have AI type 0, but are still combatants
+        //     return true;
+        // }
 
-        let stats = tdata_get().get_npc_stats(self.ty).unwrap();
-        stats.ai_type != 0 // no npcs without AI
-        && stats.ai_type != 11 // no cars or animals
+        // let stats = tdata_get().get_npc_stats(self.ty).unwrap();
+        // stats.ai_type != 0 // no npcs without AI
+        // && stats.ai_type != 11 // no cars or animals
+        true
     }
 }
 impl Display for NPC {
@@ -328,6 +329,10 @@ impl Combatant for NPC {
         } else {
             1.0
         }
+    }
+
+    fn get_target(&self) -> Option<EntityID> {
+        self.target_id
     }
 
     fn is_dead(&self) -> bool {

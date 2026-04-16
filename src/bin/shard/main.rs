@@ -425,6 +425,7 @@ fn handle_packet<'a>(
 
             //
             P_CL2FE_REQ_PC_ATTACK_NPCs => combat::pc_attack_npcs(pkt, &clients, state),
+            P_CL2FE_REQ_PC_ATTACK_CHARs => combat::pc_attack_pcs(pkt, &clients, state),
             //
             P_CL2FE_REQ_ITEM_MOVE => item::item_move(pkt, &clients, state),
             P_CL2FE_REQ_PC_ITEM_DELETE => item::item_delete(pkt, clients.get_sender(), state),

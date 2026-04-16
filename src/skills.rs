@@ -24,6 +24,15 @@ pub fn do_basic_attack(
 ) -> FFResult<()> {
     const CRIT_CHANCE: f32 = 0.05;
 
+    if let EntityID::Player(pc_id) = attacker_id {
+        let player = state.get_player_mut(pc_id)?;
+        if let Some(eid) = target_ids.first() {
+            // last_attacked_by is used by scripts as an indicator
+            // of who the player is in combat with
+            player.target = Some(*eid);
+        }
+    }
+
     let attacker = state.get_combatant(attacker_id)?;
     let mut attacker_client = attacker.get_client();
 

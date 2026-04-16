@@ -828,7 +828,7 @@ mod commands {
             let ai_script_name = if tokens.len() < 2 {
                 return send_system_message(
                     client,
-                    &format!("Usage: {}changeai <ai_script_name> [tick_mode]\ntick_mode: when_loaded (default) | always", CUSTOM_COMMAND_PREFIX));
+                    &format!("Usage: {}changeai <ai_script_name> [tick_mode]\nai_script_name: 'none' to clear\ntick_mode: when_loaded (default) | always", CUSTOM_COMMAND_PREFIX));
             } else {
                 tokens[1]
             };
@@ -871,7 +871,11 @@ mod commands {
                     &format!("Changing AI of {} to {}", npc, ai_script_name),
                 )?;
 
-                npc.ai = Some(ai_script_name.to_string());
+                npc.ai = match ai_script_name.to_lowercase().as_str() {
+                    "none" => None,
+                    other => Some(other.to_string()),
+                };
+
                 state
                     .entity_map
                     .set_tick(EntityID::NPC(npc_id), tick_mode)

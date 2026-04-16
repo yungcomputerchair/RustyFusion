@@ -410,6 +410,7 @@ pub struct Player {
     pub in_menu: bool,
     pub in_combat: bool,
     pub last_attacked_by: Option<EntityID>,
+    pub target: Option<EntityID>,
     pub freechat_muted: bool,
     pub reward_data: RewardData,
     position: Position,
@@ -1158,43 +1159,45 @@ impl Player {
             return self.fusion_matter;
         };
 
-        if self.fusion_matter >= level_up_fusion_matter && !self.mission_journal.has_nano_mission()
-        {
-            let Ok(level_up_task_def) = tdata_get().get_task_definition(level_up_task_id) else {
+        if let Some(client) = self.get_client() {
+            if self.fusion_matter >= level_up_fusion_matter
+                && !self.mission_journal.has_nano_mission()
+            {
+                let Ok(level_up_task_def) = tdata_get().get_task_definition(level_up_task_id)
+                else {
+                    log(
+                        Severity::Warning,
+                        &format!("Level up task with ID {} doesn't exist!", level_up_task_id),
+                    );
+                    return self.fusion_matter;
+                };
+
+                let level_up_mission_def = tdata_get()
+                    .get_mission_definition(level_up_task_def.mission_id)
+                    .unwrap();
+
                 log(
-                    Severity::Warning,
-                    &format!("Level up task with ID {} doesn't exist!", level_up_task_id),
+                    Severity::Info,
+                    &format!(
+                        "{} started nano mission: {} [{}]",
+                        self, level_up_mission_def.mission_name, level_up_mission_def.mission_id
+                    ),
                 );
-                return self.fusion_matter;
-            };
 
-            let level_up_mission_def = tdata_get()
-                .get_mission_definition(level_up_task_def.mission_id)
-                .unwrap();
+                self.mission_journal
+                    .start_task(level_up_task_def.into())
+                    .unwrap();
 
-            log(
-                Severity::Info,
-                &format!(
-                    "{} started nano mission: {} [{}]",
-                    self, level_up_mission_def.mission_name, level_up_mission_def.mission_id
-                ),
-            );
+                let pkt = sP_FE2CL_REP_PC_TASK_START_SUCC {
+                    iTaskNum: level_up_task_id,
+                    iRemainTime: level_up_task_def
+                        .obj_time_limit
+                        .map(|d| d.as_secs() as i32)
+                        .unwrap_or(unused!()),
+                };
 
-            self.mission_journal
-                .start_task(level_up_task_def.into())
-                .unwrap();
-
-            let pkt = sP_FE2CL_REP_PC_TASK_START_SUCC {
-                iTaskNum: level_up_task_id,
-                iRemainTime: level_up_task_def
-                    .obj_time_limit
-                    .map(|d| d.as_secs() as i32)
-                    .unwrap_or(unused!()),
-            };
-
-            self.get_client()
-                .unwrap()
-                .send_packet(P_FE2CL_REP_PC_TASK_START_SUCC, &pkt);
+                client.send_packet(P_FE2CL_REP_PC_TASK_START_SUCC, &pkt);
+            }
         }
 
         self.fusion_matter
@@ -1618,6 +1621,10 @@ impl Combatant for Player {
         }
     }
 
+    fn get_target(&self) -> Option<EntityID> {
+        self.target.or(self.last_attacked_by)
+    }
+
     fn is_dead(&self) -> bool {
         self.hp <= 0
     }
@@ -1668,6 +1675,7 @@ impl Combatant for Player {
     }
 
     fn reset(&mut self) {
+        self.target = None;
         self.last_attacked_by = None;
         self.last_heal_time = Some(SystemTime::now());
     }

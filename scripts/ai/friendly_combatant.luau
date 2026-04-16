@@ -13,19 +13,22 @@ return function(npc: Npc)
             if leader and not leader:is_dead() then
                 -- Sync target from the entity we're following
                 if not npc:has_target() then
-                    local leader_target = leader:get_target()
+                local leader_target = leader:target()
                     if leader_target then
                         npc:set_target(leader_target)
                     end
                 end
 
                 -- Attack or chase target; otherwise follow leader
-                if npc:has_target() then
+                local target = npc:get_target()
+                if target and not target:is_dead() then
                     if not b.try_attack(npc) then
                         b.chase_target(npc)
                     end
                 else
-                    npc:move_toward_entity(leader, npc:walk_speed())
+                    npc:clear_target()
+                    local distance = npc:distance_to_entity(leader)
+                    npc:move_toward_entity(leader, distance)
                 end
             end
         end

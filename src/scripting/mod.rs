@@ -84,6 +84,7 @@ pub fn scripting_get() -> &'static Mutex<ScriptingEngine> {
 }
 
 struct NpcCoroutine {
+    script_name: String,
     co_key: LuaRegistryKey,
     wait_ticks: u32,
 }
@@ -363,9 +364,16 @@ impl ScriptingEngine {
 
     pub fn tick_npc(&mut self, npc: &mut NPC, state: &mut ShardServerState) {
         let npc_id = npc.id;
+        let script_name = npc.ai.as_ref().unwrap();
 
         // Check wait timer (skip if dead unless uninterruptible)
         if let Some(co_state) = self.coroutines.get_mut(&npc_id) {
+            if co_state.script_name != *script_name {
+                // Script changed since last tick; remove old coroutine so a new one is created
+                self.coroutines.remove(&npc_id);
+                return;
+            }
+
             if co_state.wait_ticks > 0 {
                 co_state.wait_ticks -= 1;
                 return;
@@ -478,6 +486,7 @@ impl ScriptingEngine {
         self.coroutines.insert(
             npc.id,
             NpcCoroutine {
+                script_name: script_name.clone(),
                 co_key,
                 wait_ticks: 0,
             },

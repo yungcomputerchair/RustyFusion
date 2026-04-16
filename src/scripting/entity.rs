@@ -87,6 +87,16 @@ impl LuaUserData for EntityScriptContext {
                     Ok(false)
                 }
             });
+
+            luau_method!(methods, "target" -> "Entity?", |_, this, ()| {
+                let state = this.state_mut();
+                let entity = state.entity_map.get_entity_raw(this.entity_id).ok_or_else(|| LuaError::runtime("Entity not found"))?;
+                if let Some(combatant) = entity.as_combatant() {
+                    Ok(combatant.get_target().map(|target_id| EntityScriptContext::new(target_id, state)))
+                } else {
+                    Ok(None)
+                }
+            });
         });
 
         methods.add_meta_method(LuaMetaMethod::Eq, |_, this, other: EntityScriptContext| {

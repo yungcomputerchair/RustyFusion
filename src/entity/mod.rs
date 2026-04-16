@@ -67,6 +67,7 @@ pub trait Combatant: Entity {
     fn get_team(&self) -> CombatantTeam;
     fn get_char_type(&self) -> CharType;
     fn get_aggro_factor(&self) -> f32;
+    fn get_target(&self) -> Option<EntityID>;
     fn is_dead(&self) -> bool;
 
     fn get_single_power(&self) -> i32;

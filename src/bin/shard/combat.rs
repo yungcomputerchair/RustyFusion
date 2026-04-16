@@ -16,14 +16,24 @@ struct sTargetNpcId {
 }
 impl FFPacket for sTargetNpcId {}
 
+#[allow(non_camel_case_types)]
+#[allow(non_snake_case)]
+#[repr(packed(4))]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+struct sTargetPcId {
+    pub iPC_ID: i32,
+}
+impl FFPacket for sTargetPcId {}
+
+const MAX_TARGETS: usize = 3;
+const BATTERY_BASE_COST: u32 = 6;
+
 pub fn pc_attack_npcs(
     pkt: Packet,
     clients: &ClientMap,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    const MAX_TARGETS: usize = 3;
-    const BATTERY_BASE_COST: u32 = 6;
-
     let client = clients.get_sender();
     let pc_id = client.get_player_id()?;
 
@@ -58,6 +68,72 @@ pub fn pc_attack_npcs(
         };
         weapon_boosts_needed += BATTERY_BASE_COST + npc.get_level() as u32;
         target_ids.push(npc.get_id());
+    }
+
+    // consume weapon boosts
+    let player = state.get_player_mut(pc_id)?;
+    let weapon_boosts = player.get_weapon_boosts();
+    let charged = if weapon_boosts >= weapon_boosts_needed {
+        player.set_weapon_boosts(weapon_boosts - weapon_boosts_needed);
+        true
+    } else {
+        player.set_weapon_boosts(0);
+        false
+    };
+
+    // attack handler
+    skills::do_basic_attack(player.get_id(), &target_ids, charged, state)?;
+
+    Ok(())
+}
+
+pub fn pc_attack_pcs(
+    pkt: Packet,
+    clients: &ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let client = clients.get_sender();
+    let pc_id = client.get_player_id()?;
+
+    let mut reader = PacketReader::new(&pkt);
+    let pkt: &sP_CL2FE_REQ_PC_ATTACK_CHARs = reader.get_struct()?;
+    let target_count = pkt.iTargetCnt as usize;
+    if target_count == 0 {
+        return Ok(());
+    }
+
+    let mut target_ids = Vec::with_capacity(MAX_TARGETS);
+    let mut weapon_boosts_needed = 0;
+    for i in 0..target_count {
+        // TODO see above
+        if i >= MAX_TARGETS {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Player {} tried to attack {} PCs (max {})",
+                    pc_id, pkt.iTargetCnt, MAX_TARGETS
+                ),
+            ));
+        }
+
+        let target_pc_id = reader.get_struct::<sTargetPcId>()?.iPC_ID;
+        if target_pc_id == pc_id {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Player {} tried to attack themselves", pc_id),
+            ));
+        }
+
+        let target_player = match state.get_player(target_pc_id) {
+            Ok(player) => player,
+            Err(e) => {
+                log_error(e);
+                continue;
+            }
+        };
+
+        weapon_boosts_needed += BATTERY_BASE_COST + target_player.get_level() as u32;
+        target_ids.push(target_player.get_id());
     }
 
     // consume weapon boosts
