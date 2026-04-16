@@ -39,7 +39,7 @@ function behaviors.check_retreat(npc: Npc)
     local combat_range = npc:combat_range()
     local should_retreat = false
 
-    if not npc:is_target_alive() then
+    if target:is_dead() then
         -- Target dead or gone
         should_retreat = true
     else

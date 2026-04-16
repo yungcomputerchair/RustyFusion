@@ -95,20 +95,7 @@ impl LuaUserData for NpcScriptContext {
 
             luau_method!(methods, "retreating" -> "boolean", |_, this, ()| Ok(this.npc().retreating));
 
-            luau_method!(methods, "is_dead" -> "boolean", |_, this, ()| Ok(this.npc().get_hp() <= 0));
-
-            luau_method!(methods, "is_target_alive" -> "boolean", |_, this, ()| {
-                let npc = this.npc();
-                let target_id = match npc.target_id {
-                    Some(id) => id,
-                    None => return Ok(false),
-                };
-                let state = this.state_mut();
-                match state.get_combatant(target_id) {
-                    Ok(target) => Ok(!target.is_dead()),
-                    Err(_) => Ok(false),
-                }
-            });
+            luau_method!(methods, "is_dead" -> "boolean", |_, this, ()| Ok(this.npc().is_dead()));
 
             luau_method!(methods, "is_moving" -> "boolean", |_, this, ()| Ok(this.npc().path.is_some()));
 
