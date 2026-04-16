@@ -496,6 +496,8 @@ mod commands {
     use rusty_fusion::{
         chunk::TickMode,
         database::{db_get, DbImpl as _},
+        entity::Combatant,
+        enums::CombatantTeam,
         scripting::scripting_get,
     };
 
@@ -942,6 +944,8 @@ mod commands {
                 match &npc.ai {
                     None => {
                         npc.ai = Some("follow".to_string());
+                        npc.team = CombatantTeam::Friendly;
+                        npc.reset();
                         log_if_failed(send_system_message(
                             client,
                             &format!("{} is now following you", npc),

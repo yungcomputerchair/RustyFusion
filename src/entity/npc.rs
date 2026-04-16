@@ -36,6 +36,7 @@ pub struct NPC {
     position: Position,
     rotation: i32,
     hp: i32,
+    pub team: CombatantTeam,
     pub target_id: Option<EntityID>,
     pub last_attacked_by: Option<EntityID>,
     pub invulnerable: bool,
@@ -65,6 +66,7 @@ impl NPC {
             position,
             rotation: angle % 360,
             hp: stats.max_hp as i32,
+            team: stats.team,
             target_id: None,
             last_attacked_by: None,
             invulnerable: false,
@@ -153,6 +155,10 @@ impl NPC {
 
         if self.path.is_some() {
             // exception: some NPCs have AI type 0, but are still combatants
+            return true;
+        }
+
+        if self.ai.is_some() {
             return true;
         }
 
