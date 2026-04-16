@@ -17,6 +17,8 @@ pub const GROUP_MAX_NPC_COUNT: usize = 1;
 pub const PLAYER_RUN_SPEED: i32 = 600;
 pub const NANO_STAMINA_MAX: i16 = 150;
 
+pub const SKILL_DRAIN_TYPE_PASSIVE: i32 = 2;
+
 pub const ID_LIGHTNING_GUN: i16 = 328;
 pub const ID_KND_HOVERBOARD: i16 = 1;
 pub const ID_BUTTERCUP: i16 = 1;

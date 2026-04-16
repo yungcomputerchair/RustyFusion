@@ -88,6 +88,37 @@ ffenum!(CharType, i32, 5, {
     Mob = 3,
 });
 
+// eCharStatusTimeBuffID.cs
+ffenum!(CharStatusTimeBuffID, i32, 26, {
+    /*eCSTB_None*/
+    UpMoveSpeed = 1,
+    UpSwimSpeed = 2,
+    UpJumpHeight = 3,
+    UpStealth = 4,
+    Phoenix = 5,
+    ProtectBattery = 6,
+    ProtectInfection = 7,
+    DnMoveSpeed = 8,
+    DnAttackSpeed = 9,
+    Stun = 10,
+    Sleep = 11,
+    KnockDown = 12,
+    MiniMapEnemy = 13,
+    MiniMapTreasure = 14,
+    RewardBlob = 15,
+    RewardCash = 16,
+    Infection = 17,
+    Freedom = 18,
+    BoundingBall = 19,
+    Invulnerable = 20,
+    StimPakSlot1 = 21,
+    StimPakSlot2 = 22,
+    StimPakSlot3 = 23,
+    Heal = 24,
+    ExtraBank = 25,
+    /*eCSTB__End*/
+});
+
 // eTaskTypeProperty.cs
 ffenum!(TaskType, i32, 7, {
     Unknown = 0,
@@ -151,6 +182,83 @@ ffenum!(ItemType, i16, {
     Skill = 27,            /*eItemType_Skill*/
     Npc = 30,              /*eItemType_Npc*/
     SkillBuffEffect = 138, /*eItemType_SkillBuffEffect*/
+});
+
+// eSkillType.cs
+ffenum!(SkillType, i32, 37, {
+    /*eST_None*/
+    Damage = 1,
+    HealHP = 2,
+    KnockDown = 3,
+    Sleep = 4,
+    Snare = 5,
+    HealStamina = 6,
+    StaminaSelf = 7,
+    Stun = 8,
+    WeaponSlow = 9,
+    Jump = 10,
+    Run = 11,
+    Stealth = 12,
+    Swim = 13,
+    MiniMapEnemy = 14,
+    MiniMapTreasure = 15,
+    Phoenix = 16,
+    ProtectBattery = 17,
+    ProtectInfection = 18,
+    RewardBlob = 19,
+    RewardCash = 20,
+    BatteryDrain = 21,
+    CorruptionAttack = 22,
+    InfectionDamage = 23,
+    KnockBack = 24,
+    Freedom = 25,
+    PhoenixGroup = 26,
+    Recall = 27,
+    RecallGroup = 28,
+    RetroRocketSelf = 29,
+    BloodSucking = 30,
+    BoundingBall = 31,
+    Invulnerable = 32,
+    NanoStimPak = 33,
+    ReturnHomeHeal = 34,
+    BuffHeal = 35,
+    ExtraBank = 36,
+    /*eST__End*/
+    CorruptionAttackWin = 38,
+    CorruptionAttackLose = 39,
+});
+
+// eSkillTargetType.cs
+ffenum!(SkillShape, i32, 7, {
+    None = 0,
+    Target = 1, /*eSTT_Target*/
+    SelfTarget = 2, /*eSTT_Self*/
+    Cone = 3, /*eSTT_Cone*/
+    Area = 4, /*eSTT_Area*/
+    SelfArea = 5, /*eSTT_SelfArea*/
+    TargetArea = 6, /*eSTT_TargetArea*/
+    /*eSTT__End2*/
+});
+
+// eTargetType.cs
+ffenum!(TargetType, i32, {
+    Player = 0,
+    NPC = 1,
+    XYZ = 2,
+});
+
+// eTimeBuffType.cs
+ffenum!(TimeBuffType, i32, 7, {
+    /*eTBT_None*/
+    Nano = 1,       /*eTBT_Nano*/
+    GroupNano = 2,  /*eTBT_GroupNano*/
+    Shiny = 3,      /*eTBT_Shiny*/
+    LandEffect = 4, /*eTBT_LandEffect*/
+    Item = 5,       /*eTBT_Item*/
+    CashItem = 6,   /*eTBT_CashItem*/
+    /*eTBT__End*/
+    /*eTBT_Skill*/
+    /*eTBT_GroupSkill*/
 });
 
 // eTransportationType.cs

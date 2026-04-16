@@ -25,6 +25,7 @@ use crate::{
         FFClient,
     },
     path::Path,
+    skills::BuffContainer,
     state::ShardServerState,
     tabledata::{tdata_get, TripData},
     util::{self, clamp, clamp_max, clamp_min, Bitfield},
@@ -415,6 +416,7 @@ pub struct Player {
     pub reward_data: RewardData,
     position: Position,
     rotation: i32,
+    buffs: BuffContainer,
     pub instance_id: InstanceID,
     pub style: Option<PlayerStyle>,
     pub flags: PlayerFlags,
@@ -1581,7 +1583,7 @@ impl Player {
 }
 impl Combatant for Player {
     fn get_condition_bit_flag(&self) -> i32 {
-        placeholder!(0)
+        self.buffs.get_bit_flags()
     }
 
     fn get_group_id(&self) -> Option<Uuid> {
@@ -1770,7 +1772,15 @@ impl Entity for Player {
         self.tick_skyway_ride(time, state);
         self.tick_missions(time, state);
 
-        let transmit = self.tick_regen(time);
+        let mut transmit = self.tick_regen(time);
+
+        // since the player object owns the buffs, we have to swap them out,
+        // tick them, then put them back. This does not result in an extra
+        // heap allocation because HashMap doesn't allocate until its first insertion.
+        let mut buffs = std::mem::take(&mut self.buffs);
+        transmit |= buffs.tick(self);
+        self.buffs = buffs;
+
         if !transmit {
             return;
         }

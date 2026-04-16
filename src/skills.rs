@@ -1,13 +1,170 @@
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    time::{Duration, Instant},
+};
+
 use rand::Rng;
 
 use crate::{
     defines::*,
     entity::{Combatant, EntityID},
-    enums::CombatStyle,
+    enums::{CharStatusTimeBuffID, CombatStyle, SkillShape, SkillType, TargetType, TimeBuffType},
     error::*,
     net::packet::{PacketID::*, *},
     state::ShardServerState,
 };
+
+#[derive(Debug)]
+pub struct Skill {
+    pub skill_type: SkillType,
+    pub skill_shape: SkillShape,
+    pub target_type: TargetType,
+    pub passive: bool,
+    pub range: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct BuffInstance {
+    source: TimeBuffType,
+    value: i32,
+    expires: Option<Instant>,
+}
+impl BuffInstance {
+    pub fn new(source: TimeBuffType, value: i32, duration_ms: Option<usize>) -> Self {
+        let expires = duration_ms.map(|d| Instant::now() + Duration::from_millis(d as u64));
+        Self {
+            source,
+            value,
+            expires,
+        }
+    }
+
+    pub fn get_source(&self) -> TimeBuffType {
+        self.source
+    }
+
+    fn is_expired(&self) -> bool {
+        if let Some(expires) = self.expires {
+            Instant::now() >= expires
+        } else {
+            false
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct BuffStack {
+    buffs: Vec<BuffInstance>,
+    applied: bool,
+    remove: bool,
+}
+impl BuffStack {
+    fn new(first_stack: BuffInstance) -> Self {
+        Self {
+            buffs: vec![first_stack],
+            applied: false,
+            remove: false,
+        }
+    }
+
+    fn add_stack(&mut self, buff: BuffInstance) {
+        self.buffs.push(buff);
+    }
+
+    fn tick(&mut self, buff_id: CharStatusTimeBuffID, target: &mut dyn Combatant) -> bool {
+        let mut update = false;
+        if !self.applied {
+            self.on_apply(buff_id, target);
+            self.applied = true;
+            update = true;
+        }
+
+        update |= self.on_tick(buff_id, target);
+        self.buffs.retain(|buff| !buff.is_expired());
+
+        if self.buffs.is_empty() {
+            self.on_remove(buff_id, target);
+            self.remove = true;
+            update = true;
+        }
+
+        update
+    }
+
+    fn get_max_value(&self) -> i32 {
+        self.buffs.iter().map(|b| b.value).max().unwrap_or(0)
+    }
+
+    fn on_apply(&mut self, buff_id: CharStatusTimeBuffID, target: &mut dyn Combatant) {
+        // do stuff
+        log(
+            Severity::Debug,
+            &format!("Applying buff {:?} to {:?}", buff_id, target.get_id()),
+        );
+    }
+
+    fn on_remove(&mut self, buff_id: CharStatusTimeBuffID, target: &mut dyn Combatant) {
+        // do stuff
+        log(
+            Severity::Debug,
+            &format!("Removing buff {:?} from {:?}", buff_id, target.get_id()),
+        );
+    }
+
+    fn on_tick(&mut self, buff_id: CharStatusTimeBuffID, target: &mut dyn Combatant) -> bool {
+        // do stuff
+        log(
+            Severity::Debug,
+            &format!("Ticking buff {:?} on {:?}", buff_id, target.get_id()),
+        );
+        false
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct BuffContainer {
+    buff_stacks: HashMap<CharStatusTimeBuffID, BuffStack>,
+}
+impl BuffContainer {
+    pub fn add_buff(&mut self, buff_id: CharStatusTimeBuffID, buff: BuffInstance) -> bool {
+        match self.buff_stacks.entry(buff_id) {
+            Entry::Occupied(mut entry) => {
+                entry.get_mut().add_stack(buff);
+                false
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(BuffStack::new(buff));
+                true
+            }
+        }
+    }
+
+    pub fn tick(&mut self, target: &mut dyn Combatant) -> bool {
+        let mut updates = false;
+        for (buff_id, buff_stack) in self.buff_stacks.iter_mut() {
+            updates |= buff_stack.tick(*buff_id, target);
+        }
+
+        self.buff_stacks.retain(|_, buff_stack| !buff_stack.remove);
+        updates
+    }
+
+    pub fn get_buff_value(&self, buff_id: CharStatusTimeBuffID) -> Option<i32> {
+        self.buff_stacks
+            .get(&buff_id)
+            .map(|stack| stack.get_max_value())
+    }
+
+    pub fn get_bit_flags(&self) -> i32 {
+        let mut flags = 0;
+        for (buff_id, buff_stack) in &self.buff_stacks {
+            if buff_stack.applied {
+                flags |= 1 << (*buff_id as i32);
+            }
+        }
+        flags
+    }
+}
 
 struct BasicAttack {
     power: i32,

@@ -21,6 +21,7 @@ use crate::{
     mission::{MissionDefinition, TaskDefinition},
     nano::{NanoStats, NanoTuning},
     path::{Path, PathPoint},
+    skills::Skill,
     util, Position,
 };
 
@@ -148,6 +149,10 @@ struct InstanceData {
 struct NanoData {
     nano_stats: HashMap<i16, NanoStats>,
     nano_tunings: HashMap<i16, NanoTuning>,
+}
+
+struct SkillData {
+    skills: HashMap<i16, Skill>,
 }
 
 struct MissionData {
@@ -1473,6 +1478,78 @@ fn load_nano_data(root: &Map<std::string::String, Value>) -> Result<NanoData, St
     Ok(NanoData {
         nano_stats: load_stats(table)?,
         nano_tunings: load_tunings(table)?,
+    })
+}
+
+fn load_skill_data(root: &Map<std::string::String, Value>) -> Result<SkillData, String> {
+    const SKILL_TABLE_KEY: &str = "m_pSkillTable";
+    const SKILL_TABLE_SKILL_DATA_KEY: &str = "m_pSkillData";
+
+    #[derive(Debug, Deserialize)]
+    struct SkillDataEntry {
+        m_iSkillNumber: i32,
+        m_iSkillType: i32,
+        m_iEffectTarget: i32,
+        m_iEffectType: i32,
+        m_iTargetType: i32,
+        m_iValueA_Type: i32,
+        m_iValueA: [i32; 4],
+        m_iValueB_Type: i32,
+        m_iValueB: [i32; 4],
+        m_iValueC_Type: i32,
+        m_iValueC: [i32; 4],
+        m_iEffectRange: i32,
+        m_iEffectAngle: i32,
+        m_iEffectArea: i32,
+        m_iCoolTime: i32,
+        m_iTargetNumber: i32,
+        m_iBatteryDrainType: i32,
+        m_iBatteryDrainUse: [i32; 4],
+        m_iInitialTime: i32,
+        m_iDeleverTime: i32,
+        m_iDelayTime: i32,
+        m_iDurationTime: [i32; 4],
+        m_iDBType: i32,
+        m_iIcon: i32,
+        m_iEffect: i32,
+        m_iTargetEffect: i32,
+        m_iBuffEffect: i32,
+        m_iSound: i32,
+        m_iCoolType: i32,
+    }
+
+    let table = get_object(root, SKILL_TABLE_KEY)?;
+    let skill_data = get_array(table, SKILL_TABLE_SKILL_DATA_KEY)?;
+    let mut skill_table = HashMap::new();
+    for v in skill_data {
+        let skill_data_entry: SkillDataEntry = serde_json::from_value(v.clone())
+            .map_err(|e| format!("Malformed skill data entry: {} {}", e, v))?;
+
+        let key = skill_data_entry.m_iSkillNumber as i16;
+        if key == 0 {
+            continue;
+        }
+
+        let skill = Skill {
+            skill_type: skill_data_entry
+                .m_iSkillType
+                .try_into()
+                .map_err(|e: FFError| e.get_msg().to_string())?,
+            skill_shape: skill_data_entry
+                .m_iEffectTarget
+                .try_into()
+                .map_err(|e: FFError| e.get_msg().to_string())?,
+            target_type: skill_data_entry
+                .m_iTargetType
+                .try_into()
+                .map_err(|e: FFError| e.get_msg().to_string())?,
+            passive: skill_data_entry.m_iBatteryDrainType == SKILL_DRAIN_TYPE_PASSIVE,
+            range: skill_data_entry.m_iEffectArea as u32,
+        };
+        skill_table.insert(key, skill);
+    }
+    Ok(SkillData {
+        skills: skill_table,
     })
 }
 
