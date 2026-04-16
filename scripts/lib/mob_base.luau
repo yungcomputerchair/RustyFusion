@@ -8,7 +8,8 @@ function mob_base.run(npc: Npc)
             if not b.check_retreat(npc) then
                 b.scan_for_target_aggro(npc)
 
-                if npc:has_target() then
+                local target = npc:get_target()
+                if target then
                     if not b.try_attack(npc) then
                         b.chase_target(npc)
                     end

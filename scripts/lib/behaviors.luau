@@ -30,7 +30,8 @@ end
 -- After retreat, fully heals the NPC (matching native reset behavior).
 -- Returns true if retreating (caller should skip other behaviors).
 function behaviors.check_retreat(npc: Npc)
-    if not npc:has_target() then
+    local target = npc:get_target()
+    if not target then
         return false
     end
 
@@ -48,16 +49,13 @@ function behaviors.check_retreat(npc: Npc)
             should_retreat = true
         else
             -- Target too far from spawn
-            local target = npc:get_target()
-            if target then
-                local tpos = target:position()
-                if tpos then
-                    local dx = tpos.x - spawn.x
-                    local dy = tpos.y - spawn.y
-                    local dz = tpos.z - spawn.z
-                    if math.sqrt(dx*dx + dy*dy + dz*dz) > combat_range then
-                        should_retreat = true
-                    end
+            local tpos = target:position()
+            if tpos then
+                local dx = tpos.x - spawn.x
+                local dy = tpos.y - spawn.y
+                local dz = tpos.z - spawn.z
+                if math.sqrt(dx*dx + dy*dy + dz*dz) > combat_range then
+                    should_retreat = true
                 end
             end
         end
@@ -81,7 +79,7 @@ end
 -- Scan for nearest enemy within sight range (simple version).
 -- Sets the target if found.
 function behaviors.scan_for_target(npc: Npc)
-    if npc:has_target() then
+    if npc:get_target() then
         return
     end
 
@@ -93,7 +91,7 @@ end
 
 -- Scan for enemies within aggro distance.
 function behaviors.scan_for_target_aggro(npc: Npc)
-    if npc:has_target() then
+    if npc:get_target() then
         return
     end
 
@@ -122,11 +120,12 @@ end
 -- Returns true if an attack was performed.
 -- Clears target if it is dead or gone.
 function behaviors.try_attack(npc: Npc)
-    if not npc:has_target() then
+    local target = npc:get_target()
+    if not target then
         return false
     end
 
-    if not npc:is_target_alive() then
+    if target:is_dead() then
         npc:clear_target()
         return false
     end
@@ -145,15 +144,11 @@ end
 
 -- Chase the current target at run speed.
 function behaviors.chase_target(npc: Npc)
-    if not npc:has_target() then
-        return
-    end
-
     local target = npc:get_target()
     if not target then
         return
     end
-    
+
     npc:move_toward_entity(target, npc:run_speed())
 end
 
@@ -172,7 +167,7 @@ function behaviors.idle_roam(npc: Npc, on_tick: (() -> ())?)
     npc:move_to(point.x, point.y, point.z, npc:walk_speed())
     while npc:is_moving() do
         if on_tick then on_tick() end
-        if npc:is_dead() or npc:has_target() then return end
+        if npc:is_dead() or npc:get_target() then return end
         yield()
     end
 
@@ -181,7 +176,7 @@ function behaviors.idle_roam(npc: Npc, on_tick: (() -> ())?)
     local delay_ticks = math.ceil(math.random() * delay_max * 8)
     for i = 1, delay_ticks do
         if on_tick then on_tick() end
-        if npc:is_dead() or npc:has_target() then return end
+        if npc:is_dead() or npc:get_target() then return end
         yield()
     end
 end

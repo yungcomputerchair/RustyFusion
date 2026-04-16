@@ -400,7 +400,6 @@ impl ScriptingEngine {
 
         let status = co.status();
         if status == LuaThreadStatus::Finished || status == LuaThreadStatus::Error {
-            npc.ai = None;
             return;
         }
 

@@ -97,10 +97,6 @@ impl LuaUserData for NpcScriptContext {
 
             luau_method!(methods, "is_dead" -> "boolean", |_, this, ()| Ok(this.npc().get_hp() <= 0));
 
-            luau_method!(methods, "has_target" -> "boolean", |_, this, ()| {
-                Ok(this.npc().target_id.is_some())
-            });
-
             luau_method!(methods, "is_target_alive" -> "boolean", |_, this, ()| {
                 let npc = this.npc();
                 let target_id = match npc.target_id {
