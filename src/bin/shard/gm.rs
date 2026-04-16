@@ -174,7 +174,12 @@ pub fn gm_pc_goto(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState
 
     let player = state.get_player_mut(pc_id)?;
     player.set_position(new_pos);
-    player.instance_id = InstanceID::default();
+    player.instance_id = InstanceID {
+        map_num: ID_OVERWORLD,
+        instance_num: None,
+        ..player.instance_id
+    };
+
     let taros = player.get_taros();
 
     state.entity_map.update(EntityID::Player(pc_id), None, true);
