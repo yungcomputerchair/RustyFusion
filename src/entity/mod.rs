@@ -3,7 +3,7 @@ use std::{any::Any, collections::HashSet, fmt::Display, time::SystemTime};
 use crate::{
     chunk::ChunkCoords,
     defines::*,
-    enums::{BuffID, CharType, CombatStyle, CombatantTeam, TimeBuffType},
+    enums::{BuffID, BuffType, CharType, CombatStyle, CombatantTeam},
     error::{FFError, FFResult, Severity},
     net::{
         packet::{sNPCGroupMemberInfo, sPCGroupMemberInfo},
@@ -70,7 +70,7 @@ pub trait Combatant: Entity {
     fn get_aggro_factor(&self) -> f32;
     fn get_target(&self) -> Option<EntityID>;
     fn is_dead(&self) -> bool;
-    fn has_buff(&self, buff_id: BuffID, buff_type: Option<TimeBuffType>) -> bool;
+    fn has_buff(&self, buff_id: BuffID, buff_type: Option<BuffType>) -> bool;
 
     fn get_single_power(&self) -> i32;
     fn get_multi_power(&self) -> i32;
@@ -78,7 +78,7 @@ pub trait Combatant: Entity {
 
     fn take_damage(&mut self, damage: i32, source: EntityID) -> i32;
     fn apply_buff(&mut self, buff_id: BuffID, buff: BuffInstance, source: EntityID) -> bool;
-    fn remove_buff(&mut self, buff_id: BuffID, buff_type: Option<TimeBuffType>) -> bool;
+    fn remove_buff(&mut self, buff_id: BuffID, buff_type: Option<BuffType>) -> bool;
 
     fn reset(&mut self);
 }

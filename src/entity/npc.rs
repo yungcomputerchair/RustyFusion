@@ -11,7 +11,7 @@ use crate::{
     chunk::{ChunkCoords, InstanceID},
     defines::RANGE_INTERACT,
     entity::{Combatant, Entity, EntityID},
-    enums::{BuffID, CharType, CombatStyle, CombatantTeam, TimeBuffType},
+    enums::{BuffID, BuffType, CharType, CombatStyle, CombatantTeam},
     error::FFResult,
     net::{
         packet::{
@@ -347,7 +347,7 @@ impl Combatant for NPC {
         self.get_hp() <= 0
     }
 
-    fn has_buff(&self, buff_id: BuffID, buff_type: Option<TimeBuffType>) -> bool {
+    fn has_buff(&self, buff_id: BuffID, buff_type: Option<BuffType>) -> bool {
         self.buffs.has_buff(buff_id, buff_type)
     }
 
@@ -392,7 +392,7 @@ impl Combatant for NPC {
         self.buffs.add_buff(buff_id, buff)
     }
 
-    fn remove_buff(&mut self, buff_id: BuffID, buff_type: Option<TimeBuffType>) -> bool {
+    fn remove_buff(&mut self, buff_id: BuffID, buff_type: Option<BuffType>) -> bool {
         self.buffs.remove_buff(buff_id, buff_type)
     }
 

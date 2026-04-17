@@ -1539,6 +1539,13 @@ fn load_skill_data(root: &Map<String, Value>) -> Result<SkillData, String> {
                 .map_err(|e: FFError| e.get_msg().to_string())?,
             passive: skill_data_entry.m_iBatteryDrainType == SKILL_DRAIN_TYPE_PASSIVE,
             range: skill_data_entry.m_iEffectArea as u32,
+            values_a: skill_data_entry.m_iValueA,
+            values_b: skill_data_entry.m_iValueB.map(|v| (v != 0).then_some(v)),
+            values_c: skill_data_entry.m_iValueC.map(|v| (v != 0).then_some(v)),
+            costs: skill_data_entry.m_iBatteryDrainUse,
+            durations: skill_data_entry
+                .m_iDurationTime
+                .map(|v| (v != 0).then_some(Duration::from_millis(v as u64 * 100))),
         };
         skill_table.insert(key, skill);
     }

@@ -10,8 +10,8 @@ use crate::{
     defines::*,
     entity::{Combatant, Entity, EntityID},
     enums::{
-        BuffID, CharType, CombatStyle, CombatantTeam, ItemLocation, ItemType, PlayerGuide,
-        PlayerNameStatus, RewardCategory, RewardType, RideType, TaskType, TimeBuffType,
+        BuffID, BuffType, CharType, CombatStyle, CombatantTeam, ItemLocation, ItemType,
+        PlayerGuide, PlayerNameStatus, RewardCategory, RewardType, RideType, TaskType,
     },
     error::{codes, log, log_if_failed, FFError, FFResult, Severity},
     item::Item,
@@ -1631,7 +1631,7 @@ impl Combatant for Player {
         self.hp <= 0
     }
 
-    fn has_buff(&self, buff_id: BuffID, buff_type: Option<TimeBuffType>) -> bool {
+    fn has_buff(&self, buff_id: BuffID, buff_type: Option<BuffType>) -> bool {
         self.buffs.has_buff(buff_id, buff_type)
     }
 
@@ -1685,7 +1685,7 @@ impl Combatant for Player {
         self.buffs.add_buff(buff_id, buff)
     }
 
-    fn remove_buff(&mut self, buff_id: BuffID, buff_type: Option<TimeBuffType>) -> bool {
+    fn remove_buff(&mut self, buff_id: BuffID, buff_type: Option<BuffType>) -> bool {
         self.buffs.remove_buff(buff_id, buff_type)
     }
 

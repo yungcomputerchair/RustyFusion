@@ -248,7 +248,7 @@ ffenum!(TargetType, i32, {
 });
 
 // eTimeBuffType.cs
-ffenum!(TimeBuffType, i32, 7, {
+ffenum!(BuffType, i32, 7, {
     // eTBT_None
     Nano = 1,       // eTBT_Nano
     GroupNano = 2,  // eTBT_GroupNano

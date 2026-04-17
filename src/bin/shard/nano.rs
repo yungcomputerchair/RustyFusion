@@ -8,6 +8,7 @@ use rusty_fusion::{
         packet::{PacketID::*, *},
         ClientMap, FFClient,
     },
+    placeholder,
     state::ShardServerState,
     tabledata::tdata_get,
     unused,
@@ -113,7 +114,7 @@ pub fn nano_active(pkt: Packet, clients: &ClientMap, state: &mut ShardServerStat
         if let Some(skill) = nano.get_skill() {
             if skill.passive {
                 if let Some(buff_id) = skill.get_buff_id() {
-                    player.remove_buff(buff_id, Some(TimeBuffType::Nano));
+                    player.remove_buff(buff_id, Some(BuffType::Nano));
                 } else {
                     log(
                         Severity::Warning,
@@ -135,7 +136,8 @@ pub fn nano_active(pkt: Packet, clients: &ClientMap, state: &mut ShardServerStat
         if skill.passive {
             let buff_id = skill.get_buff_id();
             if let Some(buff_id) = buff_id {
-                let buff_instance = skill.make_buff_instance(TimeBuffType::Nano).unwrap();
+                let level = placeholder!(0);
+                let buff_instance = skill.make_buff_instance(BuffType::Nano, level).unwrap();
                 buff = Some((buff_id, buff_instance));
             } else {
                 log(

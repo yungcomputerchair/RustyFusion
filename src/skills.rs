@@ -8,7 +8,7 @@ use rand::Rng;
 use crate::{
     defines::*,
     entity::{Combatant, EntityID},
-    enums::{BuffID, CombatStyle, SkillShape, SkillType, TimeBuffType, TimeBuffUpdate},
+    enums::{BuffID, BuffType, CombatStyle, SkillShape, SkillType, TimeBuffUpdate},
     error::*,
     net::packet::{PacketID::*, *},
     state::ShardServerState,
@@ -32,6 +32,11 @@ pub struct Skill {
     pub skill_shape: SkillShape,
     pub passive: bool,
     pub range: u32,
+    pub values_a: [i32; SKILL_LEVEL_MAX + 1],
+    pub values_b: [Option<i32>; SKILL_LEVEL_MAX + 1],
+    pub values_c: [Option<i32>; SKILL_LEVEL_MAX + 1],
+    pub costs: [i32; SKILL_LEVEL_MAX + 1],
+    pub durations: [Option<Duration>; SKILL_LEVEL_MAX + 1],
 }
 impl Skill {
     pub fn get_buff_id(&self) -> Option<BuffID> {
@@ -60,21 +65,47 @@ impl Skill {
         Some(buff_id)
     }
 
-    pub fn make_buff_instance(&self, source: TimeBuffType) -> Option<BuffInstance> {
-        let value = placeholder!(1);
-        let duration = placeholder!(None);
-        if self.get_buff_id().is_some() {
-            Some(BuffInstance::new(source, value, duration))
-        } else {
-            None
+    pub fn make_buff_instance(&self, ty: BuffType, level: usize) -> FFResult<BuffInstance> {
+        if level > SKILL_LEVEL_MAX {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Skill level {} is above max of {}", level, SKILL_LEVEL_MAX),
+            ));
         }
+
+        if self.get_buff_id().is_none() {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Skill type {:?} does not have an associated buff",
+                    self.skill_type
+                ),
+            ));
+        }
+
+        let value = self.values_a[level];
+        let sub_value = self.values_b[level];
+        let special_value = self.values_c[level];
+        let duration = if self.passive {
+            None
+        } else {
+            self.durations[level]
+        };
+
+        Ok(BuffInstance::new(
+            ty,
+            value,
+            sub_value,
+            special_value,
+            duration,
+        ))
     }
 }
 
 #[derive(Debug)]
 pub enum BuffUpdate {
-    Added(BuffID, TimeBuffType, sTimeBuff),
-    Changed(BuffID, TimeBuffType, sTimeBuff),
+    Added(BuffID, BuffType, sTimeBuff),
+    Changed(BuffID, BuffType, sTimeBuff),
     Removed(BuffID),
 }
 impl From<BuffUpdate> for sP_FE2CL_PC_BUFF_UPDATE {
@@ -107,24 +138,30 @@ impl From<BuffUpdate> for sP_FE2CL_PC_BUFF_UPDATE {
 
 #[derive(Debug, Clone)]
 pub struct BuffInstance {
-    source: TimeBuffType,
+    ty: BuffType,
     value: i32,
+    _sub_value: Option<i32>,
+    _special_value: Option<i32>,
     onset: Instant,
     expires: Option<Instant>,
 }
 impl BuffInstance {
-    pub fn new(source: TimeBuffType, value: i32, duration_ms: Option<usize>) -> Self {
-        let expires = duration_ms.map(|d| Instant::now() + Duration::from_millis(d as u64));
+    fn new(
+        ty: BuffType,
+        value: i32,
+        sub_value: Option<i32>,
+        special_value: Option<i32>,
+        duration: Option<Duration>,
+    ) -> Self {
+        let expires = duration.map(|d| Instant::now() + d);
         Self {
-            source,
+            ty,
             value,
+            _sub_value: sub_value,
+            _special_value: special_value,
             onset: Instant::now(),
             expires,
         }
-    }
-
-    pub fn get_source(&self) -> TimeBuffType {
-        self.source
     }
 
     fn is_expired(&self) -> bool {
@@ -158,17 +195,17 @@ impl BuffStack {
         self.changed = true;
     }
 
-    fn remove_stacks(&mut self, buff_type: Option<TimeBuffType>) {
+    fn remove_stacks(&mut self, buff_type: Option<BuffType>) {
         if let Some(buff_type) = buff_type {
-            self.buffs.retain(|b| b.source != buff_type);
+            self.buffs.retain(|b| b.ty != buff_type);
         } else {
             self.buffs.clear();
         }
         self.changed = true;
     }
 
-    fn has_stack(&self, buff_type: TimeBuffType) -> bool {
-        self.buffs.iter().any(|b| b.source == buff_type)
+    fn has_stack(&self, buff_type: BuffType) -> bool {
+        self.buffs.iter().any(|b| b.ty == buff_type)
     }
 
     fn tick(&mut self, buff_id: BuffID, target: &mut dyn Combatant) -> Vec<BuffUpdate> {
@@ -181,7 +218,7 @@ impl BuffStack {
                 self.changed = false;
                 updates.push(BuffUpdate::Added(
                     buff_id,
-                    self.get_dominant_source(),
+                    self.get_dominant_type(),
                     (&*self).into(),
                 ));
             }
@@ -191,7 +228,7 @@ impl BuffStack {
                 self.changed = false;
                 updates.push(BuffUpdate::Changed(
                     buff_id,
-                    self.get_dominant_source(),
+                    self.get_dominant_type(),
                     (&*self).into(),
                 ));
             }
@@ -213,12 +250,12 @@ impl BuffStack {
         self.buffs.iter().map(|b| b.value).max().unwrap_or(0)
     }
 
-    fn get_dominant_source(&self) -> TimeBuffType {
+    fn get_dominant_type(&self) -> BuffType {
         self.buffs
             .iter()
             .max_by_key(|b| b.value)
-            .map(|b| b.source)
-            .unwrap_or(TimeBuffType::Nano)
+            .map(|b| b.ty)
+            .unwrap_or(BuffType::Nano)
     }
 
     fn get_expires(&self) -> Option<Instant> {
@@ -312,7 +349,7 @@ impl BuffContainer {
         }
     }
 
-    pub fn remove_buff(&mut self, buff_id: BuffID, buff_type: Option<TimeBuffType>) -> bool {
+    pub fn remove_buff(&mut self, buff_id: BuffID, buff_type: Option<BuffType>) -> bool {
         if let Some(stack) = self.buff_stacks.get_mut(&buff_id) {
             stack.remove_stacks(buff_type);
             true
@@ -332,7 +369,7 @@ impl BuffContainer {
         updates
     }
 
-    pub fn has_buff(&self, buff_id: BuffID, buff_type: Option<TimeBuffType>) -> bool {
+    pub fn has_buff(&self, buff_id: BuffID, buff_type: Option<BuffType>) -> bool {
         match buff_type {
             Some(buff_type) => self.buff_stacks.values().any(|s| s.has_stack(buff_type)),
             None => self.buff_stacks.contains_key(&buff_id),
