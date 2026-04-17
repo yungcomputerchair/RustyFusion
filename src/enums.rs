@@ -89,8 +89,8 @@ ffenum!(CharType, i32, 5, {
 });
 
 // eCharStatusTimeBuffID.cs
-ffenum!(CharStatusTimeBuffID, i32, 26, {
-    /*eCSTB_None*/
+ffenum!(BuffID, i32, 26, {
+    // eCSTB_None
     UpMoveSpeed = 1,
     UpSwimSpeed = 2,
     UpJumpHeight = 3,
@@ -116,7 +116,7 @@ ffenum!(CharStatusTimeBuffID, i32, 26, {
     StimPakSlot3 = 23,
     Heal = 24,
     ExtraBank = 25,
-    /*eCSTB__End*/
+    // eCSTB__End
 });
 
 // eTaskTypeProperty.cs
@@ -153,40 +153,40 @@ ffenum!(RewardCategory, usize, {
 
 // eItemLocation.cs
 ffenum!(ItemLocation, i32, 4, {
-    Equip = 0,  /*eIL_Equip*/
-    Inven = 1,  /*eIL_Inven*/
-    QInven = 2, /*eIL_QInven*/
-    Bank = 3,   /*eIL_Bank*/
-    /*eIL__End*/
+    Equip = 0,  // eIL_Equip
+    Inven = 1,  // eIL_Inven
+    QInven = 2, // eIL_QInven
+    Bank = 3,   // eIL_Bank
+    // eIL__End
 });
 
 // eItemType.cs
 ffenum!(ItemType, i16, {
-    Hand = 0,              /*eItemType_Hand*/
-    UpperBody = 1,         /*eItemType_UpperBody*/
-    LowerBody = 2,         /*eItemType_LowerBody*/
-    Foot = 3,              /*eItemType_Foot*/
-    Head = 4,              /*eItemType_Head*/
-    Face = 5,              /*eItemType_Face*/
-    Back = 6,              /*eItemType_Back*/
-    General = 7,           /*eItemType_General*/
-    Quest = 8,             /*eItemType_Quest*/
-    Chest = 9,             /*eItemType_Chest*/
-    Vehicle = 10,          /*eItemType_Vehicle*/
-    GMKey = 11,            /*eItemType_GMKey*/
-    FMatter = 12,          /*eItemType_FMatter*/
-    Hair = 13,             /*eItemType_Hair*/
-    SkinFace = 14,         /*eItemType_SkinFace*/
-    Nano = 19,             /*eItemType_Nano*/
-    NanoTune = 24,         /*eItemType_NanoTune*/
-    Skill = 27,            /*eItemType_Skill*/
-    Npc = 30,              /*eItemType_Npc*/
-    SkillBuffEffect = 138, /*eItemType_SkillBuffEffect*/
+    Hand = 0,              // eItemType_Hand
+    UpperBody = 1,         // eItemType_UpperBody
+    LowerBody = 2,         // eItemType_LowerBody
+    Foot = 3,              // eItemType_Foot
+    Head = 4,              // eItemType_Head
+    Face = 5,              // eItemType_Face
+    Back = 6,              // eItemType_Back
+    General = 7,           // eItemType_General
+    Quest = 8,             // eItemType_Quest
+    Chest = 9,             // eItemType_Chest
+    Vehicle = 10,          // eItemType_Vehicle
+    GMKey = 11,            // eItemType_GMKey
+    FMatter = 12,          // eItemType_FMatter
+    Hair = 13,             // eItemType_Hair
+    SkinFace = 14,         // eItemType_SkinFace
+    Nano = 19,             // eItemType_Nano
+    NanoTune = 24,         // eItemType_NanoTune
+    Skill = 27,            // eItemType_Skill
+    Npc = 30,              // eItemType_Npc
+    SkillBuffEffect = 138, // eItemType_SkillBuffEffect
 });
 
 // eSkillType.cs
 ffenum!(SkillType, i32, 37, {
-    /*eST_None*/
+    // eST_None
     Damage = 1,
     HealHP = 2,
     KnockDown = 3,
@@ -223,7 +223,7 @@ ffenum!(SkillType, i32, 37, {
     ReturnHomeHeal = 34,
     BuffHeal = 35,
     ExtraBank = 36,
-    /*eST__End*/
+    // eST__End
     CorruptionAttackWin = 38,
     CorruptionAttackLose = 39,
 });
@@ -231,13 +231,13 @@ ffenum!(SkillType, i32, 37, {
 // eSkillTargetType.cs
 ffenum!(SkillShape, i32, 7, {
     None = 0,
-    Target = 1, /*eSTT_Target*/
-    SelfTarget = 2, /*eSTT_Self*/
-    Cone = 3, /*eSTT_Cone*/
-    Area = 4, /*eSTT_Area*/
-    SelfArea = 5, /*eSTT_SelfArea*/
-    TargetArea = 6, /*eSTT_TargetArea*/
-    /*eSTT__End2*/
+    Target = 1, // eSTT_Target
+    SelfTarget = 2, // eSTT_Self
+    Cone = 3, // eSTT_Cone
+    Area = 4, // eSTT_Area
+    SelfArea = 5, // eSTT_SelfArea
+    TargetArea = 6, // eSTT_TargetArea
+    // eSTT__End2
 });
 
 // eTargetType.cs
@@ -249,51 +249,60 @@ ffenum!(TargetType, i32, {
 
 // eTimeBuffType.cs
 ffenum!(TimeBuffType, i32, 7, {
-    /*eTBT_None*/
-    Nano = 1,       /*eTBT_Nano*/
-    GroupNano = 2,  /*eTBT_GroupNano*/
-    Shiny = 3,      /*eTBT_Shiny*/
-    LandEffect = 4, /*eTBT_LandEffect*/
-    Item = 5,       /*eTBT_Item*/
-    CashItem = 6,   /*eTBT_CashItem*/
-    /*eTBT__End*/
-    /*eTBT_Skill*/
-    /*eTBT_GroupSkill*/
+    // eTBT_None
+    Nano = 1,       // eTBT_Nano
+    GroupNano = 2,  // eTBT_GroupNano
+    Shiny = 3,      // eTBT_Shiny
+    LandEffect = 4, // eTBT_LandEffect
+    Item = 5,       // eTBT_Item
+    CashItem = 6,   // eTBT_CashItem
+    // eTBT__End
+    // eTBT_Skill
+    // eTBT_GroupSkill
+});
+
+// eTimeBuffUpdate.cs
+ffenum!(TimeBuffUpdate, i32, {
+    // eTBU_None
+    Add = 1,
+    Del = 2,
+    Change = 3,
+    // eTBU__End
 });
 
 // eTransportationType.cs
 ffenum!(TransportationType, i32, {
-    /*eTT_None*/
-    Warp = 1,   /*eTT_Warp*/
-    Wyvern = 2, /*eTT_Wyvern*/
-    Bus = 3,    /*eTT_Bus*/
-    /*eTT__End*/
+    // eTT_None
+    Warp = 1,   // eTT_Warp
+    Wyvern = 2, // eTT_Wyvern
+    Bus = 3,    // eTT_Bus
+    // eTT__End
 });
 
 // eCN_GM_TeleportType.cs
 ffenum!(TeleportType, i32, {
-    XYZ = 0,             /*eCN_GM_TeleportMapType__XYZ*/
-    MapXYZ = 1,          /*eCN_GM_TeleportMapType__MapXYZ*/
-    MyLocation = 2,      /*eCN_GM_TeleportMapType__MyLocation*/
-    SomeoneLocation = 3, /*eCN_GM_TeleportMapType__SomeoneLocation*/
-    Unstick = 4,         /*eCN_GM_TeleportMapType__Unstick*/
+    XYZ = 0,             // eCN_GM_TeleportMapType__XYZ
+    MapXYZ = 1,          // eCN_GM_TeleportMapType__MapXYZ
+    MyLocation = 2,      // eCN_GM_TeleportMapType__MyLocation
+    SomeoneLocation = 3, // eCN_GM_TeleportMapType__SomeoneLocation
+    Unstick = 4,         // eCN_GM_TeleportMapType__Unstick
 });
 
 // eRideType.cs
 ffenum!(RideType, i32, 2, {
-    None = 0,   /*eRT_None*/
-    Wyvern = 1, /*eRT_Wyvern*/
-    /*eRT__End*/
+    None = 0,   // eRT_None
+    Wyvern = 1, // eRT_Wyvern
+    // eRT__End
 });
 
 // ePCRegenType.cs
 ffenum!(PCRegenType, i32, 7, {
-    None = 0,               /*ePCRegenType_None*/
-    Xcom = 1,               /*ePCRegenType_Xcom*/
-    Here = 2,               /*ePCRegenType_Here*/
-    HereByPhoenix = 3,      /*ePCRegenType_HereByPhoenix*/
-    HereByPhoenixGroup = 4, /*ePCRegenType_HereByPhoenixGroup*/
-    Unstick = 5,            /*ePCRegenType_Unstick*/
-    HereByPhoenixItem = 6,  /*ePCRegenType_HereByPhoenixItem*/
-    /* ePCRegenType__End */
+    None = 0,               // ePCRegenType_None
+    Xcom = 1,               // ePCRegenType_Xcom
+    Here = 2,               // ePCRegenType_Here
+    HereByPhoenix = 3,      // ePCRegenType_HereByPhoenix
+    HereByPhoenixGroup = 4, // ePCRegenType_HereByPhoenixGroup
+    Unstick = 5,            // ePCRegenType_Unstick
+    HereByPhoenixItem = 6,  // ePCRegenType_HereByPhoenixItem
+    // ePCRegenType__End
 });

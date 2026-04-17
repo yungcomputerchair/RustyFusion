@@ -34,6 +34,7 @@ struct XDTData {
     transportation_data: TransportationData,
     instance_data: InstanceData,
     nano_data: NanoData,
+    skill_data: SkillData,
     mission_data: MissionData,
     respawn_data: Vec<RespawnPoint>,
     player_data: HashMap<i16, PlayerData>,
@@ -55,6 +56,8 @@ impl XDTData {
                 .map_err(|e| format!("Error loading instance data: {}", e))?,
             nano_data: load_nano_data(&root)
                 .map_err(|e| format!("Error loading nano data: {}", e))?,
+            skill_data: load_skill_data(&root)
+                .map_err(|e| format!("Error loading skill data: {}", e))?,
             mission_data: load_mission_data(&root)
                 .map_err(|e| format!("Error loading mission data: {}", e))?,
             respawn_data: load_respawn_data(&root)
@@ -446,6 +449,17 @@ impl TableData {
             .ok_or(FFError::build(
                 Severity::Warning,
                 format!("Nano tuning with tuning id {} doesn't exist", tuning_id),
+            ))
+    }
+
+    pub fn get_skill(&self, skill_id: i16) -> FFResult<&Skill> {
+        self.xdt_data
+            .skill_data
+            .skills
+            .get(&skill_id)
+            .ok_or(FFError::build(
+                Severity::Warning,
+                format!("Skill with id {} doesn't exist", skill_id),
             ))
     }
 
@@ -927,7 +941,7 @@ pub fn tdata_get() -> &'static TableData {
     TABLE_DATA.get().expect("TableData not initialized")
 }
 
-fn load_json(filename: &str) -> Result<Map<std::string::String, Value>, String> {
+fn load_json(filename: &str) -> Result<Map<String, Value>, String> {
     let tdata_path = config_get().general.table_data_path.get();
     let path = std::path::Path::new(&tdata_path).join(filename);
 
@@ -944,9 +958,9 @@ fn load_json(filename: &str) -> Result<Map<std::string::String, Value>, String> 
 }
 
 fn get_object<'a>(
-    root: &'a Map<std::string::String, Value>,
+    root: &'a Map<String, Value>,
     key: &'static str,
-) -> Result<&'a Map<std::string::String, Value>, String> {
+) -> Result<&'a Map<String, Value>, String> {
     root.get(key)
         .ok_or(format!("Key missing: {}", key))
         .and_then(|v| {
@@ -959,7 +973,7 @@ fn get_object<'a>(
 }
 
 fn get_array<'a>(
-    root: &'a Map<std::string::String, Value>,
+    root: &'a Map<String, Value>,
     key: &'static str,
 ) -> Result<&'a Vec<Value>, String> {
     root.get(key)
@@ -974,12 +988,12 @@ fn get_array<'a>(
 }
 
 fn load_item_data(
-    root: &Map<std::string::String, Value>,
+    root: &Map<String, Value>,
 ) -> Result<HashMap<(i16, ItemType), ItemStats>, String> {
     const ITEM_TABLE_ITEM_DATA_KEY: &str = "m_pItemData";
 
     fn load_item_data_for_type(
-        root: &Map<std::string::String, Value>,
+        root: &Map<String, Value>,
         map: &mut HashMap<(i16, ItemType), ItemStats>,
         item_type: ItemType,
     ) -> Result<(), String> {
@@ -1094,9 +1108,7 @@ fn load_item_data(
     Ok(map)
 }
 
-fn load_vendor_data(
-    root: &Map<std::string::String, Value>,
-) -> Result<HashMap<i32, VendorData>, String> {
+fn load_vendor_data(root: &Map<String, Value>) -> Result<HashMap<i32, VendorData>, String> {
     const VENDOR_TABLE_KEY: &str = "m_pVendorTable";
     const VENDOR_TABLE_ITEM_DATA_KEY: &str = "m_pItemData";
 
@@ -1134,9 +1146,7 @@ fn load_vendor_data(
     Ok(vendor_data)
 }
 
-fn load_crocpot_data(
-    root: &Map<std::string::String, Value>,
-) -> Result<HashMap<i16, CrocPotData>, String> {
+fn load_crocpot_data(root: &Map<String, Value>) -> Result<HashMap<i16, CrocPotData>, String> {
     const CROCPOT_TABLE_KEY: &str = "m_pCombiningTable";
     const CROCPOT_TABLE_CROCPOT_DATA_KEY: &str = "m_pCombiningData";
 
@@ -1175,14 +1185,10 @@ fn load_crocpot_data(
     Ok(crocpot_table)
 }
 
-fn load_transportation_data(
-    root: &Map<std::string::String, Value>,
-) -> Result<TransportationData, String> {
+fn load_transportation_data(root: &Map<String, Value>) -> Result<TransportationData, String> {
     const TRANSPORTATION_TABLE_KEY: &str = "m_pTransportationTable";
 
-    fn load_trip_data(
-        table: &Map<std::string::String, Value>,
-    ) -> Result<HashMap<i32, TripData>, String> {
+    fn load_trip_data(table: &Map<String, Value>) -> Result<HashMap<i32, TripData>, String> {
         const TRIP_DATA_KEY: &str = "m_pTransportationData";
 
         #[derive(Debug, Deserialize)]
@@ -1227,7 +1233,7 @@ fn load_transportation_data(
     }
 
     fn load_transporter_data(
-        table: &Map<std::string::String, Value>,
+        table: &Map<String, Value>,
         data_key: &'static str,
     ) -> Result<HashMap<i32, TransporterData>, String> {
         #[derive(Debug, Deserialize)]
@@ -1267,12 +1273,10 @@ fn load_transportation_data(
     })
 }
 
-fn load_instance_data(root: &Map<std::string::String, Value>) -> Result<InstanceData, String> {
+fn load_instance_data(root: &Map<String, Value>) -> Result<InstanceData, String> {
     const INSTANCE_TABLE_KEY: &str = "m_pInstanceTable";
 
-    fn load_warp_data(
-        table: &Map<std::string::String, Value>,
-    ) -> Result<HashMap<i32, WarpData>, String> {
+    fn load_warp_data(table: &Map<String, Value>) -> Result<HashMap<i32, WarpData>, String> {
         const WARP_DATA_KEY: &str = "m_pWarpData";
 
         #[derive(Debug, Deserialize)]
@@ -1347,9 +1351,7 @@ fn load_instance_data(root: &Map<std::string::String, Value>) -> Result<Instance
         Ok(warp_map)
     }
 
-    fn load_map_data(
-        table: &Map<std::string::String, Value>,
-    ) -> Result<HashMap<u32, MapData>, String> {
+    fn load_map_data(table: &Map<String, Value>) -> Result<HashMap<u32, MapData>, String> {
         const INSTANCE_DATA_KEY: &str = "m_pInstanceData";
 
         #[derive(Debug, Deserialize)]
@@ -1386,12 +1388,10 @@ fn load_instance_data(root: &Map<std::string::String, Value>) -> Result<Instance
     })
 }
 
-fn load_nano_data(root: &Map<std::string::String, Value>) -> Result<NanoData, String> {
+fn load_nano_data(root: &Map<String, Value>) -> Result<NanoData, String> {
     const NANO_TABLE_KEY: &str = "m_pNanoTable";
 
-    fn load_stats(
-        table: &Map<std::string::String, Value>,
-    ) -> Result<HashMap<i16, NanoStats>, String> {
+    fn load_stats(table: &Map<String, Value>) -> Result<HashMap<i16, NanoStats>, String> {
         const NANO_TABLE_NANO_DATA_KEY: &str = "m_pNanoData";
 
         #[derive(Debug, Deserialize)]
@@ -1440,9 +1440,7 @@ fn load_nano_data(root: &Map<std::string::String, Value>) -> Result<NanoData, St
         Ok(nano_table)
     }
 
-    pub fn load_tunings(
-        table: &Map<std::string::String, Value>,
-    ) -> Result<HashMap<i16, NanoTuning>, String> {
+    pub fn load_tunings(table: &Map<String, Value>) -> Result<HashMap<i16, NanoTuning>, String> {
         const NANO_TABLE_NANO_TUNE_DATA_KEY: &str = "m_pNanoTuneData";
 
         #[derive(Debug, Deserialize)]
@@ -1481,7 +1479,7 @@ fn load_nano_data(root: &Map<std::string::String, Value>) -> Result<NanoData, St
     })
 }
 
-fn load_skill_data(root: &Map<std::string::String, Value>) -> Result<SkillData, String> {
+fn load_skill_data(root: &Map<String, Value>) -> Result<SkillData, String> {
     const SKILL_TABLE_KEY: &str = "m_pSkillTable";
     const SKILL_TABLE_SKILL_DATA_KEY: &str = "m_pSkillData";
 
@@ -1539,10 +1537,6 @@ fn load_skill_data(root: &Map<std::string::String, Value>) -> Result<SkillData, 
                 .m_iEffectTarget
                 .try_into()
                 .map_err(|e: FFError| e.get_msg().to_string())?,
-            target_type: skill_data_entry
-                .m_iTargetType
-                .try_into()
-                .map_err(|e: FFError| e.get_msg().to_string())?,
             passive: skill_data_entry.m_iBatteryDrainType == SKILL_DRAIN_TYPE_PASSIVE,
             range: skill_data_entry.m_iEffectArea as u32,
         };
@@ -1553,7 +1547,7 @@ fn load_skill_data(root: &Map<std::string::String, Value>) -> Result<SkillData, 
     })
 }
 
-fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionData, String> {
+fn load_mission_data(root: &Map<String, Value>) -> Result<MissionData, String> {
     const MISSION_TABLE_KEY: &str = "m_pMissionTable";
     const MISSION_TABLE_MISSION_DATA_KEY: &str = "m_pMissionData";
     const MISSION_TABLE_MISSION_STRINGS_KEY: &str = "m_pMissionStringData";
@@ -1831,7 +1825,7 @@ fn load_mission_data(root: &Map<std::string::String, Value>) -> Result<MissionDa
     })
 }
 
-fn load_respawn_data(root: &Map<std::string::String, Value>) -> Result<Vec<RespawnPoint>, String> {
+fn load_respawn_data(root: &Map<String, Value>) -> Result<Vec<RespawnPoint>, String> {
     const RESPAWN_TABLE_KEY: &str = "m_pXComTable";
     const RESPAWN_TABLE_RESPAWN_DATA_KEY: &str = "m_pXComData";
 
@@ -1862,9 +1856,7 @@ fn load_respawn_data(root: &Map<std::string::String, Value>) -> Result<Vec<Respa
     Ok(respawn_points)
 }
 
-fn load_player_data(
-    root: &Map<std::string::String, Value>,
-) -> Result<HashMap<i16, PlayerData>, String> {
+fn load_player_data(root: &Map<String, Value>) -> Result<HashMap<i16, PlayerData>, String> {
     const PLAYER_TABLE_KEY: &str = "m_pAvatarTable";
     const PLAYER_TABLE_PLAYER_DATA_KEY: &str = "m_pAvatarGrowData";
 
@@ -1918,7 +1910,7 @@ fn load_player_data(
     Ok(player_data_table)
 }
 
-fn load_npc_data(root: &Map<std::string::String, Value>) -> Result<HashMap<i32, NPCData>, String> {
+fn load_npc_data(root: &Map<String, Value>) -> Result<HashMap<i32, NPCData>, String> {
     const NPC_TABLE_KEY: &str = "m_pNpcTable";
     const NPC_TABLE_NPC_DATA_KEY: &str = "m_pNpcData";
     const NPC_TABLE_NPC_STRINGS_KEY: &str = "m_pNpcStringData";
@@ -2013,7 +2005,7 @@ fn load_npcs() -> Result<Vec<NPCSpawnData>, String> {
     const MOB_GROUP_TABLE_KEY: &str = "groups";
 
     fn load_npc_table(
-        table: &Map<std::string::String, Value>,
+        table: &Map<String, Value>,
         is_group: bool,
     ) -> Result<Vec<NPCSpawnData>, String> {
         #[derive(Deserialize)]
@@ -2109,7 +2101,7 @@ fn load_drop_data() -> Result<DropData, String> {
     const ITEM_REFERENCES_ID_KEY: &str = "ItemReferenceID";
 
     fn load_drop_table<T: DeserializeOwned>(
-        table: &Map<std::string::String, Value>,
+        table: &Map<String, Value>,
         id_key: &str,
     ) -> Result<HashMap<i32, T>, String> {
         let mut data_map = HashMap::new();
@@ -2163,9 +2155,7 @@ fn load_egg_data() -> Result<EggData, String> {
     const EGG_TYPES_TABLE_KEY: &str = "EggTypes";
     const EGG_TABLE_KEY: &str = "Eggs";
 
-    fn load_egg_stats(
-        table: &Map<std::string::String, Value>,
-    ) -> Result<HashMap<i32, EggStats>, String> {
+    fn load_egg_stats(table: &Map<String, Value>) -> Result<HashMap<i32, EggStats>, String> {
         #[derive(Deserialize)]
         struct EggStatsEntry {
             Id: i32,
@@ -2197,7 +2187,7 @@ fn load_egg_data() -> Result<EggData, String> {
         Ok(egg_stats)
     }
 
-    fn load_eggs(table: &Map<std::string::String, Value>) -> Result<Vec<EggSpawnData>, String> {
+    fn load_eggs(table: &Map<String, Value>) -> Result<Vec<EggSpawnData>, String> {
         #[derive(Deserialize)]
         struct EggSpawnDataEntry {
             iType: i32,
@@ -2246,9 +2236,7 @@ fn load_path_data() -> Result<PathData, String> {
         iStopTicks: Option<usize>,
     }
 
-    fn load_skyway_paths(
-        root: &Map<std::string::String, Value>,
-    ) -> Result<HashMap<i32, Path>, String> {
+    fn load_skyway_paths(root: &Map<String, Value>) -> Result<HashMap<i32, Path>, String> {
         const SKYWAY_TABLE_KEY: &str = "skyway";
 
         #[derive(Deserialize)]
@@ -2283,7 +2271,7 @@ fn load_path_data() -> Result<PathData, String> {
         Ok(skyway_paths)
     }
 
-    fn load_slider_path(root: &Map<std::string::String, Value>) -> Result<Path, String> {
+    fn load_slider_path(root: &Map<String, Value>) -> Result<Path, String> {
         const SLIDER_TABLE_KEY: &str = "slider";
         const SLIDER_SPEED: i32 = 1200;
         const SLIDER_SPEED_SLOW: i32 = 450;
@@ -2315,9 +2303,7 @@ fn load_path_data() -> Result<PathData, String> {
         Ok(Path::new(points, true))
     }
 
-    fn load_npc_paths(
-        root: &Map<std::string::String, Value>,
-    ) -> Result<HashMap<i32, Path>, String> {
+    fn load_npc_paths(root: &Map<String, Value>) -> Result<HashMap<i32, Path>, String> {
         const NPC_TABLE_KEY: &str = "npc";
 
         #[derive(Deserialize)]

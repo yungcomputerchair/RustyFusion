@@ -1,4 +1,11 @@
-use crate::{defines::*, enums::*, error::FFResult, net::packet::*, tabledata::tdata_get};
+use crate::{
+    defines::*,
+    enums::*,
+    error::{log_if_failed, FFResult},
+    net::packet::*,
+    skills::Skill,
+    tabledata::tdata_get,
+};
 
 #[derive(Debug, Clone)]
 pub struct Nano {
@@ -26,6 +33,11 @@ impl Nano {
     pub fn get_stats(&self) -> FFResult<&NanoStats> {
         tdata_get().get_nano_stats(self.id)
     }
+
+    pub fn get_skill(&self) -> Option<&'static Skill> {
+        self.selected_skill
+            .and_then(|id| log_if_failed(tdata_get().get_skill(id)))
+    }
 }
 impl From<sNano> for Option<Nano> {
     fn from(value: sNano) -> Self {
@@ -46,8 +58,8 @@ impl From<sNano> for Option<Nano> {
         Some(nano)
     }
 }
-impl From<Option<Nano>> for sNano {
-    fn from(value: Option<Nano>) -> Self {
+impl From<Option<&Nano>> for sNano {
+    fn from(value: Option<&Nano>) -> Self {
         match value {
             Some(nano) => Self {
                 iID: nano.id,

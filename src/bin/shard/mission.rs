@@ -581,7 +581,7 @@ pub fn task_end(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
                             iPC_FusionMatter: player.get_fusion_matter() as i32,
                             iQuestItemSlotNum: -1,
                             QuestItem: None.into(),
-                            Nano: Some(nano).into(),
+                            Nano: Some(&nano).into(),
                             iPC_Level: match player.set_level(new_level) {
                                 Ok(l) => l,
                                 Err(e) => {

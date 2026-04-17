@@ -11,7 +11,7 @@ use crate::{
     chunk::{ChunkCoords, InstanceID},
     defines::RANGE_INTERACT,
     entity::{Combatant, Entity, EntityID},
-    enums::{CharType, CombatStyle, CombatantTeam},
+    enums::{BuffID, CharType, CombatStyle, CombatantTeam, TimeBuffType},
     error::FFResult,
     net::{
         packet::{
@@ -22,6 +22,7 @@ use crate::{
     },
     path::Path,
     scripting::scripting_get,
+    skills::BuffInstance,
     state::ShardServerState,
     tabledata::tdata_get,
     util::{self, clamp_min},
@@ -344,6 +345,10 @@ impl Combatant for NPC {
         self.get_hp() <= 0
     }
 
+    fn has_buff(&self, _buff_id: BuffID, _buff_type: Option<TimeBuffType>) -> bool {
+        placeholder!(false)
+    }
+
     fn get_single_power(&self) -> i32 {
         const NPC_BASE_POWER: i32 = 450;
         let stats = tdata_get().get_npc_stats(self.ty).unwrap();
@@ -378,6 +383,14 @@ impl Combatant for NPC {
         let init_hp = self.hp;
         self.hp = clamp_min(self.hp - damage, 0);
         init_hp - self.hp
+    }
+
+    fn apply_buff(&mut self, _buff_id: BuffID, _buff: BuffInstance, _source: EntityID) -> bool {
+        placeholder!(false)
+    }
+
+    fn remove_buff(&mut self, _buff_id: BuffID, _buff_type: Option<TimeBuffType>) -> bool {
+        placeholder!(false)
     }
 
     fn reset(&mut self) {

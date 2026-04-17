@@ -217,7 +217,7 @@ impl PostgresDatabase {
 
         Self::exec(client, "clear_nanos", &[&pc_uid]).await?;
         for nano in player.get_nano_iter() {
-            let nano_raw: sNano = Some(nano.clone()).into();
+            let nano_raw: sNano = Some(nano).into();
             client
                 .execute(
                     &save_nano,

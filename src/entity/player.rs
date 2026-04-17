@@ -10,8 +10,8 @@ use crate::{
     defines::*,
     entity::{Combatant, Entity, EntityID},
     enums::{
-        CharType, CombatStyle, CombatantTeam, ItemLocation, ItemType, PlayerGuide,
-        PlayerNameStatus, RewardCategory, RewardType, RideType, TaskType,
+        BuffID, CharType, CombatStyle, CombatantTeam, ItemLocation, ItemType, PlayerGuide,
+        PlayerNameStatus, RewardCategory, RewardType, RideType, TaskType, TimeBuffType,
     },
     error::{codes, log, log_if_failed, FFError, FFResult, Severity},
     item::Item,
@@ -25,7 +25,7 @@ use crate::{
         FFClient,
     },
     path::Path,
-    skills::BuffContainer,
+    skills::{BuffContainer, BuffInstance},
     state::ShardServerState,
     tabledata::{tdata_get, TripData},
     util::{self, clamp, clamp_max, clamp_min, Bitfield},
@@ -144,7 +144,7 @@ impl Nanocom {
         for (id, nano) in &self.nano_inventory {
             let idx = *id as usize;
             if idx < SIZEOF_NANO_BANK_SLOT as usize {
-                bank[idx] = Some(nano.clone()).into();
+                bank[idx] = Some(nano).into();
             }
         }
         bank
@@ -154,7 +154,7 @@ impl Nanocom {
         let mut carried = [None.into(); SIZEOF_NANO_CARRY_SLOT as usize];
         for (idx, nano_id) in self.equipped_ids.iter().enumerate() {
             if let Some(nano_id) = nano_id {
-                carried[idx] = Some(self.nano_inventory.get(nano_id).unwrap().clone()).into();
+                carried[idx] = Some(self.nano_inventory.get(nano_id).unwrap()).into();
             }
         }
         carried
@@ -710,7 +710,7 @@ impl Player {
             iConditionBitFlag: self.get_condition_bit_flag(),
             iPCState: self.get_state_bit_flag(),
             iSpecialState: self.get_special_state_bit_flag(),
-            Nano: self.get_active_nano().cloned().into(),
+            Nano: self.get_active_nano().into(),
         };
         (regen_data, regen_data_other)
     }
@@ -735,7 +735,7 @@ impl Player {
                 Some(_) => 1,
                 None => 0,
             },
-            Nano: self.get_active_nano().cloned().into(),
+            Nano: self.get_active_nano().into(),
         }
     }
 
@@ -785,7 +785,7 @@ impl Player {
             iZ: self.position.z,
             iAngle: self.rotation,
             ItemEquip: self.inventory.equipped.map(Option::<Item>::into),
-            Nano: self.get_active_nano().cloned().into(),
+            Nano: self.get_active_nano().into(),
             eRT: unused!(),
         }
     }
@@ -1631,6 +1631,10 @@ impl Combatant for Player {
         self.hp <= 0
     }
 
+    fn has_buff(&self, buff_id: BuffID, buff_type: Option<TimeBuffType>) -> bool {
+        self.buffs.has_buff(buff_id, buff_type)
+    }
+
     fn get_single_power(&self) -> i32 {
         let base_power = self.level as i32 * 2 + 8;
         let weapon = self
@@ -1674,6 +1678,14 @@ impl Combatant for Player {
         let init_hp = self.hp;
         self.hp = clamp_min(self.hp - damage, 0);
         init_hp - self.hp
+    }
+
+    fn apply_buff(&mut self, buff_id: BuffID, buff: BuffInstance, _source: EntityID) -> bool {
+        self.buffs.add_buff(buff_id, buff)
+    }
+
+    fn remove_buff(&mut self, buff_id: BuffID, buff_type: Option<TimeBuffType>) -> bool {
+        self.buffs.remove_buff(buff_id, buff_type)
     }
 
     fn reset(&mut self) {
@@ -1772,15 +1784,23 @@ impl Entity for Player {
         self.tick_skyway_ride(time, state);
         self.tick_missions(time, state);
 
-        let mut transmit = self.tick_regen(time);
-
         // since the player object owns the buffs, we have to swap them out,
         // tick them, then put them back. This does not result in an extra
         // heap allocation because HashMap doesn't allocate until its first insertion.
         let mut buffs = std::mem::take(&mut self.buffs);
-        transmit |= buffs.tick(self);
+        let buff_updates = buffs.tick(self);
         self.buffs = buffs;
 
+        let condition_bit_flag = self.buffs.get_bit_flags();
+        if let Some(client) = self.get_client() {
+            for update in buff_updates {
+                let mut pkt: sP_FE2CL_PC_BUFF_UPDATE = update.into();
+                pkt.iConditionBitFlag = condition_bit_flag;
+                client.send_packet(P_FE2CL_PC_BUFF_UPDATE, &pkt);
+            }
+        }
+
+        let transmit = self.tick_regen(time);
         if !transmit {
             return;
         }

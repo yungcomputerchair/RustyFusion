@@ -8,25 +8,108 @@ use rand::Rng;
 use crate::{
     defines::*,
     entity::{Combatant, EntityID},
-    enums::{CharStatusTimeBuffID, CombatStyle, SkillShape, SkillType, TargetType, TimeBuffType},
+    enums::{BuffID, CombatStyle, SkillShape, SkillType, TimeBuffType, TimeBuffUpdate},
     error::*,
     net::packet::{PacketID::*, *},
     state::ShardServerState,
 };
 
+impl Default for sTimeBuff {
+    fn default() -> Self {
+        Self {
+            iTimeLimit: 0,
+            iTimeDuration: 0,
+            iTimeRepeat: 0,
+            iValue: 0,
+            iConfirmNum: 0,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Skill {
     pub skill_type: SkillType,
     pub skill_shape: SkillShape,
-    pub target_type: TargetType,
     pub passive: bool,
     pub range: u32,
+}
+impl Skill {
+    pub fn get_buff_id(&self) -> Option<BuffID> {
+        let buff_id = match self.skill_type {
+            SkillType::Run => BuffID::UpMoveSpeed,
+            SkillType::Jump => BuffID::UpJumpHeight,
+            SkillType::Stealth => BuffID::UpStealth,
+            SkillType::Phoenix => BuffID::Phoenix,
+            SkillType::ProtectBattery => BuffID::ProtectBattery,
+            SkillType::ProtectInfection => BuffID::ProtectInfection,
+            SkillType::Snare => BuffID::DnMoveSpeed,
+            SkillType::Sleep => BuffID::Sleep,
+            SkillType::MiniMapEnemy => BuffID::MiniMapEnemy,
+            SkillType::MiniMapTreasure => BuffID::MiniMapTreasure,
+            SkillType::RewardBlob => BuffID::RewardBlob,
+            SkillType::RewardCash => BuffID::RewardCash,
+            SkillType::InfectionDamage => BuffID::Infection,
+            SkillType::Freedom => BuffID::Freedom,
+            SkillType::BoundingBall => BuffID::BoundingBall,
+            SkillType::Invulnerable => BuffID::Invulnerable,
+            SkillType::BuffHeal => BuffID::Heal,
+            SkillType::NanoStimPak => BuffID::StimPakSlot1,
+            _ => return None,
+        };
+
+        Some(buff_id)
+    }
+
+    pub fn make_buff_instance(&self, source: TimeBuffType) -> Option<BuffInstance> {
+        let value = placeholder!(1);
+        let duration = placeholder!(None);
+        if self.get_buff_id().is_some() {
+            Some(BuffInstance::new(source, value, duration))
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum BuffUpdate {
+    Added(BuffID, TimeBuffType, sTimeBuff),
+    Changed(BuffID, TimeBuffType, sTimeBuff),
+    Removed(BuffID),
+}
+impl From<BuffUpdate> for sP_FE2CL_PC_BUFF_UPDATE {
+    fn from(update: BuffUpdate) -> Self {
+        match update {
+            BuffUpdate::Added(buff_id, source, time_buff) => Self {
+                eTBU: TimeBuffUpdate::Add as i32,
+                eTBT: source as i32,
+                eCSTB: buff_id as i32,
+                TimeBuff: time_buff,
+                iConditionBitFlag: 0, // set by caller based on active buffs
+            },
+            BuffUpdate::Changed(buff_id, source, time_buff) => Self {
+                eTBU: TimeBuffUpdate::Change as i32,
+                eTBT: source as i32,
+                eCSTB: buff_id as i32,
+                TimeBuff: time_buff,
+                iConditionBitFlag: 0, // set by caller based on active buffs
+            },
+            BuffUpdate::Removed(buff_id) => Self {
+                eTBU: TimeBuffUpdate::Del as i32,
+                eTBT: unused!(),
+                eCSTB: buff_id as i32,
+                TimeBuff: unused!(),
+                iConditionBitFlag: 0, // set by caller based on active buffs
+            },
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct BuffInstance {
     source: TimeBuffType,
     value: i32,
+    onset: Instant,
     expires: Option<Instant>,
 }
 impl BuffInstance {
@@ -35,6 +118,7 @@ impl BuffInstance {
         Self {
             source,
             value,
+            onset: Instant::now(),
             expires,
         }
     }
@@ -56,6 +140,7 @@ impl BuffInstance {
 struct BuffStack {
     buffs: Vec<BuffInstance>,
     applied: bool,
+    changed: bool,
     remove: bool,
 }
 impl BuffStack {
@@ -63,70 +148,158 @@ impl BuffStack {
         Self {
             buffs: vec![first_stack],
             applied: false,
+            changed: false,
             remove: false,
         }
     }
 
     fn add_stack(&mut self, buff: BuffInstance) {
         self.buffs.push(buff);
+        self.changed = true;
     }
 
-    fn tick(&mut self, buff_id: CharStatusTimeBuffID, target: &mut dyn Combatant) -> bool {
-        let mut update = false;
-        if !self.applied {
-            self.on_apply(buff_id, target);
-            self.applied = true;
-            update = true;
+    fn remove_stacks(&mut self, buff_type: Option<TimeBuffType>) {
+        if let Some(buff_type) = buff_type {
+            self.buffs.retain(|b| b.source != buff_type);
+        } else {
+            self.buffs.clear();
         }
+        self.changed = true;
+    }
 
-        update |= self.on_tick(buff_id, target);
-        self.buffs.retain(|buff| !buff.is_expired());
+    fn has_stack(&self, buff_type: TimeBuffType) -> bool {
+        self.buffs.iter().any(|b| b.source == buff_type)
+    }
+
+    fn tick(&mut self, buff_id: BuffID, target: &mut dyn Combatant) -> Vec<BuffUpdate> {
+        let mut updates = Vec::with_capacity(self.buffs.len());
+
+        if !self.buffs.is_empty() {
+            if !self.applied {
+                self.on_apply(buff_id, target);
+                self.applied = true;
+                self.changed = false;
+                updates.push(BuffUpdate::Added(
+                    buff_id,
+                    self.get_dominant_source(),
+                    (&*self).into(),
+                ));
+            }
+
+            if self.changed {
+                self.on_change(buff_id, target);
+                self.changed = false;
+                updates.push(BuffUpdate::Changed(
+                    buff_id,
+                    self.get_dominant_source(),
+                    (&*self).into(),
+                ));
+            }
+
+            self.on_tick(buff_id, target);
+            self.buffs.retain(|buff| !buff.is_expired());
+        }
 
         if self.buffs.is_empty() {
             self.on_remove(buff_id, target);
             self.remove = true;
-            update = true;
+            updates.push(BuffUpdate::Removed(buff_id));
         }
 
-        update
+        updates
     }
 
     fn get_max_value(&self) -> i32 {
         self.buffs.iter().map(|b| b.value).max().unwrap_or(0)
     }
 
-    fn on_apply(&mut self, buff_id: CharStatusTimeBuffID, target: &mut dyn Combatant) {
+    fn get_dominant_source(&self) -> TimeBuffType {
+        self.buffs
+            .iter()
+            .max_by_key(|b| b.value)
+            .map(|b| b.source)
+            .unwrap_or(TimeBuffType::Nano)
+    }
+
+    fn get_expires(&self) -> Option<Instant> {
+        // if any instance doesn't expire, then the whole buff doesn't expire.
+        // otherwise, the buff expires when the last instance expires.
+        if self.buffs.iter().any(|b| b.expires.is_none()) {
+            None
+        } else {
+            self.buffs.iter().map(|b| b.expires.unwrap()).max()
+        }
+    }
+
+    fn get_onset(&self) -> Instant {
+        self.buffs
+            .iter()
+            .map(|b| b.onset)
+            .min()
+            .unwrap_or_else(Instant::now)
+    }
+
+    fn get_duration(&self) -> Option<Duration> {
+        let onset = self.get_onset();
+        self.get_expires()
+            .map(|expires| expires.duration_since(onset))
+    }
+
+    fn on_apply(&mut self, buff_id: BuffID, target: &mut dyn Combatant) {
         // do stuff
         log(
             Severity::Debug,
-            &format!("Applying buff {:?} to {:?}", buff_id, target.get_id()),
+            &format!("Buff {:?} applied to {:?}", buff_id, target.get_id()),
         );
     }
 
-    fn on_remove(&mut self, buff_id: CharStatusTimeBuffID, target: &mut dyn Combatant) {
+    fn on_change(&mut self, buff_id: BuffID, target: &mut dyn Combatant) {
         // do stuff
         log(
             Severity::Debug,
-            &format!("Removing buff {:?} from {:?}", buff_id, target.get_id()),
+            &format!("Buff {:?} changed on {:?}", buff_id, target.get_id()),
         );
     }
 
-    fn on_tick(&mut self, buff_id: CharStatusTimeBuffID, target: &mut dyn Combatant) -> bool {
+    fn on_remove(&mut self, buff_id: BuffID, target: &mut dyn Combatant) {
         // do stuff
         log(
             Severity::Debug,
-            &format!("Ticking buff {:?} on {:?}", buff_id, target.get_id()),
+            &format!("Buff {:?} removed from {:?}", buff_id, target.get_id()),
+        );
+    }
+
+    fn on_tick(&mut self, buff_id: BuffID, target: &mut dyn Combatant) -> bool {
+        // do stuff
+        log(
+            Severity::Debug,
+            &format!("Buff {:?} ticked on {:?}", buff_id, target.get_id()),
         );
         false
+    }
+}
+impl From<&BuffStack> for sTimeBuff {
+    fn from(stack: &BuffStack) -> Self {
+        let now = Instant::now();
+        Self {
+            iTimeLimit: match stack.get_expires() {
+                Some(expires) => expires.saturating_duration_since(now).as_millis() as u64,
+                None => 0,
+            },
+            iTimeDuration: stack.get_duration().map_or(0, |d| d.as_millis() as u64),
+            iTimeRepeat: unused!(),
+            iValue: stack.get_max_value(),
+            iConfirmNum: unused!(),
+        }
     }
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct BuffContainer {
-    buff_stacks: HashMap<CharStatusTimeBuffID, BuffStack>,
+    buff_stacks: HashMap<BuffID, BuffStack>,
 }
 impl BuffContainer {
-    pub fn add_buff(&mut self, buff_id: CharStatusTimeBuffID, buff: BuffInstance) -> bool {
+    pub fn add_buff(&mut self, buff_id: BuffID, buff: BuffInstance) -> bool {
         match self.buff_stacks.entry(buff_id) {
             Entry::Occupied(mut entry) => {
                 entry.get_mut().add_stack(buff);
@@ -139,17 +312,34 @@ impl BuffContainer {
         }
     }
 
-    pub fn tick(&mut self, target: &mut dyn Combatant) -> bool {
-        let mut updates = false;
+    pub fn remove_buff(&mut self, buff_id: BuffID, buff_type: Option<TimeBuffType>) -> bool {
+        if let Some(stack) = self.buff_stacks.get_mut(&buff_id) {
+            stack.remove_stacks(buff_type);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn tick(&mut self, target: &mut dyn Combatant) -> Vec<BuffUpdate> {
+        let mut updates = Vec::new();
         for (buff_id, buff_stack) in self.buff_stacks.iter_mut() {
-            updates |= buff_stack.tick(*buff_id, target);
+            let stack_updates = buff_stack.tick(*buff_id, target);
+            updates.extend(stack_updates);
         }
 
         self.buff_stacks.retain(|_, buff_stack| !buff_stack.remove);
         updates
     }
 
-    pub fn get_buff_value(&self, buff_id: CharStatusTimeBuffID) -> Option<i32> {
+    pub fn has_buff(&self, buff_id: BuffID, buff_type: Option<TimeBuffType>) -> bool {
+        match buff_type {
+            Some(buff_type) => self.buff_stacks.values().any(|s| s.has_stack(buff_type)),
+            None => self.buff_stacks.contains_key(&buff_id),
+        }
+    }
+
+    pub fn get_buff_value(&self, buff_id: BuffID) -> Option<i32> {
         self.buff_stacks
             .get(&buff_id)
             .map(|stack| stack.get_max_value())
@@ -159,7 +349,7 @@ impl BuffContainer {
         let mut flags = 0;
         for (buff_id, buff_stack) in &self.buff_stacks {
             if buff_stack.applied {
-                flags |= 1 << (*buff_id as i32);
+                flags |= 1 << (*buff_id as i32 - 1);
             }
         }
         flags
