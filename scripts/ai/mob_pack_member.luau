@@ -38,14 +38,14 @@ return function(npc: Npc)
             if not b.check_retreat(npc) then
                 -- Bi-directional target sync
                 if not leader_retreating then
-                    local leader_target = leader:get_target()
+                    local leader_target = leader:target()
                     if not npc:has_target() then
                         if leader_target then
                             npc:set_target(leader_target)
                         end
                     else
                         if not leader_target then
-                            local my_target = npc:get_target()
+                            local my_target = npc:target()
                             if my_target then
                                 leader:set_target(my_target)
                             end

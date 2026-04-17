@@ -41,7 +41,7 @@ pub trait Entity: Send + Display {
     fn get_client(&self) -> Option<FFClient>;
     fn get_position(&self) -> Position;
     fn get_rotation(&self) -> i32;
-    fn get_speed(&self) -> i32;
+    fn get_speed(&self, running: bool) -> i32;
     fn get_chunk_coords(&self) -> ChunkCoords;
     fn set_position(&mut self, pos: Position);
     fn set_rotation(&mut self, rot: i32);
@@ -76,8 +76,9 @@ pub trait Combatant: Entity {
     fn get_multi_power(&self) -> i32;
     fn get_defense(&self) -> i32;
 
-    fn take_damage(&mut self, damage: i32, source: EntityID) -> i32;
-    fn apply_buff(&mut self, buff_id: BuffID, buff: BuffInstance, source: EntityID) -> bool;
+    fn take_damage(&mut self, damage: i32, source: Option<EntityID>) -> i32;
+    fn apply_buff(&mut self, buff_id: BuffID, buff: BuffInstance, source: Option<EntityID>)
+        -> bool;
     fn remove_buff(&mut self, buff_id: BuffID, buff_type: Option<BuffType>) -> bool;
 
     fn reset(&mut self);

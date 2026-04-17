@@ -1668,19 +1668,26 @@ impl Combatant for Player {
         base_defense + total_from_armor
     }
 
-    fn take_damage(&mut self, damage: i32, source: EntityID) -> i32 {
+    fn take_damage(&mut self, damage: i32, source: Option<EntityID>) -> i32 {
         if self.invulnerable {
             return 0;
         }
 
-        self.last_attacked_by = Some(source);
+        if let Some(source) = source {
+            self.last_attacked_by = Some(source);
+        }
 
         let init_hp = self.hp;
         self.hp = clamp_min(self.hp - damage, 0);
         init_hp - self.hp
     }
 
-    fn apply_buff(&mut self, buff_id: BuffID, buff: BuffInstance, _source: EntityID) -> bool {
+    fn apply_buff(
+        &mut self,
+        buff_id: BuffID,
+        buff: BuffInstance,
+        _source: Option<EntityID>,
+    ) -> bool {
         // TODO handle source
         self.buffs.add_buff(buff_id, buff)
     }
@@ -1712,11 +1719,12 @@ impl Entity for Player {
         self.rotation
     }
 
-    fn get_speed(&self) -> i32 {
+    fn get_speed(&self, _running: bool) -> i32 {
         if let Some(vehicle_speed) = self.vehicle_speed {
             vehicle_speed
         } else {
-            PLAYER_RUN_SPEED
+            let buffed_run_speed = self.buffs.get_buff_value(BuffID::UpMoveSpeed).unwrap_or(0);
+            PLAYER_RUN_SPEED + buffed_run_speed
         }
     }
 

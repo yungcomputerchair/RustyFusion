@@ -149,7 +149,7 @@ pub fn nano_active(pkt: Packet, clients: &ClientMap, state: &mut ShardServerStat
     }
 
     if let Some((buff_id, buff)) = buff.clone() {
-        player.apply_buff(buff_id, buff, EntityID::Player(pc_id));
+        player.apply_buff(buff_id, buff, Some(EntityID::Player(pc_id)));
     }
 
     let resp = sP_FE2CL_REP_NANO_ACTIVE_SUCC {

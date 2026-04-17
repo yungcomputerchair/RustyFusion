@@ -15,8 +15,8 @@ use crate::{
     error::FFResult,
     net::{
         packet::{
-            sNPCAppearanceData, sNPCGroupMemberInfo, sP_FE2CL_NPC_ENTER, sP_FE2CL_NPC_EXIT,
-            sP_FE2CL_NPC_MOVE, PacketID,
+            sNPCAppearanceData, sNPCGroupMemberInfo, sP_FE2CL_CHAR_TIME_BUFF_TIME_OUT,
+            sP_FE2CL_NPC_ENTER, sP_FE2CL_NPC_EXIT, sP_FE2CL_NPC_MOVE, PacketID::*,
         },
         FFClient,
     },
@@ -144,9 +144,9 @@ impl NPC {
                 iSpeed: speed,
                 iMoveStyle: if speed >= run_speed { 1 } else { 0 },
             };
-            state.entity_map.for_each_around(self.get_id(), |c| {
-                c.send_packet(PacketID::P_FE2CL_NPC_MOVE, &pkt)
-            });
+            state
+                .entity_map
+                .for_each_around(self.get_id(), |c| c.send_packet(P_FE2CL_NPC_MOVE, &pkt));
         }
     }
 
@@ -192,12 +192,19 @@ impl Entity for NPC {
         self.rotation
     }
 
-    fn get_speed(&self) -> i32 {
+    fn get_speed(&self, running: bool) -> i32 {
         if let Some(path) = &self.path {
             path.get_speed()
         } else {
             let stats = tdata_get().get_npc_stats(self.ty).unwrap();
-            stats.walk_speed
+            let base_speed = if running {
+                stats.run_speed
+            } else {
+                stats.walk_speed
+            };
+
+            let buffed_speed = self.buffs.get_buff_value(BuffID::UpMoveSpeed).unwrap_or(0);
+            base_speed + buffed_speed
         }
     }
 
@@ -217,12 +224,12 @@ impl Entity for NPC {
         let pkt = sP_FE2CL_NPC_ENTER {
             NPCAppearanceData: self.get_appearance_data(),
         };
-        client.send_packet(PacketID::P_FE2CL_NPC_ENTER, &pkt);
+        client.send_packet(P_FE2CL_NPC_ENTER, &pkt);
     }
 
     fn send_exit(&self, client: &FFClient) {
         let pkt = sP_FE2CL_NPC_EXIT { iNPC_ID: self.id };
-        client.send_packet(PacketID::P_FE2CL_NPC_EXIT, &pkt);
+        client.send_packet(P_FE2CL_NPC_EXIT, &pkt);
     }
 
     fn tick(&mut self, _time: &SystemTime, state: &mut ShardServerState, _rng: &mut ThreadRng) {
@@ -236,6 +243,25 @@ impl Entity for NPC {
             {
                 self.interacting_pcs.remove(&pc_id);
             }
+        }
+
+        // since the NPC object owns the buffs, we have to swap them out,
+        // tick them, then put them back. This does not result in an extra
+        // heap allocation because HashMap doesn't allocate until its first insertion.
+        let mut buffs = std::mem::take(&mut self.buffs);
+        let updates = !buffs.tick(self).is_empty();
+        self.buffs = buffs;
+
+        if updates {
+            let bcast = sP_FE2CL_CHAR_TIME_BUFF_TIME_OUT {
+                eCT: CharType::NPC as i32,
+                iID: self.id,
+                iConditionBitFlag: self.buffs.get_bit_flags(),
+            };
+
+            state.entity_map.for_each_around(self.get_id(), |c| {
+                c.send_packet(P_FE2CL_CHAR_TIME_BUFF_TIME_OUT, &bcast)
+            });
         }
 
         // tick path
@@ -372,14 +398,16 @@ impl Combatant for NPC {
         }
     }
 
-    fn take_damage(&mut self, damage: i32, source: EntityID) -> i32 {
+    fn take_damage(&mut self, damage: i32, source: Option<EntityID>) -> i32 {
         if self.invulnerable || self.retreating {
             return 0;
         }
 
-        self.last_attacked_by = Some(source);
-        if self.target_id.is_none() {
-            self.target_id = Some(source);
+        if let Some(source) = source {
+            self.last_attacked_by = Some(source);
+            if self.target_id.is_none() {
+                self.target_id = Some(source);
+            }
         }
 
         let init_hp = self.hp;
@@ -387,7 +415,12 @@ impl Combatant for NPC {
         init_hp - self.hp
     }
 
-    fn apply_buff(&mut self, buff_id: BuffID, buff: BuffInstance, _source: EntityID) -> bool {
+    fn apply_buff(
+        &mut self,
+        buff_id: BuffID,
+        buff: BuffInstance,
+        _source: Option<EntityID>,
+    ) -> bool {
         // TODO handle source
         self.buffs.add_buff(buff_id, buff)
     }

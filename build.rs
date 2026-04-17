@@ -331,7 +331,15 @@ fn generate_config_structs() {
 // Lua generation //
 
 /// Rust type -> Luau type mapping for closure parameters.
-fn rust_type_to_luau(ty: &str) -> &str {
+fn rust_type_to_luau(ty: &str) -> String {
+    if let Some(inner) = ty.strip_prefix("Option<").and_then(|s| s.strip_suffix('>')) {
+        return format!("{}?", rust_type_to_luau(inner.trim()));
+    }
+
+    if let Some(inner) = ty.strip_prefix("Vec<").and_then(|s| s.strip_suffix('>')) {
+        return format!("{{{}}}", rust_type_to_luau(inner.trim()));
+    }
+
     match ty {
         "i32" | "u32" | "i64" | "u64" | "f32" | "f64" | "usize" | "isize" => "number",
         "bool" => "boolean",
@@ -340,6 +348,7 @@ fn rust_type_to_luau(ty: &str) -> &str {
         "NpcScriptContext" => "Npc",
         _ => ty,
     }
+    .to_string()
 }
 
 /// Parse a closure parameter list like `(x, y, z): (i32, i32, i32)` or
@@ -426,7 +435,9 @@ fn generate_luau_declarations() {
     let func_re =
         regex::Regex::new(r#"(?s)luau_function!\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)"#).unwrap();
     //   luau_class!("ClassName", { ... });
-    let class_re = regex::Regex::new(r#"luau_class!\("([^"]+)"\s*,"#).unwrap();
+    //   luau_class!("ClassName" extends "ParentClass", { ... });
+    let class_re =
+        regex::Regex::new(r#"luau_class!\("([^"]+)"(?:\s+extends\s+"([^"]+)")?\s*,"#).unwrap();
     //   luau_method!(ident, "name" -> "RetType", |_, this, params| { ... });
     let method_re = regex::Regex::new(
         r#"(?s)luau_method!\(\w+,\s*"([^"]+)"\s*->\s*"([^"]+)"\s*,\s*\|[^,]*,\s*\w+,\s*([^|]*)\|"#,
@@ -460,8 +471,13 @@ fn generate_luau_declarations() {
         // find matching close → "end\n"
         for caps in class_re.captures_iter(&content) {
             let class_name = &caps[1];
+            let extends = caps.get(2).map(|m| m.as_str());
             let match_start = caps.get(0).unwrap().start();
-            fragments.push((match_start, format!("declare class {}\n", class_name)));
+            let decl = match extends {
+                Some(parent) => format!("declare class {} extends {}\n", class_name, parent),
+                None => format!("declare class {}\n", class_name),
+            };
+            fragments.push((match_start, decl));
 
             // Find the opening '{' after the class name
             let after_match = caps.get(0).unwrap().end();

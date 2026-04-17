@@ -27,6 +27,9 @@ macro_rules! luau_class {
     ($class:literal, { $($body:tt)* }) => {
         $($body)*
     };
+    ($class:literal extends $parent:literal, { $($body:tt)* }) => {
+        $($body)*
+    };
 }
 
 /// Registers a Lua method and encodes its Luau return type for build.rs.

@@ -9,7 +9,7 @@ local b = require("@lib/behaviors")
 return function(npc: Npc)
     while true do
         if not b.handle_death(npc) then
-            local target = npc:get_target()
+            local target = npc:target()
             if target then
                 if target:is_dead() then
                     npc:clear_target()

@@ -72,7 +72,7 @@ impl Entity for Egg {
         0
     }
 
-    fn get_speed(&self) -> i32 {
+    fn get_speed(&self, _running: bool) -> i32 {
         0
     }
 

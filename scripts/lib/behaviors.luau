@@ -14,15 +14,12 @@ function behaviors.handle_death(npc: Npc)
     end
 
     npc:begin_death()
-    wait(2.0) -- brief delay before despawn
+    wait(2.0) -- brief non-interruptible delay before despawn
 
     npc:despawn()
     wait(npc:regen_time()) -- non-interruptible wait for regen time
 
-    -- Reset position to spawn and respawn
-    local spawn = npc:spawn_position()
-    npc:set_position(spawn.x, spawn.y, spawn.z)
-    npc:respawn()
+    npc:respawn() -- handles target reset, healing to full, and appearing at spawn
     return true
 end
 
@@ -30,7 +27,7 @@ end
 -- After retreat, fully heals the NPC (matching native reset behavior).
 -- Returns true if retreating (caller should skip other behaviors).
 function behaviors.check_retreat(npc: Npc)
-    local target = npc:get_target()
+    local target = npc:target()
     if not target then
         return false
     end
@@ -79,7 +76,7 @@ end
 -- Scan for nearest enemy within sight range (simple version).
 -- Sets the target if found.
 function behaviors.scan_for_target(npc: Npc)
-    if npc:get_target() then
+    if npc:target() then
         return
     end
 
@@ -91,7 +88,7 @@ end
 
 -- Scan for enemies within aggro distance.
 function behaviors.scan_for_target_aggro(npc: Npc)
-    if npc:get_target() then
+    if npc:target() then
         return
     end
 
@@ -120,7 +117,7 @@ end
 -- Returns true if an attack was performed.
 -- Clears target if it is dead or gone.
 function behaviors.try_attack(npc: Npc)
-    local target = npc:get_target()
+    local target = npc:target()
     if not target then
         return false
     end
@@ -144,12 +141,12 @@ end
 
 -- Chase the current target at run speed.
 function behaviors.chase_target(npc: Npc)
-    local target = npc:get_target()
+    local target = npc:target()
     if not target then
         return
     end
 
-    npc:move_toward_entity(target, npc:run_speed())
+    npc:move_toward_entity(target)
 end
 
 -- Idle roam: pick a random point near spawn, walk to it, wait.
@@ -164,10 +161,10 @@ function behaviors.idle_roam(npc: Npc, on_tick: (() -> ())?)
 
     local roam_radius = idle_range / 2
     local point = random_point_in_range(npc:spawn_position(), roam_radius)
-    npc:move_to(point.x, point.y, point.z, npc:walk_speed())
+    npc:move_to(point.x, point.y, point.z)
     while npc:is_moving() do
         if on_tick then on_tick() end
-        if npc:is_dead() or npc:get_target() then return end
+        if npc:is_dead() or npc:target() then return end
         yield()
     end
 
@@ -176,7 +173,7 @@ function behaviors.idle_roam(npc: Npc, on_tick: (() -> ())?)
     local delay_ticks = math.ceil(math.random() * delay_max * 8)
     for i = 1, delay_ticks do
         if on_tick then on_tick() end
-        if npc:is_dead() or npc:get_target() then return end
+        if npc:is_dead() or npc:target() then return end
         yield()
     end
 end

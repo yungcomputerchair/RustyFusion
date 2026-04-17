@@ -146,7 +146,7 @@ pub struct BuffInstance {
     expires: Option<Instant>,
 }
 impl BuffInstance {
-    fn new(
+    pub fn new(
         ty: BuffType,
         value: i32,
         sub_value: Option<i32>,
@@ -645,7 +645,7 @@ fn handle_basic_attack(
     let defense_style = to.get_style();
     let defense_level = to.get_level();
     let (damage, crit) = calculate_damage(attack, defense, defense_style, defense_level);
-    let dealt = to.take_damage(damage, from);
+    let dealt = to.take_damage(damage, Some(from));
 
     let mut hit_flag = HF_BIT_NORMAL as i8;
     if crit {

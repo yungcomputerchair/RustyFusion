@@ -82,7 +82,7 @@ impl Entity for Slider {
         self.rotation
     }
 
-    fn get_speed(&self) -> i32 {
+    fn get_speed(&self, _running: bool) -> i32 {
         if let Some(path) = &self.path {
             path.get_speed()
         } else {

@@ -196,6 +196,10 @@ impl EntityMap {
             })
     }
 
+    pub fn get_entity_chunk(&self, id: EntityID) -> Option<ChunkCoords> {
+        self.registry.get(&id).and_then(|entry| entry.chunk)
+    }
+
     pub fn get_around_entity(&mut self, id: EntityID) -> HashSet<EntityID> {
         let mut entities = HashSet::new();
         if let Some(coords) = self.registry.get(&id).and_then(|entry| entry.chunk) {
@@ -845,7 +849,7 @@ mod tests {
         fn get_rotation(&self) -> i32 {
             0
         }
-        fn get_speed(&self) -> i32 {
+        fn get_speed(&self, _: bool) -> i32 {
             0
         }
         fn get_chunk_coords(&self) -> ChunkCoords {
