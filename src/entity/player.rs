@@ -1681,6 +1681,7 @@ impl Combatant for Player {
     }
 
     fn apply_buff(&mut self, buff_id: BuffID, buff: BuffInstance, _source: EntityID) -> bool {
+        // TODO handle source
         self.buffs.add_buff(buff_id, buff)
     }
 

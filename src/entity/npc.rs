@@ -22,7 +22,7 @@ use crate::{
     },
     path::Path,
     scripting::scripting_get,
-    skills::BuffInstance,
+    skills::{BuffContainer, BuffInstance},
     state::ShardServerState,
     tabledata::tdata_get,
     util::{self, clamp_min},
@@ -50,6 +50,7 @@ pub struct NPC {
     pub interacting_pcs: HashSet<i32>,
     pub summoned: bool,
     pub ai: Option<String>,
+    buffs: BuffContainer,
 }
 impl NPC {
     pub fn new(
@@ -80,6 +81,7 @@ impl NPC {
             interacting_pcs: HashSet::new(),
             summoned: false,
             ai: None,
+            buffs: BuffContainer::default(),
         })
     }
 
@@ -290,7 +292,7 @@ impl Entity for NPC {
 }
 impl Combatant for NPC {
     fn get_condition_bit_flag(&self) -> i32 {
-        placeholder!(0)
+        self.buffs.get_bit_flags()
     }
 
     fn get_group_id(&self) -> Option<Uuid> {
@@ -345,8 +347,8 @@ impl Combatant for NPC {
         self.get_hp() <= 0
     }
 
-    fn has_buff(&self, _buff_id: BuffID, _buff_type: Option<TimeBuffType>) -> bool {
-        placeholder!(false)
+    fn has_buff(&self, buff_id: BuffID, buff_type: Option<TimeBuffType>) -> bool {
+        self.buffs.has_buff(buff_id, buff_type)
     }
 
     fn get_single_power(&self) -> i32 {
@@ -385,12 +387,13 @@ impl Combatant for NPC {
         init_hp - self.hp
     }
 
-    fn apply_buff(&mut self, _buff_id: BuffID, _buff: BuffInstance, _source: EntityID) -> bool {
-        placeholder!(false)
+    fn apply_buff(&mut self, buff_id: BuffID, buff: BuffInstance, _source: EntityID) -> bool {
+        // TODO handle source
+        self.buffs.add_buff(buff_id, buff)
     }
 
-    fn remove_buff(&mut self, _buff_id: BuffID, _buff_type: Option<TimeBuffType>) -> bool {
-        placeholder!(false)
+    fn remove_buff(&mut self, buff_id: BuffID, buff_type: Option<TimeBuffType>) -> bool {
+        self.buffs.remove_buff(buff_id, buff_type)
     }
 
     fn reset(&mut self) {
