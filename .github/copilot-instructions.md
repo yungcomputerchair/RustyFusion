@@ -20,7 +20,7 @@ cargo run --bin login   # run login server
 cargo run --bin shard   # run shard server
 ```
 
-**There are no unit tests.** The CI runs `cargo test` but it is effectively a no-op. Never add or remove test infrastructure.
+Unit tests exist in several modules (`util`, `config`, `chunk`, `net/mod`, `net/crypto`, `entity/mod`, `tabledata`). Run them with `cargo test`. Do not remove existing tests.
 
 The minimum supported Rust version (MSRV) is **1.88.0**, edition **2021**, as declared in `Cargo.toml`.
 
