@@ -419,10 +419,9 @@ impl Combatant for NPC {
         &mut self,
         buff_id: BuffID,
         buff: BuffInstance,
-        _source: Option<EntityID>,
+        source: Option<EntityID>,
     ) -> bool {
-        // TODO handle source
-        self.buffs.add_buff(buff_id, buff)
+        self.buffs.add_buff(buff_id, buff, source)
     }
 
     fn remove_buff(&mut self, buff_id: BuffID, buff_type: Option<BuffType>) -> bool {

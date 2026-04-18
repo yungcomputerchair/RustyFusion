@@ -92,13 +92,8 @@ impl Skill {
             self.durations[level]
         };
 
-        Ok(BuffInstance::new(
-            ty,
-            value,
-            sub_value,
-            special_value,
-            duration,
-        ))
+        let buff = BuffInstance::new(ty, value, sub_value, special_value, duration);
+        Ok(buff)
     }
 }
 
@@ -144,6 +139,7 @@ pub struct BuffInstance {
     _special_value: Option<i32>,
     onset: Instant,
     expires: Option<Instant>,
+    source: Option<EntityID>,
 }
 impl BuffInstance {
     pub fn new(
@@ -159,8 +155,9 @@ impl BuffInstance {
             value,
             _sub_value: sub_value,
             _special_value: special_value,
-            onset: Instant::now(),
             expires,
+            onset: Instant::now(),
+            source: None,
         }
     }
 
@@ -170,6 +167,10 @@ impl BuffInstance {
         } else {
             false
         }
+    }
+
+    pub fn set_source(&mut self, source: EntityID) {
+        self.source = Some(source);
     }
 }
 
@@ -336,7 +337,16 @@ pub struct BuffContainer {
     buff_stacks: HashMap<BuffID, BuffStack>,
 }
 impl BuffContainer {
-    pub fn add_buff(&mut self, buff_id: BuffID, buff: BuffInstance) -> bool {
+    pub fn add_buff(
+        &mut self,
+        buff_id: BuffID,
+        mut buff: BuffInstance,
+        source: Option<EntityID>,
+    ) -> bool {
+        if let Some(source) = source {
+            buff.set_source(source);
+        }
+
         match self.buff_stacks.entry(buff_id) {
             Entry::Occupied(mut entry) => {
                 entry.get_mut().add_stack(buff);

@@ -6,4 +6,6 @@
 
 local mob_base = require("@lib/mob_base")
 
-return mob_base.run
+return function(npc: Npc)
+    mob_base.run(npc)
+end
