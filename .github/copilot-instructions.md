@@ -267,8 +267,134 @@ The world is divided into chunks. Each entity has a `ChunkCoords` with an `Insta
 - **Comments**: only add comments matching the existing style or explaining non-obvious logic.
 - **`unused!()`**: always use this macro for default/padding packet fields rather than `Default::default()` directly.
 - **`placeholder!()`**: use for stubs of unimplemented but planned features.
-- **Imports**: use `PacketID::*` glob when many packet IDs are needed. Use `crate::error::*` glob for error utilities in handler files.
 - **Error propagation**: prefer `?` operator; use `log_if_failed()` when you want to swallow and log an error silently.
+
+### Imports
+
+Handler files in `src/bin/shard/` and `src/bin/login/` use glob imports for tightly-coupled namespaces:
+```rust
+use rusty_fusion::{
+    enums::*,
+    error::*,
+    net::packet::{PacketID::*, *},
+    unused, util,
+};
+```
+Use `PacketID::*` glob only when many packet IDs are needed in the same file. Use `crate::error::*` in library handler files for the same reason. Do not glob-import otherwise.
+
+### Naming
+
+- Rust code uses standard Rust naming: `snake_case` for variables/functions/modules, `PascalCase` for types/enums/traits.
+- Packet struct fields use the original FusionFall Hungarian notation (`i` = int, `s` = string, `e` = enum, `sz` = zero-terminated string, `b` = bool, `ui` = unsigned int, etc.). Do not rename these.
+- Protocol-level structs (`sP_CL2FE_REQ_…`, `LoginData`) that carry non-snake-case field names are annotated with `#[allow(non_snake_case)]`.
+- Game enums defined with `ffenum!` in `enums.rs` use `PascalCase` variants.
+
+### Casting and Numeric Types
+
+Packet fields use types dictated by the protocol (`i32`, `i16`, `i8`, `u32`, etc.). Cast to the appropriate Rust type as needed when using them in logic (e.g., `pkt.iSlotNum as usize`). Prefer infallible `as` casts for well-bounded protocol fields, and `try_into()?` for enum fields or values that may be out-of-range.
+
+### Scoped Error Chains
+
+When a handler needs to perform several fallible steps before sending a response (especially a FAIL reply on error), use an immediately-invoked closure to create a local `FFResult` scope:
+```rust
+pub fn some_handler(...) -> FFResult<()> {
+    let result: FFResult<ResponseType> = (|| {
+        let x = fallible_step_1()?;
+        let y = fallible_step_2(x)?;
+        Ok(build_response(y))
+    })();
+
+    match result {
+        Ok(resp) => client.send_packet(P_FE2CL_REP_SUCC, &resp),
+        Err(e) => {
+            log_error(e);
+            client.send_packet(P_FE2CL_REP_FAIL, &fail_pkt);
+        }
+    }
+    Ok(())
+}
+```
+This pattern keeps the success path clean and lets the failure handling construct the appropriate FAIL packet.
+
+---
+
+## Module Organization
+
+### Library vs. Binary
+
+`src/lib.rs` is the library crate root — it declares all public modules and is shared by both binaries. Binaries (`src/bin/login/` and `src/bin/shard/`) import from the library with `use rusty_fusion::…`. Logic shared across both binaries belongs in the library; binary-specific handler logic lives in the binary.
+
+### Re-export Pattern
+
+Sub-modules within a module directory follow the re-export pattern: the sub-module is declared private (`mod ffclient;`) and its public items are re-exported with `pub use ffclient::*;`. This lets callers import from the parent module without knowing the internal file structure:
+```rust
+// in net/mod.rs
+mod ffclient;
+pub use ffclient::*;
+```
+
+### Global Singletons
+
+Long-lived, read-only globals (config, tabledata, database handle) are held in `OnceLock` or `LazyLock` statics and accessed via `config_get()`, `tdata_get()`, `db_get()`. These must be initialized once at startup before use. Never store mutable game state in globals; that belongs in `ShardServerState` or `LoginServerState`.
+
+### Handler File Organization
+
+Each shard binary handler file (`pc.rs`, `item.rs`, `combat.rs`, etc.) groups all packet handlers for a single game feature domain. Handler functions are `pub` and named after the packet they handle (lowercased, without the `p_cl2fe_req_` prefix, e.g. `item_move`, `pc_attack_npcs`).
+
+When a handler file has internal helpers shared only within that file, they are placed in a private `mod helpers { ... }` block at the bottom of the file. These are not exposed publicly:
+```rust
+// at the bottom of gm.rs
+mod helpers {
+    use super::*;
+    pub fn validate_perms(client: &FFClient, state: &ShardServerState, req_perms: i16) -> FFResult<i32> { … }
+}
+```
+
+### State Modules
+
+`state/shard.rs` (`ShardServerState`) holds all live shard game state: the entity map, active trades, groups, login data, etc. `state/login.rs` (`LoginServerState`) holds login server state. Both are passed to handlers by `&mut` reference (sync handlers) or via `Arc<Mutex<…>>` (async handlers).
+
+---
+
+## Safety — The Trust-but-Verify Model
+
+RustyFusion treats **all client input as untrusted**. Validation is layered: the networking layer enforces structural validity before a packet ever reaches a handler, and handlers are responsible for semantic validation.
+
+### Layer 1 — Connection-level filtering (`ffconnection.rs`)
+
+Before any handler is called, `can_send_packet()` checks that the packet ID is valid for the current `ClientType`. Unauthenticated clients (`ClientType::Unknown`) may only send a hard-coded whitelist of three packets (`UNKNOWN_CT_ALLOWED_PACKETS`). Clients whose type doesn't match the packet direction bitmask have their packet silently dropped with a Warning log. This prevents unauthed clients from invoking handlers that expect an authenticated session.
+
+### Layer 2 — Structural deserialization (`pkt.get()`)
+
+`pkt.get::<sP_CL2FE_REQ_…>()` returns `FFResult<&T>`. It validates:
+- That enough bytes came in for the struct size.
+- That the data pointer is correctly aligned (checked in `bytes_to_struct()`; misaligned data returns an error rather than causing UB).
+
+A failed `pkt.get()` propagates as `?` and terminates the handler early. The `FFError` that results has `should_dc = false` by default; use `FFError::build_dc(…)` to force a disconnect.
+
+### Layer 3 — Semantic validation inside handlers
+
+Every handler validates the meaningful content of packet fields before acting on them:
+
+- **Enum fields**: always converted with `.try_into()?` (e.g., `pkt.eFrom.try_into()?`). An unrecognized discriminant is an immediate error + disconnect (`FFError::from_enum_err` sets `should_dc = true`).
+- **Slot indices / array bounds**: all slot numbers from the client are validated against inventory sizes via `player.set_item(location, slot_num, …)?` and similar methods that return `FFResult` on out-of-range access.
+- **Target counts**: client-reported counts (e.g., `iNPCCnt`) are checked against a server-defined maximum before iterating.
+- **Entity lookups**: `state.get_player(pc_id)?`, `state.get_npc(npc_id)?`, etc. all return `FFResult` — a missing entity is an error, not a panic.
+- **Currency / resource checks**: before deducting taros, nano potions, weapon boosts, etc., the handler verifies the player has enough.
+- **Permission checks**: all GM handlers call `helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__…)` as their first action. The player's `perms` field (sourced from the database `AccountLevel` column) must be at or above the required level; otherwise the call fails with a Warning.
+
+### Layer 4 — Login handshake / session guard
+
+Players can only enter a shard if the login server has deposited a `LoginData` entry keyed by their serial key. The shard removes this entry atomically on `pc_enter`, preventing replay. A `pending_entering_uids` set guards against concurrent double-enters during the async DB load phase.
+
+### Unsafe code
+
+The only `unsafe` in the networking code is the pointer cast in `bytes_to_struct`. This is sound because:
+1. Alignment is checked at runtime before the cast.
+2. All packet structs are `#[repr(C)]` / `#[repr(packed(4))]` and composed of primitive integer types, which are valid for any bit pattern.
+3. The receive buffer (`AlignedBuf`) is declared `#[repr(C, align(4))]`, guaranteeing 4-byte alignment at the call site.
+
+Unit tests in `net/mod.rs` verify that misaligned slices are rejected and that aligned round-trips are correct.
 
 ---
 
