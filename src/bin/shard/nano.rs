@@ -22,7 +22,7 @@ pub fn nano_equip(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState
     let player = state.get_player(pc_id)?;
     if player.perms as u32 > CN_ACCOUNT_LEVEL__DEVELOPER {
         // check for nano station
-        let nano_station_ids = state.entity_map.find_npcs(|npc| {
+        let nano_station_ids = state.find_npcs(|npc| {
             npc.ty == TYPE_NANO_MACHINE
                 && npc.get_position().distance_to(&player.get_position()) <= RANGE_INTERACT
                 && npc.instance_id == player.instance_id
@@ -54,11 +54,9 @@ pub fn nano_equip(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState
             eCSTB___Add: 0,
         };
 
-        state
-            .entity_map
-            .for_each_around(EntityID::Player(pc_id), |c| {
-                c.send_packet(P_FE2CL_NANO_ACTIVE, &bcast);
-            });
+        state.for_each_around(EntityID::Player(pc_id), |c| {
+            c.send_packet(P_FE2CL_NANO_ACTIVE, &bcast);
+        });
     }
 
     client.send_packet(P_FE2CL_REP_NANO_EQUIP_SUCC, &resp);
@@ -91,11 +89,9 @@ pub fn nano_unequip(
             iConditionBitFlag: player.get_condition_bit_flag(),
             eCSTB___Add: 0,
         };
-        state
-            .entity_map
-            .for_each_around(EntityID::Player(pc_id), |c| {
-                c.send_packet(P_FE2CL_NANO_ACTIVE, &bcast);
-            });
+        state.for_each_around(EntityID::Player(pc_id), |c| {
+            c.send_packet(P_FE2CL_NANO_ACTIVE, &bcast);
+        });
     }
 
     client.send_packet(P_FE2CL_REP_NANO_UNEQUIP_SUCC, &resp);
@@ -164,11 +160,9 @@ pub fn nano_active(pkt: Packet, clients: &ClientMap, state: &mut ShardServerStat
         eCSTB___Add: buff.is_some() as i32,
     };
 
-    state
-        .entity_map
-        .for_each_around(EntityID::Player(pc_id), |c| {
-            c.send_packet(P_FE2CL_NANO_ACTIVE, &bcast);
-        });
+    state.for_each_around(EntityID::Player(pc_id), |c| {
+        c.send_packet(P_FE2CL_NANO_ACTIVE, &bcast);
+    });
 
     client.send_packet(P_FE2CL_REP_NANO_ACTIVE_SUCC, &resp);
     Ok(())

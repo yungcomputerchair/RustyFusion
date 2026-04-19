@@ -20,7 +20,7 @@ pub fn trade_offer(pkt: Packet, clients: &ClientMap, state: &mut ShardServerStat
     (|| {
         let client = clients.get_sender();
         let pc_id = client.get_player_id()?;
-        state.entity_map.validate_proximity(
+        state.validate_proximity(
             &[EntityID::Player(pc_id), EntityID::Player(pkt.iID_To)],
             RANGE_INTERACT,
         )?;

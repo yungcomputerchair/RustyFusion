@@ -72,13 +72,13 @@ impl LuaUserData for EntityScriptContext {
 
             luau_method!(methods, "position" -> "Position", |_, this, ()| {
                 let state = this.state_mut();
-                let entity = state.entity_map.get_entity_raw(this.entity_id).ok_or_else(|| LuaError::runtime("Entity not found"))?;
+                let entity = state.get_entity(this.entity_id).ok_or_else(|| LuaError::runtime("Entity not found"))?;
                 Ok(entity.get_position())
             });
 
             luau_method!(methods, "level" -> "number", |_, this, ()| {
                 let state = this.state_mut();
-                let entity = state.entity_map.get_entity_raw(this.entity_id).ok_or_else(|| LuaError::runtime("Entity not found"))?;
+                let entity = state.get_entity(this.entity_id).ok_or_else(|| LuaError::runtime("Entity not found"))?;
                 if let Some(combatant) = entity.as_combatant() {
                     Ok(combatant.get_level())
                 } else {
@@ -88,7 +88,7 @@ impl LuaUserData for EntityScriptContext {
 
             luau_method!(methods, "hp" -> "number", |_, this, ()| {
                 let state = this.state_mut();
-                let entity = state.entity_map.get_entity_raw(this.entity_id).ok_or_else(|| LuaError::runtime("Entity not found"))?;
+                let entity = state.get_entity(this.entity_id).ok_or_else(|| LuaError::runtime("Entity not found"))?;
                 if let Some(combatant) = entity.as_combatant() {
                     Ok(combatant.get_hp())
                 } else {
@@ -98,7 +98,7 @@ impl LuaUserData for EntityScriptContext {
 
             luau_method!(methods, "max_hp" -> "number", |_, this, ()| {
                 let state = this.state_mut();
-                let entity = state.entity_map.get_entity_raw(this.entity_id).ok_or_else(|| LuaError::runtime("Entity not found"))?;
+                let entity = state.get_entity(this.entity_id).ok_or_else(|| LuaError::runtime("Entity not found"))?;
                 if let Some(combatant) = entity.as_combatant() {
                     Ok(combatant.get_max_hp())
                 } else {
@@ -108,7 +108,7 @@ impl LuaUserData for EntityScriptContext {
 
             luau_method!(methods, "is_dead" -> "boolean", |_, this, ()| {
                 let state = this.state_mut();
-                let entity = state.entity_map.get_entity_raw(this.entity_id).ok_or_else(|| LuaError::runtime("Entity not found"))?;
+                let entity = state.get_entity(this.entity_id).ok_or_else(|| LuaError::runtime("Entity not found"))?;
                 if let Some(combatant) = entity.as_combatant() {
                     Ok(combatant.is_dead())
                 } else {
@@ -118,20 +118,15 @@ impl LuaUserData for EntityScriptContext {
 
             luau_method!(methods, "reset" -> "()", |_, this, ()| {
                 let state = this.state_mut();
-                // Use raw pointer to avoid creating a second &mut reference
-                // to the entity during tick() (which already holds one via raw ptr).
-                let entity_ptr = state.entity_map.get_entity_raw_ptr(this.entity_id)
-                    .ok_or_else(|| LuaError::runtime("Entity not found"))?;
-                let entity = unsafe { &mut *entity_ptr };
-                if let Some(combatant) = entity.as_combatant_mut() {
-                    combatant.reset();
-                }
+                let combatant = state.get_combatant_mut(this.entity_id)
+                    .map_err(|_| LuaError::runtime("Entity not found"))?;
+                combatant.reset();
                 Ok(())
             });
 
             luau_method!(methods, "target" -> "Entity?", |_, this, ()| {
                 let state = this.state_mut();
-                let entity = state.entity_map.get_entity_raw(this.entity_id).ok_or_else(|| LuaError::runtime("Entity not found"))?;
+                let entity = state.get_entity(this.entity_id).ok_or_else(|| LuaError::runtime("Entity not found"))?;
                 if let Some(combatant) = entity.as_combatant() {
                     Ok(combatant.get_target().map(|target_id| EntityScriptContext::new(target_id, state)))
                 } else {
@@ -141,30 +136,25 @@ impl LuaUserData for EntityScriptContext {
 
             luau_method!(methods, "apply_buff" -> "boolean", |_, this, (buff_id, values, duration, source): (i32, Vec<i32>, Option<f32>, Option<EntityScriptContext>)| {
                 let state = this.state_mut();
-                // Use raw pointer to avoid creating a second &mut reference
-                // to the entity during tick() (which already holds one via raw ptr).
-                let entity_ptr = state.entity_map.get_entity_raw_ptr(this.entity_id)
-                    .ok_or_else(|| LuaError::runtime("Entity not found"))?;
-                let entity = unsafe { &mut *entity_ptr };
-                if let Some(combatant) = entity.as_combatant_mut() {
-                    let buff_id: BuffID = buff_id.try_into().map_err(|_| LuaError::runtime(format!("Invalid buff ID: {}", buff_id)))?;
-                    let value = values.first().cloned().unwrap_or(0);
-                    let sub_value = values.get(1).cloned();
-                    let special_value = values.get(2).cloned();
-                    let duration = duration.map(Duration::from_secs_f32);
-                    let buff = BuffInstance::new(BuffType::Shiny, value, sub_value, special_value, duration);
-                    combatant.apply_buff(buff_id, buff, source.map(|s| s.entity_id));
-                    Ok(true)
-                } else {
-                    Ok(false)
-                }
+                let combatant = match state.get_combatant_mut(this.entity_id) {
+                    Ok(c) => c,
+                    Err(_) => return Ok(false),
+                };
+                let buff_id: BuffID = buff_id.try_into().map_err(|_| LuaError::runtime(format!("Invalid buff ID: {}", buff_id)))?;
+                let value = values.first().cloned().unwrap_or(0);
+                let sub_value = values.get(1).cloned();
+                let special_value = values.get(2).cloned();
+                let duration = duration.map(Duration::from_secs_f32);
+                let buff = BuffInstance::new(BuffType::Shiny, value, sub_value, special_value, duration);
+                combatant.apply_buff(buff_id, buff, source.map(|s| s.entity_id));
+                Ok(true)
             });
 
             // Helpers
 
             luau_method!(methods, "distance_to" -> "number", |_, this, (x, y, z): (i32, i32, i32)| {
                 let state = this.state_mut();
-                let entity = state.entity_map.get_entity_raw(this.entity_id).ok_or_else(|| LuaError::runtime("Entity not found"))?;
+                let entity = state.get_entity(this.entity_id).ok_or_else(|| LuaError::runtime("Entity not found"))?;
                 let pos = entity.get_position();
                 let target = Position { x, y, z };
                 Ok(pos.distance_to(&target))
@@ -172,8 +162,8 @@ impl LuaUserData for EntityScriptContext {
 
             luau_method!(methods, "distance_to_entity" -> "number", |_, this, target: EntityScriptContext| {
                 let state = this.state_mut();
-                let entity = state.entity_map.get_entity_raw(this.entity_id).ok_or_else(|| LuaError::runtime("Entity not found"))?;
-                let target_entity = state.entity_map.get_entity_raw(target.entity_id).ok_or_else(|| LuaError::runtime("Target entity not found"))?;
+                let entity = state.get_entity(this.entity_id).ok_or_else(|| LuaError::runtime("Entity not found"))?;
+                let target_entity = state.get_entity(target.entity_id).ok_or_else(|| LuaError::runtime("Target entity not found"))?;
                 let pos = entity.get_position();
                 let target_pos = target_entity.get_position();
                 Ok(pos.distance_to(&target_pos))
@@ -187,8 +177,7 @@ impl LuaUserData for EntityScriptContext {
         methods.add_meta_method(LuaMetaMethod::ToString, |_, this, ()| {
             let state = this.state_mut();
             let entity = state
-                .entity_map
-                .get_entity_raw(this.entity_id)
+                .get_entity(this.entity_id)
                 .ok_or_else(|| LuaError::runtime("Entity not found"))?;
             Ok(format!("{}", entity))
         });

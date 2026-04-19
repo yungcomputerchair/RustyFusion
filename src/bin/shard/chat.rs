@@ -82,11 +82,9 @@ pub async fn send_freechat_message(
             );
         }
 
-        state
-            .entity_map
-            .for_each_around(EntityID::Player(pc_id), |client| {
-                client.send_packet(P_FE2CL_REP_SEND_FREECHAT_MESSAGE_SUCC, &resp);
-            });
+        state.for_each_around(EntityID::Player(pc_id), |client| {
+            client.send_packet(P_FE2CL_REP_SEND_FREECHAT_MESSAGE_SUCC, &resp);
+        });
         Ok(())
     })
     .await
@@ -144,11 +142,9 @@ pub fn send_menuchat_message(
             szFreeChat: pkt.szFreeChat,
             iEmoteCode: pkt.iEmoteCode,
         };
-        state
-            .entity_map
-            .for_each_around(EntityID::Player(pc_id), |client| {
-                client.send_packet(P_FE2CL_REP_SEND_MENUCHAT_MESSAGE_SUCC, &resp);
-            });
+        state.for_each_around(EntityID::Player(pc_id), |client| {
+            client.send_packet(P_FE2CL_REP_SEND_MENUCHAT_MESSAGE_SUCC, &resp);
+        });
         Ok(())
     })()
     .catch_fail(|| {
@@ -216,8 +212,7 @@ pub fn send_group_freechat_message(
     if let Some(group_id) = player.group_id {
         let group = state.groups.get(&group_id).unwrap();
         for eid in group.get_member_ids() {
-            let entity = state.entity_map.get_entity_raw(*eid).unwrap();
-            if let Some(client) = entity.get_client() {
+            if let Some(client) = state.get_client_for(*eid) {
                 client.send_packet(P_FE2CL_REP_SEND_ALL_GROUP_FREECHAT_MESSAGE_SUCC, &pkt);
             }
         }
@@ -270,8 +265,7 @@ pub fn send_group_menuchat_message(
     if let Some(group_id) = player.group_id {
         let group = state.groups.get(&group_id).unwrap();
         for eid in group.get_member_ids() {
-            let entity = state.entity_map.get_entity_raw(*eid).unwrap();
-            if let Some(client) = entity.get_client() {
+            if let Some(client) = state.get_client_for(*eid) {
                 client.send_packet(P_FE2CL_REP_SEND_ALL_GROUP_MENUCHAT_MESSAGE_SUCC, &pkt);
             }
         }
@@ -469,11 +463,9 @@ pub fn pc_avatar_emotes_chat(
         iEmoteCode: pkt.iEmoteCode,
     };
 
-    state
-        .entity_map
-        .for_each_around(EntityID::Player(pc_id), |client| {
-            client.send_packet(P_FE2CL_REP_PC_AVATAR_EMOTES_CHAT, &resp);
-        });
+    state.for_each_around(EntityID::Player(pc_id), |client| {
+        client.send_packet(P_FE2CL_REP_PC_AVATAR_EMOTES_CHAT, &resp);
+    });
 
     Ok(())
 }
@@ -1167,12 +1159,10 @@ mod commands {
             let chunk_coords = player.get_chunk_coords();
 
             // remove from chunk completely; pulls all entities out of view
-            state.entity_map.update(EntityID::Player(pc_id), None, true);
+            state.update_entity_chunk(EntityID::Player(pc_id), None);
 
             // re-add to chunk; pushes all entities back into view
-            state
-                .entity_map
-                .update(EntityID::Player(pc_id), Some(chunk_coords), true);
+            state.update_entity_chunk(EntityID::Player(pc_id), Some(chunk_coords));
 
             Ok(())
         })

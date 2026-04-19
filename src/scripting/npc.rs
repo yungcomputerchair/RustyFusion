@@ -195,7 +195,7 @@ impl LuaUserData for NpcScriptContext {
             luau_method!(methods, "move_toward_entity" -> "()", |_, this, (target, speed): (EntityScriptContext, Option<i32>)| {
                 let npc = this.npc_mut();
                 let state = this.state_mut();
-                let target_pos = match state.entity_map.get_entity_raw(target.id()) {
+                let target_pos = match state.get_entity(target.id()) {
                     Some(entity) => entity.get_position(),
                     None => return Err(LuaError::runtime("Entity not found")),
                 };
@@ -257,7 +257,7 @@ impl LuaUserData for NpcScriptContext {
             luau_method!(methods, "despawn" -> "()", |_, this, ()| {
                 let npc = this.npc();
                 let state = this.state_mut();
-                state.entity_map.update(npc.get_id(), None, true);
+                state.update_entity_chunk(npc.get_id(), None);
                 if npc.summoned {
                     state.entity_map.mark_for_cleanup(npc.get_id());
                 }
@@ -270,7 +270,7 @@ impl LuaUserData for NpcScriptContext {
                 npc.reset();
                 npc.set_position(npc.spawn_position);
                 let chunk_pos = npc.get_chunk_coords();
-                state.entity_map.update(npc.get_id(), Some(chunk_pos), true);
+                state.update_entity_chunk(npc.get_id(), Some(chunk_pos));
                 Ok(())
             });
 
@@ -294,7 +294,7 @@ impl LuaUserData for NpcScriptContext {
                     .get_npc_stats(npc.ty)
                     .map_err(|e| LuaError::runtime(e.to_string()))?;
                 let attack_range = stats.attack_range + stats.radius;
-                let target = match state.entity_map.get_entity_raw(target_id) {
+                let target = match state.get_entity(target_id) {
                     Some(entity) => entity,
                     None => return Ok(false),
                 };
@@ -311,7 +311,7 @@ impl LuaUserData for NpcScriptContext {
                 let mut nearest_dist = u32::MAX;
 
                 for eid in state.entity_map.get_around_entity(npc.get_id()) {
-                    let entity = match state.entity_map.get_entity_raw(eid) {
+                    let entity = match state.get_entity(eid) {
                         Some(e) => e,
                         None => continue,
                     };
@@ -387,7 +387,7 @@ impl LuaUserData for NpcScriptContext {
                 let mut idx = 1;
 
                 for eid in state.entity_map.get_around_entity(npc.get_id()) {
-                    let entity = match state.entity_map.get_entity_raw(eid) {
+                    let entity = match state.get_entity(eid) {
                         Some(e) => e,
                         None => continue,
                     };

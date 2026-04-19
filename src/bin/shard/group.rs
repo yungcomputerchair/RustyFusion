@@ -132,8 +132,7 @@ pub fn pc_group_join(
 
         if let Some(pkt) = log_if_failed(pkt.build()) {
             for eid in group.get_member_ids() {
-                let entity = state.entity_map.get_entity_raw(*eid).unwrap();
-                if let Some(client) = entity.get_client() {
+                if let Some(client) = state.get_client_for(*eid) {
                     client.send_payload(pkt.clone());
                 }
             }
@@ -241,8 +240,7 @@ pub fn npc_group_invite(
 
     if let Some(pkt) = log_if_failed(pkt.build()) {
         for eid in group.get_member_ids() {
-            let entity = state.entity_map.get_entity_raw(*eid).unwrap();
-            if let Some(client) = entity.get_client() {
+            if let Some(client) = state.get_client_for(*eid) {
                 client.send_payload(pkt.clone());
             }
         }

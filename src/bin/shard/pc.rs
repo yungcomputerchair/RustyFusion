@@ -190,7 +190,9 @@ pub async fn pc_enter(
     );
 
     let player_uid = player.get_uid();
-    state.entity_map.track(Box::new(player), TickMode::Always);
+    let eid = EntityID::Player(pc_id);
+    state.players.insert(pc_id, player);
+    state.entity_map.track(eid, TickMode::Always);
     state.player_uid_to_id.insert(player_uid, pc_id);
 
     clients
@@ -242,7 +244,7 @@ pub fn pc_loading_complete(
     let player = state.get_player(pc_id)?;
     let map_num = player.instance_id.map_num;
     let chunk = player.get_chunk_coords();
-    state.entity_map.update(player.get_id(), Some(chunk), true);
+    state.update_entity_chunk(player.get_id(), Some(chunk));
     let client = clients.get_sender();
     client.send_packet(P_FE2CL_REP_PC_LOADING_COMPLETE_SUCC, &resp);
 
@@ -336,18 +338,16 @@ pub fn pc_move(
         iSvrTime: util::get_timestamp_ms(time),
     };
 
-    state
-        .entity_map
-        .for_each_around(EntityID::Player(pc_id), |client| {
-            client.send_packet(P_FE2CL_PC_MOVE, &resp);
-        });
+    state.for_each_around(EntityID::Player(pc_id), |client| {
+        client.send_packet(P_FE2CL_PC_MOVE, &resp);
+    });
 
     let player = state.get_player_mut(pc_id)?;
     let entity_id = player.get_id();
     player.set_position(pos);
     player.set_rotation(angle);
     let chunk = player.get_chunk_coords();
-    state.entity_map.update(entity_id, Some(chunk), true);
+    state.update_entity_chunk(entity_id, Some(chunk));
     Ok(())
 }
 
@@ -385,18 +385,16 @@ pub fn pc_jump(
         iSvrTime: util::get_timestamp_ms(time),
     };
 
-    state
-        .entity_map
-        .for_each_around(EntityID::Player(pc_id), |client| {
-            client.send_packet(P_FE2CL_PC_JUMP, &resp);
-        });
+    state.for_each_around(EntityID::Player(pc_id), |client| {
+        client.send_packet(P_FE2CL_PC_JUMP, &resp);
+    });
 
     let player = state.get_player_mut(pc_id)?;
     let entity_id = player.get_id();
     player.set_position(pos);
     player.set_rotation(angle);
     let chunk = player.get_chunk_coords();
-    state.entity_map.update(entity_id, Some(chunk), true);
+    state.update_entity_chunk(entity_id, Some(chunk));
 
     Ok(())
 }
@@ -427,17 +425,15 @@ pub fn pc_stop(
         iSvrTime: util::get_timestamp_ms(time),
     };
 
-    state
-        .entity_map
-        .for_each_around(EntityID::Player(pc_id), |client| {
-            client.send_packet(P_FE2CL_PC_STOP, &resp);
-        });
+    state.for_each_around(EntityID::Player(pc_id), |client| {
+        client.send_packet(P_FE2CL_PC_STOP, &resp);
+    });
 
     let player = state.get_player_mut(pc_id)?;
     let entity_id = player.get_id();
     player.set_position(pos);
     let chunk = player.get_chunk_coords();
-    state.entity_map.update(entity_id, Some(chunk), true);
+    state.update_entity_chunk(entity_id, Some(chunk));
 
     Ok(())
 }
@@ -481,11 +477,9 @@ pub fn pc_movetransportation(
         iSvrTime: util::get_timestamp_ms(time),
     };
 
-    state
-        .entity_map
-        .for_each_around(EntityID::Player(pc_id), |client| {
-            client.send_packet(P_FE2CL_PC_MOVETRANSPORTATION, &resp);
-        });
+    state.for_each_around(EntityID::Player(pc_id), |client| {
+        client.send_packet(P_FE2CL_PC_MOVETRANSPORTATION, &resp);
+    });
 
     let player = state.get_player_mut(pc_id)?;
 
@@ -495,7 +489,7 @@ pub fn pc_movetransportation(
     player.set_position(pos);
     player.set_rotation(angle);
     let chunk = player.get_chunk_coords();
-    state.entity_map.update(entity_id, Some(chunk), true);
+    state.update_entity_chunk(entity_id, Some(chunk));
     Ok(())
 }
 
@@ -629,11 +623,9 @@ pub fn pc_special_state_switch(
         iReqSpecialStateFlag: pkt.iSpecialStateFlag,
         iSpecialState: special_state_flags,
     };
-    state
-        .entity_map
-        .for_each_around(EntityID::Player(pc_id), |c| {
-            c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
-        });
+    state.for_each_around(EntityID::Player(pc_id), |c| {
+        c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
+    });
 
     client.send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp);
     Ok(())
@@ -660,11 +652,9 @@ pub fn pc_combat_begin_end(
         iReqSpecialStateFlag: CN_SPECIAL_STATE_FLAG__COMBAT as i8,
         iSpecialState: special_state_flags,
     };
-    state
-        .entity_map
-        .for_each_around(EntityID::Player(pc_id), |c| {
-            c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
-        });
+    state.for_each_around(EntityID::Player(pc_id), |c| {
+        c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
+    });
     Ok(())
 }
 
@@ -746,19 +736,15 @@ pub fn pc_regen(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
     };
     client.send_packet(P_FE2CL_REP_PC_REGEN_SUCC, &resp);
     if let Some(new_chunk) = new_chunk_coords {
-        state
-            .entity_map
-            .update(EntityID::Player(pc_id), Some(new_chunk), true);
+        state.update_entity_chunk(EntityID::Player(pc_id), Some(new_chunk));
     }
 
     let bcast = sP_FE2CL_PC_REGEN {
         PCRegenDataForOtherPC: regen_data_bcast,
     };
-    state
-        .entity_map
-        .for_each_around(EntityID::Player(pc_id), |c| {
-            c.send_packet(P_FE2CL_PC_REGEN, &bcast);
-        });
+    state.for_each_around(EntityID::Player(pc_id), |c| {
+        c.send_packet(P_FE2CL_PC_REGEN, &bcast);
+    });
     Ok(())
 }
 
@@ -887,9 +873,7 @@ pub fn pc_warp_channel(
         let resp = sP_FE2CL_REP_PC_WARP_CHANNEL_SUCC { UNUSED: unused!() };
         client.send_packet(P_FE2CL_REP_PC_WARP_CHANNEL_SUCC, &resp);
 
-        state
-            .entity_map
-            .update(EntityID::Player(pc_id), Some(chunk_coords), true);
+        state.update_entity_chunk(EntityID::Player(pc_id), Some(chunk_coords));
 
         Ok(())
     })()

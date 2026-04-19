@@ -51,7 +51,7 @@ pub fn item_move(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState)
 
     let entity_id = player.get_id();
     if location_from == ItemLocation::Equip {
-        state.entity_map.for_each_around(entity_id, |c| {
+        state.for_each_around(entity_id, |c| {
             let pkt = sP_FE2CL_PC_EQUIP_CHANGE {
                 iPC_ID: pc_id,
                 iEquipSlotNum: pkt.iFromSlotNum,
@@ -63,7 +63,7 @@ pub fn item_move(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState)
     }
 
     if location_to == ItemLocation::Equip {
-        state.entity_map.for_each_around(entity_id, |c| {
+        state.for_each_around(entity_id, |c| {
             let pkt = sP_FE2CL_PC_EQUIP_CHANGE {
                 iPC_ID: pc_id,
                 iEquipSlotNum: pkt.iToSlotNum,
@@ -675,7 +675,7 @@ mod helpers {
              * On top of that, there may exist multiple NPCs with the same type... so if
              * one of them is close enough, we'll accept it.
              */
-            let npc_ids = state.entity_map.find_npcs(|n| n.ty == vendor_id);
+            let npc_ids = state.find_npcs(|n| n.ty == vendor_id);
             for npc_id in npc_ids {
                 if validate_vendor(client, state, npc_id, vendor_id).is_ok() {
                     return Ok(());
@@ -697,7 +697,6 @@ mod helpers {
                 ));
             }
             state
-                .entity_map
                 .validate_proximity(
                     &[EntityID::Player(pc_id), EntityID::NPC(npc_id)],
                     RANGE_INTERACT,

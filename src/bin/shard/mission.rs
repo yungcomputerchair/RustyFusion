@@ -45,7 +45,7 @@ pub fn task_start(pkt: Packet, client: &FFClient, state: &mut ShardServerState) 
                     ),
                 ));
             }
-            state.entity_map.validate_proximity(
+            state.validate_proximity(
                 &[EntityID::Player(pc_id), EntityID::NPC(req_npc_id)],
                 RANGE_INTERACT,
             )?;
@@ -352,7 +352,7 @@ pub fn task_end(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
                     ),
                 ));
             }
-            state.entity_map.validate_proximity(
+            state.validate_proximity(
                 &[EntityID::Player(pc_id), EntityID::NPC(target_npc_id)],
                 match task_def.task_type {
                     TaskType::Talk => RANGE_INTERACT,
@@ -598,11 +598,9 @@ pub fn task_end(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
                             iPC_ID: pc_id,
                             iPC_Level: new_level,
                         };
-                        state
-                            .entity_map
-                            .for_each_around(EntityID::Player(pc_id), |c| {
-                                c.send_packet(P_FE2CL_REP_PC_CHANGE_LEVEL, &bcast)
-                            });
+                        state.for_each_around(EntityID::Player(pc_id), |c| {
+                            c.send_packet(P_FE2CL_REP_PC_CHANGE_LEVEL, &bcast)
+                        });
                     }
                     Err(e) => log_error(e),
                 }

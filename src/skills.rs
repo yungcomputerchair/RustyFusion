@@ -597,7 +597,7 @@ pub fn do_basic_attack(
         None
     };
 
-    state.entity_map.for_each_around(attacker_id, |c| {
+    state.for_each_around(attacker_id, |c| {
         if let Some(pkt) = &pc_bcast {
             c.send_payload(pkt.clone());
         }

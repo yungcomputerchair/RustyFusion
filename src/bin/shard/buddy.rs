@@ -53,7 +53,7 @@ pub fn request_make_buddy(
     let buddy_id = pkt.iBuddyID;
     let buddy_uid = pkt.iBuddyPCUID;
 
-    state.entity_map.validate_proximity(
+    state.validate_proximity(
         &[EntityID::Player(pc_id), EntityID::Player(buddy_id)],
         RANGE_INTERACT,
     )?;
@@ -466,7 +466,7 @@ pub fn pc_buddy_warp(
         player.buddy_warp_available_at =
             Some(util::get_timestamp_sec(SystemTime::now()) + BUDDYWARP_INTERVAL);
 
-        state.entity_map.update(EntityID::Player(pc_id), None, true);
+        state.update_entity_chunk(EntityID::Player(pc_id), None);
 
         // this packet in client code seems to just leave group
         let same_shard_succ_pkt = sP_FE2CL_REP_PC_BUDDY_WARP_SAME_SHARD_SUCC { UNUSED: 0 };

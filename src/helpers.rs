@@ -20,11 +20,9 @@ pub fn broadcast_state(pc_id: i32, player_sbf: i8, state: &mut ShardServerState)
         iPC_ID: pc_id,
         iState: player_sbf,
     };
-    state
-        .entity_map
-        .for_each_around(EntityID::Player(pc_id), |client| {
-            client.send_packet(P_FE2CL_PC_STATE_CHANGE, &bcast);
-        });
+    state.for_each_around(EntityID::Player(pc_id), |client| {
+        client.send_packet(P_FE2CL_PC_STATE_CHANGE, &bcast);
+    });
 }
 
 pub fn broadcast_monkey(pc_id: i32, ride_type: RideType, state: &mut ShardServerState) {
@@ -51,12 +49,10 @@ pub fn broadcast_monkey(pc_id: i32, ride_type: RideType, state: &mut ShardServer
     let client = player.get_client().unwrap();
     client.send_packet(P_FE2CL_REP_PC_RIDING_SUCC, &pkt_monkey);
     client.send_packet(P_FE2CL_REP_NANO_ACTIVE_SUCC, &pkt_nano);
-    state
-        .entity_map
-        .for_each_around(EntityID::Player(pc_id), |c| {
-            c.send_packet(P_FE2CL_PC_RIDING, &pkt_monkey);
-            c.send_packet(P_FE2CL_NANO_ACTIVE, &pkt_nano_bcast);
-        });
+    state.for_each_around(EntityID::Player(pc_id), |c| {
+        c.send_packet(P_FE2CL_PC_RIDING, &pkt_monkey);
+        c.send_packet(P_FE2CL_NANO_ACTIVE, &pkt_nano_bcast);
+    });
 }
 
 pub fn remove_group_member(
@@ -72,8 +68,7 @@ pub fn remove_group_member(
         // (except the leaver; that is the caller's job)
         let leaver_pkt = sP_FE2CL_PC_GROUP_LEAVE_SUCC { UNUSED: unused!() };
         for eid in group.get_member_ids() {
-            let entity = state.entity_map.get_entity_raw(*eid).unwrap();
-            if let Some(client) = entity.get_client() {
+            if let Some(client) = state.get_client_for(*eid) {
                 client.send_packet(P_FE2CL_PC_GROUP_LEAVE_SUCC, &leaver_pkt);
             }
             match eid {
@@ -112,8 +107,7 @@ pub fn remove_group_member(
 
             if let Some(update_pkt) = log_if_failed(update_pkt.build()) {
                 for eid in group.get_member_ids() {
-                    let entity = state.entity_map.get_entity_raw(*eid).unwrap();
-                    if let Some(client) = entity.get_client() {
+                    if let Some(client) = state.get_client_for(*eid) {
                         client.send_payload(update_pkt.clone());
                     }
                 }
@@ -138,8 +132,7 @@ pub fn remove_group_member(
 
             if let Some(update_pkt) = log_if_failed(update_pkt.build()) {
                 for eid in group.get_member_ids() {
-                    let entity = state.entity_map.get_entity_raw(*eid).unwrap();
-                    if let Some(client) = entity.get_client() {
+                    if let Some(client) = state.get_client_for(*eid) {
                         client.send_payload(update_pkt.clone());
                     }
                 }

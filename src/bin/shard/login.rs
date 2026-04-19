@@ -577,7 +577,7 @@ pub async fn login_buddy_warp_succ(pkt: Packet, state: &mut ShardServerState) ->
         let db = db_get();
         log_if_failed(db.save_player(&player_saved).await);
 
-        state.entity_map.update(EntityID::Player(pc_id), None, true);
+        state.update_entity_chunk(EntityID::Player(pc_id), None);
 
         let other_shard_succ_pkt = sP_FE2CL_REP_PC_BUDDY_WARP_OTHER_SHARD_SUCC {
             iBuddyPCUID: pkt.iBuddyPCUID,

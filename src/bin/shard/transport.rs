@@ -23,8 +23,7 @@ pub fn regist_transportation_location(
             let npc = state.get_npc(pkt.iNPC_ID)?;
             let npc_type = npc.ty;
             state
-                .entity_map
-                .validate_proximity(&[EntityID::Player(pc_id), npc.get_id()], RANGE_INTERACT)?;
+        .validate_proximity(&[EntityID::Player(pc_id), npc.get_id()], RANGE_INTERACT)?;
 
             let player = state.get_player_mut(pc_id)?;
             let transport_type: TransportationType = pkt.eTT.try_into()?;
@@ -98,9 +97,7 @@ pub fn warp_use_transportation(
 
         let npc = state.get_npc(pkt.iNPC_ID)?;
         let npc_type = npc.ty;
-        state
-            .entity_map
-            .validate_proximity(&[EntityID::Player(pc_id), npc.get_id()], RANGE_INTERACT)?;
+        state.validate_proximity(&[EntityID::Player(pc_id), npc.get_id()], RANGE_INTERACT)?;
 
         let player = state.get_player_mut(pc_id)?;
         let trip_id = pkt.iTransporationID;
@@ -375,7 +372,6 @@ mod helpers {
             // but we don't need to check anyway since it's a special case
             if npc.ty != TYPE_TIME_MACHINE {
                 state
-                    .entity_map
                     .validate_proximity(&[EntityID::Player(pc_id), npc.get_id()], RANGE_INTERACT)?;
             }
         }
@@ -548,7 +544,7 @@ mod helpers {
 
             // we remove the player from the chunk here and wait for PC_LOADING_COMPLETE to put them back.
             // it needs to be done this way or the client will miss the PC/NPC_ENTER packets.
-            state.entity_map.update(EntityID::Player(pc_id), None, true);
+            state.update_entity_chunk(EntityID::Player(pc_id), None);
         }
 
         Ok(item_consumed)

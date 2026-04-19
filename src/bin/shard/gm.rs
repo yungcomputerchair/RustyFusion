@@ -4,7 +4,7 @@ use std::{
 };
 
 use rusty_fusion::{
-    chunk::{EntityMap, InstanceID, TickMode},
+    chunk::{InstanceID, TickMode},
     defines::*,
     entity::{Combatant, Egg, Entity, EntityID, PlayerSearchQuery, NPC},
     enums::*,
@@ -145,11 +145,9 @@ pub fn gm_pc_give_nano(
             iPC_Level: new_level,
         };
 
-        state
-            .entity_map
-            .for_each_around(EntityID::Player(pc_id), |c| {
-                c.send_packet(P_FE2CL_REP_PC_CHANGE_LEVEL, &bcast);
-            });
+        state.for_each_around(EntityID::Player(pc_id), |c| {
+            c.send_packet(P_FE2CL_REP_PC_CHANGE_LEVEL, &bcast);
+        });
         Ok(())
     })()
     .catch_fail(|| {
@@ -183,7 +181,7 @@ pub fn gm_pc_goto(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState
 
     let taros = player.get_taros();
 
-    state.entity_map.update(EntityID::Player(pc_id), None, true);
+    state.update_entity_chunk(EntityID::Player(pc_id), None);
 
     // sP_FE2CL_REP_PC_GOTO_SUCC doesn't reset the clientside instance state,
     // but we need that to happen so we use the NPC warp packet instead
@@ -239,11 +237,9 @@ pub fn gm_pc_special_state_switch(
         iReqSpecialStateFlag: pkt.iSpecialStateFlag,
         iSpecialState: special_state_flags,
     };
-    state
-        .entity_map
-        .for_each_around(EntityID::Player(pkt.iPC_ID), |c| {
-            c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
-        });
+    state.for_each_around(EntityID::Player(pkt.iPC_ID), |c| {
+        c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
+    });
 
     client.send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp);
     Ok(())
@@ -307,14 +303,11 @@ pub fn gm_pc_announce(
 
     match area_type {
         AreaType::Local => {
-            state
-                .entity_map
-                .for_each_around(EntityID::Player(pc_id), |c| {
-                    c.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
-                });
+            state.for_each_around(EntityID::Player(pc_id), |c| {
+                c.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
+            });
         }
         AreaType::Channel => state
-            .entity_map
             .find_players(|p| p.instance_id.channel_num == player.instance_id.channel_num)
             .iter()
             .for_each(|pc_id| {
@@ -322,15 +315,11 @@ pub fn gm_pc_announce(
                 let client = player.get_client().unwrap();
                 client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
             }),
-        AreaType::Shard => state
-            .entity_map
-            .find_players(|_| true)
-            .iter()
-            .for_each(|pc_id| {
-                let player = state.get_player(*pc_id).unwrap();
-                let client = player.get_client().unwrap();
-                client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
-            }),
+        AreaType::Shard => state.find_players(|_| true).iter().for_each(|pc_id| {
+            let player = state.get_player(*pc_id).unwrap();
+            let client = player.get_client().unwrap();
+            client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
+        }),
         AreaType::Global => {
             if let Some(login_server) = clients.get_login_server() {
                 login_server.send_packet(P_FE2LS_ANNOUNCE_MSG, &pkt);
@@ -466,11 +455,9 @@ pub fn gm_target_pc_special_state_onoff(
         iSpecialState: special_state_flags,
     };
 
-    state
-        .entity_map
-        .for_each_around(EntityID::Player(pc_id), |c| {
-            c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
-        });
+    state.for_each_around(EntityID::Player(pc_id), |c| {
+        c.send_packet(P_FE2CL_PC_SPECIAL_STATE_CHANGE, &resp);
+    });
 
     client.send_packet(P_FE2CL_REP_PC_SPECIAL_STATE_SWITCH_SUCC, &resp);
 
@@ -572,9 +559,7 @@ pub fn gm_target_pc_teleport(
     client.send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp);
 
     // see transport::helpers::do_warp to see why we use None for the chunk here
-    state
-        .entity_map
-        .update(EntityID::Player(target_pc_id), None, true);
+    state.update_entity_chunk(EntityID::Player(target_pc_id), None);
 
     Ok(())
 }
@@ -696,8 +681,10 @@ pub fn gm_shiny_summon(
     let egg_id = entity_map.gen_next_egg_id();
     let egg = Egg::new(egg_id, egg_type, egg_pos, egg_instance_id, true);
     let chunk_coords = egg.get_chunk_coords();
-    let eid = entity_map.track(Box::new(egg), TickMode::Always);
-    entity_map.update(eid, Some(chunk_coords), true);
+    let eid = EntityID::Egg(egg_id);
+    state.eggs.insert(egg_id, egg);
+    state.entity_map.track(eid, TickMode::Always);
+    state.update_entity_chunk(eid, Some(chunk_coords));
     Ok(())
 }
 
@@ -718,12 +705,11 @@ pub fn gm_npc_summon(
     let spawn_angle = player.get_rotation();
     let spawn_instance_id = player.instance_id;
 
-    let entity_map = &mut state.entity_map;
     let count = pkt.iNPCCnt as usize;
     for _ in 0..count {
-        let npc_id = entity_map.gen_next_npc_id();
+        let npc_id = state.entity_map.gen_next_npc_id();
         let npc = NPC::new(npc_id, npc_type, spawn_pos, spawn_angle, spawn_instance_id).unwrap();
-        helpers::spawn_temp_npc(entity_map, npc);
+        helpers::spawn_temp_npc(state, npc);
     }
 
     Ok(())
@@ -744,14 +730,13 @@ pub fn gm_npc_group_summon(
     let spawn_instance_id = player.instance_id;
 
     let group_id = pkt.iNPCGroupType;
-    let entity_map = &mut state.entity_map;
-    let npcs = tdata_get().make_group_npcs(entity_map, unused!(), group_id);
+    let npcs = tdata_get().make_group_npcs(&mut state.entity_map, unused!(), group_id);
     for mut npc in npcs {
         npc.spawn_position = spawn_pos;
         npc.set_position(spawn_pos);
         npc.set_rotation(spawn_angle);
         npc.instance_id = spawn_instance_id;
-        helpers::spawn_temp_npc(entity_map, npc);
+        helpers::spawn_temp_npc(state, npc);
     }
 
     Ok(())
@@ -810,20 +795,24 @@ mod helpers {
         FFError::build(Severity::Warning, err_msg)
     }
 
-    pub fn spawn_temp_npc(entity_map: &mut EntityMap, mut npc: NPC) {
+    pub fn spawn_temp_npc(state: &mut ShardServerState, mut npc: NPC) {
         npc.summoned = true;
         let (ai, tick_mode) = ai::make_for_npc(&npc, true);
         npc.ai = ai;
         let chunk_coords = npc.get_chunk_coords();
-        let eid = entity_map.track(Box::new(npc), tick_mode);
-        entity_map.update(eid, Some(chunk_coords), true);
+        let npc_id = npc.id;
+        let eid = EntityID::NPC(npc_id);
+        state.npcs.insert(npc_id, npc);
+        state.entity_map.track(eid, tick_mode);
+        state.update_entity_chunk(eid, Some(chunk_coords));
     }
 
     pub fn remove_temp_npc(state: &mut ShardServerState, npc_id: i32) {
-        let entity_map = &mut state.entity_map;
         let eid = EntityID::NPC(npc_id);
-        entity_map.update(eid, None, true);
-        let mut npc = entity_map.untrack(eid);
-        npc.cleanup(state)
+        state.update_entity_chunk(eid, None);
+        state.entity_map.untrack(eid);
+        if let Some(mut npc) = state.npcs.remove(&npc_id) {
+            npc.cleanup(state);
+        }
     }
 }
