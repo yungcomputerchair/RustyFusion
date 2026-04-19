@@ -120,9 +120,7 @@ impl Entity for Slider {
             let speed = path.get_speed();
             path.tick(&mut self.position);
             let chunk_pos = self.get_chunk_coords();
-            state
-                .entity_map
-                .update(self.get_id(), Some(chunk_pos), true);
+            state.update_entity_chunk(self.get_id(), Some(chunk_pos));
 
             let pkt = sP_FE2CL_TRANSPORTATION_MOVE {
                 eTT: TransportationType::Bus as i32,
@@ -133,7 +131,7 @@ impl Entity for Slider {
                 iSpeed: speed,
                 iMoveStyle: unused!(),
             };
-            state.entity_map.for_each_around(self.get_id(), |c| {
+            state.for_each_around(self.get_id(), |c| {
                 c.send_packet(P_FE2CL_TRANSPORTATION_MOVE, &pkt)
             });
         }

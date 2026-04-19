@@ -130,9 +130,7 @@ impl NPC {
             let new_angle = old_pos.angle_to(&self.position) as i32;
             self.set_rotation(util::angle_to_rotation(new_angle));
             let chunk_pos = self.get_chunk_coords();
-            state
-                .entity_map
-                .update(self.get_id(), Some(chunk_pos), true);
+            state.update_entity_chunk(self.get_id(), Some(chunk_pos));
 
             let run_speed = tdata_get().get_npc_stats(self.ty).unwrap().run_speed;
             let pkt = sP_FE2CL_NPC_MOVE {
@@ -143,9 +141,7 @@ impl NPC {
                 iSpeed: speed,
                 iMoveStyle: if speed >= run_speed { 1 } else { 0 },
             };
-            state
-                .entity_map
-                .for_each_around(self.get_id(), |c| c.send_packet(P_FE2CL_NPC_MOVE, &pkt));
+            state.for_each_around(self.get_id(), |c| c.send_packet(P_FE2CL_NPC_MOVE, &pkt));
         }
     }
 
@@ -233,13 +229,17 @@ impl Entity for NPC {
 
     fn tick(&mut self, _time: &SystemTime, state: &mut ShardServerState) {
         let pc_ids: Vec<i32> = self.interacting_pcs.iter().copied().collect();
+        let self_pos = self.get_position();
+        let self_inst = self.instance_id;
         for pc_id in pc_ids {
-            let pc_eid = EntityID::Player(pc_id);
-            if state
-                .entity_map
-                .validate_proximity(&[self.get_id(), pc_eid], RANGE_INTERACT)
-                .is_err()
-            {
+            let too_far = state
+                .get_player(pc_id)
+                .map(|p| {
+                    let p_pos = p.get_position();
+                    p.instance_id != self_inst || self_pos.distance_to(&p_pos) > RANGE_INTERACT
+                })
+                .unwrap_or(true);
+            if too_far {
                 self.interacting_pcs.remove(&pc_id);
             }
         }
@@ -253,7 +253,7 @@ impl Entity for NPC {
                 iConditionBitFlag: self.buffs.get_bit_flags(),
             };
 
-            state.entity_map.for_each_around(self.get_id(), |c| {
+            state.for_each_around(self.get_id(), |c| {
                 c.send_packet(P_FE2CL_CHAR_TIME_BUFF_TIME_OUT, &bcast)
             });
         }

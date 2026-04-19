@@ -15,7 +15,7 @@ use super::Combatant;
 
 #[derive(Debug, Clone)]
 pub struct Egg {
-    id: i32,
+    pub id: i32,
     ty: i32,
     position: Position,
     instance_id: InstanceID,
@@ -107,9 +107,7 @@ impl Entity for Egg {
         if let Some(respawn_time) = self.respawn_time {
             if time >= &respawn_time {
                 self.respawn_time = None;
-                state
-                    .entity_map
-                    .update(self.get_id(), Some(self.get_chunk_coords()), true);
+                state.update_entity_chunk(self.get_id(), Some(self.get_chunk_coords()));
             }
         }
     }

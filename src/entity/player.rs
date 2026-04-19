@@ -1322,9 +1322,9 @@ impl Player {
         state.player_uid_to_id.remove(&uid);
 
         let id = EntityID::Player(pc_id);
-        let entity_map = &mut state.entity_map;
-        entity_map.update(id, None, true);
-        let mut player = entity_map.untrack(id);
+        state.update_entity_chunk(id, None);
+        state.entity_map.untrack(id);
+        let mut player = state.players.remove(&pc_id).unwrap();
         player.cleanup(state);
         player_snapshot
     }
@@ -1371,9 +1371,7 @@ impl Player {
             // update the player's chunk.
             // We don't actually update their position until they land
             let chunk_coords = ChunkCoords::from_pos_inst(ride.monkey_pos, self.instance_id);
-            state
-                .entity_map
-                .update(EntityID::Player(pc_id), Some(chunk_coords), true);
+            state.update_entity_chunk(EntityID::Player(pc_id), Some(chunk_coords));
 
             // send the move packet
             let pkt = sP_FE2CL_PC_BROOMSTICK_MOVE {
@@ -1383,11 +1381,9 @@ impl Player {
                 iToZ: ride.monkey_pos.z,
                 iSpeed: unused!(),
             };
-            state
-                .entity_map
-                .for_each_around(EntityID::Player(pc_id), |c| {
-                    c.send_packet(PacketID::P_FE2CL_PC_BROOMSTICK_MOVE, &pkt)
-                });
+            state.for_each_around(EntityID::Player(pc_id), |c| {
+                c.send_packet(PacketID::P_FE2CL_PC_BROOMSTICK_MOVE, &pkt)
+            });
 
             // wait for the client to catch up. in theory, takes one second.
             ride.resume_time = *time + Duration::from_secs(1);
@@ -1894,7 +1890,6 @@ impl PlayerSearchQuery {
                 state.get_player_by_uid(*pc_uid).map(|p| p.get_player_id())
             }
             PlayerSearchQuery::ByName(first_name, last_name) => state
-                .entity_map
                 .find_players(|player| {
                     player.first_name.eq_ignore_ascii_case(first_name)
                         && player.last_name.eq_ignore_ascii_case(last_name)
