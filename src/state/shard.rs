@@ -3,7 +3,6 @@ use std::{
     time::SystemTime,
 };
 
-use rand::thread_rng;
 use uuid::Uuid;
 
 use crate::{
@@ -20,6 +19,7 @@ use crate::{
         packet::{PacketID::*, *},
         LoginData,
     },
+    skills::BuffEffect,
     tabledata::tdata_get,
     trade::TradeContext,
 };
@@ -34,6 +34,7 @@ pub struct ShardServerState {
     pub groups: HashMap<Uuid, Group>,
     pub player_uid_to_id: HashMap<i64, i32>,
     pub pending_entering_uids: HashSet<i64>,
+    pub pending_buff_effects: Vec<BuffEffect>,
 }
 impl Default for ShardServerState {
     fn default() -> Self {
@@ -47,6 +48,7 @@ impl Default for ShardServerState {
             groups: HashMap::new(),
             player_uid_to_id: HashMap::new(),
             pending_entering_uids: HashSet::new(),
+            pending_buff_effects: Vec::new(),
         };
 
         let num_channels = config_get().shard.num_channels.get();
@@ -321,7 +323,6 @@ impl ShardServerState {
     }
 
     pub fn tick_entities(&mut self, time: SystemTime) {
-        let mut rng = thread_rng();
         let eids: Vec<EntityID> = self.entity_map.get_tickable_ids().collect();
         for eid in eids {
             if let Some(entity_ptr) = self.entity_map.get_entity_raw_ptr(eid) {
@@ -329,7 +330,28 @@ impl ShardServerState {
                 // (e.g. update/broadcast) work normally. No other code holds a
                 // mutable reference to this specific entity during tick().
                 let entity = unsafe { &mut *entity_ptr };
-                entity.tick(&time, self, &mut rng);
+                entity.tick(&time, self);
+            }
+        }
+
+        // Process all buff effects that were generated during this tick
+        let buff_effects = std::mem::take(&mut self.pending_buff_effects);
+        for buff_effect in buff_effects {
+            match buff_effect {
+                BuffEffect::HealEntity { target, amount } => {
+                    if let Some(combatant) = log_if_failed(self.get_combatant_mut(target)) {
+                        combatant.heal(amount);
+                    }
+                }
+                BuffEffect::DamageEntity {
+                    target,
+                    source,
+                    damage,
+                } => {
+                    if let Some(combatant) = log_if_failed(self.get_combatant_mut(target)) {
+                        combatant.take_damage(damage, source);
+                    }
+                }
             }
         }
     }

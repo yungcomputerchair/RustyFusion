@@ -4,7 +4,6 @@ use std::{
     time::SystemTime,
 };
 
-use rand::rngs::ThreadRng;
 use uuid::Uuid;
 
 use crate::{
@@ -232,7 +231,7 @@ impl Entity for NPC {
         client.send_packet(P_FE2CL_NPC_EXIT, &pkt);
     }
 
-    fn tick(&mut self, _time: &SystemTime, state: &mut ShardServerState, _rng: &mut ThreadRng) {
+    fn tick(&mut self, _time: &SystemTime, state: &mut ShardServerState) {
         let pc_ids: Vec<i32> = self.interacting_pcs.iter().copied().collect();
         for pc_id in pc_ids {
             let pc_eid = EntityID::Player(pc_id);
@@ -245,14 +244,9 @@ impl Entity for NPC {
             }
         }
 
-        // since the NPC object owns the buffs, we have to swap them out,
-        // tick them, then put them back. This does not result in an extra
-        // heap allocation because HashMap doesn't allocate until its first insertion.
-        let mut buffs = std::mem::take(&mut self.buffs);
-        let updates = !buffs.tick(self).is_empty();
-        self.buffs = buffs;
-
-        if updates {
+        let mut buff_effects = Vec::new();
+        let buffs_updated = !self.buffs.tick(self.get_id(), &mut buff_effects).is_empty();
+        if buffs_updated {
             let bcast = sP_FE2CL_CHAR_TIME_BUFF_TIME_OUT {
                 eCT: CharType::NPC as i32,
                 iID: self.id,
@@ -413,6 +407,12 @@ impl Combatant for NPC {
         let init_hp = self.hp;
         self.hp = clamp_min(self.hp - damage, 0);
         init_hp - self.hp
+    }
+
+    fn heal(&mut self, amount: i32) -> i32 {
+        let init_hp = self.hp;
+        self.hp = clamp_min(self.hp + amount, self.get_max_hp());
+        self.hp - init_hp
     }
 
     fn apply_buff(

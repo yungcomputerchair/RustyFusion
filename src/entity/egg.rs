@@ -1,7 +1,5 @@
 use std::{any::Any, fmt::Display, time::SystemTime};
 
-use rand::rngs::ThreadRng;
-
 use crate::{
     chunk::{ChunkCoords, InstanceID},
     entity::{Entity, EntityID},
@@ -105,7 +103,7 @@ impl Entity for Egg {
         client.send_packet(P_FE2CL_SHINY_EXIT, &pkt);
     }
 
-    fn tick(&mut self, time: &SystemTime, state: &mut ShardServerState, _rng: &mut ThreadRng) {
+    fn tick(&mut self, time: &SystemTime, state: &mut ShardServerState) {
         if let Some(respawn_time) = self.respawn_time {
             if time >= &respawn_time {
                 self.respawn_time = None;

@@ -1,7 +1,5 @@
 use std::{any::Any, fmt::Display, time::SystemTime};
 
-use rand::rngs::ThreadRng;
-
 use crate::{
     chunk::{ChunkCoords, InstanceID},
     defines::TYPE_SLIDER,
@@ -117,7 +115,7 @@ impl Entity for Slider {
         client.send_packet(P_FE2CL_TRANSPORTATION_EXIT, &pkt);
     }
 
-    fn tick(&mut self, _time: &SystemTime, state: &mut ShardServerState, _rng: &mut ThreadRng) {
+    fn tick(&mut self, _time: &SystemTime, state: &mut ShardServerState) {
         if let Some(path) = self.path.as_mut() {
             let speed = path.get_speed();
             path.tick(&mut self.position);

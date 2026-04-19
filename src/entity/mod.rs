@@ -1,5 +1,7 @@
 use std::{any::Any, collections::HashSet, fmt::Display, time::SystemTime};
 
+use uuid::Uuid;
+
 use crate::{
     chunk::ChunkCoords,
     defines::*,
@@ -24,9 +26,7 @@ mod player;
 pub use player::*;
 
 mod slider;
-use rand::rngs::ThreadRng;
 pub use slider::*;
-use uuid::Uuid;
 
 #[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
 pub enum EntityID {
@@ -48,7 +48,7 @@ pub trait Entity: Send + Display {
     fn send_enter(&self, client: &FFClient);
     fn send_exit(&self, client: &FFClient);
 
-    fn tick(&mut self, time: &SystemTime, state: &mut ShardServerState, rng: &mut ThreadRng);
+    fn tick(&mut self, time: &SystemTime, state: &mut ShardServerState);
     fn cleanup(&mut self, state: &mut ShardServerState);
 
     fn as_combatant(&self) -> Option<&dyn Combatant>;
@@ -77,6 +77,7 @@ pub trait Combatant: Entity {
     fn get_defense(&self) -> i32;
 
     fn take_damage(&mut self, damage: i32, source: Option<EntityID>) -> i32;
+    fn heal(&mut self, amount: i32) -> i32;
     fn apply_buff(&mut self, buff_id: BuffID, buff: BuffInstance, source: Option<EntityID>)
         -> bool;
     fn remove_buff(&mut self, buff_id: BuffID, buff_type: Option<BuffType>) -> bool;

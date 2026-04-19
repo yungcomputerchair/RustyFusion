@@ -797,8 +797,6 @@ impl Chunk {
 mod tests {
     use std::{any::Any, time::SystemTime};
 
-    use rand::rngs::ThreadRng;
-
     use super::*;
     use crate::{
         entity::{Combatant, Entity, EntityID},
@@ -861,7 +859,7 @@ mod tests {
         fn set_rotation(&mut self, _: i32) {}
         fn send_enter(&self, _: &FFClient) {}
         fn send_exit(&self, _: &FFClient) {}
-        fn tick(&mut self, _: &SystemTime, _: &mut ShardServerState, _: &mut ThreadRng) {}
+        fn tick(&mut self, _: &SystemTime, _: &mut ShardServerState) {}
         fn cleanup(&mut self, _: &mut ShardServerState) {}
         fn as_combatant(&self) -> Option<&dyn Combatant> {
             None

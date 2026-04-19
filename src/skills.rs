@@ -131,6 +131,19 @@ impl From<BuffUpdate> for sP_FE2CL_PC_BUFF_UPDATE {
     }
 }
 
+#[derive(Debug)]
+pub enum BuffEffect {
+    HealEntity {
+        target: EntityID,
+        amount: i32,
+    },
+    DamageEntity {
+        target: EntityID,
+        source: Option<EntityID>,
+        damage: i32,
+    },
+}
+
 #[derive(Debug, Clone)]
 pub struct BuffInstance {
     ty: BuffType,
@@ -167,6 +180,10 @@ impl BuffInstance {
         } else {
             false
         }
+    }
+
+    fn tick(&mut self, _target: EntityID, _effects: &mut Vec<BuffEffect>) {
+        // TODO individual buff tick
     }
 
     pub fn set_source(&mut self, source: EntityID) {
@@ -209,12 +226,16 @@ impl BuffStack {
         self.buffs.iter().any(|b| b.ty == buff_type)
     }
 
-    fn tick(&mut self, buff_id: BuffID, target: &mut dyn Combatant) -> Vec<BuffUpdate> {
-        let mut updates = Vec::with_capacity(self.buffs.len());
-
+    fn tick(
+        &mut self,
+        buff_id: BuffID,
+        target: EntityID,
+        updates: &mut Vec<BuffUpdate>,
+        effects: &mut Vec<BuffEffect>,
+    ) {
         if !self.buffs.is_empty() {
             if !self.applied {
-                self.on_apply(buff_id, target);
+                self.on_stack_apply(buff_id, target);
                 self.applied = true;
                 self.changed = false;
                 updates.push(BuffUpdate::Added(
@@ -225,7 +246,7 @@ impl BuffStack {
             }
 
             if self.changed {
-                self.on_change(buff_id, target);
+                self.on_stack_change(buff_id, target);
                 self.changed = false;
                 updates.push(BuffUpdate::Changed(
                     buff_id,
@@ -234,17 +255,16 @@ impl BuffStack {
                 ));
             }
 
-            self.on_tick(buff_id, target);
+            self.on_stack_tick(buff_id, target);
+            self.buffs.iter_mut().for_each(|b| b.tick(target, effects));
             self.buffs.retain(|buff| !buff.is_expired());
         }
 
         if self.buffs.is_empty() {
-            self.on_remove(buff_id, target);
+            self.on_stack_remove(buff_id, target);
             self.remove = true;
             updates.push(BuffUpdate::Removed(buff_id));
         }
-
-        updates
     }
 
     fn get_max_value(&self) -> i32 {
@@ -283,35 +303,35 @@ impl BuffStack {
             .map(|expires| expires.duration_since(onset))
     }
 
-    fn on_apply(&mut self, buff_id: BuffID, target: &mut dyn Combatant) {
+    fn on_stack_apply(&mut self, buff_id: BuffID, target: EntityID) {
         // do stuff
         log(
             Severity::Debug,
-            &format!("Buff {:?} applied to {:?}", buff_id, target.get_id()),
+            &format!("Buff {:?} applied to {:?}", buff_id, target),
         );
     }
 
-    fn on_change(&mut self, buff_id: BuffID, target: &mut dyn Combatant) {
+    fn on_stack_change(&mut self, buff_id: BuffID, target: EntityID) {
         // do stuff
         log(
             Severity::Debug,
-            &format!("Buff {:?} changed on {:?}", buff_id, target.get_id()),
+            &format!("Buff {:?} changed on {:?}", buff_id, target),
         );
     }
 
-    fn on_remove(&mut self, buff_id: BuffID, target: &mut dyn Combatant) {
+    fn on_stack_remove(&mut self, buff_id: BuffID, target: EntityID) {
         // do stuff
         log(
             Severity::Debug,
-            &format!("Buff {:?} removed from {:?}", buff_id, target.get_id()),
+            &format!("Buff {:?} removed from {:?}", buff_id, target),
         );
     }
 
-    fn on_tick(&mut self, buff_id: BuffID, target: &mut dyn Combatant) -> bool {
+    fn on_stack_tick(&mut self, buff_id: BuffID, target: EntityID) -> bool {
         // do stuff
         log(
             Severity::Debug,
-            &format!("Buff {:?} ticked on {:?}", buff_id, target.get_id()),
+            &format!("Buff {:?} ticked on {:?}", buff_id, target),
         );
         false
     }
@@ -368,11 +388,10 @@ impl BuffContainer {
         }
     }
 
-    pub fn tick(&mut self, target: &mut dyn Combatant) -> Vec<BuffUpdate> {
+    pub fn tick(&mut self, target: EntityID, effects: &mut Vec<BuffEffect>) -> Vec<BuffUpdate> {
         let mut updates = Vec::new();
         for (buff_id, buff_stack) in self.buff_stacks.iter_mut() {
-            let stack_updates = buff_stack.tick(*buff_id, target);
-            updates.extend(stack_updates);
+            buff_stack.tick(*buff_id, target, &mut updates, effects);
         }
 
         self.buff_stacks.retain(|_, buff_stack| !buff_stack.remove);

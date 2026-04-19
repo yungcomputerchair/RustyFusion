@@ -32,7 +32,7 @@ use crate::{
     Position,
 };
 
-use rand::{rngs::ThreadRng, Rng};
+use rand::Rng;
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -1682,6 +1682,12 @@ impl Combatant for Player {
         init_hp - self.hp
     }
 
+    fn heal(&mut self, amount: i32) -> i32 {
+        let init_hp = self.hp;
+        self.hp = clamp_max(self.hp + amount, self.get_max_hp());
+        self.hp - init_hp
+    }
+
     fn apply_buff(
         &mut self,
         buff_id: BuffID,
@@ -1784,7 +1790,7 @@ impl Entity for Player {
         }
     }
 
-    fn tick(&mut self, time: &SystemTime, state: &mut ShardServerState, _rng: &mut ThreadRng) {
+    fn tick(&mut self, time: &SystemTime, state: &mut ShardServerState) {
         if self.is_dead() {
             return;
         }
@@ -1792,13 +1798,9 @@ impl Entity for Player {
         self.tick_skyway_ride(time, state);
         self.tick_missions(time, state);
 
-        // since the player object owns the buffs, we have to swap them out,
-        // tick them, then put them back. This does not result in an extra
-        // heap allocation because HashMap doesn't allocate until its first insertion.
-        let mut buffs = std::mem::take(&mut self.buffs);
-        let buff_updates = buffs.tick(self);
-        self.buffs = buffs;
-
+        let buff_updates = self
+            .buffs
+            .tick(self.get_id(), &mut state.pending_buff_effects);
         let condition_bit_flag = self.buffs.get_bit_flags();
         if let Some(client) = self.get_client() {
             for update in buff_updates {
