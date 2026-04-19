@@ -365,9 +365,8 @@ impl ScriptingEngine {
         Ok(())
     }
 
-    pub fn tick_npc(&mut self, npc: &mut NPC, state: &mut ShardServerState) {
-        let npc_id = npc.id;
-        let script_name = npc.ai.as_ref().unwrap();
+    pub fn tick_npc(&mut self, npc_id: i32, state: &mut ShardServerState) {
+        let script_name = state.get_npc(npc_id).unwrap().ai.as_ref().unwrap();
 
         // Check wait timer (skip if dead unless uninterruptible)
         if let Some(co_state) = self.coroutines.get_mut(&npc_id) {
@@ -385,7 +384,8 @@ impl ScriptingEngine {
 
         // Get or create coroutine
         if !self.coroutines.contains_key(&npc_id) {
-            if let Err(e) = self.create_coroutine(npc) {
+            let npc = state.get_npc(npc_id).unwrap();
+            if let Err(e) = self.create_coroutine(npc, script_name) {
                 log_error(e);
                 return;
             }
@@ -406,7 +406,7 @@ impl ScriptingEngine {
             return;
         }
 
-        let handle = NpcScriptContext::new(npc, state);
+        let handle = NpcScriptContext::new(npc_id, state);
         match co.resume::<LuaValue>(handle) {
             Ok(value) => {
                 let co_state = self.coroutines.get_mut(&npc_id).unwrap();
@@ -432,6 +432,7 @@ impl ScriptingEngine {
                 }
             }
             Err(e) => {
+                let npc = state.get_npc(npc_id).unwrap();
                 log_error(
                     FFError::build(
                         Severity::Warning,
@@ -443,14 +444,7 @@ impl ScriptingEngine {
         }
     }
 
-    fn create_coroutine(&mut self, npc: &NPC) -> FFResult<()> {
-        let Some(script_name) = &npc.ai else {
-            return Err(FFError::build(
-                Severity::Warning,
-                format!("NPC {} has no AI script", npc),
-            ));
-        };
-
+    fn create_coroutine(&mut self, npc: &NPC, script_name: &str) -> FFResult<()> {
         let script_key = self.scripts.get(script_name).ok_or_else(|| {
             FFError::build(
                 Severity::Warning,
@@ -488,7 +482,7 @@ impl ScriptingEngine {
         self.coroutines.insert(
             npc.id,
             NpcCoroutine {
-                script_name: script_name.clone(),
+                script_name: script_name.to_string(),
                 co_key,
                 wait_ticks: 0,
             },

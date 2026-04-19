@@ -17,36 +17,37 @@ use super::EntityScriptContext;
 /// NPC context used in Lua script. Provides NPC bindings to Lua.
 #[derive(Debug, Clone, Copy)]
 pub(super) struct NpcScriptContext {
-    npc: *mut NPC,
+    npc_id: i32,
     state: *mut ShardServerState,
 }
 impl NpcScriptContext {
-    pub(super) fn new(npc: &mut NPC, state: &mut ShardServerState) -> Self {
+    pub(super) fn new(npc_id: i32, state: &mut ShardServerState) -> Self {
         Self {
-            npc: npc as *mut NPC,
+            npc_id,
             state: state as *mut ShardServerState,
         }
     }
 
     // SAFETY: see `unsafe impl Send` below.
-
-    fn npc(&self) -> &NPC {
-        unsafe { &*self.npc }
-    }
-
-    #[allow(clippy::mut_from_ref)]
-    fn npc_mut(&self) -> &mut NPC {
-        unsafe { &mut *self.npc }
-    }
-
     #[allow(clippy::mut_from_ref)]
     fn state_mut(&self) -> &mut ShardServerState {
         unsafe { &mut *self.state }
     }
+
+    fn npc(&self) -> &NPC {
+        let state = self.state_mut();
+        state.get_npc(self.npc_id).expect("NPC not found")
+    }
+
+    #[allow(clippy::mut_from_ref)]
+    fn npc_mut(&self) -> &mut NPC {
+        let state = self.state_mut();
+        state.get_npc_mut(self.npc_id).expect("NPC not found")
+    }
 }
 
 // SAFETY: NpcScriptContext is only used within a single synchronous resume() call.
-// The pointers are guaranteed valid for that duration.
+// The state pointer is guaranteed valid for that duration.
 unsafe impl Send for NpcScriptContext {}
 
 impl FromLua for NpcScriptContext {
@@ -350,13 +351,7 @@ impl LuaUserData for NpcScriptContext {
                     _ => return Ok(None),
                 };
 
-                let state = this.state_mut();
-                let leader = match state.get_npc_mut(leader_npc_id) {
-                    Ok(npc) => npc,
-                    Err(_) => return Ok(None),
-                };
-
-                Ok(Some(NpcScriptContext::new(leader, this.state_mut())))
+                Ok(Some(NpcScriptContext::new(leader_npc_id, this.state_mut())))
             });
 
             luau_method!(methods, "get_pack_offset" -> "Position", |lua, this, ()| {
