@@ -158,15 +158,6 @@ impl EntityMap {
         }
     }
 
-    /// # Safety
-    /// The caller must ensure the returned pointer is not used to alias
-    /// with any other mutable reference to the same entity.
-    pub fn get_entity_raw_ptr(&mut self, id: EntityID) -> Option<*mut dyn Entity> {
-        self.registry
-            .get_mut(&id)
-            .map(|entry| entry.entity.as_mut() as *mut dyn Entity)
-    }
-
     pub fn get_all_ids(&self) -> impl Iterator<Item = EntityID> + '_ {
         self.registry.keys().cloned()
     }
@@ -795,8 +786,6 @@ impl Chunk {
 
 #[cfg(test)]
 mod tests {
-    use std::{any::Any, time::SystemTime};
-
     use super::*;
     use crate::{
         entity::{Combatant, Entity, EntityID},
@@ -804,6 +793,7 @@ mod tests {
         state::ShardServerState,
         Position,
     };
+    use std::any::Any;
 
     /// Minimal mock entity for testing chunk operations.
     #[derive(Debug)]
@@ -859,8 +849,7 @@ mod tests {
         fn set_rotation(&mut self, _: i32) {}
         fn send_enter(&self, _: &FFClient) {}
         fn send_exit(&self, _: &FFClient) {}
-        fn tick(&mut self, _: &SystemTime, _: &mut ShardServerState) {}
-        fn cleanup(&mut self, _: &mut ShardServerState) {}
+        fn cleanup(self: Box<Self>, _state: &mut ShardServerState) {}
         fn as_combatant(&self) -> Option<&dyn Combatant> {
             None
         }

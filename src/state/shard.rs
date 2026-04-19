@@ -281,14 +281,16 @@ impl ShardServerState {
     pub fn tick_garbage_collection(&mut self) {
         let mut removed_entities = self.entity_map.garbage_collect_instances();
         removed_entities.extend(self.entity_map.garbage_collect_entities());
-        for entity in removed_entities.iter_mut() {
+
+        let total_removed = removed_entities.len();
+        for entity in removed_entities {
             entity.cleanup(self);
         }
 
-        if !removed_entities.is_empty() {
+        if total_removed > 0 {
             log(
                 Severity::Debug,
-                &format!("Garbage collected {} entities", removed_entities.len()),
+                &format!("Garbage collected {} entities", total_removed),
             );
         }
     }
@@ -325,13 +327,7 @@ impl ShardServerState {
     pub fn tick_entities(&mut self, time: SystemTime) {
         let eids: Vec<EntityID> = self.entity_map.get_tickable_ids().collect();
         for eid in eids {
-            if let Some(entity_ptr) = self.entity_map.get_entity_raw_ptr(eid) {
-                // SAFETY: The entity stays in the registry so other operations
-                // (e.g. update/broadcast) work normally. No other code holds a
-                // mutable reference to this specific entity during tick().
-                let entity = unsafe { &mut *entity_ptr };
-                entity.tick(&time, self);
-            }
+            self.tick_entity(eid, &time);
         }
 
         // Process all buff effects that were generated during this tick
@@ -353,6 +349,15 @@ impl ShardServerState {
                     }
                 }
             }
+        }
+    }
+
+    fn tick_entity(&mut self, id: EntityID, time: &SystemTime) {
+        match id {
+            EntityID::Egg(egg_id) => Egg::tick(self, time, egg_id),
+            EntityID::Slider(slider_id) => Slider::tick(self, slider_id),
+            EntityID::NPC(npc_id) => NPC::tick(self, npc_id),
+            EntityID::Player(pc_id) => Player::tick(self, pc_id, time),
         }
     }
 }

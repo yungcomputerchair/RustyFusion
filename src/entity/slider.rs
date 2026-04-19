@@ -1,4 +1,4 @@
-use std::{any::Any, fmt::Display, time::SystemTime};
+use std::{any::Any, fmt::Display};
 
 use crate::{
     chunk::{ChunkCoords, InstanceID},
@@ -115,31 +115,7 @@ impl Entity for Slider {
         client.send_packet(P_FE2CL_TRANSPORTATION_EXIT, &pkt);
     }
 
-    fn tick(&mut self, _time: &SystemTime, state: &mut ShardServerState) {
-        if let Some(path) = self.path.as_mut() {
-            let speed = path.get_speed();
-            path.tick(&mut self.position);
-            let chunk_pos = self.get_chunk_coords();
-            state
-                .entity_map
-                .update(self.get_id(), Some(chunk_pos), true);
-
-            let pkt = sP_FE2CL_TRANSPORTATION_MOVE {
-                eTT: TransportationType::Bus as i32,
-                iT_ID: self.id,
-                iToX: self.position.x,
-                iToY: self.position.y,
-                iToZ: self.position.z,
-                iSpeed: speed,
-                iMoveStyle: unused!(),
-            };
-            state.entity_map.for_each_around(self.get_id(), |c| {
-                c.send_packet(P_FE2CL_TRANSPORTATION_MOVE, &pkt)
-            });
-        }
-    }
-
-    fn cleanup(&mut self, _state: &mut ShardServerState) {}
+    fn cleanup(self: Box<Self>, _state: &mut ShardServerState) {}
 
     fn as_combatant(&self) -> Option<&dyn Combatant> {
         None
@@ -155,5 +131,35 @@ impl Entity for Slider {
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+}
+impl Slider {
+    pub fn tick(state: &mut ShardServerState, slider_id: i32) {
+        let slider = state.get_slider_mut(slider_id).unwrap();
+        if let Some(path) = slider.path.as_mut() {
+            let speed = path.get_speed();
+            path.tick(&mut slider.position);
+            let chunk_pos = slider.get_chunk_coords();
+            state
+                .entity_map
+                .update(EntityID::Slider(slider_id), Some(chunk_pos), true);
+
+            let slider = state.get_slider(slider_id).unwrap(); // re-borrow
+            let pkt = sP_FE2CL_TRANSPORTATION_MOVE {
+                eTT: TransportationType::Bus as i32,
+                iT_ID: slider.id,
+                iToX: slider.position.x,
+                iToY: slider.position.y,
+                iToZ: slider.position.z,
+                iSpeed: speed,
+                iMoveStyle: unused!(),
+            };
+
+            state
+                .entity_map
+                .for_each_around(EntityID::Slider(slider_id), |c| {
+                    c.send_packet(P_FE2CL_TRANSPORTATION_MOVE, &pkt)
+                });
+        }
     }
 }

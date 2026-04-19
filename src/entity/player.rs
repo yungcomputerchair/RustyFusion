@@ -14,6 +14,7 @@ use crate::{
         PlayerGuide, PlayerNameStatus, RewardCategory, RewardType, RideType, TaskType,
     },
     error::{codes, log, log_if_failed, FFError, FFResult, Severity},
+    helpers,
     item::Item,
     mission::{MissionJournal, Task, TaskDefinition},
     nano::Nano,
@@ -1324,154 +1325,172 @@ impl Player {
         let id = EntityID::Player(pc_id);
         let entity_map = &mut state.entity_map;
         entity_map.update(id, None, true);
-        let mut player = entity_map.untrack(id);
+        let player = entity_map.untrack(id);
         player.cleanup(state);
         player_snapshot
     }
 
-    fn tick_skyway_ride(&mut self, time: &SystemTime, state: &mut ShardServerState) {
-        let pc_id = self.id.unwrap();
-        // Skyway ride
-        if let Some(ref mut ride) = self.skyway_ride {
-            if &ride.resume_time > time {
-                return;
-            }
-
-            if ride.path.is_done() {
-                // we're done!
-                let final_pos = ride.monkey_pos;
-                let cost = ride.trip_data.cost;
-                self.set_taros(self.taros - cost);
-                self.set_position(final_pos);
-                self.skyway_ride = None;
-                crate::helpers::broadcast_monkey(pc_id, RideType::None, state);
-                return;
-            }
-
-            // N.B. the client doesn't treat monkey movement like every other movement.
-            // instead of using the speed value from the packet, it uses the distance between the
-            // current position and the target position. so we can only send move packets once we've
-            // covered about the same distance as the speed.
-            // 100% causes the client to go too fast and pause, but 80% seems to work fine.
-            const SPEED_TO_DISTANCE_FACTOR: f32 = 1.0;
-
-            // tick the path until we've covered the same distance as the speed
-            let speed = ride.path.get_speed() as u32;
-            let distance_to_cover = (speed as f32 * SPEED_TO_DISTANCE_FACTOR) as u32;
-            let mut distance = 0;
-            while distance < distance_to_cover {
-                let old_pos = ride.monkey_pos;
-                ride.path.tick(&mut ride.monkey_pos);
-                distance += old_pos.distance_to(&ride.monkey_pos);
-                if ride.path.is_done() {
-                    break;
-                }
-            }
-
-            // update the player's chunk.
-            // We don't actually update their position until they land
-            let chunk_coords = ChunkCoords::from_pos_inst(ride.monkey_pos, self.instance_id);
-            state
-                .entity_map
-                .update(EntityID::Player(pc_id), Some(chunk_coords), true);
-
-            // send the move packet
-            let pkt = sP_FE2CL_PC_BROOMSTICK_MOVE {
-                iPC_ID: pc_id,
-                iToX: ride.monkey_pos.x,
-                iToY: ride.monkey_pos.y,
-                iToZ: ride.monkey_pos.z,
-                iSpeed: unused!(),
-            };
-            state
-                .entity_map
-                .for_each_around(EntityID::Player(pc_id), |c| {
-                    c.send_packet(PacketID::P_FE2CL_PC_BROOMSTICK_MOVE, &pkt)
-                });
-
-            // wait for the client to catch up. in theory, takes one second.
-            ride.resume_time = *time + Duration::from_secs(1);
+    fn tick_skyway_ride(
+        state: &mut ShardServerState,
+        pc_id: i32,
+        time: &SystemTime,
+        mut ride: SkywayRideState,
+    ) -> Option<SkywayRideState> {
+        if &ride.resume_time > time {
+            return Some(ride);
         }
+
+        if ride.path.is_done() {
+            // we're done!
+            let final_pos = ride.monkey_pos;
+            let cost = ride.trip_data.cost;
+            let player = state.get_player_mut(pc_id).unwrap();
+            player.set_taros(player.get_taros() - cost);
+            player.set_position(final_pos);
+            helpers::broadcast_monkey(pc_id, RideType::None, state);
+            return None;
+        }
+
+        // N.B. the client doesn't treat monkey movement like every other movement.
+        // instead of using the speed value from the packet, it uses the distance between the
+        // current position and the target position. so we can only send move packets once we've
+        // covered about the same distance as the speed.
+        // 100% causes the client to go too fast and pause, but 80% seems to work fine.
+        const SPEED_TO_DISTANCE_FACTOR: f32 = 1.0;
+
+        // tick the path until we've covered the same distance as the speed
+        let speed = ride.path.get_speed() as u32;
+        let distance_to_cover = (speed as f32 * SPEED_TO_DISTANCE_FACTOR) as u32;
+        let mut distance = 0;
+        while distance < distance_to_cover {
+            let old_pos = ride.monkey_pos;
+            ride.path.tick(&mut ride.monkey_pos);
+            distance += old_pos.distance_to(&ride.monkey_pos);
+            if ride.path.is_done() {
+                break;
+            }
+        }
+
+        // update the player's chunk.
+        // We don't actually update their position until they land
+        let player = state.get_player(pc_id).unwrap();
+        let player_eid = player.get_id();
+        let chunk_coords = ChunkCoords::from_pos_inst(ride.monkey_pos, player.instance_id);
+        state
+            .entity_map
+            .update(player_eid, Some(chunk_coords), true);
+
+        // send the move packet
+        let pkt = sP_FE2CL_PC_BROOMSTICK_MOVE {
+            iPC_ID: pc_id,
+            iToX: ride.monkey_pos.x,
+            iToY: ride.monkey_pos.y,
+            iToZ: ride.monkey_pos.z,
+            iSpeed: unused!(),
+        };
+
+        state.entity_map.for_each_around(player_eid, |c| {
+            c.send_packet(PacketID::P_FE2CL_PC_BROOMSTICK_MOVE, &pkt)
+        });
+
+        // wait for the client to catch up. in theory, takes one second.
+        ride.resume_time = *time + Duration::from_secs(1);
+        Some(ride)
     }
 
-    fn tick_missions(&mut self, time: &SystemTime, state: &mut ShardServerState) {
-        let check_task_failure = |player: &Player, task: &Task, task_def: &TaskDefinition| {
-            if task_def.obj_time_limit.is_some() {
-                match task.fail_time {
-                    Some(fail_time) => {
-                        if time > &fail_time {
-                            return Some(codes::TaskEndErr::TimeLimitExceeded);
-                        }
-                    }
-                    None => {
-                        // user re-logged; auto-fail
+    fn check_task_failure(
+        state: &ShardServerState,
+        player: &Player,
+        task: &Task,
+        task_def: &TaskDefinition,
+        time: &SystemTime,
+    ) -> Option<codes::TaskEndErr> {
+        if task_def.obj_time_limit.is_some() {
+            match task.fail_time {
+                Some(fail_time) => {
+                    if time > &fail_time {
                         return Some(codes::TaskEndErr::TimeLimitExceeded);
                     }
                 }
-            }
-
-            if let Some(req_map_num) = task_def.prereq_map_num {
-                if player.get_mapnum() != req_map_num {
-                    return Some(codes::TaskEndErr::InstanceLeft);
+                None => {
+                    // user re-logged; auto-fail
+                    return Some(codes::TaskEndErr::TimeLimitExceeded);
                 }
             }
+        }
 
-            if let Some(escort_npc_id) = task.escort_npc_id {
-                if let Ok(escort_npc) = state.get_npc(escort_npc_id) {
-                    if escort_npc.is_dead() {
-                        return Some(codes::TaskEndErr::EscortFailed);
-                    }
-                } else {
+        if let Some(req_map_num) = task_def.prereq_map_num {
+            if player.get_mapnum() != req_map_num {
+                return Some(codes::TaskEndErr::InstanceLeft);
+            }
+        }
+
+        if let Some(escort_npc_id) = task.escort_npc_id {
+            if let Ok(escort_npc) = state.get_npc(escort_npc_id) {
+                if escort_npc.is_dead() {
                     return Some(codes::TaskEndErr::EscortFailed);
                 }
+            } else {
+                return Some(codes::TaskEndErr::EscortFailed);
             }
+        }
 
-            None
-        };
+        None
+    }
 
-        let check_task_repair = |player: &Player, task: &Task, task_def: &TaskDefinition| {
-            // There are rare cases where the clients qitem state gets corrupted, usually due to XDT bugs
-            // (e.g. tasks that don't clean up quest items properly due to a missing iDelItemID entry).
-            // We can attempt to fix this by checking if the player has the required quest items for the
-            // current task and, if so, re-sending one to force a completion request out of the client.
-            // This check is pretty strict to avoid false positives.
+    fn check_task_repair(player: &Player, task: &Task, task_def: &TaskDefinition) -> Option<i16> {
+        // There are rare cases where the clients qitem state gets corrupted, usually due to XDT bugs
+        // (e.g. tasks that don't clean up quest items properly due to a missing iDelItemID entry).
+        // We can attempt to fix this by checking if the player has the required quest items for the
+        // current task and, if so, re-sending one to force a completion request out of the client.
+        // This check is pretty strict to avoid false positives.
 
-            if task.pending_repair {
-                // already sent repair packet
+        if task.pending_repair {
+            // already sent repair packet
+            return None;
+        }
+
+        if task_def.task_type != TaskType::Defeat {
+            // only "get X item from Y mob" tasks have this issue
+            return None;
+        }
+
+        for (qitem_id, req_count) in &task_def.obj_qitems {
+            if player.get_quest_item_count(*qitem_id) < *req_count {
                 return None;
             }
+        }
 
-            if task_def.task_type != TaskType::Defeat {
-                // only "get X item from Y mob" tasks have this issue
-                return None;
-            }
+        let (qitem_id, _) = task_def.dropped_qitems.iter().next()?;
+        Some(*qitem_id)
+    }
 
-            for (qitem_id, req_count) in &task_def.obj_qitems {
-                if player.get_quest_item_count(*qitem_id) < *req_count {
-                    return None;
-                }
-            }
-
-            let (qitem_id, _) = task_def.dropped_qitems.iter().next()?;
-            Some(*qitem_id)
-        };
-
-        let client = self.get_client().unwrap();
-        for task in self.mission_journal.get_current_tasks() {
+    fn tick_missions(state: &mut ShardServerState, pc_id: i32, time: &SystemTime) {
+        let player = state.get_player(pc_id).unwrap();
+        let client = player.get_client().unwrap();
+        let active_tasks = player.mission_journal.get_current_tasks();
+        for task in active_tasks {
             let task_def = tdata_get().get_task_definition(task.get_task_id()).unwrap();
 
             // check for task failure
-            let fail_code = check_task_failure(self, &task, task_def);
+            let fail_code = {
+                let player = state.get_player(pc_id).unwrap();
+                Self::check_task_failure(state, player, &task, task_def, time)
+            };
             if let Some(fail_code) = fail_code {
-                self.mission_journal.fail_task(task.get_task_id()).unwrap();
+                let player = state.get_player_mut(pc_id).unwrap();
+                player
+                    .mission_journal
+                    .fail_task(task.get_task_id())
+                    .unwrap();
 
                 // failure qitem changes
                 if !task_def.fail_qitems.is_empty() {
                     let qitem_pkt = sP_FE2CL_REP_REWARD_ITEM {
-                        m_iCandy: self.get_taros() as i32,
-                        m_iFusionMatter: self.get_fusion_matter() as i32,
-                        m_iBatteryN: self.get_nano_potions() as i32,
-                        m_iBatteryW: self.get_weapon_boosts() as i32,
+                        m_iCandy: player.get_taros() as i32,
+                        m_iFusionMatter: player.get_fusion_matter() as i32,
+                        m_iBatteryN: player.get_nano_potions() as i32,
+                        m_iBatteryW: player.get_weapon_boosts() as i32,
                         iItemCnt: task_def.fail_qitems.len() as i8,
                         iFatigue: 100,
                         iFatigue_Level: 1,
@@ -1482,9 +1501,9 @@ impl Player {
                     let mut pkt = PacketBuilder::new(P_FE2CL_REP_REWARD_ITEM).with(&qitem_pkt);
 
                     for (qitem_id, qitem_count_mod) in &task_def.succ_qitems {
-                        let curr_count = self.get_quest_item_count(*qitem_id) as isize;
+                        let curr_count = player.get_quest_item_count(*qitem_id) as isize;
                         let new_count = (curr_count + *qitem_count_mod) as usize;
-                        let qitem_slot = self.set_quest_item_count(*qitem_id, new_count).unwrap();
+                        let qitem_slot = player.set_quest_item_count(*qitem_id, new_count).unwrap();
                         let qitem_reward = sItemReward {
                             sItem: sItemBase {
                                 iType: ItemType::Quest as i16,
@@ -1512,20 +1531,27 @@ impl Player {
             }
 
             // check for repair
-            let repair_qitem_id = check_task_repair(self, &task, task_def);
+            let repair_qitem_id = {
+                let player = state.get_player(pc_id).unwrap();
+                Self::check_task_repair(player, &task, task_def)
+            };
             if let Some(repair_qitem_id) = repair_qitem_id {
                 log(
                     Severity::Warning,
                     &format!("Detected desync on task {}; repairing...", task_def.task_id),
                 );
-                self.mission_journal.repair_task(task_def.task_id).unwrap();
+                let player = state.get_player_mut(pc_id).unwrap();
+                player
+                    .mission_journal
+                    .repair_task(task_def.task_id)
+                    .unwrap();
 
                 let mut reward_pkt =
                     PacketBuilder::new(P_FE2CL_REP_REWARD_ITEM).with(&sP_FE2CL_REP_REWARD_ITEM {
-                        m_iCandy: self.get_taros() as i32,
-                        m_iFusionMatter: self.get_fusion_matter() as i32,
-                        m_iBatteryN: self.get_nano_potions() as i32,
-                        m_iBatteryW: self.get_weapon_boosts() as i32,
+                        m_iCandy: player.get_taros() as i32,
+                        m_iFusionMatter: player.get_fusion_matter() as i32,
+                        m_iBatteryN: player.get_nano_potions() as i32,
+                        m_iBatteryW: player.get_weapon_boosts() as i32,
                         iItemCnt: 1,
                         iFatigue: 100,
                         iFatigue_Level: 1,
@@ -1533,8 +1559,8 @@ impl Player {
                         iTaskID: task_def.task_id,
                     });
 
-                let qitem_amt = self.get_quest_item_count(repair_qitem_id);
-                let qitem_slot = self
+                let qitem_amt = player.get_quest_item_count(repair_qitem_id);
+                let qitem_slot = player
                     .set_quest_item_count(repair_qitem_id, qitem_amt)
                     .unwrap(); // no-op
 
@@ -1579,6 +1605,55 @@ impl Player {
         self.hp = clamp_max(self.hp + heal_amt, max_hp);
         self.last_heal_time = Some(*time);
         true
+    }
+
+    pub fn tick(state: &mut ShardServerState, pc_id: i32, time: &SystemTime) {
+        let player_eid = EntityID::Player(pc_id);
+        if state.get_player(pc_id).unwrap().is_dead() {
+            return;
+        }
+
+        if let Some(ride) = state.get_player_mut(pc_id).unwrap().skyway_ride.take() {
+            let ride = Self::tick_skyway_ride(state, pc_id, time, ride);
+            state.get_player_mut(pc_id).unwrap().skyway_ride = ride;
+        }
+
+        Self::tick_missions(state, pc_id, time);
+
+        let mut pending_buff_effects = std::mem::take(&mut state.pending_buff_effects);
+        let buff_updates = state
+            .get_player_mut(pc_id)
+            .unwrap()
+            .buffs
+            .tick(player_eid, &mut pending_buff_effects);
+        state.pending_buff_effects = pending_buff_effects;
+
+        let player = state.get_player_mut(pc_id).unwrap();
+        let condition_bit_flag = player.buffs.get_bit_flags();
+        if let Some(client) = player.get_client() {
+            for update in buff_updates {
+                let mut pkt: sP_FE2CL_PC_BUFF_UPDATE = update.into();
+                pkt.iConditionBitFlag = condition_bit_flag;
+                client.send_packet(P_FE2CL_PC_BUFF_UPDATE, &pkt);
+            }
+        }
+
+        let transmit = player.tick_regen(time);
+        if !transmit {
+            return;
+        }
+
+        let pkt = sP_FE2CL_REP_PC_TICK {
+            iHP: player.hp,
+            aNano: player.nano_data.as_carried(),
+            iBatteryN: player.nano_potions as i32,
+            bResetMissionFlag: unused!(),
+        };
+
+        player
+            .get_client()
+            .unwrap()
+            .send_packet(P_FE2CL_REP_PC_TICK, &pkt);
     }
 }
 impl Combatant for Player {
@@ -1760,7 +1835,7 @@ impl Entity for Player {
         client.send_packet(PacketID::P_FE2CL_PC_EXIT, &pkt);
     }
 
-    fn cleanup(&mut self, state: &mut ShardServerState) {
+    fn cleanup(self: Box<Self>, state: &mut ShardServerState) {
         let pc_id = self.get_player_id();
 
         // cleanup the buyback list
@@ -1786,45 +1861,8 @@ impl Entity for Player {
 
         // cleanup group
         if let Some(group_id) = self.group_id {
-            crate::helpers::remove_group_member(EntityID::Player(pc_id), group_id, state).unwrap();
+            helpers::remove_group_member(EntityID::Player(pc_id), group_id, state).unwrap();
         }
-    }
-
-    fn tick(&mut self, time: &SystemTime, state: &mut ShardServerState) {
-        if self.is_dead() {
-            return;
-        }
-
-        self.tick_skyway_ride(time, state);
-        self.tick_missions(time, state);
-
-        let buff_updates = self
-            .buffs
-            .tick(self.get_id(), &mut state.pending_buff_effects);
-        let condition_bit_flag = self.buffs.get_bit_flags();
-        if let Some(client) = self.get_client() {
-            for update in buff_updates {
-                let mut pkt: sP_FE2CL_PC_BUFF_UPDATE = update.into();
-                pkt.iConditionBitFlag = condition_bit_flag;
-                client.send_packet(P_FE2CL_PC_BUFF_UPDATE, &pkt);
-            }
-        }
-
-        let transmit = self.tick_regen(time);
-        if !transmit {
-            return;
-        }
-
-        let pkt = sP_FE2CL_REP_PC_TICK {
-            iHP: self.hp,
-            aNano: self.nano_data.as_carried(),
-            iBatteryN: self.nano_potions as i32,
-            bResetMissionFlag: unused!(),
-        };
-
-        self.get_client()
-            .unwrap()
-            .send_packet(P_FE2CL_REP_PC_TICK, &pkt);
     }
 
     fn as_combatant(&self) -> Option<&dyn Combatant> {

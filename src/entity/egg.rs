@@ -103,18 +103,7 @@ impl Entity for Egg {
         client.send_packet(P_FE2CL_SHINY_EXIT, &pkt);
     }
 
-    fn tick(&mut self, time: &SystemTime, state: &mut ShardServerState) {
-        if let Some(respawn_time) = self.respawn_time {
-            if time >= &respawn_time {
-                self.respawn_time = None;
-                state
-                    .entity_map
-                    .update(self.get_id(), Some(self.get_chunk_coords()), true);
-            }
-        }
-    }
-
-    fn cleanup(&mut self, _state: &mut ShardServerState) {}
+    fn cleanup(self: Box<Self>, _state: &mut ShardServerState) {}
 
     fn as_combatant(&self) -> Option<&dyn Combatant> {
         None
@@ -130,5 +119,19 @@ impl Entity for Egg {
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+}
+impl Egg {
+    pub fn tick(state: &mut ShardServerState, time: &SystemTime, egg_id: i32) {
+        let egg = state.get_egg_mut(egg_id).unwrap();
+        if let Some(respawn_time) = egg.respawn_time {
+            if time >= &respawn_time {
+                egg.respawn_time = None;
+                let chunk_coords = egg.get_chunk_coords();
+                state
+                    .entity_map
+                    .update(EntityID::Egg(egg_id), Some(chunk_coords), true);
+            }
+        }
     }
 }

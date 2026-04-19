@@ -186,7 +186,7 @@ impl LuaUserData for NpcScriptContext {
 
                     let mut path = NpcPath::new_single(target_pos, speed);
                     path.start();
-                    npc.tick_movement_along_path(&mut path, state);
+                    NPC::tick_movement_along_path(npc.id, &mut path, state);
                     // Store path so is_moving() works across ticks
                     npc.path = Some(path);
                     Ok(())
@@ -225,7 +225,7 @@ impl LuaUserData for NpcScriptContext {
 
                 let mut path = NpcPath::new_single(target_pos, speed);
                 path.start();
-                npc.tick_movement_along_path(&mut path, state);
+                NPC::tick_movement_along_path(npc.id, &mut path, state);
                 npc.path = Some(path);
                 Ok(())
             });

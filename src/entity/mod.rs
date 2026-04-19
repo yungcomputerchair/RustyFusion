@@ -1,4 +1,4 @@
-use std::{any::Any, collections::HashSet, fmt::Display, time::SystemTime};
+use std::{any::Any, collections::HashSet, fmt::Display};
 
 use uuid::Uuid;
 
@@ -48,8 +48,7 @@ pub trait Entity: Send + Display {
     fn send_enter(&self, client: &FFClient);
     fn send_exit(&self, client: &FFClient);
 
-    fn tick(&mut self, time: &SystemTime, state: &mut ShardServerState);
-    fn cleanup(&mut self, state: &mut ShardServerState);
+    fn cleanup(self: Box<Self>, state: &mut ShardServerState);
 
     fn as_combatant(&self) -> Option<&dyn Combatant>;
     fn as_combatant_mut(&mut self) -> Option<&mut dyn Combatant>;

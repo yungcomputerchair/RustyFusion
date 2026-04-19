@@ -823,7 +823,7 @@ mod helpers {
         let entity_map = &mut state.entity_map;
         let eid = EntityID::NPC(npc_id);
         entity_map.update(eid, None, true);
-        let mut npc = entity_map.untrack(eid);
+        let npc = entity_map.untrack(eid);
         npc.cleanup(state)
     }
 }

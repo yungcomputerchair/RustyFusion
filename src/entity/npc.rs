@@ -1,7 +1,6 @@
 use std::{
     collections::HashSet,
     fmt::{Display, Formatter},
-    time::SystemTime,
 };
 
 use uuid::Uuid;
@@ -12,6 +11,7 @@ use crate::{
     entity::{Combatant, Entity, EntityID},
     enums::{BuffID, BuffType, CharType, CombatStyle, CombatantTeam},
     error::FFResult,
+    helpers,
     net::{
         packet::{
             sNPCAppearanceData, sNPCGroupMemberInfo, sP_FE2CL_CHAR_TIME_BUFF_TIME_OUT,
@@ -123,29 +123,37 @@ impl NPC {
         }
     }
 
-    pub fn tick_movement_along_path(&mut self, path: &mut Path, state: &mut ShardServerState) {
+    pub fn tick_movement_along_path(npc_id: i32, path: &mut Path, state: &mut ShardServerState) {
         let speed = path.get_speed();
-        let old_pos = self.position;
-        if path.tick(&mut self.position) {
-            let new_angle = old_pos.angle_to(&self.position) as i32;
-            self.set_rotation(util::angle_to_rotation(new_angle));
-            let chunk_pos = self.get_chunk_coords();
-            state
-                .entity_map
-                .update(self.get_id(), Some(chunk_pos), true);
+        let npc_eid = EntityID::NPC(npc_id);
+        let old_pos = state.get_npc(npc_id).unwrap().position;
+        let mut new_pos = old_pos;
+        if path.tick(&mut new_pos) {
+            // update angle, position, and chunks
+            let npc = state.get_npc_mut(npc_id).unwrap();
+            npc.set_position(new_pos);
 
-            let run_speed = tdata_get().get_npc_stats(self.ty).unwrap().run_speed;
+            let new_angle = old_pos.angle_to(&new_pos) as i32;
+            npc.set_rotation(util::angle_to_rotation(new_angle));
+
+            let chunk_pos = npc.get_chunk_coords();
+            state.entity_map.update(npc_eid, Some(chunk_pos), true);
+
+            // broadcast movement
+            let npc = state.get_npc(npc_id).unwrap(); // re-borrow
+            let run_speed = tdata_get().get_npc_stats(npc.ty).unwrap().run_speed;
             let pkt = sP_FE2CL_NPC_MOVE {
-                iNPC_ID: self.id,
-                iToX: self.position.x,
-                iToY: self.position.y,
-                iToZ: self.position.z,
+                iNPC_ID: npc.id,
+                iToX: npc.position.x,
+                iToY: npc.position.y,
+                iToZ: npc.position.z,
                 iSpeed: speed,
                 iMoveStyle: if speed >= run_speed { 1 } else { 0 },
             };
+
             state
                 .entity_map
-                .for_each_around(self.get_id(), |c| c.send_packet(P_FE2CL_NPC_MOVE, &pkt));
+                .for_each_around(npc_eid, |c| c.send_packet(P_FE2CL_NPC_MOVE, &pkt));
         }
     }
 
@@ -167,6 +175,60 @@ impl NPC {
         let stats = tdata_get().get_npc_stats(self.ty).unwrap();
         stats.ai_type != 0 // no npcs without AI
         && stats.ai_type != 11 // no cars or animals
+    }
+
+    pub fn tick(state: &mut ShardServerState, npc_id: i32) {
+        let npc_eid = EntityID::NPC(npc_id);
+
+        // update interacting player list (no-alloc)
+        let mut interacting_pc_ids =
+            std::mem::take(&mut state.get_npc_mut(npc_id).unwrap().interacting_pcs);
+        interacting_pc_ids.retain(|pc_id| {
+            let pc_eid = EntityID::Player(*pc_id);
+            state
+                .entity_map
+                .validate_proximity(&[npc_eid, pc_eid], RANGE_INTERACT)
+                .is_ok()
+        });
+        state.get_npc_mut(npc_id).unwrap().interacting_pcs = interacting_pc_ids;
+
+        // tick buffs
+        let mut buff_effects = Vec::new();
+        let npc = state.get_npc_mut(npc_id).unwrap();
+        let buffs_updated = !npc.buffs.tick(npc_eid, &mut buff_effects).is_empty();
+
+        if buffs_updated {
+            let bcast = sP_FE2CL_CHAR_TIME_BUFF_TIME_OUT {
+                eCT: CharType::NPC as i32,
+                iID: npc_id,
+                iConditionBitFlag: npc.buffs.get_bit_flags(),
+            };
+
+            state.entity_map.for_each_around(npc_eid, |c| {
+                c.send_packet(P_FE2CL_CHAR_TIME_BUFF_TIME_OUT, &bcast)
+            });
+        }
+
+        // tick path
+        let npc = state.get_npc_mut(npc_id).unwrap(); // re-borrow
+        if let Some(mut path) = npc.path.take() {
+            if !npc.is_dead() {
+                if !path.is_done() {
+                    NPC::tick_movement_along_path(npc_id, &mut path, state);
+                }
+
+                if !path.is_done() {
+                    state.get_npc_mut(npc_id).unwrap().path = Some(path);
+                }
+            }
+        }
+
+        // tick AI; we don't tick AI while PCs are interacting with the NPC
+        let npc = state.get_npc(npc_id).unwrap(); // re-borrow
+        if npc.ai.is_some() && npc.interacting_pcs.is_empty() {
+            let scripting = scripting_get();
+            scripting.lock().tick_npc(npc_id, state);
+        }
     }
 }
 impl Display for NPC {
@@ -231,56 +293,10 @@ impl Entity for NPC {
         client.send_packet(P_FE2CL_NPC_EXIT, &pkt);
     }
 
-    fn tick(&mut self, _time: &SystemTime, state: &mut ShardServerState) {
-        let pc_ids: Vec<i32> = self.interacting_pcs.iter().copied().collect();
-        for pc_id in pc_ids {
-            let pc_eid = EntityID::Player(pc_id);
-            if state
-                .entity_map
-                .validate_proximity(&[self.get_id(), pc_eid], RANGE_INTERACT)
-                .is_err()
-            {
-                self.interacting_pcs.remove(&pc_id);
-            }
-        }
-
-        let mut buff_effects = Vec::new();
-        let buffs_updated = !self.buffs.tick(self.get_id(), &mut buff_effects).is_empty();
-        if buffs_updated {
-            let bcast = sP_FE2CL_CHAR_TIME_BUFF_TIME_OUT {
-                eCT: CharType::NPC as i32,
-                iID: self.id,
-                iConditionBitFlag: self.buffs.get_bit_flags(),
-            };
-
-            state.entity_map.for_each_around(self.get_id(), |c| {
-                c.send_packet(P_FE2CL_CHAR_TIME_BUFF_TIME_OUT, &bcast)
-            });
-        }
-
-        // tick path
-        if let Some(mut path) = self.path.take() {
-            if !self.is_dead() {
-                if !path.is_done() {
-                    self.tick_movement_along_path(&mut path, state);
-                }
-                if !path.is_done() {
-                    self.path = Some(path);
-                }
-            }
-        }
-
-        // we don't tick AI while PCs are interacting with the NPC
-        if self.ai.is_some() && self.interacting_pcs.is_empty() {
-            let scripting = scripting_get();
-            scripting.lock().tick_npc(self, state);
-        }
-    }
-
-    fn cleanup(&mut self, state: &mut ShardServerState) {
+    fn cleanup(self: Box<Self>, state: &mut ShardServerState) {
         // cleanup group
         if let Some(group_id) = self.group_id {
-            crate::helpers::remove_group_member(self.get_id(), group_id, state).unwrap();
+            helpers::remove_group_member(self.get_id(), group_id, state).unwrap();
         }
 
         // cleanup coroutine
