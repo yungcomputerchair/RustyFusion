@@ -326,9 +326,14 @@ impl ShardServerState {
         let eids: Vec<EntityID> = self.entity_map.get_tickable_ids().collect();
         for eid in eids {
             if let Some(entity_ptr) = self.entity_map.get_entity_raw_ptr(eid) {
-                // SAFETY: The entity stays in the registry so other operations
-                // (e.g. update/broadcast) work normally. No other code holds a
-                // mutable reference to this specific entity during tick().
+                // SAFETY: Entity storage uses UnsafeCell, so shared references
+                // to the registry obtained during tick() (e.g. for broadcasts,
+                // for_each_around, validate_proximity) don't conflict with this
+                // mutable pointer. We uphold the invariant that no second
+                // *mutable* reference to this specific entity is created during
+                // tick(). All &mut re-access paths (scripting reset/apply_buff,
+                // get_pack_leader) detect the self-referential case and skip the
+                // redundant lookup.
                 let entity = unsafe { &mut *entity_ptr };
                 entity.tick(&time, self);
             }

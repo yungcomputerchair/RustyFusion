@@ -350,6 +350,12 @@ impl LuaUserData for NpcScriptContext {
                     _ => return Ok(None),
                 };
 
+                // If the leader is the NPC being ticked, use the existing raw
+                // pointer to avoid creating a second &mut reference.
+                if leader_npc_id == this.npc().id {
+                    return Ok(Some(*this));
+                }
+
                 let state = this.state_mut();
                 let leader = match state.get_npc_mut(leader_npc_id) {
                     Ok(npc) => npc,

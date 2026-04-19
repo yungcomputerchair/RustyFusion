@@ -118,7 +118,11 @@ impl LuaUserData for EntityScriptContext {
 
             luau_method!(methods, "reset" -> "()", |_, this, ()| {
                 let state = this.state_mut();
-                let entity = state.entity_map.get_entity_raw_mut(this.entity_id).ok_or_else(|| LuaError::runtime("Entity not found"))?;
+                // Use raw pointer to avoid creating a second &mut reference
+                // to the entity during tick() (which already holds one via raw ptr).
+                let entity_ptr = state.entity_map.get_entity_raw_ptr(this.entity_id)
+                    .ok_or_else(|| LuaError::runtime("Entity not found"))?;
+                let entity = unsafe { &mut *entity_ptr };
                 if let Some(combatant) = entity.as_combatant_mut() {
                     combatant.reset();
                 }
@@ -137,7 +141,11 @@ impl LuaUserData for EntityScriptContext {
 
             luau_method!(methods, "apply_buff" -> "boolean", |_, this, (buff_id, values, duration, source): (i32, Vec<i32>, Option<f32>, Option<EntityScriptContext>)| {
                 let state = this.state_mut();
-                let entity = state.entity_map.get_entity_raw_mut(this.entity_id).ok_or_else(|| LuaError::runtime("Entity not found"))?;
+                // Use raw pointer to avoid creating a second &mut reference
+                // to the entity during tick() (which already holds one via raw ptr).
+                let entity_ptr = state.entity_map.get_entity_raw_ptr(this.entity_id)
+                    .ok_or_else(|| LuaError::runtime("Entity not found"))?;
+                let entity = unsafe { &mut *entity_ptr };
                 if let Some(combatant) = entity.as_combatant_mut() {
                     let buff_id: BuffID = buff_id.try_into().map_err(|_| LuaError::runtime(format!("Invalid buff ID: {}", buff_id)))?;
                     let value = values.first().cloned().unwrap_or(0);
