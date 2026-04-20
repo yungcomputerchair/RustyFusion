@@ -207,6 +207,20 @@ impl ShardServerState {
         ))
     }
 
+    pub fn get_entity(&self, id: EntityID) -> FFResult<&dyn Entity> {
+        self.entity_map.get_entity_raw(id).ok_or(FFError::build(
+            Severity::Warning,
+            format!("Entity with ID {:?} doesn't exist", id),
+        ))
+    }
+
+    pub fn get_entity_mut(&mut self, id: EntityID) -> FFResult<&mut dyn Entity> {
+        self.entity_map.get_entity_raw_mut(id).ok_or(FFError::build(
+            Severity::Warning,
+            format!("Entity with ID {:?} doesn't exist", id),
+        ))
+    }
+
     pub fn get_combatant(&self, id: EntityID) -> FFResult<&dyn Combatant> {
         let entity = self.entity_map.get_entity_raw(id).ok_or(FFError::build(
             Severity::Warning,

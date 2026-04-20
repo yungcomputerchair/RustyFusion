@@ -40,6 +40,12 @@ macro_rules! luau_method {
     };
 }
 
+impl From<FFError> for LuaError {
+    fn from(e: FFError) -> Self {
+        LuaError::RuntimeError(e.get_msg().to_string())
+    }
+}
+
 mod entity;
 use entity::*;
 

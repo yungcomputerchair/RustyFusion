@@ -24,31 +24,23 @@ impl EntityScriptContext {
         }
     }
 
-    // SAFETY: see `unsafe impl Send` below.
-    #[allow(clippy::mut_from_ref)]
-    fn state_mut(&self) -> &mut ShardServerState {
-        unsafe { &mut *self.state }
-    }
-
     pub fn id(&self) -> EntityID {
         self.entity_id
     }
 
-    fn entity(&self) -> &dyn Entity {
-        let state = self.state_mut();
-        state
-            .entity_map
-            .get_entity_raw(self.entity_id)
-            .expect("Entity not found")
+    fn with_state<T>(&self, f: impl FnOnce(&mut ShardServerState) -> LuaResult<T>) -> LuaResult<T> {
+        // SAFETY: see unsafe impl Send below.
+        // These wrappers help avoid aliasing issues by ensuring we only have one mutable reference
+        // to state at a time. DO NOT directly dereference self.state outside of these wrappers.
+        let state = unsafe { &mut *self.state };
+        f(state)
     }
 
-    #[allow(clippy::mut_from_ref)]
-    fn entity_mut(&self) -> &mut dyn Entity {
-        let state = self.state_mut();
-        state
-            .entity_map
-            .get_entity_raw_mut(self.entity_id)
-            .expect("Entity not found")
+    fn with_entity<T>(&self, f: impl FnOnce(&mut dyn Entity) -> LuaResult<T>) -> LuaResult<T> {
+        self.with_state(|state| {
+            let entity = state.get_entity_mut(self.entity_id)?;
+            f(entity)
+        })
     }
 }
 
@@ -86,61 +78,60 @@ impl LuaUserData for EntityScriptContext {
                 Ok(matches!(this.entity_id, EntityID::Egg(_)))
             });
 
-            luau_method!(methods, "position" -> "Position", |_, this, ()| {
-                Ok(this.entity().get_position())
-            });
+            luau_method!(methods, "position" -> "Position", |_, this, ()| this.with_entity(|entity| {
+                Ok(entity.get_position())
+            }));
 
-            luau_method!(methods, "level" -> "number", |_, this, ()| {
-                if let Some(combatant) = this.entity().as_combatant() {
+            luau_method!(methods, "level" -> "number", |_, this, ()| this.with_entity(|entity| {
+                if let Some(combatant) = entity.as_combatant() {
                     Ok(combatant.get_level())
                 } else {
                     Ok(0)
                 }
-            });
+            }));
 
-            luau_method!(methods, "hp" -> "number", |_, this, ()| {
-                if let Some(combatant) = this.entity().as_combatant() {
+            luau_method!(methods, "hp" -> "number", |_, this, ()| this.with_entity(|entity| {
+                if let Some(combatant) = entity.as_combatant() {
                     Ok(combatant.get_hp())
                 } else {
                     Ok(0)
                 }
-            });
+            }));
 
-            luau_method!(methods, "max_hp" -> "number", |_, this, ()| {
-                if let Some(combatant) = this.entity().as_combatant() {
+            luau_method!(methods, "max_hp" -> "number", |_, this, ()| this.with_entity(|entity| {
+                if let Some(combatant) = entity.as_combatant() {
                     Ok(combatant.get_max_hp())
                 } else {
                     Ok(0)
                 }
-            });
+            }));
 
-            luau_method!(methods, "is_dead" -> "boolean", |_, this, ()| {
-                if let Some(combatant) = this.entity().as_combatant() {
+            luau_method!(methods, "is_dead" -> "boolean", |_, this, ()| this.with_entity(|entity| {
+                if let Some(combatant) = entity.as_combatant() {
                     Ok(combatant.is_dead())
                 } else {
                     Ok(false)
                 }
-            });
+            }));
 
-            luau_method!(methods, "reset" -> "()", |_, this, ()| {
-                if let Some(combatant) = this.entity_mut().as_combatant_mut() {
+            luau_method!(methods, "reset" -> "()", |_, this, ()| this.with_entity(|entity| {
+                if let Some(combatant) = entity.as_combatant_mut() {
                     combatant.reset();
                 }
                 Ok(())
-            });
+            }));
 
-            luau_method!(methods, "target" -> "Entity?", |_, this, ()| {
-                let state = this.state_mut();
-                let entity = this.entity();
+            luau_method!(methods, "target" -> "Entity?", |_, this, ()| this.with_state(|state| {
+                let entity = state.get_entity(this.entity_id)?;
                 if let Some(combatant) = entity.as_combatant() {
                     Ok(combatant.get_target().map(|target_id| EntityScriptContext::new(target_id, state)))
                 } else {
                     Ok(None)
                 }
-            });
+            }));
 
-            luau_method!(methods, "apply_buff" -> "boolean", |_, this, (buff_id, values, duration, source): (i32, Vec<i32>, Option<f32>, Option<EntityScriptContext>)| {
-                let entity = this.entity_mut();
+            luau_method!(methods, "apply_buff" -> "boolean", |_, this, (buff_id, values, duration, source): (i32, Vec<i32>, Option<f32>, Option<EntityScriptContext>)| this.with_state(|state| {
+                let entity = state.get_entity_mut(this.entity_id)?;
                 if let Some(combatant) = entity.as_combatant_mut() {
                     let buff_id: BuffID = buff_id.try_into().map_err(|_| LuaError::runtime(format!("Invalid buff ID: {}", buff_id)))?;
                     let value = values.first().cloned().unwrap_or(0);
@@ -153,24 +144,22 @@ impl LuaUserData for EntityScriptContext {
                 } else {
                     Ok(false)
                 }
-            });
+            }));
 
             // Helpers
 
-            luau_method!(methods, "distance_to" -> "number", |_, this, (x, y, z): (i32, i32, i32)| {
-                let pos = this.entity().get_position();
+            luau_method!(methods, "distance_to" -> "number", |_, this, (x, y, z): (i32, i32, i32)| this.with_entity(|entity| {
+                let pos = entity.get_position();
                 let target = Position { x, y, z };
                 Ok(pos.distance_to(&target))
-            });
+            }));
 
-            luau_method!(methods, "distance_to_entity" -> "number", |_, this, target: EntityScriptContext| {
-                let state = this.state_mut();
-                let entity = this.entity();
+            luau_method!(methods, "distance_to_entity" -> "number", |_, this, target: EntityScriptContext| this.with_state(|state| {
+                let pos = state.get_entity(this.entity_id)?.get_position();
                 let target_entity = state.entity_map.get_entity_raw(target.entity_id).ok_or_else(|| LuaError::runtime("Target entity not found"))?;
-                let pos = entity.get_position();
                 let target_pos = target_entity.get_position();
                 Ok(pos.distance_to(&target_pos))
-            });
+            }));
         });
 
         methods.add_meta_method(LuaMetaMethod::Eq, |_, this, other: EntityScriptContext| {
@@ -178,8 +167,7 @@ impl LuaUserData for EntityScriptContext {
         });
 
         methods.add_meta_method(LuaMetaMethod::ToString, |_, this, ()| {
-            let entity = this.entity();
-            Ok(format!("{}", entity))
+            this.with_entity(|entity| Ok(format!("{}", entity)))
         });
     }
 }
