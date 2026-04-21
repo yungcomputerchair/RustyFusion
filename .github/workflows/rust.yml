@@ -29,6 +29,8 @@ jobs:
 
   build_and_test:
     name: Build and test
+    env:
+      RUSTFLAGS: "-A dead_code"
     needs: read_msrv
     runs-on: ubuntu-latest
     steps:
