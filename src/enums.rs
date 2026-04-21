@@ -229,7 +229,7 @@ ffenum!(SkillType, i32, 37, {
 });
 
 // eSkillTargetType.cs
-ffenum!(SkillShape, i32, 7, {
+ffenum!(SkillTargetType, i32, 7, {
     None = 0,
     Target = 1, // eSTT_Target
     SelfTarget = 2, // eSTT_Self
@@ -241,10 +241,17 @@ ffenum!(SkillShape, i32, 7, {
 });
 
 // eTargetType.cs
+// NOTE: this enum is not actually used in the way the client suggests,
+// so we don't rely on these names. We have our own below that are more accurate.
+// ffenum!(TargetType, i32, {
+//     Player = 0,
+//     NPC = 1,
+//     XYZ = 2,
+// });
 ffenum!(TargetType, i32, {
-    Player = 0,
-    NPC = 1,
-    XYZ = 2,
+    HostileNPCs = 1,
+    FriendlyPCs = 2,
+    CasterPC = 3,
 });
 
 // eTimeBuffType.cs

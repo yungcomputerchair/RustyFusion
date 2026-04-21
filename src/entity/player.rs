@@ -1255,7 +1255,9 @@ impl Player {
     pub fn do_revive(&mut self) {
         self.hp = self.get_max_hp() / 2;
         for nano_id in self.nano_data.equipped_ids.into_iter().flatten() {
-            self.get_nano_mut(nano_id).unwrap().stamina = NANO_STAMINA_MAX / 2;
+            self.get_nano_mut(nano_id)
+                .unwrap()
+                .set_stamina(NANO_STAMINA_MAX / 2);
         }
         self.reset();
     }

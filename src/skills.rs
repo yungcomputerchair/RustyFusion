@@ -8,7 +8,9 @@ use rand::Rng;
 use crate::{
     defines::*,
     entity::{Combatant, EntityID},
-    enums::{BuffID, BuffType, CombatStyle, SkillShape, SkillType, TimeBuffUpdate},
+    enums::{
+        BuffID, BuffType, CombatStyle, SkillTargetType, SkillType, TargetType, TimeBuffUpdate,
+    },
     error::*,
     net::packet::{PacketID::*, *},
     state::ShardServerState,
@@ -26,10 +28,25 @@ impl Default for sTimeBuff {
     }
 }
 
+pub enum SkillResult {
+    Damage(sSkillResult_Damage),
+    DotDamage(sSkillResult_DotDamage),
+    HealHP(sSkillResult_Heal_HP),
+    HealStamina(sSkillResult_Heal_Stamina),
+    StaminaSelf(sSkillResult_Stamina_Self),
+    DamageAndDebuff(sSkillResult_Damage_N_Debuff),
+    Buff(sSkillResult_Buff),
+    BatteryDrain(sSkillResult_BatteryDrain),
+    DamageAndMove(sSkillResult_Damage_N_Move),
+    Move(sSkillResult_Move),
+    Resurrect(sSkillResult_Resurrect),
+}
+
 #[derive(Debug)]
 pub struct Skill {
     pub skill_type: SkillType,
-    pub skill_shape: SkillShape,
+    pub targeting_type: SkillTargetType,
+    pub target_type: TargetType,
     pub passive: bool,
     pub range: u32,
     pub values_a: [i32; SKILL_LEVEL_MAX + 1],
@@ -429,6 +446,12 @@ struct BasicAttack {
     charged: bool,
 }
 
+struct SkillCast {
+    skill: &'static Skill,
+    level: usize,
+    style: Option<CombatStyle>,
+}
+
 pub fn do_basic_attack(
     attacker_id: EntityID,
     target_ids: &[EntityID],
@@ -609,6 +632,67 @@ pub fn do_basic_attack(
     Ok(())
 }
 
+pub fn do_skill(
+    caster_id: EntityID,
+    target_ids: &[EntityID],
+    skill: &'static Skill,
+    level: usize,
+    state: &mut ShardServerState,
+) -> FFResult<Vec<SkillResult>> {
+    if level > SKILL_LEVEL_MAX {
+        return Err(FFError::build(
+            Severity::Warning,
+            format!("Skill level {} is above max of {}", level, SKILL_LEVEL_MAX),
+        ));
+    }
+
+    let caster = state.get_combatant(caster_id)?;
+
+    log(
+        Severity::Debug,
+        &format!(
+            "{} used skill {:?} on targets {:?}",
+            caster, skill.skill_type, target_ids
+        ),
+    );
+
+    let skill_cast = SkillCast {
+        skill,
+        level,
+        style: caster.get_style(),
+    };
+
+    let mut skill_results = Vec::new();
+    for target_id in target_ids {
+        let target = match state.get_combatant_mut(*target_id) {
+            Ok(target) => target,
+            Err(e) => {
+                log_error(e);
+                continue;
+            }
+        };
+
+        if target.is_dead() {
+            log(
+                Severity::Warning,
+                &format!(
+                    "{:?} tried to use skill {:?} on dead target {:?}",
+                    caster_id, skill.skill_type, target_id
+                ),
+            );
+            continue;
+        }
+
+        let Some(skill_result) = handle_skill_cast(caster_id, target, &skill_cast) else {
+            continue;
+        };
+
+        skill_results.push(skill_result);
+    }
+
+    Ok(skill_results)
+}
+
 fn calculate_damage(
     attack: &BasicAttack,
     defense: i32,
@@ -693,6 +777,58 @@ fn handle_basic_attack(
         iHP: to.get_hp(),
         iHitFlag: hit_flag,
     }
+}
+
+fn handle_skill_cast(
+    from: EntityID,
+    to: &mut dyn Combatant,
+    cast: &SkillCast,
+) -> Option<SkillResult> {
+    // TODO implement
+    Some(match cast.skill.skill_type {
+        // TODO find out why this doesn't work
+        // SkillType::Damage => {
+        //     let base_damage = cast.skill.values_a[cast.level];
+        //     let attack = BasicAttack {
+        //         power: base_damage,
+        //         crit_chance: None,
+        //         attack_style: cast.style,
+        //         charged: false,
+        //     };
+
+        //     let attack_result = handle_basic_attack(from, to, &attack);
+        //     SkillResult::Damage(sSkillResult_Damage {
+        //         eCT: attack_result.eCT,
+        //         iID: attack_result.iID,
+        //         bProtected: attack_result.bProtected,
+        //         iDamage: attack_result.iDamage,
+        //         iHP: attack_result.iHP,
+        //     })
+        // }
+        SkillType::HealHP => {
+            let heal_amount = cast.skill.values_a[cast.level];
+            to.heal(heal_amount);
+
+            SkillResult::HealHP(sSkillResult_Heal_HP {
+                eCT: to.get_char_type() as i32,
+                iID: match to.get_id() {
+                    EntityID::Player(id) => id,
+                    EntityID::NPC(id) => id,
+                    _ => unreachable!(),
+                },
+                iHealHP: heal_amount,
+                iHP: to.get_hp(),
+            })
+        }
+        other => {
+            log(
+                Severity::Warning,
+                &format!("Skill type {:?} is not implemented", other),
+            );
+
+            return None;
+        }
+    })
 }
 
 enum RpsResult {

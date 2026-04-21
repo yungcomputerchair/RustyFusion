@@ -5,13 +5,14 @@ use crate::{
     net::packet::*,
     skills::Skill,
     tabledata::tdata_get,
+    util::clamp,
 };
 
 #[derive(Debug, Clone)]
 pub struct Nano {
     id: i16,
     pub selected_skill: Option<i16>,
-    pub stamina: i16,
+    stamina: i16,
 }
 impl Nano {
     pub fn new(id: i16) -> Self {
@@ -24,6 +25,14 @@ impl Nano {
 
     pub fn get_id(&self) -> i16 {
         self.id
+    }
+
+    pub fn get_stamina(&self) -> i16 {
+        self.stamina
+    }
+
+    pub fn set_stamina(&mut self, stamina: i16) {
+        self.stamina = clamp(stamina, 0, NANO_STAMINA_MAX);
     }
 
     pub fn tune(&mut self, skill: Option<i16>) {

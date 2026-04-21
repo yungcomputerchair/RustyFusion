@@ -1,8 +1,13 @@
 use rusty_fusion::{
-    entity::{Combatant, Entity},
+    entity::{Combatant, Entity, EntityID},
+    enums::{SkillTargetType, TargetType},
     error::*,
-    net::{packet::*, ClientMap},
-    skills,
+    net::{
+        packet::{PacketID::*, *},
+        ClientMap,
+    },
+    placeholder,
+    skills::{self, SkillResult},
     state::ShardServerState,
 };
 
@@ -102,26 +107,29 @@ pub fn pc_attack_pcs(
         return Ok(());
     }
 
+    let player = state.get_player(pc_id)?;
     let mut target_ids = Vec::with_capacity(MAX_TARGETS);
     let mut weapon_boosts_needed = 0;
     for i in 0..target_count {
         // TODO see above
         if i >= MAX_TARGETS {
-            return Err(FFError::build(
+            log(
                 Severity::Warning,
-                format!(
-                    "Player {} tried to attack {} PCs (max {})",
-                    pc_id, pkt.iTargetCnt, MAX_TARGETS
+                &format!(
+                    "{} tried to attack {} PCs (max {})",
+                    player, pkt.iTargetCnt, MAX_TARGETS
                 ),
-            ));
+            );
+            break;
         }
 
         let target_pc_id = reader.get_struct::<sTargetPcId>()?.iPC_ID;
         if target_pc_id == pc_id {
-            return Err(FFError::build(
+            log(
                 Severity::Warning,
-                format!("Player {} tried to attack themselves", pc_id),
-            ));
+                &format!("{} tried to attack themselves", player),
+            );
+            continue;
         }
 
         let target_player = match state.get_player(target_pc_id) {
@@ -149,6 +157,155 @@ pub fn pc_attack_pcs(
 
     // attack handler
     skills::do_basic_attack(player.get_id(), &target_ids, charged, state)?;
+
+    Ok(())
+}
+
+pub fn nano_skill_use(
+    pkt: Packet,
+    clients: &ClientMap,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    let client = clients.get_sender();
+    let pc_id = client.get_player_id()?;
+    let player = state.get_player(pc_id)?;
+    let Some(nano) = player.get_active_nano() else {
+        return Err(FFError::build(
+            Severity::Warning,
+            format!(
+                "{} tried to use a nano skill without an active nano",
+                player
+            ),
+        ));
+    };
+
+    let skill_level = placeholder!(1); // TODO calculate from gumballs
+
+    let Some(skill) = nano.get_skill() else {
+        return Err(FFError::build(
+            Severity::Warning,
+            format!("{} tried to use a skill from a nano with no skill", player),
+        ));
+    };
+
+    let skill_cost = skill.costs[skill_level as usize - 1] as i16;
+    let nano_stamina = nano.get_stamina();
+    if nano_stamina < skill_cost {
+        return Err(FFError::build(
+            Severity::Warning,
+            format!(
+                "{} tried to use a nano skill without enough stamina ({} needed, {} available)",
+                player, skill_cost, nano_stamina
+            ),
+        ));
+    }
+
+    let mut reader = PacketReader::new(&pkt);
+    let pkt: &sP_CL2FE_REQ_NANO_SKILL_USE = reader.get_struct()?;
+    let target_count = pkt.iTargetCnt as usize;
+    if target_count == 0 {
+        return Ok(());
+    }
+
+    let mut target_ids = Vec::with_capacity(MAX_TARGETS);
+    for i in 0..target_count {
+        if i >= MAX_TARGETS {
+            log(
+                Severity::Warning,
+                &format!(
+                    "{} tried to use a nano skill on {} targets (max {})",
+                    player, pkt.iTargetCnt, MAX_TARGETS
+                ),
+            );
+            break;
+        }
+
+        let target_id = match skill.target_type {
+            TargetType::HostileNPCs => {
+                let target_npc_id = reader.get_struct::<sTargetNpcId>()?.iNPC_ID;
+                EntityID::NPC(target_npc_id)
+            }
+            TargetType::FriendlyPCs => {
+                let target_pc_id = reader.get_struct::<sTargetPcId>()?.iPC_ID;
+                EntityID::Player(target_pc_id)
+            }
+            TargetType::CasterPC => player.get_id(),
+        };
+
+        // validate against targeting type
+        let valid = match skill.targeting_type {
+            SkillTargetType::None => {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!(
+                        "{} tried to use a nano skill with no targeting type",
+                        player
+                    ),
+                ));
+            }
+            _ => placeholder!(true), // TODO validate for each targeting type
+        };
+
+        if !valid {
+            log(
+                Severity::Warning,
+                &format!(
+                    "{} tried to use a nano skill on an invalid target {:?} for targeting type {:?}",
+                    player, target_id, skill.targeting_type
+                ),
+            );
+            continue;
+        }
+
+        target_ids.push(target_id);
+    }
+
+    let results = skills::do_skill(player.get_id(), &target_ids, skill, skill_level, state)?;
+
+    let nano = state
+        .get_player_mut(pc_id)
+        .unwrap()
+        .get_active_nano_mut()
+        .unwrap();
+
+    nano.set_stamina(nano_stamina - skill_cost);
+
+    let resp = sP_FE2CL_NANO_SKILL_USE_SUCC {
+        iPC_ID: pc_id,
+        iBulletID: pkt.iBulletID,
+        iSkillID: nano.selected_skill.unwrap(),
+        iArg1: pkt.iArg1,
+        iArg2: pkt.iArg2,
+        iArg3: pkt.iArg3,
+        bNanoDeactive: (nano.get_stamina() == 0) as i32,
+        iNanoID: nano.get_id(),
+        iNanoStamina: nano.get_stamina(),
+        eST: skill.skill_type as i32,
+        iTargetCnt: results.len() as i32,
+    };
+
+    let mut builder = PacketBuilder::new(P_FE2CL_NANO_SKILL_USE_SUCC).with(&resp);
+    for result in results {
+        // These look identical, but since they have different concrete types, each arm
+        // is a different push call with a different type parameter.
+        match result {
+            SkillResult::Damage(sr) => builder.push(&sr),
+            SkillResult::DotDamage(sr) => builder.push(&sr),
+            SkillResult::HealHP(sr) => builder.push(&sr),
+            SkillResult::HealStamina(sr) => builder.push(&sr),
+            SkillResult::StaminaSelf(sr) => builder.push(&sr),
+            SkillResult::DamageAndDebuff(sr) => builder.push(&sr),
+            SkillResult::Buff(sr) => builder.push(&sr),
+            SkillResult::BatteryDrain(sr) => builder.push(&sr),
+            SkillResult::DamageAndMove(sr) => builder.push(&sr),
+            SkillResult::Move(sr) => builder.push(&sr),
+            SkillResult::Resurrect(sr) => builder.push(&sr),
+        }
+    }
+
+    if let Some(pkt) = log_if_failed(builder.build()) {
+        client.send_payload(pkt);
+    }
 
     Ok(())
 }

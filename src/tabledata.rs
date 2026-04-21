@@ -1528,15 +1528,22 @@ fn load_skill_data(root: &Map<String, Value>) -> Result<SkillData, String> {
             continue;
         }
 
+        let Ok(skill_type) = skill_data_entry.m_iSkillType.try_into() else {
+            continue;
+        };
+
+        let Ok(targeting_type) = skill_data_entry.m_iEffectTarget.try_into() else {
+            continue;
+        };
+
+        let Ok(target_type) = skill_data_entry.m_iTargetType.try_into() else {
+            continue;
+        };
+
         let skill = Skill {
-            skill_type: skill_data_entry
-                .m_iSkillType
-                .try_into()
-                .map_err(|e: FFError| e.get_msg().to_string())?,
-            skill_shape: skill_data_entry
-                .m_iEffectTarget
-                .try_into()
-                .map_err(|e: FFError| e.get_msg().to_string())?,
+            skill_type,
+            targeting_type,
+            target_type,
             passive: skill_data_entry.m_iBatteryDrainType == SKILL_DRAIN_TYPE_PASSIVE,
             range: skill_data_entry.m_iEffectArea as u32,
             values_a: skill_data_entry.m_iValueA,
