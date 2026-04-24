@@ -58,7 +58,7 @@ async fn main() -> FFResult<()> {
     );
     let mut shard_conn_timer = util::make_timer(Duration::from_millis(250), false);
     let mut db_conn_timer = util::make_timer(
-        Duration::from_secs(config.shard.login_server_conn_interval.get()), // TODO: config
+        Duration::from_secs(config.general.db_conn_retry_interval.get()),
         true,
     );
     let mut monitor_timer = util::make_timer(
