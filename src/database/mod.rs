@@ -127,11 +127,10 @@ async fn db_connect(config: &GeneralConfig) -> FFResult<DbBackend> {
 
     match _db_impl {
         Some(Ok(db)) => Ok(db),
-        Some(Err(e)) => Err(FFError::build(
+        Some(Err(_)) => Err(FFError::build(
             Severity::Fatal,
             "Failed to connect to database".to_string(),
-        )
-        .with_parent(e)),
+        )),
         None => Err(FFError::build(
             Severity::Fatal,
             "No database implementation enabled; please enable one through a feature".to_string(),
@@ -141,10 +140,7 @@ async fn db_connect(config: &GeneralConfig) -> FFResult<DbBackend> {
 
 pub async fn db_init(error_severity: Severity) -> FFResult<&'static Database<DbBackend>> {
     if DB.get().is_some() {
-        return Err(FFError::build(
-            Severity::Warning,
-            "Database already initialized".to_string(),
-        ));
+        return Ok(db_get());
     }
 
     let _ = DB_ERROR_SEVERITY.set(error_severity);
