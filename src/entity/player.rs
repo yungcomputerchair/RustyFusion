@@ -1276,7 +1276,7 @@ impl Player {
     }
 
     pub fn start_skyway_ride(&mut self, trip_data: &'static TripData, mut path: Path) {
-        path.tick(&mut self.position); // advance to Moving state
+        path.start();
         self.skyway_ride = Some(SkywayRideState {
             trip_data,
             path,
