@@ -1,0 +1,10 @@
+[
+  {
+    "label": "Build & Run login server",
+    "command": "cargo run --bin login"
+  },
+  {
+    "label": "Build & Run shard server",
+    "command": "cargo run --bin shard"
+  }
+]
