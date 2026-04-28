@@ -152,6 +152,12 @@ impl<
         Ok(())
     }
 
+    pub fn set_all_chunks(&mut self, val: T) {
+        for chunk in &mut self.chunks {
+            *chunk = val;
+        }
+    }
+
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         for chunk in &self.chunks {

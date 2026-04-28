@@ -518,7 +518,7 @@ mod commands {
 
     fn init_commands() -> HashMap<&'static str, Command> {
         #[rustfmt::skip]
-        let commands: [(&'static str, &'static str, CommandHandler); 13] = [
+        let commands: [(&'static str, &'static str, CommandHandler); 15] = [
             ("about", "Show information about the server", cmd_about),
             ("ban_a", "Ban an account", cmd_ban),
             ("ban_i", "Ban a player and their account", cmd_ban),
@@ -531,6 +531,8 @@ mod commands {
             ("perms", "View or change a player's permissions level", cmd_perms),
             ("ping", "View your current ping to the server", cmd_ping),
             ("refresh", "Reinsert the player into the current chunk", cmd_refresh),
+            ("registerall", "Register all transportation locations", cmd_registerall),
+            ("unregisterall", "Unregister all transportation locations", cmd_unregisterall),
             ("help", "Show this help message", cmd_help),
         ];
 
@@ -1175,6 +1177,68 @@ mod commands {
                 .update(EntityID::Player(pc_id), Some(chunk_coords), true);
 
             Ok(())
+        })
+    }
+
+    fn cmd_registerall<'a>(
+        _tokens: Vec<&'a str>,
+        clients: &'a ClientMap<'a>,
+        state: &'a mut ShardServerState,
+    ) -> Pin<Box<dyn Future<Output = FFResult<()>> + Send + 'a>> {
+        Box::pin(async move {
+            let pc_id = clients.get_sender().get_player_id()?;
+            let player = state.get_player_mut(pc_id)?;
+
+            player.flags.scamper_flags.set_all_chunks(i32::MAX);
+            player.flags.skyway_flags.set_all_chunks(i64::MAX);
+
+            let pkt = sP_FE2CL_REP_PC_REGIST_TRANSPORTATION_LOCATION_SUCC {
+                eTT: unused!(),
+                iLocationID: unused!(),
+                iWarpLocationFlag: player.flags.scamper_flags.get_chunk(0).unwrap(),
+                aWyvernLocationFlag: player.flags.skyway_flags.to_array().unwrap(),
+            };
+
+            player
+                .get_client()
+                .unwrap()
+                .send_packet(P_FE2CL_REP_PC_REGIST_TRANSPORTATION_LOCATION_SUCC, &pkt);
+
+            send_system_message(
+                clients.get_sender(),
+                "All warp locations have been registered.",
+            )
+        })
+    }
+
+    fn cmd_unregisterall<'a>(
+        _tokens: Vec<&'a str>,
+        clients: &'a ClientMap<'a>,
+        state: &'a mut ShardServerState,
+    ) -> Pin<Box<dyn Future<Output = FFResult<()>> + Send + 'a>> {
+        Box::pin(async move {
+            let pc_id = clients.get_sender().get_player_id()?;
+            let player = state.get_player_mut(pc_id)?;
+
+            player.flags.scamper_flags.set_all_chunks(0);
+            player.flags.skyway_flags.set_all_chunks(0);
+
+            let pkt = sP_FE2CL_REP_PC_REGIST_TRANSPORTATION_LOCATION_SUCC {
+                eTT: unused!(),
+                iLocationID: unused!(),
+                iWarpLocationFlag: player.flags.scamper_flags.get_chunk(0).unwrap(),
+                aWyvernLocationFlag: player.flags.skyway_flags.to_array().unwrap(),
+            };
+
+            player
+                .get_client()
+                .unwrap()
+                .send_packet(P_FE2CL_REP_PC_REGIST_TRANSPORTATION_LOCATION_SUCC, &pkt);
+
+            send_system_message(
+                clients.get_sender(),
+                "All warp locations have been unregistered.",
+            )
         })
     }
 
