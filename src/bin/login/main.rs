@@ -191,7 +191,7 @@ async fn main() -> FFResult<()> {
                     .process_shard_connection_requests(&clients, SystemTime::now());
             }
             _ = db_conn_timer.tick() => {
-                log_if_failed(db_init(Severity::Fatal).await);
+                log_if_failed(db_init(Severity::Warning).await);
             }
             _ = monitor_timer.tick() => {
                 if monitor_enabled {
