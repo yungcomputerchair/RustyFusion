@@ -134,7 +134,7 @@ pub struct SkywayRideState {
 }
 
 #[derive(Debug, Clone)]
-struct Nanocom {
+pub struct Nanocom {
     nano_inventory: HashMap<i16, Nano>,
     equipped_ids: [Option<i16>; SIZEOF_NANO_CARRY_SLOT as usize],
     active_slot: Option<usize>,
@@ -149,6 +149,16 @@ impl Nanocom {
             }
         }
         bank
+    }
+
+    pub fn as_slots(&self) -> [u16; SIZEOF_NANO_CARRY_SLOT as usize] {
+        let mut slots = [0; SIZEOF_NANO_CARRY_SLOT as usize];
+        for (idx, nano_id) in self.equipped_ids.iter().enumerate() {
+            if let Some(nano_id) = nano_id {
+                slots[idx] = *nano_id as u16;
+            }
+        }
+        slots
     }
 
     pub fn as_carried(&self) -> [sNano; SIZEOF_NANO_CARRY_SLOT as usize] {
@@ -424,7 +434,7 @@ pub struct Player {
     level: i16,
     hp: i32,
     guide_data: GuideData,
-    nano_data: Nanocom,
+    pub nano_data: Nanocom,
     pub mission_journal: MissionJournal,
     inventory: PlayerInventory,
     taros: u32,
@@ -541,7 +551,7 @@ impl Player {
         self.nano_data.active_slot
     }
 
-    pub fn set_active_nano_slot(&mut self, slot: Option<usize>) -> FFResult<()> {
+    fn set_active_nano_slot(&mut self, slot: Option<usize>) -> FFResult<()> {
         if let Some(slot) = slot {
             if !(0..SIZEOF_NANO_CARRY_SLOT as usize).contains(&slot) {
                 return Err(FFError::build(
@@ -552,6 +562,37 @@ impl Player {
         }
         self.nano_data.active_slot = slot;
         Ok(())
+    }
+
+    pub fn deactivate_nano(&mut self) {
+        if let Some(nano) = self.get_active_nano() {
+            if let Some(skill) = nano.get_skill() {
+                if skill.passive {
+                    if let Some(buff_id) = skill.get_buff_id() {
+                        self.remove_buff(buff_id, Some(BuffType::Nano));
+                    }
+                }
+            }
+        }
+        self.nano_data.active_slot = None;
+    }
+
+    pub fn activate_nano(&mut self, slot: usize) -> FFResult<bool> {
+        self.deactivate_nano();
+        self.set_active_nano_slot(Some(slot))?;
+        let mut buff_applied = false;
+        if let Some(skill) = self.get_active_nano().and_then(|n| n.get_skill()) {
+            if skill.passive {
+                if let Some(buff_id) = skill.get_buff_id() {
+                    let level = placeholder!(0);
+                    let buff = skill.make_buff_instance(BuffType::Nano, level).unwrap();
+                    let id = self.get_id();
+                    self.apply_buff(buff_id, buff, Some(id));
+                    buff_applied = true;
+                }
+            }
+        }
+        Ok(buff_applied)
     }
 
     pub fn get_active_nano(&self) -> Option<&Nano> {
@@ -621,10 +662,6 @@ impl Player {
         Ok(())
     }
 
-    pub fn get_equipped_nano_ids(&self) -> [u16; SIZEOF_NANO_CARRY_SLOT as usize] {
-        self.nano_data.equipped_ids.map(|id| id.unwrap_or(0) as u16)
-    }
-
     pub fn get_nano_iter(&self) -> impl Iterator<Item = &Nano> {
         self.nano_data.nano_inventory.values()
     }
@@ -652,7 +689,7 @@ impl Player {
             aInven: self.inventory.main.map(Option::<Item>::into),
             aQInven: self.inventory.get_quest_item_arr(),
             aNanoBank: self.nano_data.as_bank(),
-            aNanoSlots: self.get_equipped_nano_ids(),
+            aNanoSlots: self.nano_data.as_slots(),
             iActiveNanoSlotNum: match self.nano_data.active_slot {
                 Some(active_slot) => active_slot as i16,
                 None => -1,
@@ -1584,6 +1621,29 @@ impl Player {
         }
     }
 
+    fn tick_nanos(&mut self) -> bool {
+        let mut changed = false;
+
+        let active_nano_id = self.get_active_nano().map(|n| n.get_id());
+        let equipped_nano_ids = self.nano_data.equipped_ids;
+        for nano_id in equipped_nano_ids.into_iter().flatten() {
+            if active_nano_id.is_some_and(|id| id == nano_id) {
+                // don't regen active nano
+                continue;
+            }
+
+            let nano = self.get_nano_mut(nano_id).unwrap();
+            changed |= nano.tick_regen();
+        }
+
+        if let Some(nano) = self.get_active_nano_mut() {
+            let level = placeholder!(1);
+            changed |= nano.tick_wear(level);
+        }
+
+        changed
+    }
+
     fn tick_regen(&mut self, time: &SystemTime) -> bool {
         const REGEN_INTERVAL: Duration = Duration::from_secs(4);
 
@@ -1640,11 +1700,38 @@ impl Player {
             }
         }
 
-        let transmit = player.tick_regen(time);
+        let mut transmit = false;
+        transmit |= player.tick_regen(time);
+        transmit |= player.tick_nanos();
+
+        if player
+            .get_active_nano()
+            .is_some_and(|n| n.get_stamina() == 0)
+        {
+            // nano is exhausted.
+            player.deactivate_nano();
+
+            // PC_TICK will handle the clientside deactivation for the owning player,
+            // but we still need to broadcast to other players.
+            let pkt = sP_FE2CL_NANO_ACTIVE {
+                iPC_ID: pc_id,
+                Nano: None.into(),
+                iConditionBitFlag: condition_bit_flag,
+                eCSTB___Add: false as i32,
+            };
+
+            state.entity_map.for_each_around(player_eid, |c| {
+                c.send_packet(P_FE2CL_NANO_ACTIVE, &pkt);
+            });
+
+            transmit = true; // just in case
+        }
+
         if !transmit {
             return;
         }
 
+        let player = state.get_player(pc_id).unwrap(); // re-borrow
         let pkt = sP_FE2CL_REP_PC_TICK {
             iHP: player.hp,
             aNano: player.nano_data.as_carried(),

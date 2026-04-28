@@ -1502,7 +1502,7 @@ fn load_skill_data(root: &Map<String, Value>) -> Result<SkillData, String> {
         m_iCoolTime: i32,
         m_iTargetNumber: i32,
         m_iBatteryDrainType: i32,
-        m_iBatteryDrainUse: [i32; 4],
+        m_iBatteryDrainUse: [i16; 4],
         m_iInitialTime: i32,
         m_iDeleverTime: i32,
         m_iDelayTime: i32,

@@ -8,7 +8,6 @@ use rusty_fusion::{
         packet::{PacketID::*, *},
         ClientMap, FFClient,
     },
-    placeholder,
     state::ShardServerState,
     tabledata::tdata_get,
     unused,
@@ -46,7 +45,7 @@ pub fn nano_equip(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState
     };
 
     if deactivate {
-        player.set_active_nano_slot(None).unwrap();
+        player.deactivate_nano();
         let bcast = sP_FE2CL_NANO_ACTIVE {
             iPC_ID: pc_id,
             Nano: None.into(),
@@ -84,13 +83,14 @@ pub fn nano_unequip(
     };
 
     if deactivate {
-        player.set_active_nano_slot(None).unwrap();
+        player.deactivate_nano();
         let bcast = sP_FE2CL_NANO_ACTIVE {
             iPC_ID: pc_id,
             Nano: None.into(),
             iConditionBitFlag: player.get_condition_bit_flag(),
             eCSTB___Add: 0,
         };
+
         state
             .entity_map
             .for_each_around(EntityID::Player(pc_id), |c| {
@@ -108,60 +108,23 @@ pub fn nano_active(pkt: Packet, clients: &ClientMap, state: &mut ShardServerStat
     let pkt: &sP_CL2FE_REQ_NANO_ACTIVE = pkt.get()?;
 
     let player = state.get_player_mut(pc_id)?;
-    let current_nano = player.get_active_nano();
-    if let Some(nano) = current_nano {
-        // nano is being unsummoned; remove buffs if necessary
-        if let Some(skill) = nano.get_skill() {
-            if skill.passive {
-                if let Some(buff_id) = skill.get_buff_id() {
-                    player.remove_buff(buff_id, Some(BuffType::Nano));
-                } else {
-                    log(
-                        Severity::Warning,
-                        &format!("Passive nano skill {:?} does not have a buff ID", skill),
-                    );
-                }
-            }
-        }
-    }
-
-    if pkt.iNanoSlotNum == -1 {
-        player.set_active_nano_slot(None).unwrap();
+    let buff_applied = if pkt.iNanoSlotNum == NANO_SLOT_NONE {
+        player.deactivate_nano();
+        false
     } else {
-        player.set_active_nano_slot(Some(pkt.iNanoSlotNum as usize))?;
-    }
-
-    let mut buff = None;
-    if let Some(skill) = player.get_active_nano().and_then(|n| n.get_skill()) {
-        if skill.passive {
-            let buff_id = skill.get_buff_id();
-            if let Some(buff_id) = buff_id {
-                let level = placeholder!(0);
-                let buff_instance = skill.make_buff_instance(BuffType::Nano, level).unwrap();
-                buff = Some((buff_id, buff_instance));
-            } else {
-                log(
-                    Severity::Warning,
-                    &format!("Passive nano skill {:?} does not have a buff ID", skill),
-                );
-            }
-        }
-    }
-
-    if let Some((buff_id, buff)) = buff.clone() {
-        player.apply_buff(buff_id, buff, Some(EntityID::Player(pc_id)));
-    }
+        player.activate_nano(pkt.iNanoSlotNum as usize)?
+    };
 
     let resp = sP_FE2CL_REP_NANO_ACTIVE_SUCC {
         iActiveNanoSlotNum: pkt.iNanoSlotNum,
-        eCSTB___Add: buff.is_some() as i32,
+        eCSTB___Add: buff_applied as i32,
     };
 
     let bcast = sP_FE2CL_NANO_ACTIVE {
         iPC_ID: pc_id,
         Nano: player.get_active_nano().into(),
         iConditionBitFlag: player.get_condition_bit_flag(),
-        eCSTB___Add: buff.is_some() as i32,
+        eCSTB___Add: buff_applied as i32,
     };
 
     state

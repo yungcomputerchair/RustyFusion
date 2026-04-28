@@ -1,3 +1,5 @@
+use std::time::{Duration, Instant};
+
 use crate::{
     defines::*,
     enums::*,
@@ -13,6 +15,8 @@ pub struct Nano {
     id: i16,
     pub selected_skill: Option<i16>,
     stamina: i16,
+    last_regen: Option<Instant>,
+    last_wear: Option<Instant>,
 }
 impl Nano {
     pub fn new(id: i16) -> Self {
@@ -20,6 +24,8 @@ impl Nano {
             id,
             selected_skill: None,
             stamina: NANO_STAMINA_MAX,
+            last_regen: None,
+            last_wear: None,
         }
     }
 
@@ -47,6 +53,56 @@ impl Nano {
         self.selected_skill
             .and_then(|id| log_if_failed(tdata_get().get_skill(id)))
     }
+
+    pub fn tick_regen(&mut self) -> bool {
+        const STAMINA_REGEN_INTERVAL: Duration = Duration::from_secs(2);
+        const STAMINA_REGEN_HEAL: i16 = 1;
+
+        if self.stamina == NANO_STAMINA_MAX {
+            return false;
+        }
+
+        let now = Instant::now();
+        if self
+            .last_regen
+            .is_some_and(|last| now - last < STAMINA_REGEN_INTERVAL)
+        {
+            return false;
+        }
+
+        let new_stamina = self.stamina + STAMINA_REGEN_HEAL;
+        self.set_stamina(new_stamina);
+        self.last_regen = Some(now);
+        true
+    }
+
+    pub fn tick_wear(&mut self, level: usize) -> bool {
+        const STAMINA_WEAR_INTERVAL: Duration = Duration::from_secs(2);
+        const STAMINA_WEAR_BASE_RATE: f32 = 1.0;
+        const STAMINA_WEAR_PASSIVE_FACTOR: f32 = 0.2;
+
+        let now = Instant::now();
+        if self
+            .last_wear
+            .is_some_and(|last| now - last < STAMINA_WEAR_INTERVAL)
+        {
+            return false;
+        }
+
+        let mut wear_rate = STAMINA_WEAR_BASE_RATE;
+        if let Some(skill) = log_if_none!(self.get_skill()) {
+            if skill.passive {
+                let skill_wear_rate = skill.costs[level];
+                wear_rate += STAMINA_WEAR_PASSIVE_FACTOR * skill_wear_rate as f32;
+            }
+        }
+
+        let cost = wear_rate as i16;
+        let new_stamina = self.stamina - cost;
+        self.set_stamina(new_stamina);
+        self.last_wear = Some(now);
+        true
+    }
 }
 impl From<sNano> for Option<Nano> {
     fn from(value: sNano) -> Self {
@@ -63,6 +119,8 @@ impl From<sNano> for Option<Nano> {
             id: value.iID,
             selected_skill: skill,
             stamina: value.iStamina,
+            last_regen: None,
+            last_wear: None,
         };
         Some(nano)
     }

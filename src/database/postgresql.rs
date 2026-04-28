@@ -181,15 +181,17 @@ impl PostgresDatabase {
             player.get_position()
         };
 
+        let nano_slots = player.nano_data.as_slots();
+
         Self::exec(
             client,
             "save_player",
             &[
                 &pc_uid,
                 &(player.get_level() as Int),
-                &(player.get_equipped_nano_ids()[0] as Int),
-                &(player.get_equipped_nano_ids()[1] as Int),
-                &(player.get_equipped_nano_ids()[2] as Int),
+                &(nano_slots[0] as Int),
+                &(nano_slots[1] as Int),
+                &(nano_slots[2] as Int),
                 &(player.flags.tutorial_flag as Int),
                 &(player.flags.payzone_flag as Int),
                 &position.x,

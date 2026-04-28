@@ -23,6 +23,22 @@ macro_rules! placeholder {
     }};
 }
 
+#[macro_export]
+macro_rules! log_if_none {
+    ($val:expr) => {
+        match $val {
+            Some(v) => Some(v),
+            None => {
+                $crate::error::log(
+                    $crate::error::Severity::Warning,
+                    &format!("{:?} is None, line {}", $val, line!()),
+                );
+                None
+            }
+        }
+    };
+}
+
 pub mod defines;
 pub mod enums;
 pub mod error;

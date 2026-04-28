@@ -52,7 +52,7 @@ pub struct Skill {
     pub values_a: [i32; SKILL_LEVEL_MAX + 1],
     pub values_b: [Option<i32>; SKILL_LEVEL_MAX + 1],
     pub values_c: [Option<i32>; SKILL_LEVEL_MAX + 1],
-    pub costs: [i32; SKILL_LEVEL_MAX + 1],
+    pub costs: [i16; SKILL_LEVEL_MAX + 1],
     pub durations: [Option<Duration>; SKILL_LEVEL_MAX + 1],
 }
 impl Skill {
