@@ -120,7 +120,8 @@ define_db_api! {
 }
 
 fn format_db_conn_error(parent_error: FFError) -> FFError {
-    let expected_error_message = "Error occurred while creating a new object: error connecting to server";
+    let expected_error_message =
+        "Error occurred while creating a new object: error connecting to server";
 
     if let Some(parent_parent) = parent_error.get_parent() {
         if parent_parent.get_msg() == expected_error_message {
@@ -137,7 +138,8 @@ fn format_db_conn_error(parent_error: FFError) -> FFError {
     FFError::build(
         Severity::Warning,
         "Unexpected error while connecting to database".to_string(),
-    ).with_parent(parent_error)
+    )
+    .with_parent(parent_error)
 }
 
 async fn db_connect(config: &GeneralConfig) -> FFResult<DbBackend> {
