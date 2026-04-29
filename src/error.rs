@@ -319,6 +319,10 @@ impl Logger {
         }
     }
 
+    pub fn disable_buffer(&mut self) {
+        self.buffer = None;
+    }
+
     pub fn buffer(&self) -> Option<&RingBuffer<FFError>> {
         self.buffer.as_ref()
     }

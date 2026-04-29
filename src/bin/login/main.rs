@@ -12,10 +12,7 @@ use ffmonitor::PlayerEvent;
 use rusty_fusion::{
     config::config_init,
     database::db_init,
-    error::{
-        log, log_error, log_if_failed, log_init, FFError, FFResult, Logger, Severity,
-        LOG_BUFFER_SIZE,
-    },
+    error::{log, log_error, log_if_failed, log_init, FFError, FFResult, Logger, Severity},
     geo::geo_init,
     monitor::{monitor_flush, monitor_init, monitor_queue, MonitorEvent},
     net::{
@@ -143,21 +140,13 @@ async fn main() -> FFResult<()> {
                                 break;
                             }
 
-                            let tui = &mut tui.as_mut().unwrap().1;
+                            let t = &mut tui.as_mut().unwrap().1;
                             match key_event.code {
-                                KeyCode::Up => tui.state.scroll(1),
-                                KeyCode::Down => tui.state.scroll(-1),
-                                KeyCode::PageUp => tui.state.scroll(10),
-                                KeyCode::PageDown => tui.state.scroll(-10),
-                                KeyCode::Esc => tui.state.reset_scroll(),
-                                KeyCode::Char('`') => {
-                                    #[cfg(debug_assertions)]
-                                    {
-                                        for _ in 1..=LOG_BUFFER_SIZE {
-                                            log(Severity::Debug, "Test debug message");
-                                        }
-                                    }
-                                }
+                                KeyCode::Up => t.state.scroll(1),
+                                KeyCode::Down => t.state.scroll(-1),
+                                KeyCode::PageUp => t.state.scroll(10),
+                                KeyCode::PageDown => t.state.scroll(-10),
+                                KeyCode::Esc => t.state.reset_scroll(),
                                 _ => {}
                             }
                         }
@@ -166,9 +155,13 @@ async fn main() -> FFResult<()> {
                         log(Severity::Warning, &format!("Error reading key event: {}", e));
                     }
                     None => {
-                        // should not happen
-                        log(Severity::Fatal, "Key event stream ended unexpectedly");
-                        break;
+                        tui = None;
+                        ratatui::restore();
+                        logger.disable_buffer();
+                        log(
+                            Severity::Warning,
+                            "Key event stream ended; TUI disabled",
+                        );
                     }
                 }
             }
