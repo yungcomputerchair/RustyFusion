@@ -786,25 +786,24 @@ fn handle_skill_cast(
 ) -> Option<SkillResult> {
     // TODO implement
     Some(match cast.skill.skill_type {
-        // TODO find out why this doesn't work
-        // SkillType::Damage => {
-        //     let base_damage = cast.skill.values_a[cast.level];
-        //     let attack = BasicAttack {
-        //         power: base_damage,
-        //         crit_chance: None,
-        //         attack_style: cast.style,
-        //         charged: false,
-        //     };
+        SkillType::Damage => {
+            let base_damage = cast.skill.values_a[cast.level];
+            let attack = BasicAttack {
+                power: base_damage,
+                crit_chance: None,
+                attack_style: cast.style,
+                charged: false,
+            };
 
-        //     let attack_result = handle_basic_attack(from, to, &attack);
-        //     SkillResult::Damage(sSkillResult_Damage {
-        //         eCT: attack_result.eCT,
-        //         iID: attack_result.iID,
-        //         bProtected: attack_result.bProtected,
-        //         iDamage: attack_result.iDamage,
-        //         iHP: attack_result.iHP,
-        //     })
-        // }
+            let attack_result = handle_basic_attack(from, to, &attack);
+            SkillResult::Damage(sSkillResult_Damage {
+                eCT: attack_result.eCT,
+                iID: attack_result.iID,
+                bProtected: attack_result.bProtected,
+                iDamage: attack_result.iDamage,
+                iHP: attack_result.iHP,
+            })
+        }
         SkillType::HealHP => {
             let heal_amount = cast.skill.values_a[cast.level];
             to.heal(heal_amount);

@@ -195,6 +195,18 @@ const CONFIG_PATH: &str = "{config_path}";
             .collect::<Vec<_>>()
             .join("\n");
 
+        let merge_fields = section
+            .fields
+            .iter()
+            .map(|f| {
+                format!(
+                    "        if other.{key}.is_set() {{ self.{key} = other.{key}; }}",
+                    key = f.key,
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
         write!(
             out,
             r#"
@@ -203,6 +215,11 @@ const CONFIG_PATH: &str = "{config_path}";
 #[derive(Deserialize, Default)]
 pub struct {struct_name} {{
 {struct_fields}
+}}
+impl {struct_name} {{
+    fn merge(&mut self, other: Self) {{
+{merge_fields}
+    }}
 }}
 "#,
         )
@@ -239,6 +256,12 @@ pub struct {struct_name} {{
         .collect::<Vec<_>>()
         .join("\n");
 
+    let merge_sections = sections
+        .iter()
+        .map(|s| format!("        self.{name}.merge(other.{name});", name = s.name))
+        .collect::<Vec<_>>()
+        .join("\n");
+
     write!(
         out,
         r#"
@@ -248,11 +271,6 @@ pub struct Config {{
 }}
 impl Config {{
     fn load(path: &str) -> FFResult<Self> {{
-        #[derive(Deserialize)]
-        struct ConfigLayout {{
-{layout_fields}
-        }}
-
         let file_read = std::fs::read_to_string(path);
         if let Err(e) = file_read {{
             if let std::io::ErrorKind::NotFound = e.kind() {{
@@ -271,19 +289,30 @@ impl Config {{
         }}
 
         let file_contents = file_read.unwrap();
-        let parsed = toml::from_str::<ConfigLayout>(&file_contents);
-        if let Err(e) = parsed {{
-            return Err(FFError::build(
-                Severity::Fatal,
-                format!("Failed to parse config file: {{}}", e),
-            ));
-        }};
+        let config = Config::from_str(&file_contents)?;
+        Ok(config)
+    }}
 
-        let parsed = parsed.unwrap();
+    fn from_str(toml_str: &str) -> FFResult<Self> {{
+        #[derive(Deserialize)]
+        struct ConfigLayout {{
+{layout_fields}
+        }}
+
+        let parsed = toml::from_str::<ConfigLayout>(toml_str).map_err(|e| {{
+            FFError::build(
+                Severity::Fatal,
+                format!("Failed to parse config overrides: {{}}", e),
+            )
+        }})?;
 
         Ok(Config {{
 {unwrap_fields}
         }})
+    }}
+
+    fn merge(&mut self, other: Config) {{
+{merge_sections}
     }}
 }}
 "#,
