@@ -15,6 +15,7 @@ pub const GROUP_MAX_PLAYER_COUNT: usize = 4;
 pub const GROUP_MAX_NPC_COUNT: usize = 1;
 
 pub const PLAYER_RUN_SPEED: i32 = 600;
+pub const NPC_RUN_DISTANCE: u32 = 200;
 pub const NANO_STAMINA_MAX: i16 = 150;
 pub const NANO_SLOT_NONE: i16 = -1;
 

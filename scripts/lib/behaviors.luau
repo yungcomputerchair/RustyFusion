@@ -146,7 +146,7 @@ function behaviors.chase_target(npc: Npc)
         return
     end
 
-    npc:move_toward_entity(target)
+    npc:move_toward_entity(target, npc:run_speed())
 end
 
 -- Idle roam: pick a random point near spawn, walk to it, wait.

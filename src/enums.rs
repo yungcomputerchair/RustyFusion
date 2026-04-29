@@ -80,6 +80,11 @@ ffenum!(CombatantTeam, i32, {
     Mob = 2,
 });
 
+ffenum!(MoveStyle, i16, {
+    Walk = 0,
+    Run = 1,
+});
+
 // eCharType.cs
 ffenum!(CharType, i32, 5, {
     Unknown = 0,

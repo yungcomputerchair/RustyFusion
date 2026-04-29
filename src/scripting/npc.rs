@@ -4,9 +4,7 @@ use rand::thread_rng;
 use crate::{
     entity::{Combatant, Entity, EntityID, NPC},
     error::log_if_failed,
-    helpers,
-    path::Path as NpcPath,
-    skills,
+    helpers, skills,
     state::ShardServerState,
     tabledata::tdata_get,
     Position,
@@ -176,25 +174,8 @@ impl LuaUserData for NpcScriptContext {
             luau_method!(methods, "move_to" -> "()",
                 |_, this, (x, y, z, speed): (i32, i32, i32, Option<i32>)| this.with_state(|state| {
                     let target_pos = Position { x, y, z };
-                    let speed = {
-                        let npc = state.get_npc(this.npc_id)?;
-                        speed.unwrap_or_else(|| {
-                            let dist = npc.get_position().distance_to(&target_pos);
-                            let walk_speed = npc.get_speed(false);
-                            if dist > walk_speed as u32 {
-                                npc.get_speed(true)
-                            } else {
-                                walk_speed
-                            }
-                        })
-                    };
-
-                    let mut path = NpcPath::new_single(target_pos, speed);
-                    path.start();
-                    NPC::tick_movement_along_path(this.npc_id, &mut path, state);
-                    // Store path so is_moving() works across ticks
                     let npc = state.get_npc_mut(this.npc_id)?;
-                    npc.path = Some(path);
+                    npc.move_towards(target_pos, speed);
                     Ok(())
                 })
             );
@@ -205,38 +186,8 @@ impl LuaUserData for NpcScriptContext {
                     None => return Err(LuaError::runtime("Entity not found")),
                 };
 
-                let (target_pos, too_close, speed) = {
-                    let npc = state.get_npc(this.npc_id)?;
-                    let stats = tdata_get()
-                        .get_npc_stats(npc.ty)
-                        .map_err(|e| LuaError::runtime(e.to_string()))?;
-
-                    let following_distance = stats.radius;
-                    let (target_pos, too_close) =
-                        target_pos.interpolate(&npc.get_position(), following_distance as f32);
-
-                    let speed = speed.unwrap_or_else(|| {
-                        let dist = npc.get_position().distance_to(&target_pos);
-                        let walk_speed = npc.get_speed(false);
-                        if dist > walk_speed as u32 {
-                            npc.get_speed(true)
-                        } else {
-                            walk_speed
-                        }
-                    });
-
-                    (target_pos, too_close, speed)
-                };
-
-                if too_close {
-                    return Ok(());
-                }
-
-                let mut path = NpcPath::new_single(target_pos, speed);
-                path.start();
-                NPC::tick_movement_along_path(this.npc_id, &mut path, state);
                 let npc = state.get_npc_mut(this.npc_id)?;
-                npc.path = Some(path);
+                npc.move_towards(target_pos, speed);
                 Ok(())
             }));
 

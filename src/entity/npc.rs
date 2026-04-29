@@ -7,9 +7,9 @@ use uuid::Uuid;
 
 use crate::{
     chunk::{ChunkCoords, InstanceID},
-    defines::RANGE_INTERACT,
+    defines::{NPC_RUN_DISTANCE, RANGE_INTERACT},
     entity::{Combatant, Entity, EntityID},
-    enums::{BuffID, BuffType, CharType, CombatStyle, CombatantTeam},
+    enums::{BuffID, BuffType, CharType, CombatStyle, CombatantTeam, MoveStyle},
     error::FFResult,
     helpers,
     net::{
@@ -84,6 +84,32 @@ impl NPC {
         })
     }
 
+    pub fn move_towards(&mut self, position: Position, speed: Option<i32>) -> bool {
+        let stats = tdata_get().get_npc_stats(self.ty).unwrap();
+
+        let own_pos = self.get_position();
+        let following_distance = stats.radius;
+        let (target_pos, too_close) = position.interpolate(&own_pos, following_distance as f32);
+
+        if too_close {
+            return false;
+        }
+
+        let speed = speed.unwrap_or_else(|| {
+            let dist = own_pos.distance_to(&target_pos);
+            if dist > NPC_RUN_DISTANCE as u32 {
+                stats.run_speed
+            } else {
+                stats.walk_speed
+            }
+        });
+
+        let mut path = Path::new_single(target_pos, speed);
+        path.start();
+        self.path = Some(path);
+        true
+    }
+
     pub fn set_path(&mut self, path: Path) {
         self.path = Some(path);
     }
@@ -141,14 +167,20 @@ impl NPC {
 
             // broadcast movement
             let npc = state.get_npc(npc_id).unwrap(); // re-borrow
-            let run_speed = tdata_get().get_npc_stats(npc.ty).unwrap().run_speed;
+            let stats = tdata_get().get_npc_stats(npc.ty).unwrap();
+            let move_style = if speed > stats.walk_speed {
+                MoveStyle::Run
+            } else {
+                MoveStyle::Walk
+            };
+
             let pkt = sP_FE2CL_NPC_MOVE {
                 iNPC_ID: npc.id,
                 iToX: npc.position.x,
                 iToY: npc.position.y,
                 iToZ: npc.position.z,
                 iSpeed: speed,
-                iMoveStyle: if speed >= run_speed { 1 } else { 0 },
+                iMoveStyle: move_style as i16,
             };
 
             state
@@ -209,7 +241,14 @@ impl NPC {
             });
         }
 
-        // tick path
+        // tick AI; we don't tick AI while PCs are interacting with the NPC
+        let npc = state.get_npc(npc_id).unwrap(); // re-borrow
+        if npc.ai.is_some() && npc.interacting_pcs.is_empty() {
+            let scripting = scripting_get();
+            scripting.lock().tick_npc(npc_id, state);
+        }
+
+        // tick path (after AI, so movements from Lua take effect immediately)
         let npc = state.get_npc_mut(npc_id).unwrap(); // re-borrow
         if let Some(mut path) = npc.path.take() {
             if !npc.is_dead() {
@@ -221,13 +260,6 @@ impl NPC {
                     state.get_npc_mut(npc_id).unwrap().path = Some(path);
                 }
             }
-        }
-
-        // tick AI; we don't tick AI while PCs are interacting with the NPC
-        let npc = state.get_npc(npc_id).unwrap(); // re-borrow
-        if npc.ai.is_some() && npc.interacting_pcs.is_empty() {
-            let scripting = scripting_get();
-            scripting.lock().tick_npc(npc_id, state);
         }
     }
 }
@@ -254,19 +286,15 @@ impl Entity for NPC {
     }
 
     fn get_speed(&self, running: bool) -> i32 {
-        if let Some(path) = &self.path {
-            path.get_speed()
+        let stats = tdata_get().get_npc_stats(self.ty).unwrap();
+        let base_speed = if running {
+            stats.run_speed
         } else {
-            let stats = tdata_get().get_npc_stats(self.ty).unwrap();
-            let base_speed = if running {
-                stats.run_speed
-            } else {
-                stats.walk_speed
-            };
+            stats.walk_speed
+        };
 
-            let buffed_speed = self.buffs.get_buff_value(BuffID::UpMoveSpeed).unwrap_or(0);
-            base_speed + buffed_speed
-        }
+        let buffed_speed = self.buffs.get_buff_value(BuffID::UpMoveSpeed).unwrap_or(0);
+        base_speed + buffed_speed
     }
 
     fn get_chunk_coords(&self) -> ChunkCoords {
