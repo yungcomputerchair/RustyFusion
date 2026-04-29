@@ -5,6 +5,7 @@ use std::fmt::Write;
 
 const CONFIG_SCHEMA_PATH: &str = "config_schema.toml";
 const CONFIG_PATH: &str = "config.toml";
+const CONFIG_IMPL_TEMPLATE_PATH: &str = "codegen/config_impl.rs";
 
 const LUAU_SCRIPTING_DIR: &str = "src/scripting";
 const LUAU_DECL_PATH: &str = "scripts/globals.d.luau";
@@ -262,62 +263,16 @@ impl {struct_name} {{
         .collect::<Vec<_>>()
         .join("\n");
 
-    write!(
-        out,
-        r#"
-#[derive(Default)]
-pub struct Config {{
-{config_fields}
-}}
-impl Config {{
-    fn load(path: &str) -> FFResult<Self> {{
-        let file_read = std::fs::read_to_string(path);
-        if let Err(e) = file_read {{
-            if let std::io::ErrorKind::NotFound = e.kind() {{
-                log(
-                    Severity::Warning,
-                    &format!("Config file {{}} missing, using default config", path),
-                );
+    let template = std::fs::read_to_string(CONFIG_IMPL_TEMPLATE_PATH)
+        .unwrap_or_else(|e| panic!("build.rs: can't read {}: {}", CONFIG_IMPL_TEMPLATE_PATH, e));
 
-                return Ok(Self::default());
-            }} else {{
-                return Err(FFError::build(
-                    Severity::Fatal,
-                    "Failed to read config file".to_string(),
-                ).with_parent(e.into()));
-            }}
-        }}
+    let config_impl = template
+        .replace("//CONFIG_FIELDS//", &config_fields)
+        .replace("//LAYOUT_FIELDS//", &layout_fields)
+        .replace("//UNWRAP_FIELDS//", &unwrap_fields)
+        .replace("//MERGE_FIELDS//", &merge_sections);
 
-        let file_contents = file_read.unwrap();
-        let config = Config::from_str(&file_contents)?;
-        Ok(config)
-    }}
-
-    fn from_str(toml_str: &str) -> FFResult<Self> {{
-        #[derive(Deserialize)]
-        struct ConfigLayout {{
-{layout_fields}
-        }}
-
-        let parsed = toml::from_str::<ConfigLayout>(toml_str).map_err(|e| {{
-            FFError::build(
-                Severity::Fatal,
-                format!("Failed to parse config overrides: {{}}", e),
-            )
-        }})?;
-
-        Ok(Config {{
-{unwrap_fields}
-        }})
-    }}
-
-    fn merge(&mut self, other: Config) {{
-{merge_sections}
-    }}
-}}
-"#,
-    )
-    .unwrap();
+    write!(out, "\n{}", config_impl).unwrap();
 
     out
 }
@@ -336,6 +291,7 @@ fn strip_annotations(input: &str) -> String {
 fn generate_config_structs() {
     println!("cargo:rerun-if-changed={}", CONFIG_SCHEMA_PATH);
     println!("cargo:rerun-if-changed={}", CONFIG_PATH);
+    println!("cargo:rerun-if-changed={}", CONFIG_IMPL_TEMPLATE_PATH);
 
     let input = std::fs::read_to_string(CONFIG_SCHEMA_PATH)
         .unwrap_or_else(|e| panic!("build.rs: can't read {}: {}", CONFIG_SCHEMA_PATH, e));
