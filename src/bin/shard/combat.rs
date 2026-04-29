@@ -270,41 +270,104 @@ pub fn nano_skill_use(
 
     nano.set_stamina(nano_stamina - skill_cost);
 
-    let resp = sP_FE2CL_NANO_SKILL_USE_SUCC {
-        iPC_ID: pc_id,
-        iBulletID: pkt.iBulletID,
-        iSkillID: nano.selected_skill.unwrap(),
-        iArg1: pkt.iArg1,
-        iArg2: pkt.iArg2,
-        iArg3: pkt.iArg3,
-        bNanoDeactive: (nano.get_stamina() == 0) as i32,
-        iNanoID: nano.get_id(),
-        iNanoStamina: nano.get_stamina(),
-        eST: skill.skill_type as i32,
-        iTargetCnt: results.len() as i32,
-    };
+    let target_cnt = results.len() as i32;
+    let skill_id = nano.selected_skill.unwrap();
+    let nano_stamina = nano.get_stamina();
+    let nano_deactive = nano_stamina == 0;
+    let nano_id = nano.get_id();
+    let skill_type = skill.skill_type as i32;
 
-    let mut builder = PacketBuilder::new(P_FE2CL_NANO_SKILL_USE_SUCC).with(&resp);
+    let mut succ_builder =
+        PacketBuilder::new(P_FE2CL_NANO_SKILL_USE_SUCC).with(&sP_FE2CL_NANO_SKILL_USE_SUCC {
+            iPC_ID: pc_id,
+            iBulletID: pkt.iBulletID,
+            iSkillID: skill_id,
+            iArg1: pkt.iArg1,
+            iArg2: pkt.iArg2,
+            iArg3: pkt.iArg3,
+            bNanoDeactive: nano_deactive as i32,
+            iNanoID: nano_id,
+            iNanoStamina: nano_stamina,
+            eST: skill_type,
+            iTargetCnt: target_cnt,
+        });
+
+    let mut bcast_builder =
+        PacketBuilder::new(P_FE2CL_NANO_SKILL_USE).with(&sP_FE2CL_NANO_SKILL_USE {
+            iPC_ID: pc_id,
+            iBulletID: pkt.iBulletID,
+            iSkillID: skill_id,
+            iArg1: pkt.iArg1,
+            iArg2: pkt.iArg2,
+            iArg3: pkt.iArg3,
+            bNanoDeactive: nano_deactive as i32,
+            iNanoID: nano_id,
+            iNanoStamina: nano_stamina,
+            eST: skill_type,
+            iTargetCnt: target_cnt,
+        });
+
     for result in results {
         // These look identical, but since they have different concrete types, each arm
         // is a different push call with a different type parameter.
         match result {
-            SkillResult::Damage(sr) => builder.push(&sr),
-            SkillResult::DotDamage(sr) => builder.push(&sr),
-            SkillResult::HealHP(sr) => builder.push(&sr),
-            SkillResult::HealStamina(sr) => builder.push(&sr),
-            SkillResult::StaminaSelf(sr) => builder.push(&sr),
-            SkillResult::DamageAndDebuff(sr) => builder.push(&sr),
-            SkillResult::Buff(sr) => builder.push(&sr),
-            SkillResult::BatteryDrain(sr) => builder.push(&sr),
-            SkillResult::DamageAndMove(sr) => builder.push(&sr),
-            SkillResult::Move(sr) => builder.push(&sr),
-            SkillResult::Resurrect(sr) => builder.push(&sr),
+            SkillResult::Damage(sr) => {
+                succ_builder.push(&sr);
+                bcast_builder.push(&sr);
+            }
+            SkillResult::DotDamage(sr) => {
+                succ_builder.push(&sr);
+                bcast_builder.push(&sr);
+            }
+            SkillResult::HealHP(sr) => {
+                succ_builder.push(&sr);
+                bcast_builder.push(&sr);
+            }
+            SkillResult::HealStamina(sr) => {
+                succ_builder.push(&sr);
+                bcast_builder.push(&sr);
+            }
+            SkillResult::StaminaSelf(sr) => {
+                succ_builder.push(&sr);
+                bcast_builder.push(&sr);
+            }
+            SkillResult::DamageAndDebuff(sr) => {
+                succ_builder.push(&sr);
+                bcast_builder.push(&sr);
+            }
+            SkillResult::Buff(sr) => {
+                succ_builder.push(&sr);
+                bcast_builder.push(&sr);
+            }
+            SkillResult::BatteryDrain(sr) => {
+                succ_builder.push(&sr);
+                bcast_builder.push(&sr);
+            }
+            SkillResult::DamageAndMove(sr) => {
+                succ_builder.push(&sr);
+                bcast_builder.push(&sr);
+            }
+            SkillResult::Move(sr) => {
+                succ_builder.push(&sr);
+                bcast_builder.push(&sr);
+            }
+            SkillResult::Resurrect(sr) => {
+                succ_builder.push(&sr);
+                bcast_builder.push(&sr);
+            }
         }
     }
 
-    if let Some(pkt) = log_if_failed(builder.build()) {
+    if let Some(pkt) = log_if_failed(succ_builder.build()) {
         client.send_payload(pkt);
+    }
+
+    if let Some(pkt) = log_if_failed(bcast_builder.build()) {
+        state
+            .entity_map
+            .for_each_around(EntityID::Player(pc_id), |c| {
+                c.send_payload(pkt.clone());
+            });
     }
 
     Ok(())
