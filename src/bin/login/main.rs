@@ -31,7 +31,6 @@ use tokio::sync::Mutex;
 #[tokio::main]
 async fn main() -> FFResult<()> {
     color_eyre::install().unwrap();
-    let _cleanup = Cleanup {};
 
     let log_rx = log_init();
     let config = config_init()?;
@@ -118,7 +117,6 @@ async fn main() -> FFResult<()> {
 
     let mut fatal_error = None;
     loop {
-        // Check timers
         tokio::select! {
             res = server.poll() => {
                 if let Err(e) = res {
@@ -165,6 +163,9 @@ async fn main() -> FFResult<()> {
                     }
                 }
             }
+            _ = tokio::signal::ctrl_c(), if tui.is_none() => {
+                break;
+            }
             _ = tui_timer.tick() => {
                 logger.drain();
                 if let Some((terminal, tui, _)) = &mut tui {
@@ -209,17 +210,15 @@ async fn main() -> FFResult<()> {
             terminal.draw(|frame| tui.render(frame, &state, &clients, logger.buffer().unwrap()));
     }
 
+    // disable TUI
+    if tui.is_some() {
+        ratatui::restore();
+    }
+
     if let Some(e) = fatal_error {
         Err(e)
     } else {
         Ok(())
-    }
-}
-
-struct Cleanup;
-impl Drop for Cleanup {
-    fn drop(&mut self) {
-        ratatui::restore();
     }
 }
 
