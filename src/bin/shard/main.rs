@@ -454,6 +454,9 @@ fn handle_packet<'a>(
             P_CL2FE_REQ_NANO_UNEQUIP => nano::nano_unequip(pkt, &clients, state),
             P_CL2FE_REQ_NANO_ACTIVE => nano::nano_active(pkt, &clients, state),
             P_CL2FE_REQ_NANO_TUNE => nano::nano_tune(pkt, clients.get_sender(), state),
+            P_CL2FE_REQ_CHARGE_NANO_STAMINA => {
+                nano::charge_nano_stamina(clients.get_sender(), state)
+            }
             //
             P_CL2FE_REQ_REQUEST_MAKE_BUDDY => buddy::request_make_buddy(pkt, &clients, state),
             P_CL2FE_REQ_ACCEPT_MAKE_BUDDY => buddy::accept_make_buddy(pkt, &clients, state),

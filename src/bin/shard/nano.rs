@@ -137,6 +137,57 @@ pub fn nano_active(pkt: Packet, clients: &ClientMap, state: &mut ShardServerStat
     Ok(())
 }
 
+pub fn charge_nano_stamina(client: &FFClient, state: &mut ShardServerState) -> FFResult<()> {
+    let pc_id = client.get_player_id()?;
+    let player = state.get_player_mut(pc_id)?;
+    let available_potions = player.get_nano_potions();
+    if available_potions == 0 {
+        return Err(FFError::build(
+            Severity::Warning,
+            format!(
+                "{} tried to charge nano stamina without any potions",
+                player
+            ),
+        ));
+    }
+
+    let Some(active_nano) = player.get_active_nano_mut() else {
+        return Err(FFError::build(
+            Severity::Warning,
+            format!(
+                "{} tried to charge nano stamina without an active nano",
+                player
+            ),
+        ));
+    };
+
+    let nano_id = active_nano.get_id();
+    let current_stamina = active_nano.get_stamina();
+    let depleted_stamina = (NANO_STAMINA_MAX - current_stamina) as u32;
+    if depleted_stamina == 0 {
+        return Ok(()); // nothing to do
+    }
+
+    let potions_to_use = depleted_stamina.min(available_potions);
+
+    // heal nano
+    let new_stamina = current_stamina + potions_to_use as i16;
+    active_nano.set_stamina(new_stamina);
+
+    // consume from player
+    let player = state.get_player_mut(pc_id)?; // reborrow
+    let new_available_potions = player.set_nano_potions(available_potions - potions_to_use);
+
+    let resp = sP_FE2CL_REP_CHARGE_NANO_STAMINA {
+        iBatteryN: new_available_potions as i32,
+        iNanoID: nano_id,
+        iNanoStamina: new_stamina,
+    };
+
+    client.send_packet(P_FE2CL_REP_CHARGE_NANO_STAMINA, &resp);
+    Ok(())
+}
+
 pub fn nano_tune(pkt: Packet, client: &FFClient, state: &mut ShardServerState) -> FFResult<()> {
     let pkt: &sP_CL2FE_REQ_NANO_TUNE = pkt.get()?;
     let pc_id = client.get_player_id()?;
