@@ -24,14 +24,30 @@ use crate::{
 
 impl From<postgres::Error> for FFError {
     fn from(e: postgres::Error) -> Self {
+        let e = if let Some(e) = e.as_db_error() {
+            e.to_string()
+        } else {
+            e.to_string()
+        };
+
         FFError::build(db_error_severity(), "Database error".to_string())
-            .with_parent(FFError::build(Severity::Debug, e.to_string()))
+            .with_parent(FFError::build(Severity::Debug, e))
     }
 }
 impl From<deadpool_postgres::PoolError> for FFError {
     fn from(e: deadpool_postgres::PoolError) -> Self {
+        let e = if let deadpool_postgres::PoolError::Backend(ref e) = e {
+            if let Some(e) = e.as_db_error() {
+                e.to_string()
+            } else {
+                e.to_string()
+            }
+        } else {
+            e.to_string()
+        };
+
         FFError::build(db_error_severity(), "Database pool error".to_string())
-            .with_parent(FFError::build(Severity::Debug, e.to_string()))
+            .with_parent(FFError::build(Severity::Debug, e))
     }
 }
 

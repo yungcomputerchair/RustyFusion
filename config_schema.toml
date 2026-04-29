@@ -23,6 +23,9 @@ logging_level_file = 2    # ...and in the log files
 log_write_interval = 60 # how long (seconds) between log file writes
 
 #: u64
+db_conn_retry_interval = 10 # how long (seconds) to wait before retrying initial connection to DB
+
+#: u64
 live_check_time = 5  # how long (seconds) between live check packet sends.
                      # if this amount of time passes *again* after sending a live check,
                      # that wasn't answered, the client will be disconnected

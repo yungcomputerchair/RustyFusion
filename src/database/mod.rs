@@ -119,6 +119,29 @@ define_db_api! {
     delete_player(&self, pc_uid: BigInt) -> ();
 }
 
+fn format_db_conn_error(parent_error: FFError) -> FFError {
+    let expected_error_message =
+        "Error occurred while creating a new object: error connecting to server";
+
+    if let Some(parent_parent) = parent_error.get_parent() {
+        if parent_parent.get_msg() == expected_error_message {
+            // If it's the common case of not being able to connect to the DB,
+            // just print a concise, readable error message.
+            return FFError::build(
+                Severity::Warning,
+                "Failed to connect to database".to_string(),
+            );
+        }
+    }
+
+    // If it's some other DB connection error, print the pseudo-stack trace.
+    FFError::build(
+        Severity::Warning,
+        "Unexpected error while connecting to database".to_string(),
+    )
+    .with_parent(parent_error)
+}
+
 async fn db_connect(config: &GeneralConfig) -> FFResult<DbBackend> {
     let _db_impl: Option<FFResult<DbBackend>> = None;
 
@@ -127,11 +150,7 @@ async fn db_connect(config: &GeneralConfig) -> FFResult<DbBackend> {
 
     match _db_impl {
         Some(Ok(db)) => Ok(db),
-        Some(Err(e)) => Err(FFError::build(
-            Severity::Fatal,
-            "Failed to connect to database".to_string(),
-        )
-        .with_parent(e)),
+        Some(Err(parent_error)) => Err(format_db_conn_error(parent_error)),
         None => Err(FFError::build(
             Severity::Fatal,
             "No database implementation enabled; please enable one through a feature".to_string(),
@@ -141,10 +160,7 @@ async fn db_connect(config: &GeneralConfig) -> FFResult<DbBackend> {
 
 pub async fn db_init(error_severity: Severity) -> FFResult<&'static Database<DbBackend>> {
     if DB.get().is_some() {
-        return Err(FFError::build(
-            Severity::Warning,
-            "Database already initialized".to_string(),
-        ));
+        return Ok(db_get());
     }
 
     let _ = DB_ERROR_SEVERITY.set(error_severity);
