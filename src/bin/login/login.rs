@@ -164,11 +164,25 @@ Password must be 8-32 characters long and contain only letters, numbers, or spec
                         &token,
                     )
                 {
-                    error_code = LoginError::IncorrectPassword;
-                    return Err(FFError::build(
-                        Severity::Debug,
-                        format!("Invalid or expired cookie for account {}", username),
-                    ));
+                    if !allow_plaintext_passwords {
+                        error_code = LoginError::IncorrectPassword;
+                        return Err(FFError::build(
+                            Severity::Debug,
+                            format!("Invalid or expired cookie for account {}", username),
+                        ));
+                    } else {
+                        // password may have been sent over plaintext as cookie (e.g. from ffrunner)
+                        if !util::check_password(&token, &account.password_hashed)? {
+                            error_code = LoginError::IncorrectPassword;
+                            return Err(FFError::build(
+                                Severity::Debug,
+                                format!(
+                                    "Incorrect password (sent as cookie) for account {}",
+                                    username
+                                ),
+                            ));
+                        }
+                    }
                 }
             }
         }
