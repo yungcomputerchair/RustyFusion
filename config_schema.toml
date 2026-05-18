@@ -22,6 +22,10 @@ logging_level_file = 2    # ...and in the log files
 #: u64
 log_write_interval = 60 # how long (seconds) between log file writes
 
+#: String
+combined_log_path = "hybrid.log" # path to log file for hybrid (login + shard) binary,
+                                 # or blank for console logging only
+
 #: u64
 db_conn_retry_interval = 10 # how long (seconds) to wait before retrying initial connection to DB
 

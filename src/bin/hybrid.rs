@@ -29,7 +29,7 @@ async fn main() -> FFResult<()> {
 
     let log_rx = log_init();
     let config = config_init()?;
-    let mut logger = Logger::new(log_rx, &config.shard.log_path.get());
+    let mut logger = Logger::new(log_rx, &config.general.combined_log_path.get());
 
     let mut tui = if config.general.enable_tui.get() {
         let terminal = ratatui::init();
