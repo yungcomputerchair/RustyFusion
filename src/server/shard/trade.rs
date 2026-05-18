@@ -1,6 +1,6 @@
 use uuid::Uuid;
 
-use rusty_fusion::{
+use crate::{
     database::{db_get, DbImpl as _},
     defines::*,
     entity::{Entity, EntityID},
@@ -12,7 +12,6 @@ use rusty_fusion::{
     },
     state::ShardServerState,
     trade::TradeContext,
-    unused,
 };
 
 pub fn trade_offer(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) -> FFResult<()> {

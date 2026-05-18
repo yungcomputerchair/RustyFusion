@@ -1,12 +1,12 @@
-use rusty_fusion::{
+use crate::{
     entity::{Entity, EntityID, Group},
     error::*,
+    helpers,
     net::{
         packet::{PacketID::*, *},
         ClientMap,
     },
     state::ShardServerState,
-    unused,
 };
 use uuid::Uuid;
 
@@ -168,11 +168,7 @@ pub fn pc_group_leave(clients: &ClientMap, state: &mut ShardServerState) -> FFRe
             )
         })?;
 
-        rusty_fusion::helpers::remove_group_member(
-            EntityID::Player(leaver_pc_id),
-            group_id,
-            state,
-        )?;
+        helpers::remove_group_member(EntityID::Player(leaver_pc_id), group_id, state)?;
 
         // leaver needs the leave success packet too, thx client
         let resp = sP_FE2CL_PC_GROUP_LEAVE_SUCC { UNUSED: unused!() };
@@ -281,5 +277,5 @@ pub fn npc_group_kick(
     }
 
     target_npc.group_id = None;
-    rusty_fusion::helpers::remove_group_member(target_npc.get_id(), group_id, state)
+    helpers::remove_group_member(target_npc.get_id(), group_id, state)
 }

@@ -1,4 +1,4 @@
-use rusty_fusion::{
+use crate::{
     chunk::TickMode,
     defines::{RANGE_INTERACT, RANGE_TRIGGER},
     entity::{Combatant, EntityID},
@@ -11,7 +11,6 @@ use rusty_fusion::{
     },
     state::ShardServerState,
     tabledata::tdata_get,
-    unused,
 };
 
 pub fn task_start(pkt: Packet, client: &FFClient, state: &mut ShardServerState) -> FFResult<()> {

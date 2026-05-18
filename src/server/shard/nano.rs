@@ -1,4 +1,4 @@
-use rusty_fusion::{
+use crate::{
     defines::*,
     entity::{Combatant, Entity, EntityID},
     enums::*,
@@ -10,7 +10,6 @@ use rusty_fusion::{
     },
     state::ShardServerState,
     tabledata::tdata_get,
-    unused,
 };
 
 pub fn nano_equip(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) -> FFResult<()> {

@@ -1,4 +1,4 @@
-use rusty_fusion::{
+use crate::{
     defines::*,
     entity::{Entity, EntityID},
     error::*,
@@ -9,7 +9,7 @@ use rusty_fusion::{
         ClientMap,
     },
     state::ShardServerState,
-    unused, util,
+    util,
 };
 
 const CUSTOM_COMMAND_PREFIX: char = '!';
@@ -493,7 +493,7 @@ mod helpers {
 mod commands {
     use std::{collections::HashMap, future::Future, pin::Pin, sync::OnceLock, time::SystemTime};
 
-    use rusty_fusion::{
+    use crate::{
         chunk::TickMode,
         database::{db_get, DbImpl as _},
         entity::Combatant,

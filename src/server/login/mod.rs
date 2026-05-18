@@ -1,9 +1,11 @@
 use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc, time::SystemTime};
 
+use ffmonitor::PlayerEvent;
 use tokio::sync::Mutex;
 
 use crate::{
     error::*,
+    monitor::{monitor_flush, monitor_queue, MonitorEvent},
     net::{
         packet::{PacketID::*, *},
         ClientType, FFClient,
@@ -133,4 +135,15 @@ pub fn send_live_check(client: &FFClient) {
         }
         _ => {}
     }
+}
+
+pub fn send_monitor_update(state: &LoginServerState) -> FFResult<()> {
+    for data in state.get_all_shard_player_data() {
+        monitor_queue(MonitorEvent::Player(PlayerEvent {
+            x_coord: data.x_coord,
+            y_coord: data.y_coord,
+            name: format!("{} {}", data.first_name, data.last_name),
+        }));
+    }
+    monitor_flush()
 }

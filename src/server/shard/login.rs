@@ -2,7 +2,7 @@ use std::{collections::HashMap, time::SystemTime};
 
 use uuid::Uuid;
 
-use rusty_fusion::{
+use crate::{
     chunk::InstanceID,
     config::{self, config_get},
     database::{db_get, DbImpl as _},
@@ -19,15 +19,8 @@ use rusty_fusion::{
         ClientMap, FFClient, LoginData,
     },
     state::ShardServerState,
-    unused, util, Position,
+    util, Position,
 };
-
-pub fn login_connect_req(server: &FFClient) {
-    let pkt = sP_FE2LS_REQ_AUTH_CHALLENGE {
-        iTempValue: unused!(),
-    };
-    server.send_packet(P_FE2LS_REQ_AUTH_CHALLENGE, &pkt);
-}
 
 pub fn login_connect_challenge(pkt: Packet, server: &FFClient) -> FFResult<()> {
     let pkt: &sP_LS2FE_REP_AUTH_CHALLENGE = pkt.get()?;

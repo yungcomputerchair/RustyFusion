@@ -1,5 +1,6 @@
 use rand::seq::IteratorRandom;
-use rusty_fusion::{
+
+use crate::{
     entity::EntityID,
     error::*,
     net::{

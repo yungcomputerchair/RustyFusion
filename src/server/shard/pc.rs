@@ -3,7 +3,9 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use rusty_fusion::{
+use tokio::sync::Mutex;
+
+use crate::{
     chunk::{TickMode, MAP_SQUARE_SIZE},
     config::config_get,
     database::{db_get, DbImpl as _},
@@ -11,6 +13,7 @@ use rusty_fusion::{
     entity::{Combatant, Entity, EntityID, Player},
     enums::*,
     error::*,
+    helpers,
     net::{
         crypto::{self, EncryptionMode},
         packet::{PacketID::*, *},
@@ -18,9 +21,8 @@ use rusty_fusion::{
     },
     state::ShardServerState,
     tabledata::tdata_get,
-    unused, util, Position,
+    util, Position,
 };
-use tokio::sync::Mutex;
 
 pub async fn pc_enter(
     pkt: Packet,
@@ -555,7 +557,7 @@ pub fn pc_vehicle_on(clients: &ClientMap, state: &mut ShardServerState) -> FFRes
             panic_log(&format!("Vehicle has no speed: {:?}", vehicle));
         }
 
-        rusty_fusion::helpers::broadcast_state(pc_id, player.get_state_bit_flag(), state);
+        helpers::broadcast_state(pc_id, player.get_state_bit_flag(), state);
 
         let resp = sP_FE2CL_PC_VEHICLE_ON_SUCC { UNUSED: unused!() };
         client.send_packet(P_FE2CL_PC_VEHICLE_ON_SUCC, &resp);
@@ -579,7 +581,7 @@ pub fn pc_vehicle_off(clients: &ClientMap, state: &mut ShardServerState) -> FFRe
         let player = state.get_player_mut(pc_id)?;
 
         player.vehicle_speed = None;
-        rusty_fusion::helpers::broadcast_state(pc_id, player.get_state_bit_flag(), state);
+        helpers::broadcast_state(pc_id, player.get_state_bit_flag(), state);
 
         let resp = sP_FE2CL_PC_VEHICLE_OFF_SUCC { UNUSED: unused!() };
         client.send_packet(P_FE2CL_PC_VEHICLE_OFF_SUCC, &resp);

@@ -1,4 +1,4 @@
-use rusty_fusion::{
+use crate::{
     chunk::InstanceID,
     defines::*,
     entity::{BuddyListEntry, Entity, EntityID, PlayerSearchQuery},

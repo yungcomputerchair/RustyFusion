@@ -3,7 +3,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use rusty_fusion::{
+use crate::{
     chunk::{EntityMap, InstanceID, TickMode},
     defines::*,
     entity::{Combatant, Egg, Entity, EntityID, PlayerSearchQuery, NPC},
@@ -15,10 +15,9 @@ use rusty_fusion::{
         packet::{PacketID::*, *},
         ClientMap, FFClient,
     },
-    placeholder,
     state::ShardServerState,
     tabledata::tdata_get,
-    unused, util, Position,
+    util, Position,
 };
 
 pub fn gm_pc_set_value(
@@ -776,7 +775,7 @@ pub fn gm_npc_unsummon(
 }
 
 mod helpers {
-    use rusty_fusion::ai;
+    use crate::ai;
 
     use super::*;
 

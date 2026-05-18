@@ -5,12 +5,13 @@ use std::{
 
 use rand::random;
 
-use rusty_fusion::{
+use crate::{
     config::config_get,
     defines::*,
     entity::{Entity, EntityID},
     enums::*,
     error::*,
+    helpers,
     item::Item,
     net::{
         packet::{PacketID::*, *},
@@ -18,7 +19,7 @@ use rusty_fusion::{
     },
     state::ShardServerState,
     tabledata::tdata_get,
-    unused, util,
+    util,
 };
 
 pub fn item_move(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) -> FFResult<()> {
@@ -81,7 +82,7 @@ pub fn item_move(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState)
         && player.vehicle_speed.is_some()
     {
         player.vehicle_speed = None;
-        rusty_fusion::helpers::broadcast_state(pc_id, player.get_state_bit_flag(), state);
+        helpers::broadcast_state(pc_id, player.get_state_bit_flag(), state);
         let pkt = sP_FE2CL_PC_VEHICLE_OFF_SUCC { UNUSED: unused!() };
         clients
             .get_sender()
@@ -326,7 +327,7 @@ pub fn item_chest_open(
 pub fn vendor_start(pkt: Packet, client: &FFClient, state: &mut ShardServerState) -> FFResult<()> {
     let pkt: &sP_CL2FE_REQ_PC_VENDOR_START = pkt.get()?;
     (|| {
-        helpers::validate_vendor(client, state, pkt.iNPC_ID, pkt.iVendorID)?;
+        validate_vendor(client, state, pkt.iNPC_ID, pkt.iVendorID)?;
         let resp = sP_FE2CL_REP_PC_VENDOR_START_SUCC {
             iNPC_ID: pkt.iNPC_ID,
             iVendorID: pkt.iVendorID,
@@ -374,7 +375,7 @@ pub fn vendor_item_buy(
     (|| {
         let pkt: &sP_CL2FE_REQ_PC_VENDOR_ITEM_BUY = pkt.get()?;
 
-        helpers::validate_vendor(client, state, pkt.iNPC_ID, pkt.iVendorID)?;
+        validate_vendor(client, state, pkt.iNPC_ID, pkt.iVendorID)?;
 
         // sanitize the item
         let item: Option<Item> = pkt.Item.try_into()?;
@@ -505,7 +506,7 @@ pub fn vendor_item_restore_buy(
     (|| {
         let pc_id = client.get_player_id()?;
         let pkt: &sP_CL2FE_REQ_PC_VENDOR_ITEM_RESTORE_BUY = pkt.get()?;
-        helpers::validate_vendor(client, state, pkt.iNPC_ID, pkt.iVendorID)?;
+        validate_vendor(client, state, pkt.iNPC_ID, pkt.iVendorID)?;
 
         let item: Option<Item> = pkt.Item.try_into()?;
         let item: Item = item.ok_or(FFError::build(
@@ -578,7 +579,7 @@ pub fn vendor_battery_buy(
 
     (|| {
         let pkt: &sP_CL2FE_REQ_PC_VENDOR_BATTERY_BUY = pkt.get()?;
-        helpers::validate_vendor(client, state, pkt.iNPC_ID, pkt.iVendorID)?;
+        validate_vendor(client, state, pkt.iNPC_ID, pkt.iVendorID)?;
 
         let battery_type = pkt.Item.iID;
         let mut quantity = pkt.Item.iOpt as u32 * 100;
@@ -657,57 +658,53 @@ pub fn streetstall_cancel(client: &FFClient) -> FFResult<()> {
     Ok(())
 }
 
-mod helpers {
-    use super::*;
-
-    pub fn validate_vendor(
-        client: &FFClient,
-        state: &mut ShardServerState,
-        npc_id: i32,
-        vendor_id: i32,
-    ) -> FFResult<()> {
-        let pc_id = client.get_player_id()?;
-        if npc_id == vendor_id {
-            /*
-             * due to a client bug where the iNPC_ID field in vendor packets is incorrectly
-             * set to the same value as iVendorID, we need to lookup the NPC by its type
-             * instead (which is equal to iVendorID for whatever reason).
-             * On top of that, there may exist multiple NPCs with the same type... so if
-             * one of them is close enough, we'll accept it.
-             */
-            let npc_ids = state.entity_map.find_npcs(|n| n.ty == vendor_id);
-            for npc_id in npc_ids {
-                if validate_vendor(client, state, npc_id, vendor_id).is_ok() {
-                    return Ok(());
-                }
+fn validate_vendor(
+    client: &FFClient,
+    state: &mut ShardServerState,
+    npc_id: i32,
+    vendor_id: i32,
+) -> FFResult<()> {
+    let pc_id = client.get_player_id()?;
+    if npc_id == vendor_id {
+        /*
+         * due to a client bug where the iNPC_ID field in vendor packets is incorrectly
+         * set to the same value as iVendorID, we need to lookup the NPC by its type
+         * instead (which is equal to iVendorID for whatever reason).
+         * On top of that, there may exist multiple NPCs with the same type... so if
+         * one of them is close enough, we'll accept it.
+         */
+        let npc_ids = state.entity_map.find_npcs(|n| n.ty == vendor_id);
+        for npc_id in npc_ids {
+            if validate_vendor(client, state, npc_id, vendor_id).is_ok() {
+                return Ok(());
             }
-            Err(FFError::build(
-                Severity::Warning,
-                "No matching NPCs close enough".to_string(),
-            ))
-        } else {
-            let npc = state.get_npc(npc_id)?;
-            if npc.ty != vendor_id {
-                return Err(FFError::build(
-                    Severity::Warning,
-                    format!(
-                        "Vendor {} has type {} instead of {}",
-                        npc_id, npc.ty, vendor_id
-                    ),
-                ));
-            }
-            state
-                .entity_map
-                .validate_proximity(
-                    &[EntityID::Player(pc_id), EntityID::NPC(npc_id)],
-                    RANGE_INTERACT,
-                )
-                .map_err(|e| {
-                    e.with_parent(FFError::build(
-                        Severity::Warning,
-                        format!("Vendor {} not close enough", npc_id),
-                    ))
-                })
         }
+        Err(FFError::build(
+            Severity::Warning,
+            "No matching NPCs close enough".to_string(),
+        ))
+    } else {
+        let npc = state.get_npc(npc_id)?;
+        if npc.ty != vendor_id {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!(
+                    "Vendor {} has type {} instead of {}",
+                    npc_id, npc.ty, vendor_id
+                ),
+            ));
+        }
+        state
+            .entity_map
+            .validate_proximity(
+                &[EntityID::Player(pc_id), EntityID::NPC(npc_id)],
+                RANGE_INTERACT,
+            )
+            .map_err(|e| {
+                e.with_parent(FFError::build(
+                    Severity::Warning,
+                    format!("Vendor {} not close enough", npc_id),
+                ))
+            })
     }
 }

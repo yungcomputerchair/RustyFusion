@@ -1,4 +1,4 @@
-use rusty_fusion::{
+use crate::{
     entity::{Combatant, Entity, EntityID},
     enums::{SkillTargetType, TargetType},
     error::*,
@@ -6,7 +6,6 @@ use rusty_fusion::{
         packet::{PacketID::*, *},
         ClientMap,
     },
-    placeholder,
     skills::{self, SkillResult},
     state::ShardServerState,
 };

@@ -6,279 +6,21 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
-use crossterm::event::{self as ce, KeyCode};
+use tokio::{sync::Mutex, task::JoinHandle};
 
-use futures::StreamExt as _;
-use rusty_fusion::{
-    config::{config_get, config_init},
-    database::{db_get, db_init, DbImpl as _},
-    defines::*,
-    entity::{Entity, Player},
-    error::{log, log_error, log_if_failed, log_init, FFError, FFResult, Logger, Severity},
+use crate::{
+    config::config_get,
+    database::{db_get, DbImpl as _},
+    defines::EXIT_CODE_REQ_BY_SVR,
+    entity::{Entity as _, Player},
+    error::*,
     net::{
         packet::{PacketID::*, *},
         ClientMap, ClientType, FFClient, FFServer,
     },
-    scripting::scripting_init,
     state::ShardServerState,
-    tabledata::tdata_init,
-    tui::{ShardTui, Tui as _},
-    unused, util,
+    util,
 };
-use tokio::{sync::Mutex, task::JoinHandle};
-
-#[tokio::main]
-async fn main() -> FFResult<()> {
-    color_eyre::install().unwrap();
-
-    let log_rx = log_init();
-    let config = config_init()?;
-    let mut logger = Logger::new(log_rx, &config.shard.log_path.get());
-
-    let mut tui = if config.general.enable_tui.get() {
-        let terminal = ratatui::init();
-        let tui = ShardTui::default();
-        let ke = ce::EventStream::new();
-        Some((terminal, tui, ke))
-    } else {
-        None
-    };
-
-    tdata_init()?;
-    scripting_init()?;
-
-    let mut tui_timer = util::make_timer(Duration::from_millis(250), true);
-    let mut logger_timer = util::make_timer(
-        Duration::from_secs(config.general.log_write_interval.get()),
-        false,
-    );
-    let mut login_conn_timer = util::make_timer(
-        Duration::from_secs(config.shard.login_server_conn_interval.get()),
-        true,
-    );
-    let mut db_conn_timer = util::make_timer(
-        Duration::from_secs(config.general.db_conn_retry_interval.get()),
-        true,
-    );
-    let mut save_timer = util::make_timer(
-        Duration::from_secs(config.shard.autosave_interval.get() * 60),
-        false,
-    );
-    let mut status_timer = util::make_timer(
-        Duration::from_secs(config.shard.login_server_update_interval.get()),
-        false,
-    );
-    let mut vehicle_timer = util::make_timer(Duration::from_secs(60), false);
-    let mut entity_timer = util::make_timer(
-        Duration::from_millis(1000 / SHARD_TICKS_PER_SECOND as u64),
-        false,
-    );
-    let mut slow_timer = util::make_timer(Duration::from_secs(1), false);
-
-    let state = Arc::new(Mutex::new(ShardServerState::default()));
-    let live_check_time = Duration::from_secs(config.general.live_check_time.get());
-    let listen_addr = config_get().shard.listen_addr.get();
-    let mut server = FFServer::new(
-        listen_addr,
-        handle_packet,
-        Some(handle_disconnect),
-        Some((live_check_time, send_live_check)),
-        state.clone(),
-    )
-    .await?;
-
-    log(
-        Severity::Info,
-        &format!("Shard server listening on {}", server.get_endpoint()),
-    );
-
-    let mut fatal_error = None;
-    let mut save_handle = None;
-    loop {
-        tokio::select! {
-            res = server.poll() => {
-                if let Err(e) = res {
-                    let fatal = e.get_severity() == Severity::Fatal;
-                    if fatal {
-                        log_error(e.clone());
-                        fatal_error = Some(e);
-                        break;
-                    }
-
-                    log_error(e);
-                }
-            }
-            ke = async { tui.as_mut().unwrap().2.next().await }, if tui.is_some() => {
-                match ke {
-                    Some(Ok(event)) => {
-                        if let ce::Event::Key(key_event) = event {
-                            if util::is_ctrl_c(&key_event) {
-                                break;
-                            }
-
-                            let tui = &mut tui.as_mut().unwrap().1;
-                            match key_event.code {
-                                KeyCode::Up => tui.state.scroll(1),
-                                KeyCode::Down => tui.state.scroll(-1),
-                                KeyCode::PageUp => tui.state.scroll(10),
-                                KeyCode::PageDown => tui.state.scroll(-10),
-                                KeyCode::Esc => tui.state.reset_scroll(),
-                                _ => {}
-                            }
-                        }
-                    }
-                    Some(Err(e)) => {
-                        log(Severity::Warning, &format!("Error reading key event: {}", e));
-                    }
-                    None => {
-                        tui = None;
-                        ratatui::restore();
-                        logger.disable_buffer();
-                        log(
-                            Severity::Warning,
-                            "Key event stream ended; TUI disabled",
-                        );
-                    }
-                }
-            }
-            _ = tokio::signal::ctrl_c(), if tui.is_none() => {
-                break;
-            }
-            _ = tui_timer.tick() => {
-                logger.drain();
-                if let Some((terminal, tui, _)) = &mut tui {
-                    let clients = server.get_clients().await;
-                    let state = state.lock().await;
-                    if let Err(e) = terminal.draw(|frame| tui.render(frame, &state, &clients, logger.buffer().unwrap())) {
-                        log(
-                            Severity::Warning,
-                            &format!("Failed to draw TUI; skipping this frame: {}", e),
-                        );
-                    }
-                }
-            }
-            _ = entity_timer.tick() => {
-                state.lock().await
-                    .tick_entities(SystemTime::now());
-            }
-            _ = slow_timer.tick() => {
-                let mut state = state.lock().await;
-                state.tick_garbage_collection();
-                state.tick_groups();
-            }
-            _ = vehicle_timer.tick() => {
-                state.lock().await
-                    .check_for_expired_vehicles(SystemTime::now());
-            }
-            _ = login_conn_timer.tick() => {
-                log_if_failed(connect_to_login_server(&mut server, &mut *state.lock().await).await);
-            }
-            _ = db_conn_timer.tick() => {
-                log_if_failed(db_init(Severity::Fatal).await);
-            }
-            _ = status_timer.tick() => {
-                let clients = server.get_clients().await;
-                let client_map = ClientMap::new(0, &clients);
-                log_if_failed(send_status_to_login_server(&client_map, &*state.lock().await));
-            }
-            _ = save_timer.tick() => {
-                if save_handle.is_none() {
-                    let state = state.lock().await;
-                    save_handle = do_save(&state);
-                }
-            }
-            res = async { save_handle.as_mut().unwrap().await }, if save_handle.is_some() => {
-                save_handle = None;
-                match res.unwrap() {
-                    Ok((num_players, time_taken)) => {
-                        log(
-                            Severity::Info,
-                            &format!("Saved {} player(s) in {}ms", num_players, time_taken.as_millis()),
-                        );
-                    }
-                    Err(e) => {
-                        fatal_error = Some(e);
-                        break;
-                    }
-                }
-            }
-            _ = logger_timer.tick() => {
-                logger.flush();
-            }
-        }
-    }
-
-    // final TUI render before cleanup
-    log(Severity::Info, "Shard server shutting down...");
-    logger.drain();
-
-    let clients = server.get_clients().await;
-    let state = state.lock().await;
-
-    if let Some((terminal, tui, _)) = &mut tui {
-        let _ =
-            terminal.draw(|frame| tui.render(frame, &state, &clients, logger.buffer().unwrap()));
-    }
-
-    // save players
-    if let Some(handle) = do_save(&state) {
-        let _ = handle.await;
-    }
-
-    let client_map = ClientMap::new(0, &clients);
-    shutdown_notify_clients(&client_map, &state);
-
-    // disable TUI
-    if tui.is_some() {
-        ratatui::restore();
-    }
-
-    if let Some(e) = fatal_error {
-        Err(e)
-    } else {
-        Ok(())
-    }
-}
-
-fn handle_disconnect(key: usize, clients: &HashMap<usize, FFClient>, state: &mut ShardServerState) {
-    let clients = ClientMap::new(key, clients);
-    let client = clients.get_sender();
-    match client.get_client_type() {
-        ClientType::LoginServer => {
-            log(
-                Severity::Warning,
-                &format!("Login server ({}) disconnected", client.get_addr()),
-            );
-            state.login_server_conn_id = None;
-        }
-        ClientType::GameClient {
-            pc_id: Some(pc_id), ..
-        } => {
-            // dirty exit; clean exit happens in P_CL2FE_REQ_PC_EXIT handler
-            let player = Player::remove_from_state(pc_id, state);
-            tokio::spawn(async move {
-                let db = db_get();
-                log_if_failed(db.save_player(&player).await);
-            });
-        }
-        ClientType::Unknown => {
-            log(
-                Severity::Debug,
-                &format!("Client disconnected: {}", client.get_addr()),
-            );
-        }
-        _ => {
-            log(
-                Severity::Warning,
-                &format!(
-                    "Unhandled disconnect for client {} (type {})",
-                    client.get_addr(),
-                    client.get_client_type()
-                ),
-            );
-        }
-    }
-}
 
 mod buddy;
 mod chat;
@@ -293,7 +35,8 @@ mod npc;
 mod pc;
 mod trade;
 mod transport;
-fn handle_packet<'a>(
+
+pub fn handle_packet<'a>(
     pkt: Packet,
     key: usize,
     clients: &'a HashMap<usize, FFClient>,
@@ -520,80 +263,51 @@ fn handle_packet<'a>(
     })
 }
 
-fn wrong_server(pkt: Packet, client: &FFClient) -> FFResult<()> {
-    let pkt: &sP_CL2LS_REQ_LOGIN = pkt.get()?;
-    let resp = sP_LS2CL_REP_LOGIN_FAIL {
-        iErrorCode: 4, // "Login error"
-        szID: pkt.szID,
-    };
-
-    client.send_packet(P_LS2CL_REP_LOGIN_FAIL, &resp);
-    Ok(())
-}
-
-async fn connect_to_login_server(
-    shard_server: &mut FFServer<ShardServerState>,
+pub fn handle_disconnect(
+    key: usize,
+    clients: &HashMap<usize, FFClient>,
     state: &mut ShardServerState,
-) -> FFResult<()> {
-    if is_login_server_connected(state) {
-        return Ok(());
+) {
+    let clients = ClientMap::new(key, clients);
+    let client = clients.get_sender();
+    match client.get_client_type() {
+        ClientType::LoginServer => {
+            log(
+                Severity::Warning,
+                &format!("Login server ({}) disconnected", client.get_addr()),
+            );
+            state.login_server_conn_id = None;
+        }
+        ClientType::GameClient {
+            pc_id: Some(pc_id), ..
+        } => {
+            // dirty exit; clean exit happens in P_CL2FE_REQ_PC_EXIT handler
+            let player = Player::remove_from_state(pc_id, state);
+            tokio::spawn(async move {
+                let db = db_get();
+                log_if_failed(db.save_player(&player).await);
+            });
+        }
+        ClientType::Unknown => {
+            log(
+                Severity::Debug,
+                &format!("Client disconnected: {}", client.get_addr()),
+            );
+        }
+        _ => {
+            log(
+                Severity::Warning,
+                &format!(
+                    "Unhandled disconnect for client {} (type {})",
+                    client.get_addr(),
+                    client.get_client_type()
+                ),
+            );
+        }
     }
-
-    let login_server_addr = config_get().shard.login_server_addr.get();
-    log(
-        Severity::Info,
-        &format!("Connecting to login server at {}...", login_server_addr),
-    );
-
-    let conn = shard_server
-        .connect(login_server_addr, ClientType::LoginServer)
-        .await;
-    if let Some(login_server) = &conn {
-        login::login_connect_req(login_server);
-    }
-
-    Ok(())
 }
 
-fn is_login_server_connected(state: &ShardServerState) -> bool {
-    state.login_server_conn_id.is_some()
-}
-
-fn send_status_to_login_server(clients: &ClientMap, state: &ShardServerState) -> FFResult<()> {
-    if !is_login_server_connected(state) {
-        return Ok(());
-    }
-
-    let Some(client) = clients.get_login_server() else {
-        return Ok(());
-    };
-
-    let pc_ids: Vec<i32> = state.entity_map.get_player_ids().collect();
-    let mut pkt =
-        PacketBuilder::new(P_FE2LS_UPDATE_PC_STATUSES).with(&sP_FE2LS_UPDATE_PC_STATUSES {
-            iCnt: pc_ids.len() as u32,
-        });
-
-    for pc_id in pc_ids {
-        let player = state.get_player(pc_id).unwrap();
-        let pos = player.get_position();
-        pkt.push(&sPlayerMetadata {
-            iPC_UID: player.get_uid(),
-            szFirstName: util::encode_utf16(&player.first_name).unwrap(),
-            szLastName: util::encode_utf16(&player.last_name).unwrap(),
-            iX: pos.x,
-            iY: pos.y,
-            iZ: pos.z,
-            iChannelNum: player.instance_id.channel_num as i8,
-        });
-    }
-
-    let pkt = pkt.build()?;
-    client.send_payload(pkt);
-    Ok(())
-}
-
-fn send_live_check(client: &FFClient) {
+pub fn send_live_check(client: &FFClient) {
     match client.get_client_type() {
         ClientType::GameClient { .. } => {
             let pkt = sP_FE2CL_REQ_LIVE_CHECK {
@@ -611,7 +325,7 @@ fn send_live_check(client: &FFClient) {
     }
 }
 
-fn do_save(state: &ShardServerState) -> Option<JoinHandle<FFResult<(usize, Duration)>>> {
+pub fn do_save(state: &ShardServerState) -> Option<JoinHandle<FFResult<(usize, Duration)>>> {
     let pc_ids: Vec<i32> = state.entity_map.get_player_ids().collect();
     if pc_ids.is_empty() {
         return None;
@@ -643,7 +357,7 @@ fn do_save(state: &ShardServerState) -> Option<JoinHandle<FFResult<(usize, Durat
     Some(handle)
 }
 
-fn shutdown_notify_clients(clients: &ClientMap, state: &ShardServerState) {
+pub fn shutdown_notify_clients(clients: &ClientMap, state: &ShardServerState) {
     let reconnect = if let Some(login_server) = clients.get_login_server() {
         let pkt = sP_FE2LS_DISCONNECTING {
             iTempValue: unused!(),
@@ -702,4 +416,85 @@ fn shutdown_notify_clients(clients: &ClientMap, state: &ShardServerState) {
 
         client.send_packet(P_FE2CL_REP_PC_BUDDY_WARP_OTHER_SHARD_SUCC, &dc_pkt);
     }
+}
+
+pub fn send_status_to_login_server(clients: &ClientMap, state: &ShardServerState) -> FFResult<()> {
+    if !is_login_server_connected(state) {
+        return Ok(());
+    }
+
+    let Some(client) = clients.get_login_server() else {
+        return Ok(());
+    };
+
+    let pc_ids: Vec<i32> = state.entity_map.get_player_ids().collect();
+    let mut pkt =
+        PacketBuilder::new(P_FE2LS_UPDATE_PC_STATUSES).with(&sP_FE2LS_UPDATE_PC_STATUSES {
+            iCnt: pc_ids.len() as u32,
+        });
+
+    for pc_id in pc_ids {
+        let player = state.get_player(pc_id).unwrap();
+        let pos = player.get_position();
+        pkt.push(&sPlayerMetadata {
+            iPC_UID: player.get_uid(),
+            szFirstName: util::encode_utf16(&player.first_name).unwrap(),
+            szLastName: util::encode_utf16(&player.last_name).unwrap(),
+            iX: pos.x,
+            iY: pos.y,
+            iZ: pos.z,
+            iChannelNum: player.instance_id.channel_num as i8,
+        });
+    }
+
+    let pkt = pkt.build()?;
+    client.send_payload(pkt);
+    Ok(())
+}
+
+pub async fn connect_to_login_server(
+    shard_server: &mut FFServer<ShardServerState>,
+    state: &mut ShardServerState,
+) -> FFResult<()> {
+    if is_login_server_connected(state) {
+        return Ok(());
+    }
+
+    let login_server_addr = config_get().shard.login_server_addr.get();
+    log(
+        Severity::Info,
+        &format!("Connecting to login server at {}...", login_server_addr),
+    );
+
+    let conn = shard_server
+        .connect(login_server_addr, ClientType::LoginServer)
+        .await;
+
+    if let Some(login_server) = &conn {
+        login_connect_req(login_server);
+    }
+
+    Ok(())
+}
+
+fn login_connect_req(server: &FFClient) {
+    let pkt = sP_FE2LS_REQ_AUTH_CHALLENGE {
+        iTempValue: unused!(),
+    };
+    server.send_packet(P_FE2LS_REQ_AUTH_CHALLENGE, &pkt);
+}
+
+fn is_login_server_connected(state: &ShardServerState) -> bool {
+    state.login_server_conn_id.is_some()
+}
+
+fn wrong_server(pkt: Packet, client: &FFClient) -> FFResult<()> {
+    let pkt: &sP_CL2LS_REQ_LOGIN = pkt.get()?;
+    let resp = sP_LS2CL_REP_LOGIN_FAIL {
+        iErrorCode: 4, // "Login error"
+        szID: pkt.szID,
+    };
+
+    client.send_packet(P_LS2CL_REP_LOGIN_FAIL, &resp);
+    Ok(())
 }
