@@ -110,13 +110,13 @@ async fn main() -> FFResult<()> {
                                 break;
                             }
 
-                            let tui = &mut tui.as_mut().unwrap().1;
+                            let t = &mut tui.as_mut().unwrap().1;
                             match key_event.code {
-                                KeyCode::Up => tui.state.scroll(1),
-                                KeyCode::Down => tui.state.scroll(-1),
-                                KeyCode::PageUp => tui.state.scroll(10),
-                                KeyCode::PageDown => tui.state.scroll(-10),
-                                KeyCode::Esc => tui.state.reset_scroll(),
+                                KeyCode::Up => t.scroll(1),
+                                KeyCode::Down => t.scroll(-1),
+                                KeyCode::PageUp => t.scroll(10),
+                                KeyCode::PageDown => t.scroll(-10),
+                                KeyCode::Esc => t.reset_scroll(),
                                 _ => {}
                             }
                         }

@@ -105,7 +105,7 @@ enum ScrollMode {
     Scroll(usize), // scroll offset from the end, in lines
 }
 
-pub struct TuiState {
+struct TuiState {
     title: String,
     scroll_mode: ScrollMode,
 }
@@ -152,10 +152,14 @@ pub trait Tui<S> {
         clients: &HashMap<usize, FFClient>,
         log_buffer: &RingBuffer<FFError>,
     );
+
+    fn scroll(&mut self, amount: isize);
+
+    fn reset_scroll(&mut self);
 }
 
 pub struct LoginTui {
-    pub state: TuiState,
+    state: TuiState,
 }
 impl Default for LoginTui {
     fn default() -> Self {
@@ -192,6 +196,14 @@ impl Tui<LoginServerState> for LoginTui {
             clients: &clients,
         };
         frame.render_widget(shard_list_widget, layout[1]);
+    }
+
+    fn scroll(&mut self, amount: isize) {
+        self.state.scroll(amount);
+    }
+
+    fn reset_scroll(&mut self) {
+        self.state.reset_scroll();
     }
 }
 
@@ -295,7 +307,7 @@ impl<'a, 'b, 'c> Widget for ShardListWidget<'a, 'b, 'c> {
 }
 
 pub struct ShardTui {
-    pub state: TuiState,
+    state: TuiState,
     stats_cache: ShardStatsCache,
 }
 impl Default for ShardTui {
@@ -347,6 +359,14 @@ impl Tui<ShardServerState> for ShardTui {
             clients: &clients,
         };
         frame.render_widget(shard_stats_widget, inner_layout_left[1]);
+    }
+
+    fn scroll(&mut self, amount: isize) {
+        self.state.scroll(amount);
+    }
+
+    fn reset_scroll(&mut self) {
+        self.state.reset_scroll();
     }
 }
 
@@ -543,6 +563,42 @@ impl<'a, 'b, 'c> Widget for ShardStatsWidget<'a, 'b, 'c> {
             line.render(areas[i], buf);
         }
         block.render(area, buf);
+    }
+}
+
+pub struct HybridTui {
+    inner: ShardTui,
+}
+impl Default for HybridTui {
+    fn default() -> Self {
+        let inner = ShardTui {
+            state: TuiState::new(format!(
+                " RustyFusion v{} Hybrid Server ",
+                env!("CARGO_PKG_VERSION")
+            )),
+            ..ShardTui::default()
+        };
+
+        Self { inner }
+    }
+}
+impl Tui<ShardServerState> for HybridTui {
+    fn render(
+        &mut self,
+        frame: &mut Frame,
+        server_state: &ShardServerState,
+        clients: &HashMap<usize, FFClient>,
+        log_buffer: &RingBuffer<FFError>,
+    ) {
+        self.inner.render(frame, server_state, clients, log_buffer);
+    }
+
+    fn scroll(&mut self, amount: isize) {
+        self.inner.scroll(amount);
+    }
+
+    fn reset_scroll(&mut self) {
+        self.inner.reset_scroll();
     }
 }
 
