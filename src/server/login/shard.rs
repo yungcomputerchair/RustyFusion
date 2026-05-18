@@ -4,7 +4,7 @@ use std::{
     time::SystemTime,
 };
 
-use rusty_fusion::{
+use crate::{
     config::config_get,
     entity::PlayerMetadata,
     error::{
@@ -18,7 +18,7 @@ use rusty_fusion::{
         ClientType, FFClient,
     },
     state::{LoginServerState, PlayerSearchRequest},
-    unused, util,
+    util,
 };
 
 pub fn auth_challenge(server: &FFClient) -> FFResult<()> {

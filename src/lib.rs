@@ -44,6 +44,7 @@ pub mod enums;
 pub mod error;
 pub mod helpers;
 pub mod net;
+pub mod server;
 pub mod state;
 pub mod tui;
 pub mod util;

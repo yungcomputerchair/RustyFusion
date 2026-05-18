@@ -3,8 +3,7 @@ use std::{collections::HashMap, sync::LazyLock, time::SystemTime};
 use ffmonitor::NameRequestEvent;
 use rand::random;
 
-use regex::Regex;
-use rusty_fusion::{
+use crate::{
     config::config_get,
     database::{db_get, DbImpl as _},
     defines::*,
@@ -19,8 +18,9 @@ use rusty_fusion::{
         ClientMap, ClientType, FFClient,
     },
     state::LoginServerState,
-    unused, util,
+    util,
 };
+use regex::Regex;
 
 static USERNAME_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"[a-zA-Z0-9_-]{4,32}").unwrap());
