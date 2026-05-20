@@ -514,3 +514,13 @@ impl ScriptingEngine {
         self.coroutines.remove(&npc_id);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_load() {
+        scripting_init().expect("Failed to load scripting engine");
+    }
+}
