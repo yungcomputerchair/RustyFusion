@@ -2,12 +2,14 @@ use std::{
     collections::VecDeque,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     ops::{BitAnd, BitAndAssign, BitOrAssign, Not, Shl, Shr},
+    path::PathBuf,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use chrono::{DateTime, Local};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use rand::{distributions::uniform::SampleUniform, Rng};
+use uuid::Uuid;
 
 use crate::{
     defines::*,
@@ -234,6 +236,28 @@ impl<T> RingBuffer<T> {
 
     pub fn is_empty(&self) -> bool {
         self.buffer.is_empty()
+    }
+}
+
+pub struct TempFile {
+    path: PathBuf,
+}
+impl TempFile {
+    pub fn new() -> FFResult<Self> {
+        let mut temp_dir = std::env::temp_dir();
+        let uuid = Uuid::new_v4();
+        let filename = format!("rustyfusion_{}.tmp", uuid);
+        temp_dir.push(filename);
+        Ok(Self { path: temp_dir })
+    }
+
+    pub fn path(&self) -> &PathBuf {
+        &self.path
+    }
+}
+impl Drop for TempFile {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.path);
     }
 }
 
