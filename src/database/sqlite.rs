@@ -538,6 +538,23 @@ impl SqliteDatabase {
 
 #[async_trait]
 impl DbImpl for SqliteDatabase {
+    async fn get_db_version(&self) -> FFResult<Int> {
+        let conn = self.pool.get().await?;
+        conn.interact(|conn| -> FFResult<Int> {
+            let sql = Self::read_sql("get_db_version")?;
+            let mut stmt = conn.prepare_cached(sql)?;
+            let mut rows = stmt.query([])?;
+            match rows.next()? {
+                Some(row) => Ok(row.get::<_, Int>(0)?),
+                None => Err(FFError::build(
+                    db_error_severity(),
+                    "Meta table has no DatabaseVersion row".to_string(),
+                )),
+            }
+        })
+        .await?
+    }
+
     async fn init_player(&self, acc_id: BigInt, player: &Player) -> FFResult<()> {
         let conn = self.pool.get().await?;
         let player = player.clone();

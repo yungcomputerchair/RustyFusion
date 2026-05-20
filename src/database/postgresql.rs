@@ -514,6 +514,18 @@ impl PostgresDatabase {
 }
 #[async_trait]
 impl DbImpl for PostgresDatabase {
+    async fn get_db_version(&self) -> FFResult<Int> {
+        let client = self.get_client().await?;
+        let rows = Self::query(&client, "get_db_version", &[]).await?;
+        if rows.is_empty() {
+            return Err(FFError::build(
+                db_error_severity(),
+                "Meta table has no DatabaseVersion row".to_string(),
+            ));
+        }
+        Ok(rows[0].get(0))
+    }
+
     async fn init_player(&self, acc_id: BigInt, player: &Player) -> FFResult<()> {
         let mut client = self.get_client().await?;
         let updated = Self::exec(

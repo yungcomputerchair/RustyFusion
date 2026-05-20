@@ -184,6 +184,7 @@ macro_rules! define_db_api {
 }
 
 define_db_api! {
+    get_db_version(&self) -> Int;
     find_account_from_username(&self, username: &str) -> Option<Account>;
     find_account_from_player(&self, pc_uid: BigInt) -> Option<Account>;
     create_account(&self, username: &str, password_hashed: &str) -> Account;
@@ -239,6 +240,8 @@ async fn db_connect(config: &GeneralConfig) -> FFResult<DbBackend> {
     }
 }
 
+use crate::defines::DB_VERSION;
+
 pub async fn db_init(error_severity: Severity) -> FFResult<&'static Database<DbBackend>> {
     if DB.get().is_some() {
         return Ok(db_get());
@@ -256,7 +259,21 @@ pub async fn db_init(error_severity: Severity) -> FFResult<&'static Database<DbB
     );
 
     let _ = DB.set(Database::new(db_impl));
-    Ok(db_get())
+    let db = db_get();
+
+    let found_version = db.get_db_version().await?;
+    if found_version != DB_VERSION {
+        return Err(FFError::build(
+            error_severity,
+            format!(
+                "Database version mismatch: server expects {}, but database is at {}. \
+                 Migrate the database or use a compatible server version.",
+                DB_VERSION, found_version,
+            ),
+        ));
+    }
+
+    Ok(db)
 }
 
 pub fn db_get() -> &'static Database<DbBackend> {
