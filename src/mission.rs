@@ -327,13 +327,28 @@ impl MissionJournal {
             .find(|t| t.get_task_def().mission_id == mission_def.mission_id);
         let new_mission = if let Some(existing_task) = mission_existing_task {
             if !existing_task.completed && !existing_task.failed {
-                return Err(FFError::build(
-                    Severity::Warning,
-                    format!(
-                        "Tried to start task {} while task {} for mission {} is in progress",
-                        task.task_id, existing_task.task_id, mission_def.mission_id
-                    ),
-                ));
+                // Two in-progress tasks for the same mission: keep the one with
+                // the higher task_id, since tasks advance forward through the
+                // mission's task chain.
+                if task.task_id > existing_task.task_id {
+                    log(
+                        Severity::Warning,
+                        &format!(
+                            "Replacing in-progress task {} with later task {} for mission {}",
+                            existing_task.task_id, task.task_id, mission_def.mission_id
+                        ),
+                    );
+                    *existing_task = task;
+                } else {
+                    log(
+                        Severity::Warning,
+                        &format!(
+                            "Discarding task {} since later task {} for mission {} is already in progress",
+                            task.task_id, existing_task.task_id, mission_def.mission_id
+                        ),
+                    );
+                }
+                return Ok(false);
             }
             *existing_task = task; // replace existing task
             false
@@ -368,10 +383,14 @@ impl MissionJournal {
                 }
                 MissionType::Normal => {
                     if self.current_world_missions.len() >= 4 {
-                        return Err(FFError::build(
+                        log(
                             Severity::Warning,
-                            "No empty world mission slots".to_string(),
-                        ));
+                            &format!(
+                                "Discarding task {} for mission {}: no empty world mission slots",
+                                task.task_id, mission_def.mission_id
+                            ),
+                        );
+                        return Ok(false);
                     }
                     self.current_world_missions.push(task);
                 }
