@@ -966,4 +966,66 @@ mod test {
     }
 
     crate::for_each_db_test!(run);
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_load_sample_db_players() {
+        test_suite::ensure_init();
+
+        let tmp = TempFile::new().expect("temp file");
+        std::fs::copy("sample.db", tmp.path()).expect("copy sample.db");
+        let path = tmp.path().to_str().expect("temp path utf-8").to_string();
+        let cfg = test_suite::build_config(&path);
+
+        let inner = SqliteDatabase::connect(&cfg.general)
+            .await
+            .expect("sqlite connect to sample.db");
+        let db = Database::new(inner);
+
+        let expected_by_account: std::collections::BTreeMap<BigInt, Vec<BigInt>> = {
+            let raw = Connection::open(tmp.path()).expect("raw open sample.db");
+            let mut stmt = raw
+                .prepare("SELECT AccountID, PlayerID FROM Players ORDER BY AccountID, PlayerID")
+                .expect("prepare players");
+            let rows: Vec<(BigInt, BigInt)> = stmt
+                .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)))
+                .expect("query players")
+                .map(|r| r.expect("row"))
+                .collect();
+            let mut map: std::collections::BTreeMap<BigInt, Vec<BigInt>> =
+                std::collections::BTreeMap::new();
+            for (acc, uid) in rows {
+                map.entry(acc).or_default().push(uid);
+            }
+            map
+        };
+
+        let expected_total: usize = expected_by_account.values().map(|v| v.len()).sum();
+        assert!(expected_total > 0, "sample.db should contain players");
+
+        let mut missing: Vec<BigInt> = Vec::new();
+        for (acc_id, expected_uids) in &expected_by_account {
+            let loaded = db
+                .load_players(*acc_id)
+                .await
+                .unwrap_or_else(|e| panic!("load_players({}) errored: {}", acc_id, e.get_msg()));
+            let loaded_uids: std::collections::HashSet<BigInt> =
+                loaded.iter().map(|p| p.get_uid()).collect();
+            for uid in expected_uids {
+                if !loaded_uids.contains(uid) {
+                    missing.push(*uid);
+                }
+            }
+        }
+
+        if !missing.is_empty() {
+            missing.sort();
+            panic!(
+                "{} of {} players failed to load from sample.db; missing PlayerIDs: {:?}",
+                missing.len(),
+                expected_total,
+                missing
+            );
+        }
+    }
 }
