@@ -788,3 +788,128 @@ impl DbImpl for PostgresDatabase {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use sqlparser::{dialect::PostgreSqlDialect, parser::Parser};
+
+    fn list_sql_files() -> Vec<std::path::PathBuf> {
+        std::fs::read_dir("sql")
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| p.is_file() && p.extension().and_then(|s| s.to_str()) == Some("sql"))
+            .collect()
+    }
+
+    #[test]
+    fn test_all_sql_files_parse() {
+        let dialect = PostgreSqlDialect {};
+        let mut tried = 0;
+        for path in list_sql_files() {
+            let sql = std::fs::read_to_string(&path).unwrap();
+            Parser::parse_sql(&dialect, &sql)
+                .unwrap_or_else(|e| panic!("Failed to parse {}: {}", path.display(), e));
+            tried += 1;
+        }
+        assert!(
+            tried > 30,
+            "expected to exercise >30 SQL files, got {}",
+            tried
+        );
+    }
+
+    /// Live-DB validation that every shared `sql/*.sql` file `PREPARE`s
+    /// against a real Postgres server. Ignored by default; run with:
+    ///
+    /// ```sh
+    /// cargo test --features postgres -- --ignored
+    /// ```
+    ///
+    /// Connection details are read from `config.toml` (the same file
+    /// used by the running server). The entire test runs inside a
+    /// transaction that is rolled back at the end, so the target DB
+    /// is left unmodified.
+    #[tokio::test]
+    #[ignore]
+    async fn test_all_sql_files_prepare() {
+        use crate::config::Config;
+        use crate::defines::{DB_VERSION, PROTOCOL_VERSION};
+        use tokio_postgres::NoTls;
+
+        let config = Config::load("config.toml").expect("failed to load config.toml");
+        let g = &config.general;
+        let conn_str = format!(
+            "host={} port={} user={} password={} dbname={}",
+            g.db_host.get(),
+            g.db_port.get(),
+            g.db_username.get(),
+            g.db_password.get(),
+            g.db_name.get(),
+        );
+
+        let (mut client, connection) = tokio_postgres::connect(&conn_str, NoTls)
+            .await
+            .expect("failed to connect to test Postgres");
+
+        tokio::spawn(async move {
+            if let Err(e) = connection.await {
+                eprintln!("connection error: {}", e);
+            }
+        });
+
+        // Run everything inside a transaction so the live DB is unchanged on exit.
+        let tx = client.transaction().await.unwrap();
+
+        let reset_sql = std::fs::read_to_string("sql/reset_db.sql").unwrap();
+        tx.batch_execute(&reset_sql).await.expect("reset_db failed");
+
+        let create_tables_sql = std::fs::read_to_string("sql/create_tables.sql").unwrap();
+        let param_regex = regex::Regex::new(r"\$([0-9]+)").unwrap();
+        let mut params: &[&(dyn tokio_postgres::types::ToSql + Sync)] =
+            &[&PROTOCOL_VERSION, &DB_VERSION];
+
+        for stmt in create_tables_sql.split(';') {
+            if stmt.trim().is_empty() {
+                continue;
+            }
+            let num_params = param_regex
+                .find_iter(stmt)
+                .map(|m| m.as_str()[1..].parse::<usize>().unwrap())
+                .max()
+                .unwrap_or(0);
+            tx.execute(stmt, &params[..num_params])
+                .await
+                .unwrap_or_else(|e| panic!("create_tables stmt failed: {}\nSQL:\n{}", e, stmt));
+            params = &params[num_params..];
+        }
+
+        let skip = |name: &str| name == "create_tables.sql" || name == "reset_db.sql";
+
+        let mut tried = 0;
+        for path in list_sql_files() {
+            let name = path.file_name().unwrap().to_string_lossy().to_string();
+            if skip(&name) {
+                continue;
+            }
+            let sql = std::fs::read_to_string(&path).unwrap();
+            for stmt_sql in sql.split(';') {
+                if stmt_sql.trim().is_empty() {
+                    continue;
+                }
+                tx.prepare(stmt_sql).await.unwrap_or_else(|e| {
+                    panic!("Failed to prepare sql/{}: {}\nSQL:\n{}", name, e, stmt_sql)
+                });
+            }
+            tried += 1;
+        }
+
+        tx.rollback().await.unwrap();
+
+        assert!(
+            tried > 30,
+            "expected to exercise >30 SQL files, got {}",
+            tried
+        );
+    }
+}

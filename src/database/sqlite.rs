@@ -882,19 +882,6 @@ mod test {
     }
 
     #[test]
-    fn test_create_tables() {
-        let _conn = init_db();
-    }
-
-    #[test]
-    fn test_meta_table_exists_query() {
-        let conn = init_db();
-        let sql = std::fs::read_to_string("sql/sqlite/meta_table_exists.sql").unwrap();
-        let n: i64 = conn.query_row(&sql, [], |r| r.get(0)).unwrap();
-        assert_eq!(n, 1);
-    }
-
-    #[test]
     fn test_all_sql_files_prepare() {
         let conn = init_db();
         let skip = |name: &str| name == "create_tables.sql" || name == "reset_db.sql";

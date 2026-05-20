@@ -6,7 +6,7 @@ pub struct Config {
 }
 
 impl Config {
-    fn load(path: &str) -> FFResult<Self> {
+    pub(crate) fn load(path: &str) -> FFResult<Self> {
         let file_read = std::fs::read_to_string(path);
         if let Err(e) = file_read {
             if let std::io::ErrorKind::NotFound = e.kind() {

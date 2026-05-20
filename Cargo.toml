@@ -44,3 +44,6 @@ opt-level = 3
 
 [build-dependencies]
 regex = "1.12.3"
+
+[dev-dependencies]
+sqlparser = "0.61.0"
