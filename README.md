@@ -126,7 +126,7 @@ RustyFusion is an open-source server emulator for Cartoon Network's MMO Fusionfa
 Items that are ***highlighted*** are in planning or WIP. Items marked with `+` are either new and not present in OpenFusion or enhanced from OpenFusion (bug fixes not included). Some items have dependencies in other categories, so the list won't get completed in order.
 
 ## Developing
-**RustyFusion requires an instance of a supported database backend (currently only PostgreSQL, but SQLite support is planned) to connect to for database operations.** You can manually configure an instance and set the connection parameters in `config.toml` or, for PostgreSQL specifically, use `docker compose` to spawn a container with the default parameters.
+**RustyFusion requires an instance of a supported database backend (either PostgreSQL or SQLite) to connect to for database operations.** You can manually configure an instance and set the connection parameters in `config.toml` or, for PostgreSQL specifically, use `docker compose` to spawn a container with the default parameters.
 
 Cargo (Rust's package manager) makes working with Rust projects extremely easy to setup. Just clone the repo (recursively, to grab critical tabledata), build, and run:
 ```
@@ -141,6 +141,10 @@ To force the server to load the config file from a location other than `config.t
 ```
 cargo run --bin shard --config=some_other_config.toml
 cargo run --bin shard --general.db_port=1234 --shard.num_channels=2
+```
+If you would like to use a different DB backend, disable the default (PostgreSQL) amd enable the one of your choice (currently only SQLite):
+```
+cargo run --bin hybrid --no-default-features --features sqlite
 ```
 
 ## Contributing
