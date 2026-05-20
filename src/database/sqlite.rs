@@ -1003,7 +1003,6 @@ mod test {
     crate::for_each_db_test!(run);
 
     #[tokio::test]
-    #[ignore]
     async fn test_load_sample_db_players() {
         test_suite::ensure_init();
 
@@ -1020,7 +1019,11 @@ mod test {
         let expected_by_account: std::collections::BTreeMap<BigInt, Vec<BigInt>> = {
             let raw = Connection::open(tmp.path()).expect("raw open sample.db");
             let mut stmt = raw
-                .prepare("SELECT AccountID, PlayerID FROM Players ORDER BY AccountID, PlayerID")
+                .prepare(
+                    "SELECT p.AccountID, p.PlayerID FROM Players p \
+                     INNER JOIN Accounts a ON p.AccountID = a.AccountID \
+                     ORDER BY p.AccountID, p.PlayerID",
+                )
                 .expect("prepare players");
             let rows: Vec<(BigInt, BigInt)> = stmt
                 .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)))
