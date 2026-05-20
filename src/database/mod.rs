@@ -1,26 +1,107 @@
 #![allow(dead_code)]
 
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::OnceLock;
+use std::sync::{LazyLock, OnceLock};
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
+use parking_lot::RwLock;
 
 use crate::config::{config_get, GeneralConfig};
 use crate::entity::Player;
 use crate::error::*;
 use crate::state::Account;
 
+#[cfg(not(any(feature = "postgres", feature = "sqlite")))]
+compile_error!(
+    "A database backend must be enabled for compilation. \
+     Use `--no-default-features --features sqlite` to select SQLite, \
+     or use the default features for the default PostgreSQL backend."
+);
+
+#[cfg(all(feature = "postgres", feature = "sqlite"))]
+compile_error!(
+    "Only one database backend can be enabled for compilation. \
+     Use `--no-default-features --features sqlite` to select SQLite, \
+     or use the default features for the default PostgreSQL backend."
+);
+
 #[cfg(feature = "postgres")]
 mod postgresql;
+#[cfg(feature = "sqlite")]
+mod sqlite;
 
 type Int = i32;
 type BigInt = i64;
 type Bytes = Vec<u8>;
 
+static SQL_CACHE: LazyLock<RwLock<HashMap<String, &'static str>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+fn cache_sql_string(name: &str, s: String) -> &'static str {
+    // since the string is immutable, we can leak it so
+    // we don't need to hold a read lock on the cache
+    let leaked: &'static str = Box::leak(s.into_boxed_str());
+    SQL_CACHE.write().insert(name.to_string(), leaked);
+    leaked
+}
+
+#[cfg(feature = "sqlite")]
+fn convert_postgres_to_sqlite(s: String) -> String {
+    use regex::Regex;
+    static PG_PARAM_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\$([0-9]+)").unwrap());
+    PG_PARAM_REGEX.replace_all(&s, "?$1").into_owned()
+}
+
+fn read_sql_string(name: &str) -> FFResult<String> {
+    #[cfg(feature = "sqlite")]
+    let (sql_path, needs_conversion) = {
+        let sqlite_path = format!("sql/sqlite/{}.sql", name);
+        if std::fs::exists(&sqlite_path).unwrap_or(false) {
+            (sqlite_path, false)
+        } else {
+            (format!("sql/{}.sql", name), true)
+        }
+    };
+
+    #[cfg(feature = "postgres")]
+    let sql_path = format!("sql/{}.sql", name);
+
+    let s = std::fs::read_to_string(&sql_path).map_err(|e| {
+        FFError::build(
+            Severity::Warning,
+            format!("Couldn't read SQL file '{}' @ {}", name, sql_path),
+        )
+        .with_parent(e.into())
+    })?;
+
+    #[cfg(feature = "sqlite")]
+    let s = if needs_conversion {
+        convert_postgres_to_sqlite(s)
+    } else {
+        s
+    };
+
+    Ok(s)
+}
+
+fn get_sql_string(name: &str) -> FFResult<&'static str> {
+    if let Some(cached) = SQL_CACHE.read().get(name) {
+        return Ok(cached);
+    }
+
+    let sql_string = read_sql_string(name)?;
+    let interned = cache_sql_string(name, sql_string);
+    Ok(interned)
+}
+
 #[cfg(feature = "postgres")]
 type DbBackend = postgresql::PostgresDatabase;
+
+#[cfg(all(feature = "sqlite", not(feature = "postgres")))]
+type DbBackend = sqlite::SqliteDatabase;
 
 static DB: OnceLock<Database<DbBackend>> = OnceLock::new();
 static DB_ERROR_SEVERITY: OnceLock<Severity> = OnceLock::new();
@@ -148,13 +229,13 @@ async fn db_connect(config: &GeneralConfig) -> FFResult<DbBackend> {
     #[cfg(feature = "postgres")]
     let _db_impl = Some(postgresql::PostgresDatabase::connect(config).await);
 
+    #[cfg(all(feature = "sqlite", not(feature = "postgres")))]
+    let _db_impl = Some(sqlite::SqliteDatabase::connect(config).await);
+
     match _db_impl {
         Some(Ok(db)) => Ok(db),
         Some(Err(parent_error)) => Err(format_db_conn_error(parent_error)),
-        None => Err(FFError::build(
-            Severity::Fatal,
-            "No database implementation enabled; please enable one through a feature".to_string(),
-        )),
+        None => unreachable!("A backend is guaranteed to be enabled at compile time"),
     }
 }
 
@@ -171,12 +252,7 @@ pub async fn db_init(error_severity: Severity) -> FFResult<&'static Database<DbB
 
     log(
         Severity::Info,
-        &format!(
-            "Connected to database ({}@{}:{})",
-            config.db_username.get(),
-            config.db_host.get(),
-            config.db_port.get()
-        ),
+        &format!("Connected to database ({:?})", db_impl),
     );
 
     let _ = DB.set(Database::new(db_impl));

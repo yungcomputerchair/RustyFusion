@@ -4,5 +4,6 @@ config.toml
 *.log*
 motd.txt*
 *.mmdb
+*.db*
 scripts/globals.d.luau
 

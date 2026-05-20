@@ -16,6 +16,7 @@ uuid = { version = "1.23.1", features = ['v4', 'fast-rng']}
 vecmath = "1.0.0"
 tokio-postgres = { version = "0.7.17", optional = true }
 deadpool-postgres = { version = "0.14.1", optional = true }
+deadpool-sqlite = { version = "0.13", features = ["rt_tokio_1"], optional = true }
 num_enum = "0.7.6"
 regex = "1.12.3"
 bcrypt = "0.15.1"
@@ -36,6 +37,7 @@ mlua = { version = "0.11.6", features = ["luau", "send"] }
 [features]
 default = ["postgres"]
 postgres = ["dep:tokio-postgres", "dep:deadpool-postgres"]
+sqlite = ["dep:deadpool-sqlite"]
 
 [profile.dev.package.backtrace]
 opt-level = 3

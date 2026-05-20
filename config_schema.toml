@@ -39,19 +39,22 @@ server_key = "myserverkey" # CHANGE ME; what password the login server and shard
                            # will use to connect to each other. this must match between servers!!
 
 #: String
-db_name = "rustyfusion" # the database to use
+db_name = "rustyfusion" # the database to use (PostgreSQL only)
 
 #: String
-db_username = "admin" # what username to connect to database with
+db_username = "admin" # what username to connect to database with (PostgreSQL only)
 
 #: String
-db_password = "mypassword" # CHANGE ME; what password to connect to database with
+db_password = "mypassword" # CHANGE ME; what password to connect to database with (PostgreSQL only)
 
 #: String
-db_host = "localhost" # hostname/address of database server to connect to
+db_host = "localhost" # hostname/address of database server to connect to (PostgreSQL only)
 
 #: u16
-db_port = 5432 # port used by database server
+db_port = 5432 # port used by database server (PostgreSQL only)
+
+#: String
+db_path = "database.db" # path to database file (SQLite only)
 
 #: String
 table_data_path = "tabledata/" # path to OpenFusion table data repository

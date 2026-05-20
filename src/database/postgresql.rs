@@ -112,16 +112,8 @@ impl PostgresDatabase {
         })
     }
 
-    fn read_sql(name: &str) -> FFResult<String> {
-        let path = format!("sql/{}.sql", name);
-        match std::fs::read_to_string(&path) {
-            Ok(s) => Ok(s),
-            Err(e) => Err(FFError::build(
-                Severity::Warning,
-                format!("Couldn't read SQL file {}", path),
-            )
-            .with_parent(e.into())),
-        }
+    fn read_sql(name: &str) -> FFResult<&'static str> {
+        crate::database::get_sql_string(name)
     }
 
     async fn query(
@@ -130,14 +122,14 @@ impl PostgresDatabase {
         params: &[&(dyn ToSql + Sync)],
     ) -> FFResult<Vec<Row>> {
         let query = Self::read_sql(name)?;
-        let rows = client.query(&query, params).await?;
+        let rows = client.query(query, params).await?;
 
         Ok(rows)
     }
 
     async fn prep(client: &impl GenericClient, name: &str) -> FFResult<postgres::Statement> {
         let query = Self::read_sql(name)?;
-        let stmt = client.prepare(&query).await?;
+        let stmt = client.prepare(query).await?;
         Ok(stmt)
     }
 

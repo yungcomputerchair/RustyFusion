@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/rust.yml
       - src/**
+      - sql/**
       - tabledata/**
       - Cargo.toml
       - Cargo.lock
@@ -14,6 +15,7 @@ on:
     paths:
       - .github/workflows/rust.yml
       - src/**
+      - sql/**
       - tabledata/**
       - Cargo.toml
       - Cargo.lock
@@ -50,6 +52,22 @@ jobs:
             target/debug/login
             target/debug/shard
           if-no-files-found: error
+
+  build_and_test_sqlite:
+    name: Build and test (sqlite backend)
+    env:
+      RUSTFLAGS: "-A dead_code"
+    needs: read_msrv
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: "stable, ${{ needs.read_msrv.outputs.msrv }}"
+      - run: cargo build --no-default-features --features sqlite --verbose
+      - run: cargo test --no-default-features --features sqlite
 
   # Check formatting with rustfmt
   formatting:
