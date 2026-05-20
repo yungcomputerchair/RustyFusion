@@ -917,22 +917,17 @@ impl TableData {
 }
 
 pub fn tdata_init() -> FFResult<&'static TableData> {
-    if TABLE_DATA.get().is_some() {
-        return Err(FFError::build(
-            Severity::Warning,
-            "TableData already initialized".to_string(),
-        ));
+    if TABLE_DATA.get().is_none() {
+        let load_start = SystemTime::now();
+        let tdata = TableData::new()?;
+        let load_time = load_start.elapsed().unwrap();
+
+        let _ = TABLE_DATA.set(tdata);
+        log(
+            Severity::Info,
+            &format!("Loaded TableData ({:.2}s)", load_time.as_secs_f32()),
+        );
     }
-
-    let load_start = SystemTime::now();
-    let tdata = TableData::new()?;
-    let load_time = load_start.elapsed().unwrap();
-
-    let _ = TABLE_DATA.set(tdata);
-    log(
-        Severity::Info,
-        &format!("Loaded TableData ({:.2}s)", load_time.as_secs_f32()),
-    );
 
     Ok(tdata_get())
 }

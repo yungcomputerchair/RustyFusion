@@ -29,8 +29,8 @@ jobs:
     name: Read MSRV
     uses: actions-rust-lang/msrv/.github/workflows/msrv.yml@main
 
-  build_and_test:
-    name: Build and test
+  build_and_test_pg:
+    name: Build and test (PostgreSQL)
     env:
       RUSTFLAGS: "-A dead_code"
     needs: read_msrv
@@ -68,7 +68,7 @@ jobs:
           if-no-files-found: error
 
   build_and_test_sqlite:
-    name: Build and test (sqlite backend)
+    name: Build and test (sqlite)
     env:
       RUSTFLAGS: "-A dead_code"
     needs: read_msrv
@@ -83,7 +83,6 @@ jobs:
       - run: cargo build --no-default-features --features sqlite --verbose
       - run: cargo test --no-default-features --features sqlite
 
-  # Check formatting with rustfmt
   formatting:
     name: Check formatting
     needs: read_msrv
