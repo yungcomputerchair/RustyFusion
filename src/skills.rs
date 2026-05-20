@@ -683,11 +683,10 @@ pub fn do_skill(
             continue;
         }
 
-        let Some(skill_result) = handle_skill_cast(caster_id, target, &skill_cast) else {
-            continue;
-        };
-
-        skill_results.push(skill_result);
+        match handle_skill_cast(caster_id, target, &skill_cast) {
+            Ok(skill_result) => skill_results.push(skill_result),
+            Err(e) => log_error(e),
+        }
     }
 
     Ok(skill_results)
@@ -783,9 +782,18 @@ fn handle_skill_cast(
     from: EntityID,
     to: &mut dyn Combatant,
     cast: &SkillCast,
-) -> Option<SkillResult> {
-    // TODO implement
-    Some(match cast.skill.skill_type {
+) -> FFResult<SkillResult> {
+    if cast.skill.passive {
+        return Err(FFError::build(
+            Severity::Warning,
+            format!(
+                "Passive skill {:?} was cast, should not happen",
+                cast.skill.skill_type
+            ),
+        ));
+    }
+
+    let result = match cast.skill.skill_type {
         SkillType::Damage => {
             let base_damage = cast.skill.values_a[cast.level];
             let attack = BasicAttack {
@@ -820,14 +828,36 @@ fn handle_skill_cast(
             })
         }
         other => {
-            log(
-                Severity::Warning,
-                &format!("Skill type {:?} is not implemented", other),
-            );
+            // generic buff application
+            if let Some(buff_id) = cast.skill.get_buff_id() {
+                let applied = if to.has_buff(BuffID::Invulnerable, None) {
+                    false
+                } else {
+                    let buff = cast.skill.make_buff_instance(BuffType::Shiny, cast.level)?;
+                    to.apply_buff(buff_id, buff, Some(from));
+                    true
+                };
 
-            return None;
+                SkillResult::Buff(sSkillResult_Buff {
+                    eCT: to.get_char_type() as i32,
+                    iID: match to.get_id() {
+                        EntityID::Player(id) => id,
+                        EntityID::NPC(id) => id,
+                        _ => unreachable!(),
+                    },
+                    bProtected: !applied as i32,
+                    iConditionBitFlag: to.get_condition_bit_flag(),
+                })
+            } else {
+                return Err(FFError::build(
+                    Severity::Warning,
+                    format!("Skill type {:?} is not implemented", other),
+                ));
+            }
         }
-    })
+    };
+
+    Ok(result)
 }
 
 enum RpsResult {
