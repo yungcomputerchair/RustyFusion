@@ -215,7 +215,10 @@ pub fn task_start(pkt: Packet, client: &FFClient, state: &mut ShardServerState) 
         }
 
         let player = state.get_player_mut(pc_id).unwrap();
-        if player.mission_journal.start_task(task)? {
+        if player
+            .mission_journal
+            .start_task(task, player.get_level())?
+        {
             log(
                 Severity::Info,
                 &format!(

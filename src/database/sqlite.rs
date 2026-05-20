@@ -442,7 +442,9 @@ impl SqliteDatabase {
                 npc_count_2 as usize,
                 npc_count_3 as usize,
             ]);
-            player.mission_journal.start_task(task)?;
+            player
+                .mission_journal
+                .start_task(task, player.get_level())?;
         }
 
         let active_mission_id: Int = row.get("CurrentMissionID");

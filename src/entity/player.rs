@@ -1219,7 +1219,7 @@ impl Player {
                 );
 
                 self.mission_journal
-                    .start_task(level_up_task_def.into())
+                    .start_task(level_up_task_def.into(), self.level)
                     .unwrap();
 
                 let pkt = sP_FE2CL_REP_PC_TASK_START_SUCC {

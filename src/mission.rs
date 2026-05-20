@@ -6,7 +6,7 @@ use std::{
 use crate::{
     defines::{SIZEOF_QUESTFLAG_NUMBER, SIZEOF_RQUEST_SLOT},
     enums::*,
-    error::{panic_log, FFError, FFResult, Severity},
+    error::{log, panic_log, FFError, FFResult, Severity},
     net::packet::sRunningQuest,
     tabledata::tdata_get,
     util::Bitfield,
@@ -285,8 +285,43 @@ impl MissionJournal {
         false
     }
 
-    pub fn start_task(&mut self, task: Task) -> FFResult<bool> {
+    pub fn start_task(&mut self, task: Task, player_level: i16) -> FFResult<bool> {
         let mission_def = task.get_mission_def();
+
+        // Ensure correct nano mission
+        if mission_def.mission_type == MissionType::Nano {
+            let expected_mission_id = tdata_get()
+                .get_player_stats(player_level)
+                .expect("Player loads with valid level")
+                .nano_quest_task_id
+                .map(|tid| tdata_get().get_task_definition(tid).unwrap().mission_id);
+
+            match expected_mission_id {
+                Some(mid) => {
+                    if mid != mission_def.mission_id {
+                        log(
+                            Severity::Warning,
+                            &format!(
+                                "Discarding nano mission {} since player level {} nano mission is {}",
+                                mission_def.mission_id, player_level, mid
+                            ),
+                        );
+                        return Ok(false);
+                    }
+                }
+                None => {
+                    log(
+                        Severity::Warning,
+                        &format!(
+                            "Discarding orphaned nano mission {} since player level {} has no nano mission",
+                            mission_def.mission_id, player_level
+                        ),
+                    );
+                    return Ok(false);
+                }
+            }
+        }
+
         let mission_existing_task = self
             .get_task_iter_mut()
             .find(|t| t.get_task_def().mission_id == mission_def.mission_id);
