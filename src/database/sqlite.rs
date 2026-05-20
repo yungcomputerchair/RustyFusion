@@ -496,22 +496,55 @@ impl SqliteDatabase {
         Ok(player)
     }
 
+    fn load_buddy_entry_sync(
+        conn: &Connection,
+        buddy_uid: BigInt,
+    ) -> FFResult<Option<BuddyListEntry>> {
+        let rows = Self::query(conn, "load_player_lite", &[&buddy_uid])?;
+        let Some(row) = rows.first() else {
+            return Ok(None);
+        };
+        let appearance_flag: Int = row.get("AppearanceFlag");
+        if appearance_flag == 0 {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Buddy {} has no appearance set", buddy_uid),
+            ));
+        }
+        let style = PlayerStyle {
+            gender: row.get::<Int>("Gender") as i8,
+            face_style: row.get::<Int>("FaceStyle") as i8,
+            hair_style: row.get::<Int>("HairStyle") as i8,
+            hair_color: row.get::<Int>("HairColor") as i8,
+            skin_color: row.get::<Int>("SkinColor") as i8,
+            eye_color: row.get::<Int>("EyeColor") as i8,
+            height: row.get::<Int>("Height") as i8,
+            body: row.get::<Int>("Body") as i8,
+        };
+        Ok(Some(BuddyListEntry {
+            pc_uid: row.get("PlayerId"),
+            first_name: row.get("FirstName"),
+            last_name: row.get("LastName"),
+            style,
+            name_check: (row.get::<Int>("NameCheck") as i8).try_into()?,
+            free_chat: true,
+            blocked: false,
+        }))
+    }
+
     fn load_buddies_sync(conn: &Connection, player: &mut Player) -> FFResult<()> {
         let rows = Self::query(conn, "load_buddy_ids", &[&player.get_uid()])?;
         for row in &rows {
             let buddy_uid: BigInt = row.get("PlayerBId");
-            match Self::query(conn, "load_player", &[&buddy_uid]) {
-                Ok(buddy_rows) => {
-                    if let Some(buddy_row) = buddy_rows.first() {
-                        let buddy = Self::load_player_sync(conn, buddy_row, false)?;
-                        let buddy_info = BuddyListEntry::new(&buddy);
-                        log_if_failed(player.add_buddy(buddy_info));
-                    } else {
-                        log(
-                            Severity::Warning,
-                            &format!("Buddy with UID {} not found", buddy_uid),
-                        );
-                    }
+            match Self::load_buddy_entry_sync(conn, buddy_uid) {
+                Ok(Some(buddy_info)) => {
+                    log_if_failed(player.add_buddy(buddy_info));
+                }
+                Ok(None) => {
+                    log(
+                        Severity::Warning,
+                        &format!("Buddy with UID {} not found", buddy_uid),
+                    );
                 }
                 Err(e) => {
                     log(

@@ -466,24 +466,55 @@ impl PostgresDatabase {
         Ok(player)
     }
 
+    async fn load_buddy_entry(
+        client: &impl GenericClient,
+        buddy_uid: BigInt,
+    ) -> FFResult<Option<BuddyListEntry>> {
+        let rows = Self::query(client, "load_player_lite", &[&buddy_uid]).await?;
+        let Some(row) = rows.first() else {
+            return Ok(None);
+        };
+        let appearance_flag: Int = row.get("AppearanceFlag");
+        if appearance_flag == 0 {
+            return Err(FFError::build(
+                Severity::Warning,
+                format!("Buddy {} has no appearance set", buddy_uid),
+            ));
+        }
+        let style = PlayerStyle {
+            gender: row.get::<_, Int>("Gender") as i8,
+            face_style: row.get::<_, Int>("FaceStyle") as i8,
+            hair_style: row.get::<_, Int>("HairStyle") as i8,
+            hair_color: row.get::<_, Int>("HairColor") as i8,
+            skin_color: row.get::<_, Int>("SkinColor") as i8,
+            eye_color: row.get::<_, Int>("EyeColor") as i8,
+            height: row.get::<_, Int>("Height") as i8,
+            body: row.get::<_, Int>("Body") as i8,
+        };
+        Ok(Some(BuddyListEntry {
+            pc_uid: row.get("PlayerId"),
+            first_name: row.get("FirstName"),
+            last_name: row.get("LastName"),
+            style,
+            name_check: (row.get::<_, Int>("NameCheck") as i8).try_into()?,
+            free_chat: true,
+            blocked: false,
+        }))
+    }
+
     async fn load_buddies(client: &impl GenericClient, player: &mut Player) -> FFResult<()> {
         let rows = Self::query(client, "load_buddy_ids", &[&player.get_uid()]).await?;
         for row in rows {
             let buddy_uid: BigInt = row.get("PlayerBId");
-            let buddy_load_result = Self::query(client, "load_player", &[&buddy_uid]).await;
-            match buddy_load_result {
-                Ok(buddy_rows) => {
-                    if let Some(buddy_row) = buddy_rows.first() {
-                        let buddy =
-                            Box::pin(Self::load_player_internal(client, buddy_row, false)).await?;
-                        let buddy_info = BuddyListEntry::new(&buddy);
-                        log_if_failed(player.add_buddy(buddy_info));
-                    } else {
-                        log(
-                            Severity::Warning,
-                            &format!("Buddy with UID {} not found", buddy_uid),
-                        );
-                    }
+            match Self::load_buddy_entry(client, buddy_uid).await {
+                Ok(Some(buddy_info)) => {
+                    log_if_failed(player.add_buddy(buddy_info));
+                }
+                Ok(None) => {
+                    log(
+                        Severity::Warning,
+                        &format!("Buddy with UID {} not found", buddy_uid),
+                    );
                 }
                 Err(e) => {
                     log(
