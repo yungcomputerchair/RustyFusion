@@ -70,7 +70,7 @@ jobs:
             config.toml
             docker-compose.yml
             LICENSE
-            sql/
+            sql/*.sql
             scripts/
             tabledata/
           if-no-files-found: error
