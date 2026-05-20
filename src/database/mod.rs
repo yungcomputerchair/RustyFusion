@@ -33,6 +33,9 @@ mod postgresql;
 #[cfg(feature = "sqlite")]
 mod sqlite;
 
+#[cfg(test)]
+mod test_suite;
+
 type Int = i32;
 type BigInt = i64;
 type Bytes = Vec<u8>;

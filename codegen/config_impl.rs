@@ -29,7 +29,7 @@ impl Config {
         Config::from_str(&file_contents)
     }
 
-    fn from_str(toml_str: &str) -> FFResult<Self> {
+    pub(crate) fn from_str(toml_str: &str) -> FFResult<Self> {
         #[derive(Deserialize)]
         struct ConfigLayout {
             //LAYOUT_FIELDS//

@@ -1,4 +1,5 @@
 #![allow(clippy::derivable_impls)]
+#![allow(clippy::module_inception)]
 
 use std::ops::Add;
 

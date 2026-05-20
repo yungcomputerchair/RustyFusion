@@ -791,7 +791,10 @@ impl DbImpl for PostgresDatabase {
 
 #[cfg(test)]
 mod test {
+    use std::sync::LazyLock;
+
     use sqlparser::{dialect::PostgreSqlDialect, parser::Parser};
+    use tokio::sync::Mutex;
 
     fn list_sql_files() -> Vec<std::path::PathBuf> {
         std::fs::read_dir("sql")
@@ -800,6 +803,19 @@ mod test {
             .map(|e| e.path())
             .filter(|p| p.is_file() && p.extension().and_then(|s| s.to_str()) == Some("sql"))
             .collect()
+    }
+
+    fn pg_conn_str() -> String {
+        let config = crate::config::Config::load("config.toml").expect("config.toml");
+        let g = &config.general;
+        format!(
+            "host={} port={} user={} password={} dbname={}",
+            g.db_host.get(),
+            g.db_port.get(),
+            g.db_username.get(),
+            g.db_password.get(),
+            g.db_name.get(),
+        )
     }
 
     #[test]
@@ -833,20 +849,10 @@ mod test {
     #[tokio::test]
     #[ignore]
     async fn test_all_sql_files_prepare() {
-        use crate::config::Config;
         use crate::defines::{DB_VERSION, PROTOCOL_VERSION};
         use tokio_postgres::NoTls;
 
-        let config = Config::load("config.toml").expect("failed to load config.toml");
-        let g = &config.general;
-        let conn_str = format!(
-            "host={} port={} user={} password={} dbname={}",
-            g.db_host.get(),
-            g.db_port.get(),
-            g.db_username.get(),
-            g.db_password.get(),
-            g.db_name.get(),
-        );
+        let conn_str = pg_conn_str();
 
         let (mut client, connection) = tokio_postgres::connect(&conn_str, NoTls)
             .await
@@ -912,4 +918,46 @@ mod test {
             tried
         );
     }
+
+    // DB API functional tests against a live PG (ignored by default)
+
+    async fn reset_pg() {
+        use tokio_postgres::NoTls;
+        let (client, connection) = tokio_postgres::connect(&pg_conn_str(), NoTls)
+            .await
+            .expect("pg connect");
+        tokio::spawn(async move {
+            let _ = connection.await;
+        });
+        let reset_sql = std::fs::read_to_string("sql/reset_db.sql").unwrap();
+        client.batch_execute(&reset_sql).await.expect("reset_db");
+    }
+
+    async fn connect_pg_db() -> super::super::Database<super::PostgresDatabase> {
+        let config = crate::config::Config::load("config.toml").expect("config.toml");
+        let inner = super::PostgresDatabase::connect(&config.general)
+            .await
+            .expect("postgres connect");
+        super::super::Database::new(inner)
+    }
+
+    // Tests run in parallel, but since we want each one to run on clean state,
+    // we need to serailze them. Just lock on this mutex.
+    static PG_TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+
+    macro_rules! pg_suite_test {
+        ($name:ident) => {
+            #[tokio::test]
+            #[ignore]
+            async fn $name() {
+                let _guard = PG_TEST_LOCK.lock().await;
+                crate::database::test_suite::ensure_init();
+                reset_pg().await;
+                let db = connect_pg_db().await;
+                crate::database::test_suite::$name(&db).await;
+            }
+        };
+    }
+
+    crate::for_each_db_test!(pg_suite_test);
 }

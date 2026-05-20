@@ -97,7 +97,7 @@ impl NPC {
 
         let speed = speed.unwrap_or_else(|| {
             let dist = own_pos.distance_to(&target_pos);
-            if dist > NPC_RUN_DISTANCE as u32 {
+            if dist > NPC_RUN_DISTANCE {
                 stats.run_speed
             } else {
                 stats.walk_speed

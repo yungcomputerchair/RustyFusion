@@ -940,4 +940,30 @@ mod test {
             tried
         );
     }
+
+    use crate::database::{test_suite, Database};
+    use crate::util::TempFile;
+
+    async fn setup_db() -> (TempFile, Database<SqliteDatabase>) {
+        test_suite::ensure_init();
+        let tmp = TempFile::new().expect("temp file");
+        let path = tmp.path().to_str().expect("temp path utf-8").to_string();
+        let cfg = test_suite::build_config(&path);
+        let inner = SqliteDatabase::connect(&cfg.general)
+            .await
+            .expect("sqlite connect");
+        (tmp, Database::new(inner))
+    }
+
+    macro_rules! run {
+        ($name:ident) => {
+            #[tokio::test]
+            async fn $name() {
+                let (_tmp, db) = setup_db().await;
+                test_suite::$name(&db).await;
+            }
+        };
+    }
+
+    crate::for_each_db_test!(run);
 }
