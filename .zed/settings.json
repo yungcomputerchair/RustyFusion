@@ -1,0 +1,17 @@
+{
+  "lsp": {
+    "luau-lsp": {
+      "settings": {
+        "definitions": ["scripts/globals.d.luau"],
+        "roblox": {
+          "enabled": false
+        },
+        "luau-lsp": {
+          "sourcemap": {
+            "enabled": false
+          }
+        }
+      }
+    }
+  }
+}
