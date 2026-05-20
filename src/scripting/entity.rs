@@ -130,6 +130,15 @@ impl LuaUserData for EntityScriptContext {
                 }
             }));
 
+            luau_method!(methods, "has_buff" -> "boolean", |_, this, buff_id: i32| this.with_entity(|entity| {
+                if let Some(combatant) = entity.as_combatant() {
+                    let buff_id: BuffID = buff_id.try_into().map_err(|_| LuaError::runtime(format!("Invalid buff ID: {}", buff_id)))?;
+                    Ok(combatant.has_buff(buff_id, None))
+                } else {
+                    Ok(false)
+                }
+            }));
+
             luau_method!(methods, "apply_buff" -> "boolean", |_, this, (buff_id, values, duration, source): (i32, Vec<i32>, Option<f32>, Option<EntityScriptContext>)| this.with_state(|state| {
                 let entity = state.get_entity_mut(this.entity_id)?;
                 if let Some(combatant) = entity.as_combatant_mut() {

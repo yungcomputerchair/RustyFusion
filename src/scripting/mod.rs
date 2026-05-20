@@ -6,6 +6,7 @@ use parking_lot::Mutex;
 use crate::{
     defines::*,
     entity::NPC,
+    enums::BuffID,
     error::{log, log_error, FFError, FFResult, Severity},
     state::ShardServerState,
     Position,
@@ -146,6 +147,8 @@ impl ScriptingEngine {
         luau_const!(vm, "LIB_VERSION", "string", LIB_VERSION);
         luau_const!(vm, "PROTOCOL_VERSION", "number", PROTOCOL_VERSION);
         luau_const!(vm, "DB_VERSION", "number", DB_VERSION);
+
+        luau_const!(vm, "BUFF_SLEEP", "number", BuffID::Sleep as i32);
 
         luau_function!("yield", "(): ()");
         luau_function!("wait", "(seconds: number, predicate: (() -> boolean)?): ()");

@@ -23,6 +23,18 @@ function behaviors.handle_death(npc: Npc)
     return true
 end
 
+-- Sleep
+-- Returns true if the NPC is sleeping
+function behaviors.handle_sleep(npc: Npc)
+    if not npc:has_buff(BUFF_SLEEP) then
+        return false
+    end
+
+    -- Don't move while asleep
+    npc:stop()
+    return true
+end
+
 -- Retreat to spawn if target is dead, gone, or too far from spawn.
 -- After retreat, fully heals the NPC (matching native reset behavior).
 -- Returns true if retreating (caller should skip other behaviors).
