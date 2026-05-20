@@ -416,18 +416,16 @@ pub fn slot_num_to_loc_and_slot_num(mut slot_num: usize) -> FFResult<(ItemLocati
     if slot_num < SIZEOF_EQUIP_SLOT as usize {
         return Ok((ItemLocation::Equip, slot_num));
     }
-
     slot_num -= SIZEOF_EQUIP_SLOT as usize;
+
     if slot_num < SIZEOF_INVEN_SLOT as usize {
         return Ok((ItemLocation::Inven, slot_num));
     }
-
     slot_num -= SIZEOF_INVEN_SLOT as usize;
-    if slot_num < SIZEOF_QINVEN_SLOT as usize {
-        return Ok((ItemLocation::QInven, slot_num));
-    }
 
-    slot_num -= SIZEOF_QINVEN_SLOT as usize;
+    // NOTE: quest items are not stored in inventory slots,
+    // so do NOT factor in SIZEOF_QINVEN_SLOT
+
     if slot_num < SIZEOF_BANK_SLOT as usize {
         return Ok((ItemLocation::Bank, slot_num));
     }

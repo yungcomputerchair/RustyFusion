@@ -1054,15 +1054,9 @@ impl Player {
     }
 
     pub fn get_item_iter(&self) -> impl Iterator<Item = (usize, &Item)> {
-        let inv_slot_max =
-            (SIZEOF_EQUIP_SLOT + SIZEOF_INVEN_SLOT + SIZEOF_BANK_SLOT + SIZEOF_QINVEN_SLOT)
-                as usize;
+        let inv_slot_max = (SIZEOF_EQUIP_SLOT + SIZEOF_INVEN_SLOT + SIZEOF_BANK_SLOT) as usize;
         (0..inv_slot_max).filter_map(move |slot_num| {
             let (loc, slot_num_loc) = util::slot_num_to_loc_and_slot_num(slot_num).unwrap();
-            if loc == ItemLocation::QInven {
-                return None;
-            }
-
             let item = self.get_item(loc, slot_num_loc).unwrap();
             item.as_ref().map(|item| (slot_num, item))
         })
