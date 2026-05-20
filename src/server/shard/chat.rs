@@ -591,9 +591,7 @@ mod commands {
                 Library version: {}\n\
                 Protocol version: {}\n\
                 Database version: {}",
-                    LIB_VERSION.unwrap_or("unknown"),
-                    PROTOCOL_VERSION,
-                    DB_VERSION,
+                    LIB_VERSION, PROTOCOL_VERSION, DB_VERSION,
                 ),
             )
         })

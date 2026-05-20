@@ -4,7 +4,7 @@ use mlua::prelude::*;
 use parking_lot::Mutex;
 
 use crate::{
-    defines::SHARD_TICKS_PER_SECOND,
+    defines::*,
     entity::NPC,
     error::{log, log_error, FFError, FFResult, Severity},
     state::ShardServerState,
@@ -37,6 +37,15 @@ macro_rules! luau_class {
 macro_rules! luau_method {
     ($methods:ident, $name:literal -> $ret:literal, $($body:tt)+) => {
         $methods.add_method($name, $($body)+);
+    };
+}
+
+/// Registers a Lua global constant and emits:
+/// - `declare <NAME>: <value>` for literals
+/// - `declare <NAME>: <type>` for non-literals
+macro_rules! luau_const {
+    ($vm:expr, $name:literal, $luau_ty:literal, $val:expr) => {
+        $vm.globals().set($name, $val).unwrap();
     };
 }
 
@@ -134,6 +143,10 @@ impl ScriptingEngine {
     }
 
     fn register_globals(vm: &Lua) -> FFResult<()> {
+        luau_const!(vm, "LIB_VERSION", "string", LIB_VERSION);
+        luau_const!(vm, "PROTOCOL_VERSION", "number", PROTOCOL_VERSION);
+        luau_const!(vm, "DB_VERSION", "number", DB_VERSION);
+
         luau_function!("yield", "(): ()");
         luau_function!("wait", "(seconds: number, predicate: (() -> boolean)?): ()");
         luau_function!("log", "(message: string): ()");

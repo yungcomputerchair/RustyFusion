@@ -428,10 +428,19 @@ fn generate_luau_declarations() {
         r#"(?s)luau_method!\(\w+,\s*"([^"]+)"\s*->\s*"([^"]+)"\s*,\s*\|[^,]*,\s*\w+,\s*([^|]*)\|"#,
     )
     .unwrap();
+    //   luau_const!(vm, "NAME", "LuauType", value);
+    //   Captures name, Luau type, and value. If the value is a Luau-compatible
+    //   literal we emit `const NAME = value`; otherwise we fall back to
+    //   `declare NAME: <LuauType>`.
+    let const_re = regex::Regex::new(
+        r#"(?s)luau_const!\(\s*\w+\s*,\s*"([^"]+)"\s*,\s*"([^"]+)"\s*,\s*([^)]+?)\s*\)\s*;"#,
+    )
+    .unwrap();
 
     for path in &source_files {
         let content = std::fs::read_to_string(path)
             .unwrap_or_else(|e| panic!("build.rs: can't read {}: {}", path.display(), e));
+        let content = strip_doc_comments(&content);
 
         // Collect all fragments with their byte offset so we emit in source order
         let mut fragments: Vec<(usize, String)> = Vec::new();
@@ -505,15 +514,41 @@ fn generate_luau_declarations() {
             ));
         }
 
+        // luau_const! → `declare NAME: <value>` (singleton type) when the
+        // value is a pure literal that Luau can use as a singleton; otherwise
+        // `declare NAME: <LuauType>` falls back to the type string.
+        for caps in const_re.captures_iter(&content) {
+            let offset = caps.get(0).unwrap().start();
+            let name = &caps[1];
+            let luau_ty = &caps[2];
+            let value = caps[3].trim();
+            let ty = if is_luau_singleton_literal(value) {
+                value.to_string()
+            } else {
+                luau_ty.to_string()
+            };
+            fragments.push((offset, format!("declare {}: {}\n", name, ty)));
+        }
+
         fragments.sort_by_key(|(offset, _)| *offset);
         let mut prev_was_end = false;
         let mut prev_was_type = false;
+        let mut prev_was_function = false;
+        let mut prev_was_const = false;
         for (_, fragment) in &fragments {
             let is_class_start = fragment.starts_with("declare class ");
             let is_top_level = !fragment.starts_with("    ") && fragment.trim() != "end";
             let is_type = fragment.starts_with("export type ");
             let is_function = fragment.starts_with("declare function ");
+            let is_const = fragment.starts_with("declare ")
+                && !fragment.starts_with("declare class ")
+                && !fragment.starts_with("declare function ");
+            // Consts form their own cluster — blank-line separated from
+            // surrounding types/functions/classes.
+            let const_boundary = (is_const && (prev_was_type || prev_was_function))
+                || (prev_was_const && is_top_level && !is_const);
             if (is_class_start && !out.ends_with("\n\n"))
+                || (const_boundary && !out.ends_with("\n\n"))
                 || (prev_was_end && is_top_level)
                 || (prev_was_type && is_function)
             {
@@ -522,6 +557,8 @@ fn generate_luau_declarations() {
             out.push_str(fragment);
             prev_was_end = fragment.trim() == "end";
             prev_was_type = is_type;
+            prev_was_function = is_function;
+            prev_was_const = is_const;
         }
     }
 
@@ -531,4 +568,62 @@ fn generate_luau_declarations() {
         std::fs::write(LUAU_DECL_PATH, &out)
             .unwrap_or_else(|e| panic!("build.rs: can't write {}: {}", LUAU_DECL_PATH, e));
     }
+}
+
+/// Blank out `///` and `//!` doc-comment lines so example macro invocations
+/// inside them don't false-match the codegen regexes. Byte offsets within
+/// the file are preserved (each comment char is replaced with a space).
+fn strip_doc_comments(content: &str) -> String {
+    let mut out = String::with_capacity(content.len());
+    for line in content.split_inclusive('\n') {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("///") || trimmed.starts_with("//!") {
+            let body_len = line.len() - line.ends_with('\n') as usize;
+            for _ in 0..body_len {
+                out.push(' ');
+            }
+            if line.ends_with('\n') {
+                out.push('\n');
+            }
+        } else {
+            out.push_str(line);
+        }
+    }
+    out
+}
+
+/// Returns true if `value` is a pure Luau literal usable as a singleton type:
+/// an integer or float literal, a string literal, or `true`/`false`. Rejects
+/// compound expressions (`1 << 3`, `BuffID::Foo`) — those fall back to the
+/// caller-provided Luau type.
+fn is_luau_singleton_literal(value: &str) -> bool {
+    let v = value.trim();
+    if v == "true" || v == "false" {
+        return true;
+    }
+    if v.starts_with('"') && v.ends_with('"') && v.len() >= 2 {
+        return true;
+    }
+    // Integer or float literal, optionally negative. Reject anything with
+    // operators, identifiers, or whitespace.
+    let mut chars = v.chars().peekable();
+    if chars.peek() == Some(&'-') {
+        chars.next();
+    }
+    let rest: String = chars.collect();
+    if rest.is_empty() {
+        return false;
+    }
+    let mut seen_dot = false;
+    for c in rest.chars() {
+        if c.is_ascii_digit() {
+            continue;
+        }
+        if c == '.' && !seen_dot {
+            seen_dot = true;
+            continue;
+        }
+        return false;
+    }
+    true
 }
