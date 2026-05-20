@@ -35,6 +35,20 @@ jobs:
       RUSTFLAGS: "-A dead_code"
     needs: read_msrv
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: mypassword
+          POSTGRES_DB: rustyfusion
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U admin -d rustyfusion"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v6
         with:
@@ -43,7 +57,7 @@ jobs:
         with:
           toolchain: "stable, ${{ needs.read_msrv.outputs.msrv }}"
       - run: cargo build --verbose
-      - run: cargo test
+      - run: cargo test -- --include-ignored
       - uses: actions/upload-artifact@v6
         if: ${{ github.event_name != 'pull_request' && github.ref_name == 'main' }}
         with:
