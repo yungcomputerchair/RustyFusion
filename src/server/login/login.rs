@@ -225,18 +225,18 @@ Password must be 8-32 characters long and contain only letters, numbers, or spec
          */
         #[cfg(not(debug_assertions))]
         if state.is_session_active(account.id) {
-            client.get_client_type() = ClientType::UnauthedClient {
+            client.set_client_type(ClientType::UnauthedClient {
                 username: username.clone(),
                 dup_pc_uid: None,
-            };
+            });
         } else if let Some(dup_player) = players
             .iter()
             .find(|p| state.get_player_shard(p.get_uid()).is_some())
         {
-            client.get_client_type() = ClientType::UnauthedClient {
+            client.set_client_type(ClientType::UnauthedClient {
                 username: username.clone(),
                 dup_pc_uid: Some(dup_player.get_uid()),
-            };
+            });
         }
 
         if matches!(client.get_client_type(), ClientType::UnauthedClient { .. }) {
