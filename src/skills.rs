@@ -16,18 +16,6 @@ use crate::{
     state::ShardServerState,
 };
 
-impl Default for sTimeBuff {
-    fn default() -> Self {
-        Self {
-            iTimeLimit: 0,
-            iTimeDuration: 0,
-            iTimeRepeat: 0,
-            iValue: 0,
-            iConfirmNum: 0,
-        }
-    }
-}
-
 pub enum SkillResult {
     Damage(sSkillResult_Damage),
     DotDamage(sSkillResult_DotDamage),

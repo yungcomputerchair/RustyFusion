@@ -469,7 +469,7 @@ pub fn pc_buddy_warp(
         state.entity_map.update(EntityID::Player(pc_id), None, true);
 
         // this packet in client code seems to just leave group
-        let same_shard_succ_pkt = sP_FE2CL_REP_PC_BUDDY_WARP_SAME_SHARD_SUCC { UNUSED: 0 };
+        let same_shard_succ_pkt = sP_FE2CL_REP_PC_BUDDY_WARP_SAME_SHARD_SUCC::default();
 
         // this packet in client code loads the new position
         let goto_succ_pkt = sP_FE2CL_REP_PC_GOTO_SUCC {

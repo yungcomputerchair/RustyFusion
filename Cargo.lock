@@ -611,6 +611,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ffproto"
+version = "1.0.0"
+source = "git+https://github.com/OpenFusionProject/ffproto.git?rev=e9c6336#e9c633664dcda17cbe32550e709ea7c3b3012c9b"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
 name = "find-msvc-tools"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1652,6 +1660,7 @@ dependencies = [
  "deadpool-postgres",
  "deadpool-sqlite",
  "ffmonitor",
+ "ffproto",
  "futures",
  "maxminddb",
  "mlua",

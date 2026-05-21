@@ -559,7 +559,7 @@ pub fn pc_vehicle_on(clients: &ClientMap, state: &mut ShardServerState) -> FFRes
 
         helpers::broadcast_state(pc_id, player.get_state_bit_flag(), state);
 
-        let resp = sP_FE2CL_PC_VEHICLE_ON_SUCC { UNUSED: unused!() };
+        let resp = sP_FE2CL_PC_VEHICLE_ON_SUCC::default();
         client.send_packet(P_FE2CL_PC_VEHICLE_ON_SUCC, &resp);
         Ok(())
     })()
@@ -583,7 +583,7 @@ pub fn pc_vehicle_off(clients: &ClientMap, state: &mut ShardServerState) -> FFRe
         player.vehicle_speed = None;
         helpers::broadcast_state(pc_id, player.get_state_bit_flag(), state);
 
-        let resp = sP_FE2CL_PC_VEHICLE_OFF_SUCC { UNUSED: unused!() };
+        let resp = sP_FE2CL_PC_VEHICLE_OFF_SUCC::default();
         client.send_packet(P_FE2CL_PC_VEHICLE_OFF_SUCC, &resp);
         Ok(())
     })()
@@ -886,7 +886,7 @@ pub fn pc_warp_channel(
         player.instance_id.channel_num = channel_num;
         let chunk_coords = player.get_chunk_coords();
 
-        let resp = sP_FE2CL_REP_PC_WARP_CHANNEL_SUCC { UNUSED: unused!() };
+        let resp = sP_FE2CL_REP_PC_WARP_CHANNEL_SUCC::default();
         client.send_packet(P_FE2CL_REP_PC_WARP_CHANNEL_SUCC, &resp);
 
         state

@@ -227,7 +227,7 @@ impl PostgresDatabase {
 
         Self::exec(client, "clear_nanos", &[&pc_uid]).await?;
         for nano in player.get_nano_iter() {
-            let nano_raw: sNano = Some(nano).into();
+            let nano_raw: sNano = Some(nano).into_proto();
             client
                 .execute(
                     &save_nano,
@@ -243,7 +243,7 @@ impl PostgresDatabase {
 
         Self::exec(client, "clear_items", &[&pc_uid]).await?;
         for (slot_num, item) in player.get_item_iter() {
-            let item_raw: sItemBase = Some(*item).into();
+            let item_raw: sItemBase = Some(*item).into_proto();
             client
                 .execute(
                     &save_item,
@@ -364,7 +364,7 @@ impl PostgresDatabase {
                 iSkillID: nano.get::<_, Int>("Skill") as i16,
                 iStamina: nano.get::<_, Int>("Stamina") as i16,
             };
-            let nano: Option<Nano> = nano_raw.into();
+            let nano: Option<Nano> = nano_raw.into_proto();
             if let Some(nano) = nano {
                 player.set_nano(nano);
             }
@@ -435,7 +435,7 @@ impl PostgresDatabase {
                 iTimeLimit: item.get::<_, Int>("TimeLimit"),
             };
 
-            let item: Option<Item> = item_raw.try_into()?;
+            let item: Option<Item> = item_raw.try_into_proto()?;
             if item.is_some_and(|item| {
                 item.get_expiry_time()
                     .is_some_and(|et| et < SystemTime::now())

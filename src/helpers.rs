@@ -43,7 +43,7 @@ pub fn broadcast_monkey(pc_id: i32, ride_type: RideType, state: &mut ShardServer
     };
     let pkt_nano_bcast = sP_FE2CL_NANO_ACTIVE {
         iPC_ID: pc_id,
-        Nano: None.into(),
+        Nano: None.into_proto(),
         iConditionBitFlag: player.get_condition_bit_flag(),
         eCSTB___Add: 0,
     };
@@ -70,7 +70,7 @@ pub fn remove_group_member(
     if group.should_disband() {
         // we can just tell all players that they've left the group
         // (except the leaver; that is the caller's job)
-        let leaver_pkt = sP_FE2CL_PC_GROUP_LEAVE_SUCC { UNUSED: unused!() };
+        let leaver_pkt = sP_FE2CL_PC_GROUP_LEAVE_SUCC::default();
         for eid in group.get_member_ids() {
             let entity = state.entity_map.get_entity_raw(*eid).unwrap();
             if let Some(client) = entity.get_client() {
@@ -260,7 +260,7 @@ pub fn give_defeat_rewards(player: &mut Player, defeated_type: i32, rng: &mut Th
                         .set_item(ItemLocation::Inven, slot, Some(item))
                         .unwrap();
                     let item_reward = sItemReward {
-                        sItem: Some(item).into(),
+                        sItem: Some(item).into_proto(),
                         eIL: ItemLocation::Inven as i32,
                         iSlotNum: slot as i32,
                     };

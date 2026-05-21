@@ -538,7 +538,7 @@ pub fn task_end(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
                             .set_item(ItemLocation::Inven, slot_num, Some(item_reward))
                             .unwrap();
                         reward_pkt.push(&sItemReward {
-                            sItem: Some(item_reward).into(),
+                            sItem: Some(item_reward).into_proto(),
                             eIL: ItemLocation::Inven as i32,
                             iSlotNum: slot_num as i32,
                         });
@@ -582,8 +582,8 @@ pub fn task_end(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
                         let resp = sP_FE2CL_REP_PC_NANO_CREATE_SUCC {
                             iPC_FusionMatter: player.get_fusion_matter() as i32,
                             iQuestItemSlotNum: -1,
-                            QuestItem: None.into(),
-                            Nano: Some(&nano).into(),
+                            QuestItem: None.into_proto(),
+                            Nano: Some(&nano).into_proto(),
                             iPC_Level: match player.set_level(new_level) {
                                 Ok(l) => l,
                                 Err(e) => {

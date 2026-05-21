@@ -104,8 +104,8 @@ impl Nano {
         true
     }
 }
-impl From<sNano> for Option<Nano> {
-    fn from(value: sNano) -> Self {
+impl FromProto<sNano> for Option<Nano> {
+    fn from_proto(value: sNano) -> Self {
         if value.iID == 0 {
             return None;
         }
@@ -125,8 +125,8 @@ impl From<sNano> for Option<Nano> {
         Some(nano)
     }
 }
-impl From<Option<&Nano>> for sNano {
-    fn from(value: Option<&Nano>) -> Self {
+impl FromProto<Option<&Nano>> for sNano {
+    fn from_proto(value: Option<&Nano>) -> Self {
         match value {
             Some(nano) => Self {
                 iID: nano.id,

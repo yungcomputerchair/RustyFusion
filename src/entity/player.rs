@@ -141,31 +141,31 @@ pub struct Nanocom {
 }
 impl Nanocom {
     pub fn as_bank(&self) -> [sNano; SIZEOF_NANO_BANK_SLOT as usize] {
-        let mut bank = [None.into(); SIZEOF_NANO_BANK_SLOT as usize];
+        let mut bank = [None.into_proto(); SIZEOF_NANO_BANK_SLOT as usize];
         for (id, nano) in &self.nano_inventory {
             let idx = *id as usize;
             if idx < SIZEOF_NANO_BANK_SLOT as usize {
-                bank[idx] = Some(nano).into();
+                bank[idx] = Some(nano).into_proto();
             }
         }
         bank
     }
 
-    pub fn as_slots(&self) -> [u16; SIZEOF_NANO_CARRY_SLOT as usize] {
+    pub fn as_slots(&self) -> [i16; SIZEOF_NANO_CARRY_SLOT as usize] {
         let mut slots = [0; SIZEOF_NANO_CARRY_SLOT as usize];
         for (idx, nano_id) in self.equipped_ids.iter().enumerate() {
             if let Some(nano_id) = nano_id {
-                slots[idx] = *nano_id as u16;
+                slots[idx] = *nano_id;
             }
         }
         slots
     }
 
     pub fn as_carried(&self) -> [sNano; SIZEOF_NANO_CARRY_SLOT as usize] {
-        let mut carried = [None.into(); SIZEOF_NANO_CARRY_SLOT as usize];
+        let mut carried = [None.into_proto(); SIZEOF_NANO_CARRY_SLOT as usize];
         for (idx, nano_id) in self.equipped_ids.iter().enumerate() {
             if let Some(nano_id) = nano_id {
-                carried[idx] = Some(self.nano_inventory.get(nano_id).unwrap()).into();
+                carried[idx] = Some(self.nano_inventory.get(nano_id).unwrap()).into_proto();
             }
         }
         carried
@@ -685,8 +685,8 @@ impl Player {
             iY: self.position.y,
             iZ: self.position.z,
             iAngle: self.rotation,
-            aEquip: self.inventory.equipped.map(Option::<Item>::into),
-            aInven: self.inventory.main.map(Option::<Item>::into),
+            aEquip: self.inventory.equipped.map(Option::<Item>::into_proto),
+            aInven: self.inventory.main.map(Option::<Item>::into_proto),
             aQInven: self.inventory.get_quest_item_arr(),
             aNanoBank: self.nano_data.as_bank(),
             aNanoSlots: self.nano_data.as_slots(),
@@ -748,7 +748,7 @@ impl Player {
             iConditionBitFlag: self.get_condition_bit_flag(),
             iPCState: self.get_state_bit_flag(),
             iSpecialState: self.get_special_state_bit_flag(),
-            Nano: self.get_active_nano().into(),
+            Nano: self.get_active_nano().into_proto(),
         };
         (regen_data, regen_data_other)
     }
@@ -773,7 +773,7 @@ impl Player {
                 Some(_) => 1,
                 None => 0,
             },
-            Nano: self.get_active_nano().into(),
+            Nano: self.get_active_nano().into_proto(),
         }
     }
 
@@ -822,8 +822,8 @@ impl Player {
             iY: self.position.y,
             iZ: self.position.z,
             iAngle: self.rotation,
-            ItemEquip: self.inventory.equipped.map(Option::<Item>::into),
-            Nano: self.get_active_nano().into(),
+            ItemEquip: self.inventory.equipped.map(Option::<Item>::into_proto),
+            Nano: self.get_active_nano().into_proto(),
             eRT: unused!(),
         }
     }
@@ -1709,7 +1709,7 @@ impl Player {
             // but we still need to broadcast to other players.
             let pkt = sP_FE2CL_NANO_ACTIVE {
                 iPC_ID: pc_id,
-                Nano: None.into(),
+                Nano: None.into_proto(),
                 iConditionBitFlag: condition_bit_flag,
                 eCSTB___Add: false as i32,
             };

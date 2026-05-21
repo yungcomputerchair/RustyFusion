@@ -289,7 +289,7 @@ Password must be 8-32 characters long and contain only letters, numbers, or spec
                 iX: pos.x,
                 iY: pos.y,
                 iZ: pos.z,
-                aEquip: player.get_equipped().map(Option::<Item>::into),
+                aEquip: player.get_equipped().map(Option::<Item>::into_proto),
             };
             client.send_packet(P_LS2CL_REP_CHAR_INFO, &pkt);
         });
@@ -571,7 +571,7 @@ pub async fn char_select(
         db.update_selected_player(account_id, slot_num as i32)
             .await?;
 
-        let pkt = sP_LS2CL_REP_CHAR_SELECT_SUCC { UNUSED: unused!() };
+        let pkt = sP_LS2CL_REP_CHAR_SELECT_SUCC::default();
         client.send_packet(P_LS2CL_REP_CHAR_SELECT_SUCC, &pkt);
         Ok(())
     } else {

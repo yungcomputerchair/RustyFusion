@@ -171,7 +171,7 @@ pub fn pc_group_leave(clients: &ClientMap, state: &mut ShardServerState) -> FFRe
         helpers::remove_group_member(EntityID::Player(leaver_pc_id), group_id, state)?;
 
         // leaver needs the leave success packet too, thx client
-        let resp = sP_FE2CL_PC_GROUP_LEAVE_SUCC { UNUSED: unused!() };
+        let resp = sP_FE2CL_PC_GROUP_LEAVE_SUCC::default();
         clients
             .get_sender()
             .send_packet(P_FE2CL_PC_GROUP_LEAVE_SUCC, &resp);

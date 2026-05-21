@@ -268,7 +268,7 @@ pub fn warp_use_npc(
             iZ: pos.z,
             eIL: pkt.eIL2,
             iItemSlotNum: pkt.iItemSlot2,
-            Item: item_remaining.into(),
+            Item: item_remaining.into_proto(),
             iCandy: taros_left as i32,
         };
 
@@ -322,7 +322,7 @@ pub fn time_to_go_warp(
             iZ: pos.z,
             eIL: pkt.eIL2,
             iItemSlotNum: pkt.iItemSlot2,
-            Item: item_remaining.into(),
+            Item: item_remaining.into_proto(),
             iCandy: taros_left as i32,
         };
 
@@ -536,7 +536,7 @@ fn do_warp(
                 iZ: player.get_position().z,
                 eIL: ItemLocation::end(),
                 iItemSlotNum: unused!(),
-                Item: None.into(),
+                Item: None.into_proto(),
                 iCandy: player.get_taros() as i32,
             };
             client.send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp);

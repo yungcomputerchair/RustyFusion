@@ -256,7 +256,7 @@ impl SqliteDatabase {
             let save_nano_sql = Self::read_sql("save_nano")?;
             let mut save_nano = tx.prepare_cached(save_nano_sql)?;
             for nano in player.get_nano_iter() {
-                let nano_raw: sNano = Some(nano).into();
+                let nano_raw: sNano = Some(nano).into_proto();
                 save_nano.execute(params_from_iter(
                     [
                         &pc_uid as &dyn ToSql,
@@ -275,7 +275,7 @@ impl SqliteDatabase {
             let save_item_sql = Self::read_sql("save_item")?;
             let mut save_item = tx.prepare_cached(save_item_sql)?;
             for (slot_num, item) in player.get_item_iter() {
-                let item_raw: sItemBase = Some(*item).into();
+                let item_raw: sItemBase = Some(*item).into_proto();
                 save_item.execute(params_from_iter(
                     [
                         &pc_uid as &dyn ToSql,
@@ -396,7 +396,7 @@ impl SqliteDatabase {
                 iSkillID: nano.get::<Int>("Skill") as i16,
                 iStamina: nano.get::<Int>("Stamina") as i16,
             };
-            let nano: Option<Nano> = nano_raw.into();
+            let nano: Option<Nano> = nano_raw.into_proto();
             if let Some(nano) = nano {
                 player.set_nano(nano);
             }
@@ -466,7 +466,7 @@ impl SqliteDatabase {
                 iTimeLimit: item.get::<Int>("TimeLimit"),
             };
 
-            let item: Option<Item> = item_raw.try_into()?;
+            let item: Option<Item> = item_raw.try_into_proto()?;
             if item.is_some_and(|item| {
                 item.get_expiry_time()
                     .is_some_and(|et| et < SystemTime::now())

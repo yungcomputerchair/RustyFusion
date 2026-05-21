@@ -94,19 +94,9 @@ impl Item {
         Ok(())
     }
 }
-impl Default for sItemBase {
-    fn default() -> Self {
-        Self {
-            iType: 0,
-            iID: 0,
-            iOpt: 0,
-            iTimeLimit: 0,
-        }
-    }
-}
-impl TryFrom<sItemBase> for Option<Item> {
+impl TryFromProto<sItemBase> for Option<Item> {
     type Error = FFError;
-    fn try_from(value: sItemBase) -> FFResult<Self> {
+    fn try_from_proto(value: sItemBase) -> FFResult<Self> {
         if value.iID == 0 || value.iOpt == 0 {
             Ok(None)
         } else {
@@ -131,8 +121,8 @@ impl TryFrom<sItemBase> for Option<Item> {
         }
     }
 }
-impl From<Option<Item>> for sItemBase {
-    fn from(value: Option<Item>) -> Self {
+impl FromProto<Option<Item>> for sItemBase {
+    fn from_proto(value: Option<Item>) -> Self {
         if let Some(value) = value {
             Self {
                 iType: value.ty as i16,

@@ -264,7 +264,7 @@ impl ShardServerState {
                         let client = player.get_client().unwrap();
                         if player.vehicle_speed.is_some() {
                             player.vehicle_speed = None;
-                            let pkt = sP_FE2CL_PC_VEHICLE_OFF_SUCC { UNUSED: unused!() };
+                            let pkt = sP_FE2CL_PC_VEHICLE_OFF_SUCC::default();
                             client.send_packet(P_FE2CL_PC_VEHICLE_OFF_SUCC, &pkt);
                             pc_ids_dismounted.push(pc_id);
                         }

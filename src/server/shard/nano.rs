@@ -47,7 +47,7 @@ pub fn nano_equip(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState
         player.deactivate_nano();
         let bcast = sP_FE2CL_NANO_ACTIVE {
             iPC_ID: pc_id,
-            Nano: None.into(),
+            Nano: None.into_proto(),
             iConditionBitFlag: player.get_condition_bit_flag(),
             eCSTB___Add: 0,
         };
@@ -85,7 +85,7 @@ pub fn nano_unequip(
         player.deactivate_nano();
         let bcast = sP_FE2CL_NANO_ACTIVE {
             iPC_ID: pc_id,
-            Nano: None.into(),
+            Nano: None.into_proto(),
             iConditionBitFlag: player.get_condition_bit_flag(),
             eCSTB___Add: 0,
         };
@@ -121,7 +121,7 @@ pub fn nano_active(pkt: Packet, clients: &ClientMap, state: &mut ShardServerStat
 
     let bcast = sP_FE2CL_NANO_ACTIVE {
         iPC_ID: pc_id,
-        Nano: player.get_active_nano().into(),
+        Nano: player.get_active_nano().into_proto(),
         iConditionBitFlag: player.get_condition_bit_flag(),
         eCSTB___Add: buff_applied as i32,
     };
@@ -197,7 +197,7 @@ pub fn nano_tune(pkt: Packet, client: &FFClient, state: &mut ShardServerState) -
 
         // check for + consume tuning items
         let mut item_slots = [-1; 10];
-        let mut items = [None.into(); 10];
+        let mut items = [None.into_proto(); 10];
         let mut quantity_left = tuning.req_item_quantity;
 
         let mut player_working = player.clone();
@@ -221,7 +221,7 @@ pub fn nano_tune(pkt: Packet, client: &FFClient, state: &mut ShardServerState) -
                     let removed = Item::split_items(slot, quantity_left);
                     quantity_left -= removed.unwrap().quantity;
                     item_slots[i] = *slot_num;
-                    items[i] = (*slot).into();
+                    items[i] = (*slot).into_proto();
                 }
             }
 

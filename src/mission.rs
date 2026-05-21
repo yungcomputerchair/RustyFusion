@@ -492,15 +492,3 @@ impl MissionJournal {
         (enemy_in_tasks, count_updated)
     }
 }
-
-impl Default for sRunningQuest {
-    fn default() -> Self {
-        sRunningQuest {
-            m_aCurrTaskID: 0,
-            m_aKillNPCID: [0; 3],
-            m_aKillNPCCount: [0; 3],
-            m_aNeededItemID: [0; 3],
-            m_aNeededItemCount: [0; 3],
-        }
-    }
-}

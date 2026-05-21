@@ -71,7 +71,7 @@ pub fn gm_pc_give_item(
         let pkt: &sP_CL2FE_REQ_PC_GIVE_ITEM = pkt.get()?;
         let player = state.get_player_mut(pc_id)?;
 
-        let mut item: Option<Item> = pkt.Item.try_into()?;
+        let mut item: Option<Item> = pkt.Item.try_into_proto()?;
         let time = pkt.iTimeLeft as u32;
         if let Some(item) = item.as_mut() {
             if time > 0 {
@@ -98,7 +98,7 @@ pub fn gm_pc_give_item(
         let resp = sP_FE2CL_REP_PC_GIVE_ITEM_SUCC {
             eIL: pkt.eIL,
             iSlotNum: slot_number as i32,
-            Item: item.into(),
+            Item: item.into_proto(),
         };
 
         client.send_packet(P_FE2CL_REP_PC_GIVE_ITEM_SUCC, &resp);
@@ -132,8 +132,8 @@ pub fn gm_pc_give_nano(
         let resp = sP_FE2CL_REP_PC_NANO_CREATE_SUCC {
             iPC_FusionMatter: fusion_matter as i32,
             iQuestItemSlotNum: -1,
-            QuestItem: None.into(),
-            Nano: Some(&*nano).into(),
+            QuestItem: None.into_proto(),
+            Nano: Some(&*nano).into_proto(),
             iPC_Level: new_level,
         };
 

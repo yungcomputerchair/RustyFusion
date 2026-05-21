@@ -42,10 +42,10 @@ pub fn item_move(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState)
     let resp = sP_FE2CL_PC_ITEM_MOVE_SUCC {
         eFrom: pkt.eFrom,
         iFromSlotNum: pkt.iFromSlotNum,
-        FromSlotItem: item_from.into(),
+        FromSlotItem: item_from.into_proto(),
         eTo: pkt.eTo,
         iToSlotNum: pkt.iToSlotNum,
-        ToSlotItem: item_to.into(),
+        ToSlotItem: item_to.into_proto(),
     };
 
     client.send_packet(P_FE2CL_PC_ITEM_MOVE_SUCC, &resp);
@@ -56,7 +56,7 @@ pub fn item_move(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState)
             let pkt = sP_FE2CL_PC_EQUIP_CHANGE {
                 iPC_ID: pc_id,
                 iEquipSlotNum: pkt.iFromSlotNum,
-                EquipSlotItem: item_to.into(),
+                EquipSlotItem: item_to.into_proto(),
             };
 
             c.send_packet(P_FE2CL_PC_EQUIP_CHANGE, &pkt);
@@ -68,7 +68,7 @@ pub fn item_move(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState)
             let pkt = sP_FE2CL_PC_EQUIP_CHANGE {
                 iPC_ID: pc_id,
                 iEquipSlotNum: pkt.iToSlotNum,
-                EquipSlotItem: item_from.into(),
+                EquipSlotItem: item_from.into_proto(),
             };
 
             c.send_packet(P_FE2CL_PC_EQUIP_CHANGE, &pkt);
@@ -83,7 +83,7 @@ pub fn item_move(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState)
     {
         player.vehicle_speed = None;
         helpers::broadcast_state(pc_id, player.get_state_bit_flag(), state);
-        let pkt = sP_FE2CL_PC_VEHICLE_OFF_SUCC { UNUSED: unused!() };
+        let pkt = sP_FE2CL_PC_VEHICLE_OFF_SUCC::default();
         clients
             .get_sender()
             .send_packet(P_FE2CL_PC_VEHICLE_OFF_SUCC, &pkt);
@@ -221,7 +221,7 @@ pub fn item_combination(
 
         let resp = sP_FE2CL_REP_PC_ITEM_COMBINATION_SUCC {
             iNewItemSlot: pkt.iCostumeItemSlot,
-            sNewItem: Some(stats_item).into(),
+            sNewItem: Some(stats_item).into_proto(),
             iStatItemSlot: pkt.iStatItemSlot,
             iCashItemSlot1: pkt.iCashItemSlot1,
             iCashItemSlot2: pkt.iCashItemSlot2,
@@ -300,7 +300,7 @@ pub fn item_chest_open(
                 iTaskID: unused!(),
             })
             .with(&sItemReward {
-                sItem: Some(reward_item).into(),
+                sItem: Some(reward_item).into_proto(),
                 eIL: location as i32,
                 iSlotNum: pkt.iSlotNum,
             })
@@ -378,7 +378,7 @@ pub fn vendor_item_buy(
         validate_vendor(client, state, pkt.iNPC_ID, pkt.iVendorID)?;
 
         // sanitize the item
-        let item: Option<Item> = pkt.Item.try_into()?;
+        let item: Option<Item> = pkt.Item.try_into_proto()?;
         let mut item = item.ok_or(FFError::build(
             Severity::Warning,
             "Tried to buy nothing".to_string(),
@@ -422,7 +422,7 @@ pub fn vendor_item_buy(
             let resp = sP_FE2CL_REP_PC_VENDOR_ITEM_BUY_SUCC {
                 iCandy: player.get_taros() as i32,
                 iInvenSlotNum: pkt.iInvenSlotNum,
-                Item: Some(item).into(),
+                Item: Some(item).into_proto(),
             };
 
             client.send_packet(P_FE2CL_REP_PC_VENDOR_ITEM_BUY_SUCC, &resp);
@@ -482,8 +482,8 @@ pub fn vendor_item_sell(
         let resp = sP_FE2CL_REP_PC_VENDOR_ITEM_SELL_SUCC {
             iCandy: new_taros as i32,
             iInvenSlotNum: pkt.iInvenSlotNum,
-            Item: item.into(),
-            ItemStay: remaining_item.into(),
+            Item: item.into_proto(),
+            ItemStay: remaining_item.into_proto(),
         };
 
         client.send_packet(P_FE2CL_REP_PC_VENDOR_ITEM_SELL_SUCC, &resp);
@@ -508,7 +508,7 @@ pub fn vendor_item_restore_buy(
         let pkt: &sP_CL2FE_REQ_PC_VENDOR_ITEM_RESTORE_BUY = pkt.get()?;
         validate_vendor(client, state, pkt.iNPC_ID, pkt.iVendorID)?;
 
-        let item: Option<Item> = pkt.Item.try_into()?;
+        let item: Option<Item> = pkt.Item.try_into_proto()?;
         let item: Item = item.ok_or(FFError::build(
             Severity::Warning,
             format!("Bad item for buyback {:?}", pkt.Item),
@@ -553,7 +553,7 @@ pub fn vendor_item_restore_buy(
             let resp = sP_FE2CL_REP_PC_VENDOR_ITEM_RESTORE_BUY_SUCC {
                 iCandy: new_taros as i32,
                 iInvenSlotNum: pkt.iInvenSlotNum,
-                Item: Some(item).into(),
+                Item: Some(item).into_proto(),
             };
 
             client.send_packet(P_FE2CL_REP_PC_VENDOR_ITEM_RESTORE_BUY_SUCC, &resp);
