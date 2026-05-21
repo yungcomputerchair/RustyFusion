@@ -23,7 +23,7 @@ VALUES (
 
 CREATE TABLE IF NOT EXISTS Accounts (
     AccountID           BIGSERIAL PRIMARY KEY NOT NULL,
-    Login               TEXT    NOT NULL UNIQUE,
+    Login               TEXT    NOT NULL,
     Password            TEXT    NOT NULL,
     Selected            INTEGER  DEFAULT 1 NOT NULL,
     AccountLevel        INTEGER NOT NULL,
@@ -35,6 +35,8 @@ CREATE TABLE IF NOT EXISTS Accounts (
     Email               TEXT    DEFAULT '' NOT NULL,
     LastPasswordReset   INTEGER DEFAULT 0 NOT NULL
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS Accounts_Login_Lower_Idx ON Accounts (LOWER(Login));
 
 CREATE TABLE IF NOT EXISTS Players (
     PlayerID           BIGSERIAL PRIMARY KEY NOT NULL,
@@ -68,9 +70,10 @@ CREATE TABLE IF NOT EXISTS Players (
     FirstUseFlag       BYTEA NOT NULL,
     Quests             BYTEA NOT NULL,
     FOREIGN KEY(AccountID) REFERENCES Accounts(AccountID) ON DELETE CASCADE,
-    UNIQUE (AccountID, Slot),
-    UNIQUE (FirstName, LastName)
+    UNIQUE (AccountID, Slot)
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS Players_Name_Lower_Idx ON Players (LOWER(FirstName), LOWER(LastName));
 
 CREATE TABLE IF NOT EXISTS Auth (
     AccountID   BIGINT NOT NULL,
