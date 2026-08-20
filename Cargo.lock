@@ -613,7 +613,7 @@ dependencies = [
 [[package]]
 name = "ffproto"
 version = "1.0.0"
-source = "git+https://github.com/OpenFusionProject/ffproto.git?rev=e9c6336#e9c633664dcda17cbe32550e709ea7c3b3012c9b"
+source = "git+https://github.com/OpenFusionProject/ffproto.git?rev=3cdf273#3cdf273d8ec710d50f97fdbdebb391b503fc0665"
 dependencies = [
  "serde_json",
 ]
@@ -1004,6 +1004,7 @@ version = "0.36.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95b4103cffefa72eb8428cb6b47d6627161e51c2739fc5e3b734584157bc642a"
 dependencies = [
+ "cc",
  "pkg-config",
  "vcpkg",
 ]
