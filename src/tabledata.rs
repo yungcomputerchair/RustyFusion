@@ -11,7 +11,7 @@ use std::{
 };
 
 use crate::{
-    chunk::{world_pos_to_chunk_pos, ChunkCoords, EntityMap, InstanceID, NCHUNKS},
+    chunk::{world_pos_to_chunk_pos, ChunkCoords, EntityMap, InstanceID},
     config::config_get,
     defines::*,
     entity::{Egg, EntityID, NPC},
@@ -141,7 +141,7 @@ pub struct WorldNameData {
 
 struct WorldNameDataContainer {
     world_name_data: HashMap<i32, WorldNameData>,
-    lookup_grid: [i32; NCHUNKS * NCHUNKS],
+    lookup_grid: HashMap<(i32, i32), i32>,
 }
 
 struct InstanceData {
@@ -895,24 +895,10 @@ impl TableData {
             })
     }
 
-    pub fn get_world_name_data(&self, chunk: ChunkCoords) -> FFResult<&WorldNameData> {
-        let chunk_idx = chunk.y as usize * NCHUNKS + chunk.x as usize;
-        let map_num = self
-            .world_name_data
-            .lookup_grid
-            .get(chunk_idx)
-            .ok_or(FFError::build(
-                Severity::Warning,
-                format!("No world name data for chunk {:?}", chunk),
-            ))?;
+    pub fn get_world_name_data(&self, chunk: ChunkCoords) -> Option<&WorldNameData> {
+        let map_num = self.world_name_data.lookup_grid.get(&(chunk.x, chunk.y))?;
 
-        self.world_name_data
-            .world_name_data
-            .get(map_num)
-            .ok_or(FFError::build(
-                Severity::Warning,
-                format!("No world name data for map num {}", map_num),
-            ))
+        self.world_name_data.world_name_data.get(map_num)
     }
 }
 
@@ -2393,7 +2379,7 @@ fn load_world_name_data() -> Result<WorldNameDataContainer, String> {
     let world_name_root = load_json("worldnames.json")?;
     let world_name_table = get_object(&world_name_root, WORLD_NAME_TABLE_KEY)?;
     let mut world_name_data = HashMap::new();
-    let mut lookup_grid = [0; NCHUNKS * NCHUNKS];
+    let mut lookup_grid = HashMap::new();
     for (k, v) in world_name_table.iter().skip(1) {
         let entry: WorldNameDataEntry = serde_json::from_value(v.clone())
             .map_err(|e| format!("Malformed world name data entry: {} {}", e, v))?;
@@ -2421,8 +2407,7 @@ fn load_world_name_data() -> Result<WorldNameDataContainer, String> {
 
         for x in chunk1x..=chunk2x {
             for y in chunk1y..=chunk2y {
-                let idx = y as usize * NCHUNKS + x as usize;
-                lookup_grid[idx] = id;
+                lookup_grid.insert((x, y), id);
             }
         }
     }

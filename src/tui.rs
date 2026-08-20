@@ -454,7 +454,7 @@ impl<'a> Widget for PlayerListWidget<'a> {
                 let chunk_coords = player.get_chunk_coords();
                 let world_data = tdata_get().get_world_name_data(chunk_coords);
 
-                let location_info = if let Ok(world_data) = world_data {
+                let location_info = if let Some(world_data) = world_data {
                     format!("  {}, {}", world_data.area_name, world_data.zone_name)
                 } else {
                     "  Unknown".to_string()
