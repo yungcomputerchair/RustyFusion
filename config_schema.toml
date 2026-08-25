@@ -59,6 +59,9 @@ db_path = "database.db" # path to database file (SQLite only)
 #: String
 table_data_path = "tabledata/" # path to OpenFusion table data repository
 
+#: FFProtocol
+protocol = "v0104" # the protocol version to use (v0104 or v1013)
+
 [login]
 
 #: String

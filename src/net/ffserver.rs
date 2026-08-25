@@ -9,6 +9,7 @@ use tokio::{
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 
 use crate::{
+    config::config_get,
     error::{log, FFError, FFResult, Severity},
     net::{ClientMetadata, FFConnection, ServerMessage},
 };
@@ -37,6 +38,12 @@ impl<S: Send + 'static> FFServer<S> {
     ) -> FFResult<Self> {
         let sock = TcpListener::bind(addr).await?;
         let (event_tx, event_rx) = mpsc::unbounded_channel();
+
+        log(
+            Severity::Info,
+            &format!("Protocol: {:?}", config_get().general.protocol.get()),
+        );
+
         Ok(Self {
             sock,
             next_client_key: 1,

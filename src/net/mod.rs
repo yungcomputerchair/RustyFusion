@@ -10,6 +10,7 @@ use std::{
 };
 
 use parking_lot as pl;
+use serde::Deserialize;
 use tokio::sync::Mutex;
 
 use self::packet::{
@@ -21,6 +22,14 @@ use crate::{
     error::{log, FFError, FFResult, Severity},
     net::packet::Packet,
 };
+
+#[allow(non_camel_case_types)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+pub enum FFProtocol {
+    #[default]
+    v0104,
+    v1013,
+}
 
 const PACKET_BUFFER_SIZE: usize = 4096; // payload buffer size; includes ID, but not length
 const PACKET_LENGTH_SIZE: usize = size_of::<u32>(); // not encrypted
