@@ -225,7 +225,7 @@ impl VendorData {
         self.items.push(item);
     }
 
-    pub fn as_arr(&self) -> FFResult<[sItemVendor; SIZEOF_VENDOR_TABLE_SLOT as usize]> {
+    pub fn as_arr_104(&self) -> FFResult<[sItemVendor; SIZEOF_VENDOR_TABLE_SLOT as usize]> {
         let mut vendor_item_structs = Vec::new();
         for item in &self.items {
             vendor_item_structs.push(sItemVendor {
@@ -246,6 +246,34 @@ impl VendorData {
                 iVendorID: 0,
                 fBuyCost: 0.0,
                 item: sItemBase::default(),
+                iSortNum: 0,
+            },
+        );
+        Ok(vendor_item_structs.try_into().unwrap())
+    }
+
+    pub fn as_arr_1013(&self) -> FFResult<[v1013::sItemVendor; SIZEOF_VENDOR_TABLE_SLOT as usize]> {
+        let mut vendor_item_structs = Vec::new();
+        for item in &self.items {
+            vendor_item_structs.push(v1013::sItemVendor {
+                iVendorID: self.vendor_id,
+                fBuyCost: tdata_get().get_item_stats(item.id, item.ty)?.buy_price as f32,
+                item: v1013::sItemBase {
+                    iType: item.ty as i16,
+                    iID: item.id,
+                    iOpt: 1,
+                    iTimeLimit: 0,
+                    iSerial: 0,
+                },
+                iSortNum: item.sort_number,
+            });
+        }
+        vendor_item_structs.resize(
+            SIZEOF_VENDOR_TABLE_SLOT as usize,
+            v1013::sItemVendor {
+                iVendorID: 0,
+                fBuyCost: 0.0,
+                item: v1013::sItemBase::default(),
                 iSortNum: 0,
             },
         );

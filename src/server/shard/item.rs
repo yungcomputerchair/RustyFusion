@@ -15,7 +15,7 @@ use crate::{
     item::Item,
     net::{
         packet::{PacketID::*, *},
-        ClientMap, FFClient,
+        ClientMap, FFClient, FFProtocol,
     },
     state::ShardServerState,
     tabledata::tdata_get,
@@ -350,11 +350,24 @@ pub fn vendor_table_update(pkt: Packet, client: &FFClient) -> FFResult<()> {
         let pkt: &sP_CL2FE_REQ_PC_VENDOR_TABLE_UPDATE = pkt.get()?;
 
         let vendor_data = tdata_get().get_vendor_data(pkt.iVendorID)?;
-        let resp = sP_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_SUCC {
-            item: vendor_data.as_arr()?,
-        };
 
-        client.send_packet(P_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_SUCC, &resp);
+        match config_get().general.protocol.get() {
+            FFProtocol::v0104 => {
+                let resp = sP_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_SUCC {
+                    item: vendor_data.as_arr_104()?,
+                };
+
+                client.send_packet(P_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_SUCC, &resp);
+            }
+            FFProtocol::v1013 => {
+                let resp = v1013::sP_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_SUCC {
+                    item: vendor_data.as_arr_1013()?,
+                };
+
+                client.send_packet(P_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_SUCC, &resp);
+            }
+        }
+
         Ok(())
     })()
     .catch_fail(|| {
