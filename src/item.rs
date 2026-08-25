@@ -94,6 +94,8 @@ impl Item {
         Ok(())
     }
 }
+
+// 104
 impl TryFromProto<sItemBase> for Option<Item> {
     type Error = FFError;
     fn try_from_proto(value: sItemBase) -> FFResult<Self> {
@@ -132,6 +134,53 @@ impl FromProto<Option<Item>> for sItemBase {
                     Some(time) => util::get_timestamp_sec(time) as i32,
                     None => 0,
                 },
+            }
+        } else {
+            Self::default()
+        }
+    }
+}
+
+// Academy
+impl TryFromProto<v1013::sItemBase> for Option<Item> {
+    type Error = FFError;
+    fn try_from_proto(value: v1013::sItemBase) -> FFResult<Self> {
+        if value.iID == 0 || value.iOpt == 0 {
+            Ok(None)
+        } else {
+            Ok(Some(Item {
+                ty: value.iType.try_into()?,
+                id: value.iID,
+                appearance_id: {
+                    let id = (value.iOpt >> 16) as i16;
+                    if id == 0 {
+                        None
+                    } else {
+                        Some(id)
+                    }
+                },
+                quantity: value.iOpt as u16,
+                expiry_time: if value.iTimeLimit == 0 {
+                    None
+                } else {
+                    Some(util::get_systime_from_sec(value.iTimeLimit as u64))
+                },
+            }))
+        }
+    }
+}
+impl FromProto<Option<Item>> for v1013::sItemBase {
+    fn from_proto(value: Option<Item>) -> Self {
+        if let Some(value) = value {
+            Self {
+                iType: value.ty as i16,
+                iID: value.id,
+                iOpt: (value.quantity as i32) | ((value.appearance_id.unwrap_or(0) as i32) << 16),
+                iTimeLimit: match value.expiry_time {
+                    Some(time) => util::get_timestamp_sec(time) as i32,
+                    None => 0,
+                },
+                iSerial: 0,
             }
         } else {
             Self::default()
