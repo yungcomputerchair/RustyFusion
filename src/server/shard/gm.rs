@@ -166,7 +166,7 @@ pub fn gm_pc_give_nano(
         crate::helpers::send_nano_create_succ(
             client,
             fusion_matter,
-            -1,
+            None,
             None,
             Some(&*nano),
             new_level,

@@ -1320,43 +1320,64 @@ impl Player {
         };
 
         if let Some(client) = self.get_client() {
-            if self.fusion_matter >= level_up_fusion_matter
-                && !self.mission_journal.has_nano_mission()
-            {
-                let Ok(level_up_task_def) = tdata_get().get_task_definition(level_up_task_id)
-                else {
-                    log(
-                        Severity::Warning,
-                        &format!("Level up task with ID {} doesn't exist!", level_up_task_id),
-                    );
-                    return self.fusion_matter;
-                };
+            if self.fusion_matter >= level_up_fusion_matter {
+                match config_get().general.protocol.get() {
+                    FFProtocol::v0104 => {
+                        if !self.mission_journal.has_nano_mission() {
+                            let Ok(level_up_task_def) =
+                                tdata_get().get_task_definition(level_up_task_id)
+                            else {
+                                log(
+                                    Severity::Warning,
+                                    &format!(
+                                        "Level up task with ID {} doesn't exist!",
+                                        level_up_task_id
+                                    ),
+                                );
+                                return self.fusion_matter;
+                            };
 
-                let level_up_mission_def = tdata_get()
-                    .get_mission_definition(level_up_task_def.mission_id)
-                    .unwrap();
+                            let level_up_mission_def = tdata_get()
+                                .get_mission_definition(level_up_task_def.mission_id)
+                                .unwrap();
 
-                log(
-                    Severity::Info,
-                    &format!(
-                        "{} started nano mission: {} [{}]",
-                        self, level_up_mission_def.mission_name, level_up_mission_def.mission_id
-                    ),
-                );
+                            log(
+                                Severity::Info,
+                                &format!(
+                                    "{} started nano mission: {} [{}]",
+                                    self,
+                                    level_up_mission_def.mission_name,
+                                    level_up_mission_def.mission_id
+                                ),
+                            );
 
-                self.mission_journal
-                    .start_task(level_up_task_def.into(), self.level)
-                    .unwrap();
+                            self.mission_journal
+                                .start_task(level_up_task_def.into(), self.level)
+                                .unwrap();
 
-                let pkt = sP_FE2CL_REP_PC_TASK_START_SUCC {
-                    iTaskNum: level_up_task_id,
-                    iRemainTime: level_up_task_def
-                        .obj_time_limit
-                        .map(|d| d.as_secs() as i32)
-                        .unwrap_or(unused!()),
-                };
+                            let pkt = sP_FE2CL_REP_PC_TASK_START_SUCC {
+                                iTaskNum: level_up_task_id,
+                                iRemainTime: level_up_task_def
+                                    .obj_time_limit
+                                    .map(|d| d.as_secs() as i32)
+                                    .unwrap_or(unused!()),
+                            };
 
-                client.send_packet(P_FE2CL_REP_PC_TASK_START_SUCC, &pkt);
+                            client.send_packet(P_FE2CL_REP_PC_TASK_START_SUCC, &pkt);
+                        }
+                    }
+                    FFProtocol::v1013 => {
+                        if self.set_level(self.level + 1).is_ok() {
+                            self.fusion_matter -= level_up_fusion_matter;
+                            let pkt = sP_FE2CL_REP_PC_CHANGE_LEVEL_SUCC {
+                                iLevel: self.level as i32,
+                                iFusionMatter: self.fusion_matter as i32,
+                            };
+
+                            client.send_packet(P_FE2CL_REP_PC_CHANGE_LEVEL_SUCC, &pkt);
+                        }
+                    }
+                }
             }
         }
 

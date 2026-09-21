@@ -42,7 +42,7 @@ pub fn send_equip_change(client: &FFClient, pc_id: i32, equip_slot_num: i32, ite
 pub fn send_nano_create_succ(
     client: &FFClient,
     fusion_matter: u32,
-    quest_item_slot_num: i32,
+    quest_item_slot_num: Option<i32>,
     quest_item: Option<Item>,
     nano: Option<&Nano>,
     level: i16,
@@ -52,7 +52,7 @@ pub fn send_nano_create_succ(
             P_FE2CL_REP_PC_NANO_CREATE_SUCC,
             &v0104::sP_FE2CL_REP_PC_NANO_CREATE_SUCC {
                 iPC_FusionMatter: fusion_matter as i32,
-                iQuestItemSlotNum: quest_item_slot_num,
+                iQuestItemSlotNum: quest_item_slot_num.unwrap_or(-1),
                 QuestItem: quest_item.into_proto(),
                 Nano: nano.into_proto(),
                 iPC_Level: level,
@@ -62,7 +62,7 @@ pub fn send_nano_create_succ(
             P_FE2CL_REP_PC_NANO_CREATE_SUCC,
             &v1013::sP_FE2CL_REP_PC_NANO_CREATE_SUCC {
                 iPC_FusionMatter: fusion_matter as i32,
-                iQuestItemSlotNum: quest_item_slot_num,
+                iQuestItemSlotNum: quest_item_slot_num.unwrap_or(-1),
                 QuestItem: quest_item.into_proto(),
                 Nano: nano.into_proto(),
                 iPC_Level: level,

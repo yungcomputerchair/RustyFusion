@@ -1,5 +1,6 @@
 use crate::{
     chunk::TickMode,
+    config::config_get,
     defines::{RANGE_INTERACT, RANGE_TRIGGER},
     entity::{Combatant, EntityID},
     enums::{ItemLocation, MissionType, TaskType},
@@ -9,7 +10,7 @@ use crate::{
     mission::Task,
     net::{
         packet::{PacketID::*, *},
-        ClientMap, FFClient,
+        ClientMap, FFClient, FFProtocol,
     },
     state::ShardServerState,
     tabledata::tdata_get,
@@ -564,6 +565,7 @@ pub fn task_end(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
                 .mission_journal
                 .set_mission_completed(task_def.mission_id)
                 .unwrap();
+
             log(
                 Severity::Info,
                 &format!(
@@ -571,39 +573,55 @@ pub fn task_end(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
                     player, mission_def.mission_name, task_def.mission_id
                 ),
             );
+
             if let Some(nano_id) = task_def.succ_nano_id {
-                let player_stats = tdata_get().get_player_stats(player.get_level()).unwrap();
+                let old_level = player.get_level();
                 match player.unlock_nano(nano_id).cloned() {
                     Ok(nano) => {
-                        player.set_fusion_matter(
-                            player.get_fusion_matter() - player_stats.req_fm_nano_create,
-                        );
-                        let new_level = std::cmp::max(player.get_level(), nano_id);
-                        let level = match player.set_level(new_level) {
-                            Ok(l) => l,
-                            Err(e) => {
-                                log_error(e);
-                                player.get_level()
+                        let level = match config_get().general.protocol.get() {
+                            FFProtocol::v0104 => {
+                                let player_stats = tdata_get().get_player_stats(old_level).unwrap();
+
+                                // Player is guaranteed to have enough fusion matter to create the nano,
+                                // but if they used commands they may have less. Clamp to 0.
+                                let new_fm = player
+                                    .get_fusion_matter()
+                                    .saturating_sub(player_stats.req_fm_nano_create);
+                                player.set_fusion_matter(new_fm);
+
+                                let new_level = std::cmp::max(old_level, nano_id);
+                                match player.set_level(new_level) {
+                                    Ok(l) => l,
+                                    Err(e) => {
+                                        log_error(e);
+                                        player.get_level()
+                                    }
+                                }
                             }
+                            FFProtocol::v1013 => old_level,
                         };
+
                         helpers::send_nano_create_succ(
                             clients.get_sender(),
                             player.get_fusion_matter(),
-                            -1,
+                            None,
                             None,
                             Some(&nano),
                             level,
                         );
 
-                        let bcast = sP_FE2CL_REP_PC_CHANGE_LEVEL {
-                            iPC_ID: pc_id,
-                            iPC_Level: new_level,
-                        };
-                        state
-                            .entity_map
-                            .for_each_around(EntityID::Player(pc_id), |c| {
-                                c.send_packet(P_FE2CL_REP_PC_CHANGE_LEVEL, &bcast)
-                            });
+                        if level != old_level {
+                            let bcast = sP_FE2CL_REP_PC_CHANGE_LEVEL {
+                                iPC_ID: pc_id,
+                                iPC_Level: level,
+                            };
+
+                            state
+                                .entity_map
+                                .for_each_around(EntityID::Player(pc_id), |c| {
+                                    c.send_packet(P_FE2CL_REP_PC_CHANGE_LEVEL, &bcast)
+                                });
+                        }
                     }
                     Err(e) => log_error(e),
                 }
