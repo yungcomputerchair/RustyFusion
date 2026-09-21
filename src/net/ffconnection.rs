@@ -18,6 +18,7 @@ use tokio::{
 };
 
 use crate::{
+    config::config_get,
     error::{log, log_error, FFError, FFResult, Severity},
     net::{
         crypto::{self, EncryptionMode, DEFAULT_KEY},
@@ -25,7 +26,7 @@ use crate::{
             Packet, PacketID, PACKET_MASK_CL2FE, PACKET_MASK_CL2LS, PACKET_MASK_FE2LS,
             PACKET_MASK_LS2FE,
         },
-        ClientType, FFClient, LiveCheckCallback, PacketBuffer, PacketCallback, PACKET_BUFFER_SIZE,
+        packet_buffer_size, ClientType, FFClient, LiveCheckCallback, PacketBuffer, PacketCallback,
         PACKET_LENGTH_SIZE, SILENCED_PACKETS, UNKNOWN_CT_ALLOWED_PACKETS,
     },
 };
@@ -63,6 +64,8 @@ pub struct FFConnection<S: Send + 'static> {
     client: FFClient,
     clients: Arc<RwLock<HashMap<usize, FFClient>>>,
     state: Arc<Mutex<S>>,
+    //
+    buffer_size: usize,
 }
 impl<S: Send + 'static> FFConnection<S> {
     pub fn new(
@@ -74,6 +77,9 @@ impl<S: Send + 'static> FFConnection<S> {
         clients: Arc<RwLock<HashMap<usize, FFClient>>>,
         state: Arc<Mutex<S>>,
     ) -> Self {
+        let protocol = config_get().general.protocol.get();
+        let buffer_size = packet_buffer_size(&protocol);
+
         Self {
             key,
             sock,
@@ -91,6 +97,8 @@ impl<S: Send + 'static> FFConnection<S> {
             client,
             clients,
             state,
+            //
+            buffer_size,
         }
     }
 
@@ -274,12 +282,12 @@ impl<S: Send + 'static> FFConnection<S> {
         let mut sz_buf: [u8; PACKET_LENGTH_SIZE] = [0; PACKET_LENGTH_SIZE];
         self.sock.read_exact(&mut sz_buf).await?;
         let sz = u32::from_le_bytes(sz_buf) as usize;
-        if sz > PACKET_BUFFER_SIZE {
+        if sz > self.buffer_size {
             return Err(FFError::build_dc(
                 Severity::Warning,
                 format!(
                     "Payload bigger than input buffer ({} > {}); disconnecting client",
-                    sz, PACKET_BUFFER_SIZE
+                    sz, self.buffer_size
                 ),
             ));
         }
@@ -323,7 +331,7 @@ impl<S: Send + 'static> FFConnection<S> {
 
     async fn flush_exact(&mut self, sz: usize) -> FFResult<()> {
         // send the size
-        assert!(sz <= PACKET_BUFFER_SIZE);
+        assert!(sz <= self.buffer_size);
 
         // prepare buffers
         let sz_buf: [u8; 4] = u32::to_le_bytes(sz as u32);

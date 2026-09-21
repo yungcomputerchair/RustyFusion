@@ -43,7 +43,7 @@ use crate::{
     net::{
         self,
         crypto::{AES128_NONCE_SIZE, AUTH_CHALLENGE_MAX_SIZE},
-        struct_to_bytes, PacketBuffer, PACKET_BODY_SIZE, PACKET_ID_SIZE, SILENCED_PACKETS,
+        struct_to_bytes, PacketBuffer, MIN_PACKET_BUFFER_SIZE, PACKET_ID_SIZE, SILENCED_PACKETS,
     },
 };
 
@@ -937,7 +937,7 @@ impl FFPacket for sP_FE2LS_UPDATE_PC_STATUSES {}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct sP_FE2LS_UPDATE_MONITOR {
-    pub szUpdate: [u16; PACKET_BODY_SIZE / size_of::<u16>()],
+    pub szUpdate: [u16; (MIN_PACKET_BUFFER_SIZE - PACKET_ID_SIZE) / size_of::<u16>()],
 }
 impl FFPacket for sP_FE2LS_UPDATE_MONITOR {}
 

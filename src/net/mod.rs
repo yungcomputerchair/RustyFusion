@@ -39,10 +39,18 @@ impl FFProtocol {
     }
 }
 
-const PACKET_BUFFER_SIZE: usize = 4096; // payload buffer size; includes ID, but not length
+const MIN_PACKET_BUFFER_SIZE: usize = 4096; // ensure small enough for every supported protocol
+const MAX_PACKET_BUFFER_SIZE: usize = 8192; // emsure large enough for every supported protocol
 const PACKET_LENGTH_SIZE: usize = size_of::<u32>(); // not encrypted
 const PACKET_ID_SIZE: usize = size_of::<u32>(); // encrypted
-const PACKET_BODY_SIZE: usize = PACKET_BUFFER_SIZE - PACKET_ID_SIZE;
+
+/// Total payload size; includes 4-byte ID, but not the 4-byte length from the pipe
+pub const fn packet_buffer_size(protocol: &FFProtocol) -> usize {
+    match protocol {
+        FFProtocol::v0104 => 4096,
+        FFProtocol::v1013 => 8192, // max
+    }
+}
 
 const UNKNOWN_CT_ALLOWED_PACKETS: [PacketID; 3] = [
     P_FE2LS_REQ_AUTH_CHALLENGE,
@@ -98,9 +106,9 @@ pub type LiveCheckCallback = fn(&FFClient);
 
 #[derive(Clone, Copy)]
 #[repr(C, align(4))]
-pub struct AlignedBuf([u8; PACKET_BUFFER_SIZE]);
+pub struct AlignedBuf([u8; MAX_PACKET_BUFFER_SIZE]);
 impl Deref for AlignedBuf {
-    type Target = [u8; PACKET_BUFFER_SIZE];
+    type Target = [u8; MAX_PACKET_BUFFER_SIZE];
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -112,7 +120,7 @@ impl DerefMut for AlignedBuf {
 }
 impl Default for AlignedBuf {
     fn default() -> Self {
-        Self([0; PACKET_BUFFER_SIZE])
+        Self([0; MAX_PACKET_BUFFER_SIZE])
     }
 }
 
