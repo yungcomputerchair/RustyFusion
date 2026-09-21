@@ -1229,26 +1229,34 @@ impl Player {
 
     pub fn set_tutorial_done(&mut self) {
         self.flags.tutorial_flag = true;
-        // unlock buttercup
-        let buttercup_stats = tdata_get().get_nano_stats(ID_BUTTERCUP).unwrap();
-        self.unlock_nano(ID_BUTTERCUP).unwrap();
-        self.tune_nano(ID_BUTTERCUP, Some(buttercup_stats.skills[0]))
+        let protocol = config_get().general.protocol.get();
+        if let FFProtocol::v0104 = protocol {
+            // unlock buttercup
+            let buttercup_stats = tdata_get().get_nano_stats(ID_BUTTERCUP).unwrap();
+            self.unlock_nano(ID_BUTTERCUP).unwrap();
+            self.tune_nano(ID_BUTTERCUP, Some(buttercup_stats.skills[0]))
+                .unwrap();
+            self.change_nano(0, Some(ID_BUTTERCUP)).unwrap();
+            // equip lightning gun
+            self.set_item(
+                ItemLocation::Equip,
+                EQUIP_SLOT_HAND as usize,
+                Some(Item::new(ItemType::Hand, ID_LIGHTNING_GUN)),
+            )
             .unwrap();
-        self.change_nano(0, Some(ID_BUTTERCUP)).unwrap();
-        // equip lightning gun
-        self.set_item(
-            ItemLocation::Equip,
-            EQUIP_SLOT_HAND as usize,
-            Some(Item::new(ItemType::Hand, ID_LIGHTNING_GUN)),
-        )
-        .unwrap();
-        // place in Sector V future
+        }
+
+        let (spawn_x, spawn_y, spawn_z) = match protocol {
+            FFProtocol::v0104 => (632032, 187177, -5500), // Sector V future
+            FFProtocol::v1013 => (19835, 108682, 8450),   // Null Void
+        };
+
         let mut rand = rand::thread_rng();
         let range = 0; //PC_START_LOCATION_RANDOM_RANGE as i32 / 2;
         self.position = Position {
-            x: 632032 + rand.gen_range(-range..=range),
-            y: 187177 + rand.gen_range(-range..=range),
-            z: -5500,
+            x: spawn_x + rand.gen_range(-range..=range),
+            y: spawn_y + rand.gen_range(-range..=range),
+            z: spawn_z,
         }
     }
 
