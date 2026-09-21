@@ -15,7 +15,7 @@ use crate::{
     net::{
         crypto,
         packet::{PacketID::*, *},
-        ClientMap, ClientType, FFClient,
+        ClientMap, ClientType, FFClient, FFProtocol,
     },
     state::LoginServerState,
     util,
@@ -247,19 +247,43 @@ Password must be 8-32 characters long and contain only letters, numbers, or spec
             ));
         }
 
-        let resp = sP_LS2CL_REP_LOGIN_SUCC {
-            iCharCount: players.len() as i8,
-            iSlotNum: last_player_slot as i8,
-            iTempForPacking4: unused!(),
-            uiSvrTime: util::get_timestamp_ms(time),
-            szID: pkt.szID,
-            iPaymentFlag: 1,  // all accounts have a subscription
-            iOpenBetaFlag: 0, // and we're not in open beta
-        };
+        let char_count = players.len() as i8;
+        let slot_num = last_player_slot as i8;
+        let svr_time = util::get_timestamp_ms(time);
+        let protocol = config_get().general.protocol.get();
 
-        let e_base: u64 = resp.uiSvrTime;
-        let e_iv1: i32 = (resp.iCharCount + 1) as i32;
-        let e_iv2: i32 = (resp.iSlotNum + 1) as i32;
+        match protocol {
+            FFProtocol::v0104 => {
+                let resp = sP_LS2CL_REP_LOGIN_SUCC {
+                    iCharCount: char_count,
+                    iSlotNum: slot_num,
+                    iTempForPacking4: unused!(),
+                    uiSvrTime: svr_time,
+                    szID: pkt.szID,
+                    iPaymentFlag: 1,  // all accounts have a subscription
+                    iOpenBetaFlag: 0, // and we're not in open beta
+                };
+                client.send_packet(P_LS2CL_REP_LOGIN_SUCC, &resp);
+            }
+            FFProtocol::v1013 => {
+                let resp = v1013::sP_LS2CL_REP_LOGIN_SUCC {
+                    iCharCount: char_count,
+                    iSlotNum: slot_num,
+                    iTempForPacking4: unused!(),
+                    uiSvrTime: svr_time,
+                    szID: pkt.szID,
+                    iPaymentFlag: 1,  // all accounts have a subscription
+                    iOpenBetaFlag: 0, // and we're not in open beta
+                    // the freechat prompt just closes the Academy client
+                    iChatEnabled: 1,
+                };
+                client.send_packet(P_LS2CL_REP_LOGIN_SUCC, &resp);
+            }
+        }
+
+        let e_base: u64 = svr_time;
+        let e_iv1: i32 = (char_count + 1) as i32;
+        let e_iv2: i32 = (slot_num + 1) as i32;
         let fe_base: u64 = crypto::DEFAULT_KEY;
         let fe_iv1: i32 = pkt.iClientVerC;
         let fe_iv2: i32 = 1;
@@ -267,7 +291,6 @@ Password must be 8-32 characters long and contain only letters, numbers, or spec
         let e_key = crypto::gen_key(e_base, e_iv1, e_iv2);
         let fe_key = crypto::gen_key(fe_base, fe_iv1, fe_iv2);
 
-        client.send_packet(P_LS2CL_REP_LOGIN_SUCC, &resp);
         client.update_encryption(Some(e_key), Some(fe_key), None);
 
         let serial_key: i64 = random();
@@ -281,17 +304,34 @@ Password must be 8-32 characters long and contain only letters, numbers, or spec
 
         players.iter().for_each(|player| {
             let pos = player.get_position();
-            let pkt = sP_LS2CL_REP_CHAR_INFO {
-                iSlot: player.get_slot_num() as i8,
-                iLevel: player.get_level(),
-                sPC_Style: player.get_style(),
-                sPC_Style2: player.get_style_2(),
-                iX: pos.x,
-                iY: pos.y,
-                iZ: pos.z,
-                aEquip: player.get_equip_arr(),
-            };
-            client.send_packet(P_LS2CL_REP_CHAR_INFO, &pkt);
+            match protocol {
+                FFProtocol::v0104 => {
+                    let pkt = sP_LS2CL_REP_CHAR_INFO {
+                        iSlot: player.get_slot_num() as i8,
+                        iLevel: player.get_level(),
+                        sPC_Style: player.get_style(),
+                        sPC_Style2: player.get_style_2(),
+                        iX: pos.x,
+                        iY: pos.y,
+                        iZ: pos.z,
+                        aEquip: player.get_equip_arr(),
+                    };
+                    client.send_packet(P_LS2CL_REP_CHAR_INFO, &pkt);
+                }
+                FFProtocol::v1013 => {
+                    let pkt = v1013::sP_LS2CL_REP_CHAR_INFO {
+                        iSlot: player.get_slot_num() as i8,
+                        iLevel: player.get_level(),
+                        sPC_Style: player.get_style(),
+                        sPC_Style2: player.get_style_2(),
+                        iX: pos.x,
+                        iY: pos.y,
+                        iZ: pos.z,
+                        aEquip: player.get_equip_arr_1013(),
+                    };
+                    client.send_packet(P_LS2CL_REP_CHAR_INFO, &pkt);
+                }
+            }
         });
         Ok(())
     })

@@ -613,7 +613,7 @@ dependencies = [
 [[package]]
 name = "ffproto"
 version = "1.0.0"
-source = "git+https://github.com/OpenFusionProject/ffproto.git?rev=3cdf273#3cdf273d8ec710d50f97fdbdebb391b503fc0665"
+source = "git+https://github.com/OpenFusionProject/ffproto.git?rev=a866587#a8665875f84b6a3c9f586ba8712a0550d73a7997"
 dependencies = [
  "serde_json",
 ]

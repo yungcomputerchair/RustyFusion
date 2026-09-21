@@ -17,7 +17,7 @@ use crate::{
     net::{
         crypto::{self, EncryptionMode},
         packet::{PacketID::*, *},
-        ClientMap, ClientType, FFClient,
+        ClientMap, ClientType, FFClient, FFProtocol,
     },
     state::ShardServerState,
     tabledata::tdata_get,
@@ -157,15 +157,29 @@ pub async fn pc_enter(
 
     player.instance_id.channel_num = channel_num;
 
-    let resp = sP_FE2CL_REP_PC_ENTER_SUCC {
-        iID: pc_id,
-        PCLoadData2CL: player.get_load_data(),
-        uiSvrTime: util::get_timestamp_ms(time),
+    let svr_time = util::get_timestamp_ms(time);
+    let resp_pkt = match config_get().general.protocol.get() {
+        FFProtocol::v0104 => Packet::new(
+            P_FE2CL_REP_PC_ENTER_SUCC,
+            &sP_FE2CL_REP_PC_ENTER_SUCC {
+                iID: pc_id,
+                PCLoadData2CL: player.get_load_data(),
+                uiSvrTime: svr_time,
+            },
+        )?,
+        FFProtocol::v1013 => Packet::new(
+            P_FE2CL_REP_PC_ENTER_SUCC,
+            &v1013::sP_FE2CL_REP_PC_ENTER_SUCC {
+                iID: pc_id,
+                PCLoadData2CL: player.get_load_data_1013(),
+                uiSvrTime: svr_time,
+            },
+        )?,
     };
 
-    let iv1: i32 = resp.iID + 1;
-    let iv2: i32 = resp.PCLoadData2CL.iFusionMatter + 1;
-    let e_key = crypto::gen_key(resp.uiSvrTime, iv1, iv2);
+    let iv1: i32 = pc_id + 1;
+    let iv2: i32 = player.get_fusion_matter() as i32 + 1;
+    let e_key = crypto::gen_key(svr_time, iv1, iv2);
     let fe_key = login_data.uiFEKey;
     let enc_mode = EncryptionMode::FEKey;
     client.update_encryption(Some(e_key), Some(fe_key), Some(enc_mode));
@@ -195,9 +209,7 @@ pub async fn pc_enter(
     state.entity_map.track(Box::new(player), TickMode::Always);
     state.player_uid_to_id.insert(player_uid, pc_id);
 
-    clients
-        .get_sender()
-        .send_packet(P_FE2CL_REP_PC_ENTER_SUCC, &resp);
+    clients.get_sender().send_payload(resp_pkt);
 
     Ok(())
 }

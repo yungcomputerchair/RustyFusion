@@ -204,9 +204,29 @@ impl PlayerInventory {
         std::array::from_fn(|i| self.equipped.get(i).copied().flatten().into_proto())
     }
 
+    fn get_equip_arr_1013<const N: usize>(&self) -> [v1013::sItemBase; N] {
+        std::array::from_fn(|i| self.equipped.get(i).copied().flatten().into_proto())
+    }
+
+    fn get_main_arr_1013(&self) -> [v1013::sItemBase; SIZEOF_INVEN_SLOT as usize] {
+        self.main.map(Option::<Item>::into_proto)
+    }
+
     fn get_quest_item_arr(&self) -> [sItemBase; SIZEOF_QINVEN_SLOT as usize] {
         self.quest.map(|vals| {
             let mut item_raw = sItemBase::default();
+            if let Some((id, count)) = vals {
+                item_raw.iType = ItemType::Quest as i16;
+                item_raw.iID = id;
+                item_raw.iOpt = count as i32;
+            }
+            item_raw
+        })
+    }
+
+    fn get_quest_item_arr_1013(&self) -> [v1013::sItemBase; SIZEOF_QINVEN_SLOT as usize] {
+        self.quest.map(|vals| {
+            let mut item_raw = v1013::sItemBase::default();
             if let Some((id, count)) = vals {
                 item_raw.iType = ItemType::Quest as i16;
                 item_raw.iID = id;
@@ -730,6 +750,65 @@ impl Player {
         }
     }
 
+    pub fn get_load_data_1013(&self) -> v1013::sPCLoadData2CL {
+        v1013::sPCLoadData2CL {
+            iUserLevel: 0, // allow anyone to send GM commands; we'll validate perms
+            PCStyle: self.get_style(),
+            PCStyle2: self.get_style_2(),
+            iLevel: self.level,
+            iMentor: self.guide_data.current_guide as i16,
+            iMentorCount: self.guide_data.total_guides as i16,
+            iHP: self.hp,
+            iBatteryW: self.weapon_boosts as i32,
+            iBatteryN: self.nano_potions as i32,
+            iCandy: self.taros as i32,
+            iFusionMatter: self.fusion_matter as i32,
+            iSpecialState: self.get_special_state_bit_flag(),
+            iMapNum: self.get_mapnum() as i32,
+            iX: self.position.x,
+            iY: self.position.y,
+            iZ: self.position.z,
+            iAngle: self.rotation,
+            aEquip: self.inventory.get_equip_arr_1013(),
+            aInven: self.inventory.get_main_arr_1013(),
+            aQInven: self.inventory.get_quest_item_arr_1013(),
+            aNanoBank: self.nano_data.as_bank(),
+            aNanoSlots: self.nano_data.as_slots(),
+            iActiveNanoSlotNum: match self.nano_data.active_slot {
+                Some(active_slot) => active_slot as i16,
+                None => -1,
+            },
+            iConditionBitFlag: self.get_condition_bit_flag(),
+            eCSTB___Add: placeholder!(0),
+            TimeBuff: v1013::sTimeBuff {
+                iTimeLimit: placeholder!(0),
+                iTimeDuration: placeholder!(0),
+                iTimeRepeat: placeholder!(0),
+                iValue: placeholder!(0),
+                iConfirmNum: placeholder!(0),
+            },
+            aQuestFlag: self
+                .mission_journal
+                .completed_mission_flags
+                .to_array()
+                .unwrap(),
+            aRepeatQuestFlag: unused!(),
+            aRunningQuest: self.mission_journal.get_running_quests(),
+            iCurrentMissionID: self.mission_journal.get_active_mission_id().unwrap_or(0),
+            iWarpLocationFlag: self.flags.scamper_flags.get_chunk(0).unwrap(),
+            aWyvernLocationFlag: self.flags.skyway_flags.to_array().unwrap(),
+            iBuddyWarpTime: self
+                .buddy_warp_available_at
+                .map_or(0, |available_at| available_at as i32),
+            iFatigue: unused!(),
+            iFatigue_Level: unused!(),
+            iFatigueRate: unused!(),
+            iFirstUseFlag1: self.flags.tip_flags.get_chunk(0).unwrap(),
+            iFirstUseFlag2: self.flags.tip_flags.get_chunk(1).unwrap(),
+            aiPCSkill: [unused!(); 33],
+        }
+    }
+
     pub fn get_regen_data(&self) -> (sPCRegenData, sPCRegenDataForOtherPC) {
         let regen_data = sPCRegenData {
             iHP: self.hp,
@@ -1085,6 +1164,10 @@ impl Player {
 
     pub fn get_equip_arr<const N: usize>(&self) -> [sItemBase; N] {
         self.inventory.get_equip_arr()
+    }
+
+    pub fn get_equip_arr_1013<const N: usize>(&self) -> [v1013::sItemBase; N] {
+        self.inventory.get_equip_arr_1013()
     }
 
     pub fn get_taros(&self) -> u32 {
