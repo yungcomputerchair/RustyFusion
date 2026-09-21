@@ -1,5 +1,7 @@
 #![allow(non_upper_case_globals)]
 
+use crate::net::FFProtocol;
+
 pub const LIB_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const DB_VERSION: i32 = 6;
 
@@ -101,7 +103,7 @@ pub const PC_BATTERY_MAX: u32 = 9999;
 pub const PC_LEVEL_MAX: u32 = 36;
 pub const SIZEOF_PC_BULLET_SLOT: u32 = 3;
 pub const PC_TICK_TIME: u32 = 5000;
-pub const SIZEOF_EQUIP_SLOT: u32 = 9;
+// pub const SIZEOF_EQUIP_SLOT: u32 = 9; // variable; do not use directly
 pub const EQUIP_SLOT_HAND: u32 = 0;
 pub const EQUIP_SLOT_UPPERBODY: u32 = 1;
 pub const EQUIP_SLOT_LOWERBODY: u32 = 2;
@@ -126,7 +128,7 @@ pub const WPN_EQUIP_TYPE_DH_THROW: u32 = 10;
 pub const WPN_EQUIP_TYPE_DH_ROCKET: u32 = 11;
 pub const SIZEOF_INVEN_SLOT: u32 = 50;
 pub const SIZEOF_QINVEN_SLOT: u32 = 50;
-pub const SIZEOF_BANK_SLOT: u32 = 119;
+// pub const SIZEOF_BANK_SLOT: u32 = 119; // variable; do not use directly
 pub const SIZEOF_RESTORE_SLOT: u32 = 5;
 pub const SIZEOF_NANO_BANK_SLOT: u32 = 37;
 pub const SIZEOF_QUEST_SLOT: u32 = 1024;
@@ -353,3 +355,21 @@ pub const MAX_QUEST: u32 = 30;
 //pub const MENTOR_CHANGE_BASE_COST: u32 = 100;
 pub const MAX_UNIT_TIME_OF_MISSION_SYSTEM_UPDATING: u32 = 1;
 pub const MAX_BARKER_CHECK_PERIOD_TIME: u32 = 20;
+
+// Protocol-sensitive; ensure these are greater than or equal to the largest possible slot size for any protocol.
+pub const MAX_SIZEOF_EQUIP_SLOT: usize = 12;
+pub const MAX_SIZEOF_BANK_SLOT: usize = 200;
+
+pub const fn sizeof_equip_slot(protocol: &FFProtocol) -> usize {
+    match protocol {
+        FFProtocol::v0104 => 9,
+        FFProtocol::v1013 => 12,
+    }
+}
+
+pub const fn sizeof_bank_slot(protocol: &FFProtocol) -> usize {
+    match protocol {
+        FFProtocol::v0104 => 119,
+        FFProtocol::v1013 => 200,
+    }
+}

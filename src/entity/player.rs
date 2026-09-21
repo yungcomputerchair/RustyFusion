@@ -7,6 +7,7 @@ use std::{
 
 use crate::{
     chunk::{ChunkCoords, InstanceID},
+    config::config_get,
     defines::*,
     entity::{Combatant, Entity, EntityID},
     enums::{
@@ -184,21 +185,25 @@ impl Default for Nanocom {
 #[derive(Debug, Clone)]
 struct PlayerInventory {
     main: [Option<Item>; SIZEOF_INVEN_SLOT as usize],
-    equipped: [Option<Item>; SIZEOF_EQUIP_SLOT as usize],
+    equipped: [Option<Item>; MAX_SIZEOF_EQUIP_SLOT],
     quest: [Option<(i16, usize)>; SIZEOF_QINVEN_SLOT as usize],
-    bank: [Option<Item>; SIZEOF_BANK_SLOT as usize],
+    bank: [Option<Item>; MAX_SIZEOF_BANK_SLOT],
 }
 impl Default for PlayerInventory {
     fn default() -> Self {
         Self {
             main: [None; SIZEOF_INVEN_SLOT as usize],
-            equipped: [None; SIZEOF_EQUIP_SLOT as usize],
+            equipped: [None; MAX_SIZEOF_EQUIP_SLOT],
             quest: [None; SIZEOF_QINVEN_SLOT as usize],
-            bank: [None; SIZEOF_BANK_SLOT as usize],
+            bank: [None; MAX_SIZEOF_BANK_SLOT],
         }
     }
 }
 impl PlayerInventory {
+    fn get_equip_arr<const N: usize>(&self) -> [sItemBase; N] {
+        std::array::from_fn(|i| self.equipped.get(i).copied().flatten().into_proto())
+    }
+
     fn get_quest_item_arr(&self) -> [sItemBase; SIZEOF_QINVEN_SLOT as usize] {
         self.quest.map(|vals| {
             let mut item_raw = sItemBase::default();
@@ -685,7 +690,7 @@ impl Player {
             iY: self.position.y,
             iZ: self.position.z,
             iAngle: self.rotation,
-            aEquip: self.inventory.equipped.map(Option::<Item>::into_proto),
+            aEquip: self.inventory.get_equip_arr(),
             aInven: self.inventory.main.map(Option::<Item>::into_proto),
             aQInven: self.inventory.get_quest_item_arr(),
             aNanoBank: self.nano_data.as_bank(),
@@ -822,7 +827,7 @@ impl Player {
             iY: self.position.y,
             iZ: self.position.z,
             iAngle: self.rotation,
-            ItemEquip: self.inventory.equipped.map(Option::<Item>::into_proto),
+            ItemEquip: self.inventory.get_equip_arr(),
             Nano: self.get_active_nano().into_proto(),
             eRT: unused!(),
         }
@@ -833,9 +838,10 @@ impl Player {
             Severity::Warning,
             format!("Bad slot number: {slot_num} (location {:?})", location),
         ));
+        let protocol = config_get().general.protocol.get();
         match location {
             ItemLocation::Equip => {
-                if slot_num < SIZEOF_EQUIP_SLOT as usize {
+                if slot_num < sizeof_equip_slot(&protocol) {
                     Ok(&self.inventory.equipped[slot_num])
                 } else {
                     err
@@ -850,7 +856,7 @@ impl Player {
             }
             ItemLocation::QInven => unimplemented!("Quest items not accessible by slot number"),
             ItemLocation::Bank => {
-                if slot_num < SIZEOF_BANK_SLOT as usize {
+                if slot_num < sizeof_bank_slot(&protocol) {
                     Ok(&self.inventory.bank[slot_num])
                 } else {
                     err
@@ -875,10 +881,11 @@ impl Player {
                 self.id.unwrap_or_default()
             ),
         ));
+        let protocol = config_get().general.protocol.get();
 
         let res = match location {
             ItemLocation::Equip => {
-                if slot_num < SIZEOF_EQUIP_SLOT as usize {
+                if slot_num < sizeof_equip_slot(&protocol) {
                     Ok(&mut self.inventory.equipped[slot_num])
                 } else {
                     err_oob
@@ -893,7 +900,7 @@ impl Player {
             }
             ItemLocation::QInven => unimplemented!("Quest items not accessible by slot number"),
             ItemLocation::Bank => {
-                if slot_num < SIZEOF_BANK_SLOT as usize {
+                if slot_num < sizeof_bank_slot(&protocol) {
                     Ok(&mut self.inventory.bank[slot_num])
                 } else {
                     err_oob
@@ -1054,7 +1061,9 @@ impl Player {
     }
 
     pub fn get_item_iter(&self) -> impl Iterator<Item = (usize, &Item)> {
-        let inv_slot_max = (SIZEOF_EQUIP_SLOT + SIZEOF_INVEN_SLOT + SIZEOF_BANK_SLOT) as usize;
+        let protocol = config_get().general.protocol.get();
+        let inv_slot_max =
+            sizeof_equip_slot(&protocol) + SIZEOF_INVEN_SLOT as usize + sizeof_bank_slot(&protocol);
         (0..inv_slot_max).filter_map(move |slot_num| {
             let (loc, slot_num_loc) = util::slot_num_to_loc_and_slot_num(slot_num).unwrap();
             let item = self.get_item(loc, slot_num_loc).unwrap();
@@ -1070,8 +1079,12 @@ impl Player {
             .map(|(id, count)| (*id, *count))
     }
 
-    pub fn get_equipped(&self) -> &[Option<Item>; 9] {
+    pub fn get_equipped(&self) -> &[Option<Item>; MAX_SIZEOF_EQUIP_SLOT] {
         &self.inventory.equipped
+    }
+
+    pub fn get_equip_arr<const N: usize>(&self) -> [sItemBase; N] {
+        self.inventory.get_equip_arr()
     }
 
     pub fn get_taros(&self) -> u32 {

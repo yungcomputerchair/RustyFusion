@@ -12,6 +12,7 @@ use rand::{distributions::uniform::SampleUniform, Rng};
 use uuid::Uuid;
 
 use crate::{
+    config::config_get,
     defines::*,
     enums::{ItemLocation, ItemType},
     error::{FFError, FFResult, Severity},
@@ -437,10 +438,12 @@ pub fn get_uid() -> i64 {
 }
 
 pub fn slot_num_to_loc_and_slot_num(mut slot_num: usize) -> FFResult<(ItemLocation, usize)> {
-    if slot_num < SIZEOF_EQUIP_SLOT as usize {
+    let protocol = config_get().general.protocol.get();
+
+    if slot_num < sizeof_equip_slot(&protocol) {
         return Ok((ItemLocation::Equip, slot_num));
     }
-    slot_num -= SIZEOF_EQUIP_SLOT as usize;
+    slot_num -= sizeof_equip_slot(&protocol);
 
     if slot_num < SIZEOF_INVEN_SLOT as usize {
         return Ok((ItemLocation::Inven, slot_num));
@@ -450,7 +453,7 @@ pub fn slot_num_to_loc_and_slot_num(mut slot_num: usize) -> FFResult<(ItemLocati
     // NOTE: quest items are not stored in inventory slots,
     // so do NOT factor in SIZEOF_QINVEN_SLOT
 
-    if slot_num < SIZEOF_BANK_SLOT as usize {
+    if slot_num < sizeof_bank_slot(&protocol) {
         return Ok((ItemLocation::Bank, slot_num));
     }
 
