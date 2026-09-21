@@ -13,7 +13,7 @@ use crate::{
     entity::{Combatant, Entity, EntityID, Player},
     enums::*,
     error::*,
-    helpers,
+    helpers::broadcast_state,
     net::{
         crypto::{self, EncryptionMode},
         packet::{PacketID::*, *},
@@ -158,7 +158,8 @@ pub async fn pc_enter(
     player.instance_id.channel_num = channel_num;
 
     let svr_time = util::get_timestamp_ms(time);
-    let resp_pkt = match config_get().general.protocol.get() {
+    let protocol = config_get().general.protocol.get();
+    let resp_pkt = match protocol {
         FFProtocol::v0104 => Packet::new(
             P_FE2CL_REP_PC_ENTER_SUCC,
             &sP_FE2CL_REP_PC_ENTER_SUCC {
@@ -175,6 +176,11 @@ pub async fn pc_enter(
                 uiSvrTime: svr_time,
             },
         )?,
+    };
+
+    let nano_book = match protocol {
+        FFProtocol::v0104 => None,
+        FFProtocol::v1013 => Some(helpers::build_nano_book(&player)?),
     };
 
     let iv1: i32 = pc_id + 1;
@@ -209,7 +215,19 @@ pub async fn pc_enter(
     state.entity_map.track(Box::new(player), TickMode::Always);
     state.player_uid_to_id.insert(player_uid, pc_id);
 
-    clients.get_sender().send_payload(resp_pkt);
+    let sender = clients.get_sender();
+    match nano_book {
+        // the resize must arrive before PC_ENTER_SUCC so the client
+        // sizes its nano array, and the contents after it
+        Some((resize, pages)) => {
+            sender.send_payload(resize);
+            sender.send_payload(resp_pkt);
+            for page in pages {
+                sender.send_payload(page);
+            }
+        }
+        None => sender.send_payload(resp_pkt),
+    }
 
     Ok(())
 }
@@ -569,7 +587,7 @@ pub fn pc_vehicle_on(clients: &ClientMap, state: &mut ShardServerState) -> FFRes
             panic_log(&format!("Vehicle has no speed: {:?}", vehicle));
         }
 
-        helpers::broadcast_state(pc_id, player.get_state_bit_flag(), state);
+        broadcast_state(pc_id, player.get_state_bit_flag(), state);
 
         let resp = sP_FE2CL_PC_VEHICLE_ON_SUCC::default();
         client.send_packet(P_FE2CL_PC_VEHICLE_ON_SUCC, &resp);
@@ -593,7 +611,7 @@ pub fn pc_vehicle_off(clients: &ClientMap, state: &mut ShardServerState) -> FFRe
         let player = state.get_player_mut(pc_id)?;
 
         player.vehicle_speed = None;
-        helpers::broadcast_state(pc_id, player.get_state_bit_flag(), state);
+        broadcast_state(pc_id, player.get_state_bit_flag(), state);
 
         let resp = sP_FE2CL_PC_VEHICLE_OFF_SUCC::default();
         client.send_packet(P_FE2CL_PC_VEHICLE_OFF_SUCC, &resp);
@@ -916,4 +934,37 @@ pub fn pc_warp_channel(
             .get_sender()
             .send_packet(P_FE2CL_REP_PC_WARP_CHANNEL_FAIL, &resp);
     })
+}
+
+mod helpers {
+    use super::*;
+
+    pub fn build_nano_book(player: &Player) -> FFResult<(Packet, Vec<Packet>)> {
+        const PAGE_LEN: usize = 10;
+        let book_size = nano_count(&FFProtocol::v1013);
+
+        let mut pkt = v1013::sP_FE2CL_REP_NANO_BOOK_SUBSET {
+            PCUID: player.get_uid(),
+            bookSize: book_size as i32,
+            elementOffset: 0,
+            element: [None.into_proto(); PAGE_LEN],
+        };
+        let resize = Packet::new(P_FE2CL_REP_NANO_BOOK_SUBSET, &pkt)?;
+
+        let mut pages = Vec::with_capacity(book_size.div_ceil(PAGE_LEN));
+        for offset in (0..book_size).step_by(PAGE_LEN) {
+            pkt.elementOffset = offset as i32;
+            for (i, slot) in pkt.element.iter_mut().enumerate() {
+                let nano_id = offset + i;
+                *slot = if nano_id < book_size {
+                    player.get_nano(nano_id as i16).into_proto()
+                } else {
+                    None.into_proto()
+                };
+            }
+            pages.push(Packet::new(P_FE2CL_REP_NANO_BOOK_SUBSET, &pkt)?);
+        }
+
+        Ok((resize, pages))
+    }
 }

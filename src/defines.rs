@@ -373,3 +373,11 @@ pub const fn sizeof_bank_slot(protocol: &FFProtocol) -> usize {
         FFProtocol::v1013 => 200,
     }
 }
+
+// Total number of available nano slots (including the zeroeth entry)
+pub const fn nano_count(protocol: &FFProtocol) -> usize {
+    match protocol {
+        FFProtocol::v0104 => 37,
+        FFProtocol::v1013 => 58,
+    }
+}
