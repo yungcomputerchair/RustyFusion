@@ -19,7 +19,7 @@ use crate::{
     item::Item,
     mission::Task,
     nano::Nano,
-    net::packet::*,
+    net::{packet::*, FFProtocol},
     state::Cookie,
     tabledata::tdata_get,
     util::{self, Bitfield},
@@ -139,9 +139,15 @@ impl SqliteDatabase {
                 Severity::Info,
                 "Meta table missing; initializing database...",
             );
-            conn.interact(|conn| -> FFResult<()> {
+
+            let protocol_version = match config.protocol.get() {
+                FFProtocol::v0104 => 104,
+                FFProtocol::v1013 => 1013,
+            };
+
+            conn.interact(move |conn| -> FFResult<()> {
                 let tx = conn.transaction()?;
-                Self::exec_in(&tx, "create_tables", &[&PROTOCOL_VERSION, &DB_VERSION])?;
+                Self::exec_in(&tx, "create_tables", &[&protocol_version, &DB_VERSION])?;
                 tx.commit()?;
                 Ok(())
             })

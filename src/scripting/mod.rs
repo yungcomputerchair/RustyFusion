@@ -144,10 +144,6 @@ impl ScriptingEngine {
     }
 
     fn register_globals(vm: &Lua) -> FFResult<()> {
-        luau_const!(vm, "LIB_VERSION", "string", LIB_VERSION);
-        luau_const!(vm, "PROTOCOL_VERSION", "number", PROTOCOL_VERSION);
-        luau_const!(vm, "DB_VERSION", "number", DB_VERSION);
-
         luau_const!(vm, "BUFF_SLEEP", "number", BuffID::Sleep as i32);
 
         luau_function!("yield", "(): ()");

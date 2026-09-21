@@ -495,6 +495,7 @@ mod commands {
 
     use crate::{
         chunk::TickMode,
+        config::config_get,
         database::{db_get, DbImpl as _},
         entity::Combatant,
         enums::CombatantTeam,
@@ -583,15 +584,16 @@ mod commands {
         clients: &'a ClientMap<'a>,
         _state: &'a mut ShardServerState,
     ) -> Pin<Box<dyn Future<Output = FFResult<()>> + Send + 'a>> {
+        let protocol_version = config_get().general.protocol.get();
         Box::pin(async move {
             send_system_message(
                 clients.get_sender(),
                 &format!(
                     "RustyFusion by ycc\n\
                 Library version: {}\n\
-                Protocol version: {}\n\
+                Protocol version: {:?}\n\
                 Database version: {}",
-                    LIB_VERSION, PROTOCOL_VERSION, DB_VERSION,
+                    LIB_VERSION, protocol_version, DB_VERSION,
                 ),
             )
         })
