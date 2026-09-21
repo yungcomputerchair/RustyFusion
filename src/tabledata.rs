@@ -20,6 +20,7 @@ use crate::{
     item::{CrocPotData, Item, ItemStats, Reward, VendorData, VendorItem},
     mission::{MissionDefinition, TaskDefinition},
     nano::{NanoStats, NanoTuning},
+    net::FFProtocol,
     path::{Path, PathPoint},
     skills::Skill,
     util, Position,
@@ -2025,6 +2026,14 @@ fn load_npcs() -> Result<Vec<NPCSpawnData>, String> {
         for (k, v) in table {
             let npc_data_entry: NPCSpawnDataEntry = serde_json::from_value(v.clone())
                 .map_err(|e| format!("Malformed NPC data entry: {}", e))?;
+
+            if let FFProtocol::v1013 = config_get().general.protocol.get() {
+                // Academy's map doesn't include the Future; skip all NPCs spawned there for parity with OpenFusion
+                if npc_data_entry.iX > 512000 && npc_data_entry.iY < 256000 {
+                    continue;
+                }
+            }
+
             let key: i32 = k.parse().map_err(|e| format!("Malformed NPC key: {}", e))?;
             let npc_data_entry = NPCSpawnData {
                 group_id: if is_group { Some(key) } else { None },
