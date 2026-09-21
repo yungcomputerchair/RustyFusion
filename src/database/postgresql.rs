@@ -15,7 +15,7 @@ use crate::{
     item::Item,
     mission::Task,
     nano::Nano,
-    net::{packet::*, FFProtocol},
+    net::packet::*,
     state::Cookie,
     tabledata::tdata_get,
     util::{self, Bitfield},
@@ -93,10 +93,7 @@ impl PostgresDatabase {
         let meta_table_exists: bool =
             Self::query(&db_client, "meta_table_exists", &[]).await?[0].get(0);
 
-        let protocol_version = match config.protocol.get() {
-            FFProtocol::v0104 => 104,
-            FFProtocol::v1013 => 1013,
-        };
+        let protocol_version = config.protocol.get().version_number();
 
         if !meta_table_exists {
             log(
@@ -564,6 +561,18 @@ impl DbImpl for PostgresDatabase {
         Ok(rows[0].get(0))
     }
 
+    async fn get_protocol_version(&self) -> FFResult<Int> {
+        let client = self.get_client().await?;
+        let rows = Self::query(&client, "get_protocol_version", &[]).await?;
+        if rows.is_empty() {
+            return Err(FFError::build(
+                db_error_severity(),
+                "Meta table has no ProtocolVersion row".to_string(),
+            ));
+        }
+        Ok(rows[0].get(0))
+    }
+
     async fn init_player(&self, acc_id: BigInt, player: &Player) -> FFResult<()> {
         let mut client = self.get_client().await?;
         let updated = Self::exec(
@@ -889,7 +898,6 @@ mod test {
     async fn test_all_sql_files_prepare() {
         use crate::config::config_get;
         use crate::defines::DB_VERSION;
-        use crate::net::FFProtocol;
         use tokio_postgres::NoTls;
 
         let conn_str = pg_conn_str();
@@ -910,10 +918,7 @@ mod test {
         let reset_sql = std::fs::read_to_string("sql/reset_db.sql").unwrap();
         tx.batch_execute(&reset_sql).await.expect("reset_db failed");
 
-        let protocol_version = match config_get().general.protocol.get() {
-            FFProtocol::v0104 => 104,
-            FFProtocol::v1013 => 1013,
-        };
+        let protocol_version = config_get().general.protocol.get().version_number();
 
         let create_tables_sql = std::fs::read_to_string("sql/create_tables.sql").unwrap();
         let param_regex = regex::Regex::new(r"\$([0-9]+)").unwrap();

@@ -19,7 +19,7 @@ use crate::{
     item::Item,
     mission::Task,
     nano::Nano,
-    net::{packet::*, FFProtocol},
+    net::packet::*,
     state::Cookie,
     tabledata::tdata_get,
     util::{self, Bitfield},
@@ -140,10 +140,7 @@ impl SqliteDatabase {
                 "Meta table missing; initializing database...",
             );
 
-            let protocol_version = match config.protocol.get() {
-                FFProtocol::v0104 => 104,
-                FFProtocol::v1013 => 1013,
-            };
+            let protocol_version = config.protocol.get().version_number();
 
             conn.interact(move |conn| -> FFResult<()> {
                 let tx = conn.transaction()?;
@@ -590,6 +587,23 @@ impl DbImpl for SqliteDatabase {
                 None => Err(FFError::build(
                     db_error_severity(),
                     "Meta table has no DatabaseVersion row".to_string(),
+                )),
+            }
+        })
+        .await?
+    }
+
+    async fn get_protocol_version(&self) -> FFResult<Int> {
+        let conn = self.pool.get().await?;
+        conn.interact(|conn| -> FFResult<Int> {
+            let sql = Self::read_sql("get_protocol_version")?;
+            let mut stmt = conn.prepare_cached(sql)?;
+            let mut rows = stmt.query([])?;
+            match rows.next()? {
+                Some(row) => Ok(row.get::<_, Int>(0)?),
+                None => Err(FFError::build(
+                    db_error_severity(),
+                    "Meta table has no ProtocolVersion row".to_string(),
                 )),
             }
         })

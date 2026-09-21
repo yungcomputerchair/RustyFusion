@@ -30,6 +30,14 @@ pub enum FFProtocol {
     v0104,
     v1013,
 }
+impl FFProtocol {
+    pub const fn version_number(self) -> i32 {
+        match self {
+            Self::v0104 => 104,
+            Self::v1013 => 1013,
+        }
+    }
+}
 
 const PACKET_BUFFER_SIZE: usize = 4096; // payload buffer size; includes ID, but not length
 const PACKET_LENGTH_SIZE: usize = size_of::<u32>(); // not encrypted
