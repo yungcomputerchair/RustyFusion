@@ -262,17 +262,14 @@ pub fn warp_use_npc(
         let player = state.get_player(client.get_player_id().unwrap()).unwrap();
         let pos = player.get_position();
         let taros_left = player.get_taros();
-        let resp = sP_FE2CL_REP_PC_WARP_USE_NPC_SUCC {
-            iX: pos.x,
-            iY: pos.y,
-            iZ: pos.z,
-            eIL: pkt.eIL2,
-            iItemSlotNum: pkt.iItemSlot2,
-            Item: item_remaining.into_proto(),
-            iCandy: taros_left as i32,
-        };
-
-        client.send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp);
+        helpers::send_warp_use_npc_succ(
+            client,
+            pos,
+            pkt.eIL2,
+            pkt.iItemSlot2,
+            item_remaining,
+            taros_left,
+        );
         Ok(())
     })()
     .catch_fail(|| {
@@ -316,17 +313,14 @@ pub fn time_to_go_warp(
         let player = state.get_player(client.get_player_id().unwrap()).unwrap();
         let pos = player.get_position();
         let taros_left = player.get_taros();
-        let resp = sP_FE2CL_REP_PC_WARP_USE_NPC_SUCC {
-            iX: pos.x,
-            iY: pos.y,
-            iZ: pos.z,
-            eIL: pkt.eIL2,
-            iItemSlotNum: pkt.iItemSlot2,
-            Item: item_remaining.into_proto(),
-            iCandy: taros_left as i32,
-        };
-
-        client.send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp);
+        helpers::send_warp_use_npc_succ(
+            client,
+            pos,
+            pkt.eIL2,
+            pkt.iItemSlot2,
+            item_remaining,
+            taros_left,
+        );
         Ok(())
     })()
     .catch_fail(|| {
@@ -530,16 +524,14 @@ fn do_warp(
         // generic NPC warp packet for players that are warping along.
         // caller should reply with the correct packet for the initiator
         if warping_pc_id != pc_id {
-            let resp = sP_FE2CL_REP_PC_WARP_USE_NPC_SUCC {
-                iX: player.get_position().x,
-                iY: player.get_position().y,
-                iZ: player.get_position().z,
-                eIL: ItemLocation::end(),
-                iItemSlotNum: unused!(),
-                Item: None.into_proto(),
-                iCandy: player.get_taros() as i32,
-            };
-            client.send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp);
+            helpers::send_warp_use_npc_succ(
+                &client,
+                player.get_position(),
+                ItemLocation::end(),
+                unused!(),
+                None,
+                player.get_taros(),
+            );
         }
 
         helpers::broadcast_state(pc_id, player.get_state_bit_flag(), state);

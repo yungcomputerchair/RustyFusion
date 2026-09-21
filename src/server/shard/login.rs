@@ -315,7 +315,8 @@ pub fn login_get_buddy_state(pkt: Packet, state: &mut ShardServerState) -> FFRes
     let player = state.get_player(pc_id).unwrap();
     let buddy_info = player.get_all_buddy_info();
 
-    let mut resp = sP_FE2CL_REP_GET_BUDDY_STATE_SUCC {
+    // identical on the wire across protocols; aBuddyState is merely u8 vs i8
+    let mut resp = v0104::sP_FE2CL_REP_GET_BUDDY_STATE_SUCC {
         aBuddyID: [0; SIZEOF_BUDDYLIST_SLOT as usize],
         aBuddyState: [0; SIZEOF_BUDDYLIST_SLOT as usize],
     };

@@ -278,7 +278,7 @@ impl SqliteDatabase {
             let save_item_sql = Self::read_sql("save_item")?;
             let mut save_item = tx.prepare_cached(save_item_sql)?;
             for (slot_num, item) in player.get_item_iter() {
-                let item_raw: sItemBase = Some(*item).into_proto();
+                let item_raw: v0104::sItemBase = Some(*item).into_proto();
                 save_item.execute(params_from_iter(
                     [
                         &pc_uid as &dyn ToSql,
@@ -462,7 +462,7 @@ impl SqliteDatabase {
         let items = Self::query(conn, "load_items", &[&pc_uid])?;
         for item in &items {
             let slot_num = item.get::<Int>("Slot") as usize;
-            let item_raw = sItemBase {
+            let item_raw = v0104::sItemBase {
                 iType: item.get::<Int>("Type") as i16,
                 iID: item.get::<Int>("ID") as i16,
                 iOpt: item.get::<Int>("Opt"),

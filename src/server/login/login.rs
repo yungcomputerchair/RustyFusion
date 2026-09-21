@@ -254,7 +254,7 @@ Password must be 8-32 characters long and contain only letters, numbers, or spec
 
         match protocol {
             FFProtocol::v0104 => {
-                let resp = sP_LS2CL_REP_LOGIN_SUCC {
+                let resp = v0104::sP_LS2CL_REP_LOGIN_SUCC {
                     iCharCount: char_count,
                     iSlotNum: slot_num,
                     iTempForPacking4: unused!(),
@@ -306,7 +306,7 @@ Password must be 8-32 characters long and contain only letters, numbers, or spec
             let pos = player.get_position();
             match protocol {
                 FFProtocol::v0104 => {
-                    let pkt = sP_LS2CL_REP_CHAR_INFO {
+                    let pkt = v0104::sP_LS2CL_REP_CHAR_INFO {
                         iSlot: player.get_slot_num() as i8,
                         iLevel: player.get_level(),
                         sPC_Style: player.get_style(),
@@ -314,7 +314,7 @@ Password must be 8-32 characters long and contain only letters, numbers, or spec
                         iX: pos.x,
                         iY: pos.y,
                         iZ: pos.z,
-                        aEquip: player.get_equip_arr(),
+                        aEquip: player.get_equip_arr_104(),
                     };
                     client.send_packet(P_LS2CL_REP_CHAR_INFO, &pkt);
                 }
@@ -631,7 +631,8 @@ pub fn shard_list_info(client: &FFClient, state: &mut LoginServerState) -> FFRes
     let mut statuses = [0; MAX_NUM_CHANNELS + 1];
     statuses[0] = unused!();
     statuses[1..].copy_from_slice(&state.get_shard_channel_statuses(shard_id).map(|s| s as u8));
-    let resp = sP_LS2CL_REP_SHARD_LIST_INFO_SUCC {
+    // identical on the wire across protocols; aShardConnectFlag is merely u8 vs i8
+    let resp = v0104::sP_LS2CL_REP_SHARD_LIST_INFO_SUCC {
         aShardConnectFlag: statuses,
     };
     client.send_packet(P_LS2CL_REP_SHARD_LIST_INFO_SUCC, &resp);

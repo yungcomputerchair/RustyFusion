@@ -245,7 +245,7 @@ impl PostgresDatabase {
 
         Self::exec(client, "clear_items", &[&pc_uid]).await?;
         for (slot_num, item) in player.get_item_iter() {
-            let item_raw: sItemBase = Some(*item).into_proto();
+            let item_raw: v0104::sItemBase = Some(*item).into_proto();
             client
                 .execute(
                     &save_item,
@@ -430,7 +430,7 @@ impl PostgresDatabase {
         let items = Self::query(client, "load_items", &[&pc_uid]).await?;
         for item in items {
             let slot_num = item.get::<_, Int>("Slot") as usize;
-            let item_raw = sItemBase {
+            let item_raw = v0104::sItemBase {
                 iType: item.get::<_, Int>("Type") as i16,
                 iID: item.get::<_, Int>("ID") as i16,
                 iOpt: item.get::<_, Int>("Opt"),

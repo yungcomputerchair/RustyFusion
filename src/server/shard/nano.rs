@@ -1,4 +1,5 @@
 use crate::{
+    config::config_get,
     defines::*,
     entity::{Combatant, Entity, EntityID},
     enums::*,
@@ -6,7 +7,7 @@ use crate::{
     item::Item,
     net::{
         packet::{PacketID::*, *},
-        ClientMap, FFClient,
+        ClientMap, FFClient, FFProtocol,
     },
     state::ShardServerState,
     tabledata::tdata_get,
@@ -197,7 +198,7 @@ pub fn nano_tune(pkt: Packet, client: &FFClient, state: &mut ShardServerState) -
 
         // check for + consume tuning items
         let mut item_slots = [-1; 10];
-        let mut items = [None.into_proto(); 10];
+        let mut items: [Option<Item>; 10] = [None; 10];
         let mut quantity_left = tuning.req_item_quantity;
 
         let mut player_working = player.clone();
@@ -221,7 +222,7 @@ pub fn nano_tune(pkt: Packet, client: &FFClient, state: &mut ShardServerState) -
                     let removed = Item::split_items(slot, quantity_left);
                     quantity_left -= removed.unwrap().quantity;
                     item_slots[i] = *slot_num;
-                    items[i] = (*slot).into_proto();
+                    items[i] = *slot;
                 }
             }
 
@@ -255,15 +256,28 @@ pub fn nano_tune(pkt: Packet, client: &FFClient, state: &mut ShardServerState) -
         player_working.tune_nano(pkt.iNanoID, Some(skill_id))?;
         *player = player_working; // commit changes
 
-        let resp = sP_FE2CL_REP_NANO_TUNE_SUCC {
-            iNanoID: pkt.iNanoID,
-            iSkillID: skill_id,
-            iPC_FusionMatter: player.get_fusion_matter() as i32,
-            aiItemSlotNum: item_slots,
-            aItem: items,
-        };
-
-        client.send_packet(P_FE2CL_REP_NANO_TUNE_SUCC, &resp);
+        match config_get().general.protocol.get() {
+            FFProtocol::v0104 => client.send_packet(
+                P_FE2CL_REP_NANO_TUNE_SUCC,
+                &v0104::sP_FE2CL_REP_NANO_TUNE_SUCC {
+                    iNanoID: pkt.iNanoID,
+                    iSkillID: skill_id,
+                    iPC_FusionMatter: player.get_fusion_matter() as i32,
+                    aiItemSlotNum: item_slots,
+                    aItem: items.map(Option::<Item>::into_proto),
+                },
+            ),
+            FFProtocol::v1013 => client.send_packet(
+                P_FE2CL_REP_NANO_TUNE_SUCC,
+                &v1013::sP_FE2CL_REP_NANO_TUNE_SUCC {
+                    iNanoID: pkt.iNanoID,
+                    iSkillID: skill_id,
+                    iPC_FusionMatter: player.get_fusion_matter() as i32,
+                    aiItemSlotNum: item_slots,
+                    aItem: items.map(Option::<Item>::into_proto),
+                },
+            ),
+        }
         Ok(())
     })()
     .catch_fail(|| {

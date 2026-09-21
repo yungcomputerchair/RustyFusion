@@ -104,11 +104,13 @@ impl Skill {
 
 #[derive(Debug)]
 pub enum BuffUpdate {
-    Added(BuffID, BuffType, sTimeBuff),
-    Changed(BuffID, BuffType, sTimeBuff),
+    Added(BuffID, BuffType, v0104::sTimeBuff),
+    Changed(BuffID, BuffType, v0104::sTimeBuff),
     Removed(BuffID),
 }
-impl From<BuffUpdate> for sP_FE2CL_PC_BUFF_UPDATE {
+// sTimeBuff and PC_BUFF_UPDATE are byte-identical across protocols
+// (iTimeRepeat is merely i32 vs u32), so one version serves both.
+impl From<BuffUpdate> for v0104::sP_FE2CL_PC_BUFF_UPDATE {
     fn from(update: BuffUpdate) -> Self {
         match update {
             BuffUpdate::Added(buff_id, source, time_buff) => Self {
@@ -341,7 +343,7 @@ impl BuffStack {
         false
     }
 }
-impl From<&BuffStack> for sTimeBuff {
+impl From<&BuffStack> for v0104::sTimeBuff {
     fn from(stack: &BuffStack) -> Self {
         let now = Instant::now();
         Self {

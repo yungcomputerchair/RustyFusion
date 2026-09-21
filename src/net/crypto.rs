@@ -132,7 +132,7 @@ mod tests {
 
     #[test]
     fn test_enc_dec() {
-        let pkt = sP_LS2CL_REP_LOGIN_SUCC {
+        let pkt = v0104::sP_LS2CL_REP_LOGIN_SUCC {
             iCharCount: 1,
             iSlotNum: 2,
             iPaymentFlag: 3,
@@ -150,7 +150,7 @@ mod tests {
         decrypt_payload(&mut buf, key);
         assert_eq!(buf.as_slice(), bytes);
 
-        let pkt_dec: sP_LS2CL_REP_LOGIN_SUCC = *bytes_to_struct(&buf).unwrap();
+        let pkt_dec: v0104::sP_LS2CL_REP_LOGIN_SUCC = *bytes_to_struct(&buf).unwrap();
         //dbg!(pkt_dec);
         assert_eq!({ pkt.uiSvrTime }, { pkt_dec.uiSvrTime });
     }

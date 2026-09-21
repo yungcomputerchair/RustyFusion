@@ -5,6 +5,7 @@ use std::{
 
 use crate::{
     chunk::{EntityMap, InstanceID, TickMode},
+    config::config_get,
     defines::*,
     entity::{Combatant, Egg, Entity, EntityID, PlayerSearchQuery, NPC},
     enums::*,
@@ -13,7 +14,7 @@ use crate::{
     monitor::monitor_event_to_packet,
     net::{
         packet::{PacketID::*, *},
-        ClientMap, FFClient,
+        ClientMap, FFClient, FFProtocol,
     },
     state::ShardServerState,
     tabledata::tdata_get,
@@ -68,11 +69,37 @@ pub fn gm_pc_give_item(
 ) -> FFResult<()> {
     (|| {
         let pc_id = helpers::validate_perms(client, state, CN_ACCOUNT_LEVEL__DEVELOPER as i16)?;
-        let pkt: &sP_CL2FE_REQ_PC_GIVE_ITEM = pkt.get()?;
+        let (location, slot_num, time_left, given_item, qitem_id, qitem_count) =
+            match config_get().general.protocol.get() {
+                FFProtocol::v0104 => {
+                    let pkt: &v0104::sP_CL2FE_REQ_PC_GIVE_ITEM = pkt.get()?;
+                    let item: Option<Item> = pkt.Item.try_into_proto()?;
+                    (
+                        pkt.eIL,
+                        pkt.iSlotNum,
+                        pkt.iTimeLeft,
+                        item,
+                        pkt.Item.iID,
+                        pkt.Item.iOpt as usize,
+                    )
+                }
+                FFProtocol::v1013 => {
+                    let pkt: &v1013::sP_CL2FE_REQ_PC_GIVE_ITEM = pkt.get()?;
+                    let item: Option<Item> = pkt.Item.try_into_proto()?;
+                    (
+                        pkt.eIL,
+                        pkt.iSlotNum,
+                        pkt.iTimeLeft,
+                        item,
+                        pkt.Item.iID,
+                        pkt.Item.iOpt as usize,
+                    )
+                }
+            };
         let player = state.get_player_mut(pc_id)?;
 
-        let mut item: Option<Item> = pkt.Item.try_into_proto()?;
-        let time = pkt.iTimeLeft as u32;
+        let mut item = given_item;
+        let time = time_left as u32;
         if let Some(item) = item.as_mut() {
             if time > 0 {
                 let duration = Duration::from_secs(time as u64);
@@ -81,27 +108,34 @@ pub fn gm_pc_give_item(
             }
         }
 
-        let location = pkt.eIL.try_into()?;
-        let slot_number = match location {
-            ItemLocation::QInven => {
-                let qitem_id = pkt.Item.iID;
-                let qitem_count = pkt.Item.iOpt as usize;
-                player.set_quest_item_count(qitem_id, qitem_count)?
-            }
+        let item_location = location.try_into()?;
+        let slot_number = match item_location {
+            ItemLocation::QInven => player.set_quest_item_count(qitem_id, qitem_count)?,
             other => {
-                let req_slot_number = pkt.iSlotNum as usize;
+                let req_slot_number = slot_num as usize;
                 player.set_item(other, req_slot_number, item)?;
                 req_slot_number
             }
         };
 
-        let resp = sP_FE2CL_REP_PC_GIVE_ITEM_SUCC {
-            eIL: pkt.eIL,
-            iSlotNum: slot_number as i32,
-            Item: item.into_proto(),
-        };
-
-        client.send_packet(P_FE2CL_REP_PC_GIVE_ITEM_SUCC, &resp);
+        match config_get().general.protocol.get() {
+            FFProtocol::v0104 => client.send_packet(
+                P_FE2CL_REP_PC_GIVE_ITEM_SUCC,
+                &v0104::sP_FE2CL_REP_PC_GIVE_ITEM_SUCC {
+                    eIL: location,
+                    iSlotNum: slot_number as i32,
+                    Item: item.into_proto(),
+                },
+            ),
+            FFProtocol::v1013 => client.send_packet(
+                P_FE2CL_REP_PC_GIVE_ITEM_SUCC,
+                &v1013::sP_FE2CL_REP_PC_GIVE_ITEM_SUCC {
+                    eIL: location,
+                    iSlotNum: slot_number as i32,
+                    Item: item.into_proto(),
+                },
+            ),
+        }
         Ok(())
     })()
     .catch_fail(|| {
@@ -129,15 +163,14 @@ pub fn gm_pc_give_nano(
         let fusion_matter = player.get_fusion_matter();
         let nano = player.unlock_nano(nano_id)?;
 
-        let resp = sP_FE2CL_REP_PC_NANO_CREATE_SUCC {
-            iPC_FusionMatter: fusion_matter as i32,
-            iQuestItemSlotNum: -1,
-            QuestItem: None.into_proto(),
-            Nano: Some(&*nano).into_proto(),
-            iPC_Level: new_level,
-        };
-
-        client.send_packet(P_FE2CL_REP_PC_NANO_CREATE_SUCC, &resp);
+        crate::helpers::send_nano_create_succ(
+            client,
+            fusion_matter,
+            -1,
+            None,
+            Some(&*nano),
+            new_level,
+        );
 
         let bcast = sP_FE2CL_REP_PC_CHANGE_LEVEL {
             iPC_ID: pc_id,
@@ -186,16 +219,14 @@ pub fn gm_pc_goto(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState
 
     // sP_FE2CL_REP_PC_GOTO_SUCC doesn't reset the clientside instance state,
     // but we need that to happen so we use the NPC warp packet instead
-    let resp = sP_FE2CL_REP_PC_WARP_USE_NPC_SUCC {
-        iX: new_pos.x,
-        iY: new_pos.y,
-        iZ: new_pos.z,
-        eIL: ItemLocation::end(),
-        iItemSlotNum: unused!(),
-        Item: unused!(),
-        iCandy: taros as i32,
-    };
-    client.send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp);
+    crate::helpers::send_warp_use_npc_succ(
+        client,
+        new_pos,
+        ItemLocation::end(),
+        unused!(),
+        None,
+        taros,
+    );
     Ok(())
 }
 
@@ -557,18 +588,16 @@ pub fn gm_target_pc_teleport(
     player.set_position(dest_pos);
     player.instance_id = dest_inst_id;
 
-    let resp = sP_FE2CL_REP_PC_WARP_USE_NPC_SUCC {
-        iX: dest_pos.x,
-        iY: dest_pos.y,
-        iZ: dest_pos.z,
-        eIL: ItemLocation::end(),
-        iItemSlotNum: unused!(),
-        Item: unused!(),
-        iCandy: player.get_taros() as i32,
-    };
-
+    let taros = player.get_taros();
     let client = player.get_client().unwrap();
-    client.send_packet(P_FE2CL_REP_PC_WARP_USE_NPC_SUCC, &resp);
+    crate::helpers::send_warp_use_npc_succ(
+        &client,
+        dest_pos,
+        ItemLocation::end(),
+        unused!(),
+        None,
+        taros,
+    );
 
     // see transport::helpers::do_warp to see why we use None for the chunk here
     state

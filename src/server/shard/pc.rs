@@ -162,9 +162,9 @@ pub async fn pc_enter(
     let resp_pkt = match protocol {
         FFProtocol::v0104 => Packet::new(
             P_FE2CL_REP_PC_ENTER_SUCC,
-            &sP_FE2CL_REP_PC_ENTER_SUCC {
+            &v0104::sP_FE2CL_REP_PC_ENTER_SUCC {
                 iID: pc_id,
-                PCLoadData2CL: player.get_load_data(),
+                PCLoadData2CL: player.get_load_data_104(),
                 uiSvrTime: svr_time,
             },
         )?,

@@ -12,7 +12,7 @@ use crate::{
     enums::*,
     error::*,
     helpers,
-    item::Item,
+    item::{Item, RewardItem},
     net::{
         packet::{PacketID::*, *},
         ClientMap, FFClient, FFProtocol,
@@ -39,39 +39,41 @@ pub fn item_move(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState)
     player.set_item(location_from, pkt.iFromSlotNum as usize, item_from)?;
     player.set_item(location_to, pkt.iToSlotNum as usize, item_to)?;
 
-    let resp = sP_FE2CL_PC_ITEM_MOVE_SUCC {
-        eFrom: pkt.eFrom,
-        iFromSlotNum: pkt.iFromSlotNum,
-        FromSlotItem: item_from.into_proto(),
-        eTo: pkt.eTo,
-        iToSlotNum: pkt.iToSlotNum,
-        ToSlotItem: item_to.into_proto(),
-    };
-
-    client.send_packet(P_FE2CL_PC_ITEM_MOVE_SUCC, &resp);
+    match config_get().general.protocol.get() {
+        FFProtocol::v0104 => client.send_packet(
+            P_FE2CL_PC_ITEM_MOVE_SUCC,
+            &v0104::sP_FE2CL_PC_ITEM_MOVE_SUCC {
+                eFrom: pkt.eFrom,
+                iFromSlotNum: pkt.iFromSlotNum,
+                FromSlotItem: item_from.into_proto(),
+                eTo: pkt.eTo,
+                iToSlotNum: pkt.iToSlotNum,
+                ToSlotItem: item_to.into_proto(),
+            },
+        ),
+        FFProtocol::v1013 => client.send_packet(
+            P_FE2CL_PC_ITEM_MOVE_SUCC,
+            &v1013::sP_FE2CL_PC_ITEM_MOVE_SUCC {
+                eFrom: pkt.eFrom,
+                iFromSlotNum: pkt.iFromSlotNum,
+                FromSlotItem: item_from.into_proto(),
+                eTo: pkt.eTo,
+                iToSlotNum: pkt.iToSlotNum,
+                ToSlotItem: item_to.into_proto(),
+            },
+        ),
+    }
 
     let entity_id = player.get_id();
     if location_from == ItemLocation::Equip {
         state.entity_map.for_each_around(entity_id, |c| {
-            let pkt = sP_FE2CL_PC_EQUIP_CHANGE {
-                iPC_ID: pc_id,
-                iEquipSlotNum: pkt.iFromSlotNum,
-                EquipSlotItem: item_to.into_proto(),
-            };
-
-            c.send_packet(P_FE2CL_PC_EQUIP_CHANGE, &pkt);
+            helpers::send_equip_change(c, pc_id, pkt.iFromSlotNum, item_to);
         });
     }
 
     if location_to == ItemLocation::Equip {
         state.entity_map.for_each_around(entity_id, |c| {
-            let pkt = sP_FE2CL_PC_EQUIP_CHANGE {
-                iPC_ID: pc_id,
-                iEquipSlotNum: pkt.iToSlotNum,
-                EquipSlotItem: item_from.into_proto(),
-            };
-
-            c.send_packet(P_FE2CL_PC_EQUIP_CHANGE, &pkt);
+            helpers::send_equip_change(c, pc_id, pkt.iToSlotNum, item_from);
         });
     }
 
@@ -219,17 +221,32 @@ pub fn item_combination(
                 .unwrap();
         }
 
-        let resp = sP_FE2CL_REP_PC_ITEM_COMBINATION_SUCC {
-            iNewItemSlot: pkt.iCostumeItemSlot,
-            sNewItem: Some(stats_item).into_proto(),
-            iStatItemSlot: pkt.iStatItemSlot,
-            iCashItemSlot1: pkt.iCashItemSlot1,
-            iCashItemSlot2: pkt.iCashItemSlot2,
-            iCandy: taros_left as i32,
-            iSuccessFlag: if succeeded { 1 } else { 0 },
-        };
-
-        client.send_packet(P_FE2CL_REP_PC_ITEM_COMBINATION_SUCC, &resp);
+        match config_get().general.protocol.get() {
+            FFProtocol::v0104 => client.send_packet(
+                P_FE2CL_REP_PC_ITEM_COMBINATION_SUCC,
+                &v0104::sP_FE2CL_REP_PC_ITEM_COMBINATION_SUCC {
+                    iNewItemSlot: pkt.iCostumeItemSlot,
+                    sNewItem: Some(stats_item).into_proto(),
+                    iStatItemSlot: pkt.iStatItemSlot,
+                    iCashItemSlot1: pkt.iCashItemSlot1,
+                    iCashItemSlot2: pkt.iCashItemSlot2,
+                    iCandy: taros_left as i32,
+                    iSuccessFlag: if succeeded { 1 } else { 0 },
+                },
+            ),
+            FFProtocol::v1013 => client.send_packet(
+                P_FE2CL_REP_PC_ITEM_COMBINATION_SUCC,
+                &v1013::sP_FE2CL_REP_PC_ITEM_COMBINATION_SUCC {
+                    iNewItemSlot: pkt.iCostumeItemSlot,
+                    sNewItem: Some(stats_item).into_proto(),
+                    iStatItemSlot: pkt.iStatItemSlot,
+                    iCashItemSlot1: pkt.iCashItemSlot1,
+                    iCashItemSlot2: pkt.iCashItemSlot2,
+                    iCandy: taros_left as i32,
+                    iSuccessFlag: if succeeded { 1 } else { 0 },
+                },
+            ),
+        }
         Ok(())
     })()
     .catch_fail(|| {
@@ -250,10 +267,19 @@ pub fn item_chest_open(
     client: &FFClient,
     state: &mut ShardServerState,
 ) -> FFResult<()> {
-    let pkt: &sP_CL2FE_REQ_ITEM_CHEST_OPEN = pkt.get()?;
+    let (location, slot_num) = match config_get().general.protocol.get() {
+        FFProtocol::v0104 => {
+            let pkt: &v0104::sP_CL2FE_REQ_ITEM_CHEST_OPEN = pkt.get()?;
+            (pkt.eIL, pkt.iSlotNum)
+        }
+        FFProtocol::v1013 => {
+            let pkt: &v1013::sP_CL2FE_REQ_ITEM_CHEST_OPEN = pkt.get()?;
+            (pkt.eIL, pkt.iSlotNum)
+        }
+    };
     (|| {
         let player = state.get_player_mut(client.get_player_id()?)?;
-        let location: ItemLocation = pkt.eIL.try_into()?;
+        let location: ItemLocation = location.try_into()?;
         if location != ItemLocation::Inven {
             return Err(FFError::build(
                 Severity::Warning,
@@ -262,10 +288,10 @@ pub fn item_chest_open(
         }
 
         let chest = player
-            .set_item(location, pkt.iSlotNum as usize, None)?
+            .set_item(location, slot_num as usize, None)?
             .ok_or(FFError::build(
                 Severity::Warning,
-                format!("C.R.A.T.E. in empty slot: {}", pkt.iSlotNum),
+                format!("C.R.A.T.E. in empty slot: {}", slot_num),
             ))?;
 
         if chest.ty != ItemType::Chest {
@@ -285,10 +311,10 @@ pub fn item_chest_open(
                 util::get_random_gumball()
             });
 
-        player.set_item(location, pkt.iSlotNum as usize, Some(reward_item))?;
+        player.set_item(location, slot_num as usize, Some(reward_item))?;
 
-        let reward_pkt = PacketBuilder::new(P_FE2CL_REP_REWARD_ITEM)
-            .with(&sP_FE2CL_REP_REWARD_ITEM {
+        let mut reward_pkt =
+            PacketBuilder::new(P_FE2CL_REP_REWARD_ITEM).with(&sP_FE2CL_REP_REWARD_ITEM {
                 m_iCandy: player.get_taros() as i32,
                 m_iFusionMatter: player.get_fusion_matter() as i32,
                 m_iBatteryN: player.get_nano_potions() as i32,
@@ -298,26 +324,26 @@ pub fn item_chest_open(
                 iFatigue_Level: 1,
                 iNPC_TypeID: unused!(),
                 iTaskID: unused!(),
-            })
-            .with(&sItemReward {
-                sItem: Some(reward_item).into_proto(),
-                eIL: location as i32,
-                iSlotNum: pkt.iSlotNum,
-            })
-            .build()?;
+            });
+        helpers::push_item_reward(
+            &mut reward_pkt,
+            RewardItem::Normal {
+                item: reward_item,
+                slot_num: slot_num as usize,
+            },
+        );
+        let reward_pkt = reward_pkt.build()?;
 
         client.send_payload(reward_pkt);
 
-        let resp = sP_FE2CL_REP_ITEM_CHEST_OPEN_SUCC {
-            iSlotNum: pkt.iSlotNum,
-        };
+        let resp = sP_FE2CL_REP_ITEM_CHEST_OPEN_SUCC { iSlotNum: slot_num };
 
         client.send_packet(P_FE2CL_REP_ITEM_CHEST_OPEN_SUCC, &resp);
         Ok(())
     })()
     .catch_fail(|| {
         let resp = sP_FE2CL_REP_ITEM_CHEST_OPEN_FAIL {
-            iSlotNum: pkt.iSlotNum,
+            iSlotNum: slot_num,
             iErrorCode: unused!(),
         };
         client.send_packet(P_FE2CL_REP_ITEM_CHEST_OPEN_FAIL, &resp);
@@ -353,7 +379,7 @@ pub fn vendor_table_update(pkt: Packet, client: &FFClient) -> FFResult<()> {
 
         match config_get().general.protocol.get() {
             FFProtocol::v0104 => {
-                let resp = sP_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_SUCC {
+                let resp = v0104::sP_FE2CL_REP_PC_VENDOR_TABLE_UPDATE_SUCC {
                     item: vendor_data.as_arr_104()?,
                 };
 
@@ -386,13 +412,23 @@ pub fn vendor_item_buy(
     time: SystemTime,
 ) -> FFResult<()> {
     (|| {
-        let pkt: &sP_CL2FE_REQ_PC_VENDOR_ITEM_BUY = pkt.get()?;
+        let (npc_id, vendor_id, item_bought, inven_slot_num) =
+            match config_get().general.protocol.get() {
+                FFProtocol::v0104 => {
+                    let pkt: &v0104::sP_CL2FE_REQ_PC_VENDOR_ITEM_BUY = pkt.get()?;
+                    let item: Option<Item> = pkt.Item.try_into_proto()?;
+                    (pkt.iNPC_ID, pkt.iVendorID, item, pkt.iInvenSlotNum)
+                }
+                FFProtocol::v1013 => {
+                    let pkt: &v1013::sP_CL2FE_REQ_PC_VENDOR_ITEM_BUY = pkt.get()?;
+                    let item: Option<Item> = pkt.Item.try_into_proto()?;
+                    (pkt.iNPC_ID, pkt.iVendorID, item, pkt.iInvenSlotNum)
+                }
+            };
 
-        validate_vendor(client, state, pkt.iNPC_ID, pkt.iVendorID)?;
+        validate_vendor(client, state, npc_id, vendor_id)?;
 
-        // sanitize the item
-        let item: Option<Item> = pkt.Item.try_into_proto()?;
-        let mut item = item.ok_or(FFError::build(
+        let mut item = item_bought.ok_or(FFError::build(
             Severity::Warning,
             "Tried to buy nothing".to_string(),
         ))?;
@@ -405,13 +441,13 @@ pub fn vendor_item_buy(
             item.set_expiry_time(expires);
         }
 
-        let vendor_data = tdata_get().get_vendor_data(pkt.iVendorID)?;
+        let vendor_data = tdata_get().get_vendor_data(vendor_id)?;
         if !vendor_data.has_item(item.id, item.ty) {
             return Err(FFError::build(
                 Severity::Warning,
                 format!(
                     "Vendor {} doesn't sell item ({}, {:?})",
-                    pkt.iVendorID, item.id, item.ty
+                    vendor_id, item.id, item.ty
                 ),
             ));
         }
@@ -429,16 +465,27 @@ pub fn vendor_item_buy(
                 ),
             ))
         } else {
-            player.set_item(ItemLocation::Inven, pkt.iInvenSlotNum as usize, Some(item))?;
+            player.set_item(ItemLocation::Inven, inven_slot_num as usize, Some(item))?;
             player.set_taros(player.get_taros() - price);
 
-            let resp = sP_FE2CL_REP_PC_VENDOR_ITEM_BUY_SUCC {
-                iCandy: player.get_taros() as i32,
-                iInvenSlotNum: pkt.iInvenSlotNum,
-                Item: Some(item).into_proto(),
-            };
-
-            client.send_packet(P_FE2CL_REP_PC_VENDOR_ITEM_BUY_SUCC, &resp);
+            match config_get().general.protocol.get() {
+                FFProtocol::v0104 => client.send_packet(
+                    P_FE2CL_REP_PC_VENDOR_ITEM_BUY_SUCC,
+                    &v0104::sP_FE2CL_REP_PC_VENDOR_ITEM_BUY_SUCC {
+                        iCandy: player.get_taros() as i32,
+                        iInvenSlotNum: inven_slot_num,
+                        Item: Some(item).into_proto(),
+                    },
+                ),
+                FFProtocol::v1013 => client.send_packet(
+                    P_FE2CL_REP_PC_VENDOR_ITEM_BUY_SUCC,
+                    &v1013::sP_FE2CL_REP_PC_VENDOR_ITEM_BUY_SUCC {
+                        iCandy: player.get_taros() as i32,
+                        iInvenSlotNum: inven_slot_num,
+                        Item: Some(item).into_proto(),
+                    },
+                ),
+            }
             Ok(())
         }
     })()
@@ -492,14 +539,26 @@ pub fn vendor_item_sell(
         let buyback_list = state.buyback_lists.entry(pc_id).or_default();
         buyback_list.push(item.unwrap());
 
-        let resp = sP_FE2CL_REP_PC_VENDOR_ITEM_SELL_SUCC {
-            iCandy: new_taros as i32,
-            iInvenSlotNum: pkt.iInvenSlotNum,
-            Item: item.into_proto(),
-            ItemStay: remaining_item.into_proto(),
-        };
-
-        client.send_packet(P_FE2CL_REP_PC_VENDOR_ITEM_SELL_SUCC, &resp);
+        match config_get().general.protocol.get() {
+            FFProtocol::v0104 => client.send_packet(
+                P_FE2CL_REP_PC_VENDOR_ITEM_SELL_SUCC,
+                &v0104::sP_FE2CL_REP_PC_VENDOR_ITEM_SELL_SUCC {
+                    iCandy: new_taros as i32,
+                    iInvenSlotNum: pkt.iInvenSlotNum,
+                    Item: item.into_proto(),
+                    ItemStay: remaining_item.into_proto(),
+                },
+            ),
+            FFProtocol::v1013 => client.send_packet(
+                P_FE2CL_REP_PC_VENDOR_ITEM_SELL_SUCC,
+                &v1013::sP_FE2CL_REP_PC_VENDOR_ITEM_SELL_SUCC {
+                    iCandy: new_taros as i32,
+                    iInvenSlotNum: pkt.iInvenSlotNum,
+                    Item: item.into_proto(),
+                    ItemStay: remaining_item.into_proto(),
+                },
+            ),
+        }
         Ok(())
     })()
     .catch_fail(|| {
@@ -518,13 +577,24 @@ pub fn vendor_item_restore_buy(
 ) -> FFResult<()> {
     (|| {
         let pc_id = client.get_player_id()?;
-        let pkt: &sP_CL2FE_REQ_PC_VENDOR_ITEM_RESTORE_BUY = pkt.get()?;
-        validate_vendor(client, state, pkt.iNPC_ID, pkt.iVendorID)?;
+        let (npc_id, vendor_id, item_requested, inven_slot_num) =
+            match config_get().general.protocol.get() {
+                FFProtocol::v0104 => {
+                    let pkt: &v0104::sP_CL2FE_REQ_PC_VENDOR_ITEM_RESTORE_BUY = pkt.get()?;
+                    let item: Option<Item> = pkt.Item.try_into_proto()?;
+                    (pkt.iNPC_ID, pkt.iVendorID, item, pkt.iInvenSlotNum)
+                }
+                FFProtocol::v1013 => {
+                    let pkt: &v1013::sP_CL2FE_REQ_PC_VENDOR_ITEM_RESTORE_BUY = pkt.get()?;
+                    let item: Option<Item> = pkt.Item.try_into_proto()?;
+                    (pkt.iNPC_ID, pkt.iVendorID, item, pkt.iInvenSlotNum)
+                }
+            };
+        validate_vendor(client, state, npc_id, vendor_id)?;
 
-        let item: Option<Item> = pkt.Item.try_into_proto()?;
-        let item: Item = item.ok_or(FFError::build(
+        let item: Item = item_requested.ok_or(FFError::build(
             Severity::Warning,
-            format!("Bad item for buyback {:?}", pkt.Item),
+            "Bad item for buyback".to_string(),
         ))?;
         let buyback_list = state.buyback_lists.get_mut(&pc_id).ok_or(FFError::build(
             Severity::Warning,
@@ -560,16 +630,27 @@ pub fn vendor_item_restore_buy(
                 ),
             ))
         } else {
-            player.set_item(ItemLocation::Inven, pkt.iInvenSlotNum as usize, Some(item))?;
+            player.set_item(ItemLocation::Inven, inven_slot_num as usize, Some(item))?;
             let new_taros = player.set_taros(player.get_taros() - cost);
 
-            let resp = sP_FE2CL_REP_PC_VENDOR_ITEM_RESTORE_BUY_SUCC {
-                iCandy: new_taros as i32,
-                iInvenSlotNum: pkt.iInvenSlotNum,
-                Item: Some(item).into_proto(),
-            };
-
-            client.send_packet(P_FE2CL_REP_PC_VENDOR_ITEM_RESTORE_BUY_SUCC, &resp);
+            match config_get().general.protocol.get() {
+                FFProtocol::v0104 => client.send_packet(
+                    P_FE2CL_REP_PC_VENDOR_ITEM_RESTORE_BUY_SUCC,
+                    &v0104::sP_FE2CL_REP_PC_VENDOR_ITEM_RESTORE_BUY_SUCC {
+                        iCandy: new_taros as i32,
+                        iInvenSlotNum: inven_slot_num,
+                        Item: Some(item).into_proto(),
+                    },
+                ),
+                FFProtocol::v1013 => client.send_packet(
+                    P_FE2CL_REP_PC_VENDOR_ITEM_RESTORE_BUY_SUCC,
+                    &v1013::sP_FE2CL_REP_PC_VENDOR_ITEM_RESTORE_BUY_SUCC {
+                        iCandy: new_taros as i32,
+                        iInvenSlotNum: inven_slot_num,
+                        Item: Some(item).into_proto(),
+                    },
+                ),
+            }
             Ok(())
         }
     })()
@@ -591,11 +672,20 @@ pub fn vendor_battery_buy(
     const BATTERY_TYPE_POTION: i16 = 4;
 
     (|| {
-        let pkt: &sP_CL2FE_REQ_PC_VENDOR_BATTERY_BUY = pkt.get()?;
-        validate_vendor(client, state, pkt.iNPC_ID, pkt.iVendorID)?;
+        let (npc_id, vendor_id, battery_type, battery_count) =
+            match config_get().general.protocol.get() {
+                FFProtocol::v0104 => {
+                    let pkt: &v0104::sP_CL2FE_REQ_PC_VENDOR_BATTERY_BUY = pkt.get()?;
+                    (pkt.iNPC_ID, pkt.iVendorID, pkt.Item.iID, pkt.Item.iOpt)
+                }
+                FFProtocol::v1013 => {
+                    let pkt: &v1013::sP_CL2FE_REQ_PC_VENDOR_BATTERY_BUY = pkt.get()?;
+                    (pkt.iNPC_ID, pkt.iVendorID, pkt.Item.iID, pkt.Item.iOpt)
+                }
+            };
+        validate_vendor(client, state, npc_id, vendor_id)?;
 
-        let battery_type = pkt.Item.iID;
-        let mut quantity = pkt.Item.iOpt as u32 * 100;
+        let mut quantity = battery_count as u32 * 100;
 
         let player = state.get_player_mut(client.get_player_id()?)?;
         match battery_type {

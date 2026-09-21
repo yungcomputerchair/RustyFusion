@@ -16,7 +16,7 @@ use crate::{
     },
     error::{codes, log, log_if_failed, FFError, FFResult, Severity},
     helpers,
-    item::Item,
+    item::{Item, RewardItem},
     mission::{MissionJournal, Task, TaskDefinition},
     nano::Nano,
     net::{
@@ -24,7 +24,7 @@ use crate::{
             PacketID::{self, *},
             *,
         },
-        FFClient,
+        FFClient, FFProtocol,
     },
     path::Path,
     skills::{BuffContainer, BuffInstance},
@@ -200,21 +200,9 @@ impl Default for PlayerInventory {
     }
 }
 impl PlayerInventory {
-    fn get_equip_arr<const N: usize>(&self) -> [sItemBase; N] {
-        std::array::from_fn(|i| self.equipped.get(i).copied().flatten().into_proto())
-    }
-
-    fn get_equip_arr_1013<const N: usize>(&self) -> [v1013::sItemBase; N] {
-        std::array::from_fn(|i| self.equipped.get(i).copied().flatten().into_proto())
-    }
-
-    fn get_main_arr_1013(&self) -> [v1013::sItemBase; SIZEOF_INVEN_SLOT as usize] {
-        self.main.map(Option::<Item>::into_proto)
-    }
-
-    fn get_quest_item_arr(&self) -> [sItemBase; SIZEOF_QINVEN_SLOT as usize] {
+    fn get_quest_item_arr_104(&self) -> [v0104::sItemBase; SIZEOF_QINVEN_SLOT as usize] {
         self.quest.map(|vals| {
-            let mut item_raw = sItemBase::default();
+            let mut item_raw = v0104::sItemBase::default();
             if let Some((id, count)) = vals {
                 item_raw.iType = ItemType::Quest as i16;
                 item_raw.iID = id;
@@ -691,8 +679,8 @@ impl Player {
         self.nano_data.nano_inventory.values()
     }
 
-    pub fn get_load_data(&self) -> sPCLoadData2CL {
-        sPCLoadData2CL {
+    pub fn get_load_data_104(&self) -> v0104::sPCLoadData2CL {
+        v0104::sPCLoadData2CL {
             iUserLevel: 0, // allow anyone to send GM commands; we'll validate perms
             PCStyle: self.get_style(),
             PCStyle2: self.get_style_2(),
@@ -710,9 +698,9 @@ impl Player {
             iY: self.position.y,
             iZ: self.position.z,
             iAngle: self.rotation,
-            aEquip: self.inventory.get_equip_arr(),
+            aEquip: self.get_equip_arr_104(),
             aInven: self.inventory.main.map(Option::<Item>::into_proto),
-            aQInven: self.inventory.get_quest_item_arr(),
+            aQInven: self.inventory.get_quest_item_arr_104(),
             aNanoBank: self.nano_data.as_bank(),
             aNanoSlots: self.nano_data.as_slots(),
             iActiveNanoSlotNum: match self.nano_data.active_slot {
@@ -721,7 +709,7 @@ impl Player {
             },
             iConditionBitFlag: self.get_condition_bit_flag(),
             eCSTB___Add: placeholder!(0),
-            TimeBuff: sTimeBuff {
+            TimeBuff: v0104::sTimeBuff {
                 iTimeLimit: placeholder!(0),
                 iTimeDuration: placeholder!(0),
                 iTimeRepeat: placeholder!(0),
@@ -769,8 +757,8 @@ impl Player {
             iY: self.position.y,
             iZ: self.position.z,
             iAngle: self.rotation,
-            aEquip: self.inventory.get_equip_arr_1013(),
-            aInven: self.inventory.get_main_arr_1013(),
+            aEquip: self.get_equip_arr_1013(),
+            aInven: self.inventory.main.map(Option::<Item>::into_proto),
             aQInven: self.inventory.get_quest_item_arr_1013(),
             aNanoBank: self.nano_data.as_bank(),
             aNanoSlots: self.nano_data.as_slots(),
@@ -892,8 +880,8 @@ impl Player {
         flags as i8
     }
 
-    pub fn get_appearance_data(&self) -> sPCAppearanceData {
-        sPCAppearanceData {
+    pub fn get_appearance_data_104(&self) -> v0104::sPCAppearanceData {
+        v0104::sPCAppearanceData {
             iID: self.id.unwrap_or_default(),
             PCStyle: self.get_style(),
             iConditionBitFlag: self.get_condition_bit_flag(),
@@ -906,7 +894,27 @@ impl Player {
             iY: self.position.y,
             iZ: self.position.z,
             iAngle: self.rotation,
-            ItemEquip: self.inventory.get_equip_arr(),
+            ItemEquip: self.get_equip_arr_104(),
+            Nano: self.get_active_nano().into_proto(),
+            eRT: unused!(),
+        }
+    }
+
+    pub fn get_appearance_data_1013(&self) -> v1013::sPCAppearanceData {
+        v1013::sPCAppearanceData {
+            iID: self.id.unwrap_or_default(),
+            PCStyle: self.get_style(),
+            iConditionBitFlag: self.get_condition_bit_flag(),
+            iPCState: self.get_state_bit_flag(),
+            iSpecialState: self.get_special_state_bit_flag(),
+            iLv: self.level,
+            iHP: self.hp,
+            iMapNum: self.get_mapnum() as i32,
+            iX: self.position.x,
+            iY: self.position.y,
+            iZ: self.position.z,
+            iAngle: self.rotation,
+            ItemEquip: self.get_equip_arr_1013(),
             Nano: self.get_active_nano().into_proto(),
             eRT: unused!(),
         }
@@ -1162,12 +1170,26 @@ impl Player {
         &self.inventory.equipped
     }
 
-    pub fn get_equip_arr<const N: usize>(&self) -> [sItemBase; N] {
-        self.inventory.get_equip_arr()
+    pub fn get_equip_arr_104<const N: usize>(&self) -> [v0104::sItemBase; N] {
+        std::array::from_fn(|i| {
+            self.inventory
+                .equipped
+                .get(i)
+                .copied()
+                .flatten()
+                .into_proto()
+        })
     }
 
     pub fn get_equip_arr_1013<const N: usize>(&self) -> [v1013::sItemBase; N] {
-        self.inventory.get_equip_arr_1013()
+        std::array::from_fn(|i| {
+            self.inventory
+                .equipped
+                .get(i)
+                .copied()
+                .flatten()
+                .into_proto()
+        })
     }
 
     pub fn get_taros(&self) -> u32 {
@@ -1633,17 +1655,12 @@ impl Player {
                         let curr_count = player.get_quest_item_count(*qitem_id) as isize;
                         let new_count = (curr_count + *qitem_count_mod) as usize;
                         let qitem_slot = player.set_quest_item_count(*qitem_id, new_count).unwrap();
-                        let qitem_reward = sItemReward {
-                            sItem: sItemBase {
-                                iType: ItemType::Quest as i16,
-                                iID: *qitem_id,
-                                iOpt: new_count as i32,
-                                iTimeLimit: unused!(),
-                            },
-                            eIL: ItemLocation::QInven as i32,
-                            iSlotNum: qitem_slot as i32,
+                        let qitem_reward = RewardItem::Quest {
+                            id: *qitem_id,
+                            count: new_count,
+                            slot_num: qitem_slot,
                         };
-                        pkt.push(&qitem_reward);
+                        helpers::push_item_reward(&mut pkt, qitem_reward);
                     }
 
                     if let Some(pkt) = log_if_failed(pkt.build()) {
@@ -1693,16 +1710,14 @@ impl Player {
                     .set_quest_item_count(repair_qitem_id, qitem_amt)
                     .unwrap(); // no-op
 
-                reward_pkt.push(&sItemReward {
-                    sItem: sItemBase {
-                        iType: ItemType::Quest as i16,
-                        iID: repair_qitem_id,
-                        iOpt: qitem_amt as i32,
-                        iTimeLimit: unused!(),
+                helpers::push_item_reward(
+                    &mut reward_pkt,
+                    RewardItem::Quest {
+                        id: repair_qitem_id,
+                        count: qitem_amt,
+                        slot_num: qitem_slot,
                     },
-                    eIL: ItemLocation::QInven as i32,
-                    iSlotNum: qitem_slot as i32,
-                });
+                );
 
                 if let Some(reward_pkt) = log_if_failed(reward_pkt.build()) {
                     client.send_payload(reward_pkt);
@@ -1784,7 +1799,7 @@ impl Player {
         let condition_bit_flag = player.buffs.get_bit_flags();
         if let Some(client) = player.get_client() {
             for update in buff_updates {
-                let mut pkt: sP_FE2CL_PC_BUFF_UPDATE = update.into();
+                let mut pkt: v0104::sP_FE2CL_PC_BUFF_UPDATE = update.into();
                 pkt.iConditionBitFlag = condition_bit_flag;
                 client.send_packet(P_FE2CL_PC_BUFF_UPDATE, &pkt);
             }
@@ -2000,10 +2015,20 @@ impl Entity for Player {
     }
 
     fn send_enter(&self, client: &FFClient) {
-        let pkt = sP_FE2CL_PC_NEW {
-            PCAppearanceData: self.get_appearance_data(),
-        };
-        client.send_packet(PacketID::P_FE2CL_PC_NEW, &pkt);
+        match config_get().general.protocol.get() {
+            FFProtocol::v0104 => {
+                let pkt = v0104::sP_FE2CL_PC_NEW {
+                    PCAppearanceData: self.get_appearance_data_104(),
+                };
+                client.send_packet(PacketID::P_FE2CL_PC_NEW, &pkt);
+            }
+            FFProtocol::v1013 => {
+                let pkt = v1013::sP_FE2CL_PC_NEW {
+                    PCAppearanceData: self.get_appearance_data_1013(),
+                };
+                client.send_packet(PacketID::P_FE2CL_PC_NEW, &pkt);
+            }
+        }
     }
 
     fn send_exit(&self, client: &FFClient) {
