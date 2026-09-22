@@ -112,7 +112,7 @@ pub fn config_init() -> FFResult<&'static Config> {
         Err(e) => {
             log(
                 Severity::Warning,
-                &format!("Failed to parse config overrides: {}", e),
+                &format!("Failed to parse config overrides: {}", e.get_msg()),
             );
         }
     }
@@ -153,6 +153,11 @@ impl SettingDefault<FFProtocol> for &str {
     fn setting_default(self) -> FFProtocol {
         let deserializer = serde::de::value::StrDeserializer::<serde::de::value::Error>::new(self);
         FFProtocol::deserialize(deserializer).expect("Invalid default FFProtocol")
+    }
+}
+impl<const N: usize> SettingDefault<Vec<String>> for [&str; N] {
+    fn setting_default(self) -> Vec<String> {
+        self.iter().map(|s| s.to_string()).collect()
     }
 }
 

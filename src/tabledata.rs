@@ -43,7 +43,12 @@ struct XDTData {
 }
 impl XDTData {
     fn load() -> Result<Self, String> {
-        let root = load_json("xdt.json")?;
+        let protocol = config_get().general.protocol.get();
+        let root = load_json(match protocol {
+            FFProtocol::v0104 => "xdt.json",
+            FFProtocol::v1013 => "xdt1013.json",
+        })?;
+
         Ok(Self {
             vendor_data: load_vendor_data(&root)
                 .map_err(|e| format!("Error loading vendor data: {}", e))?,
@@ -924,19 +929,94 @@ pub fn tdata_get() -> &'static TableData {
 }
 
 fn load_json(filename: &str) -> Result<Map<String, Value>, String> {
-    let tdata_path = config_get().general.table_data_path.get();
+    let config = &config_get().general;
+    let tdata_path = config.table_data_path.get();
     let path = std::path::Path::new(&tdata_path).join(filename);
 
     let file = std::fs::read_to_string(path.clone())
         .map_err(|e| format!("Couldn't read file {:?}: {}", path, e))?;
-    let json = serde_json::from_str(&file)
+    let mut json = serde_json::from_str(&file)
         .map_err(|e| format!("Couldn't parse {:?} as JSON: {}", path, e))?;
+
+    let mut patches = match config.protocol.get() {
+        FFProtocol::v0104 => vec!["0104-fixes"],
+        FFProtocol::v1013 => vec!["1013", "1013-fixes"],
+    }
+    .into_iter()
+    .map(|s| s.to_string())
+    .collect::<Vec<String>>();
+
+    patches.extend(config.enabled_patches.get());
+
+    for patch in &patches {
+        let patch_path = std::path::Path::new(&tdata_path)
+            .join("patch/")
+            .join(patch)
+            .join(filename);
+
+        if let Ok(file) = std::fs::read_to_string(&patch_path) {
+            if let Ok(patch_json) = serde_json::from_str(&file) {
+                if let Err(e) = apply_patch(&mut json, patch_json) {
+                    return Err(format!("Failed to apply patch {:?}: {}", patch_path, e));
+                } else {
+                    log(
+                        Severity::Info,
+                        &format!("Applied tabledata patch {} to {}", patch, filename),
+                    );
+                }
+            }
+        }
+    }
 
     let Value::Object(root) = json else {
         return Err(format!("Malformed {:?}", path));
     };
-    // TODO patching
+
     Ok(root)
+}
+
+fn apply_patch(root: &mut Value, patch: Value) -> Result<(), String> {
+    match (root, patch) {
+        (Value::Bool(root_bool), Value::Bool(patch_bool)) => {
+            *root_bool = patch_bool;
+        }
+        (Value::String(root_str), Value::String(patch_str)) => {
+            *root_str = patch_str;
+        }
+        (Value::Number(root_num), Value::Number(patch_num)) => {
+            let types_match = (root_num.is_i64() && patch_num.is_i64())
+                || (root_num.is_u64() && patch_num.is_u64())
+                || (root_num.is_f64() && patch_num.is_f64());
+
+            if !types_match {
+                return Err("Number types do not match".to_string());
+            }
+
+            *root_num = patch_num;
+        }
+        (Value::Array(root_arr), Value::Array(patch_arr)) => {
+            root_arr.extend(patch_arr);
+        }
+        (Value::Object(root_obj), Value::Object(patch_obj)) => {
+            for (k, v) in patch_obj {
+                if let Some(key) = k.strip_prefix('!') {
+                    // Forced replacement
+                    root_obj.insert(key.to_string(), v);
+                } else if let Value::Null = v {
+                    // Removal
+                    root_obj.remove(&k);
+                } else if let Some(existing) = root_obj.get_mut(&k) {
+                    // Recursive patch application
+                    apply_patch(existing, v)?;
+                } else {
+                    // New key-value pair
+                    root_obj.insert(k, v);
+                }
+            }
+        }
+        _ => return Err("Invalid patch".to_string()),
+    }
+    Ok(())
 }
 
 fn get_object<'a>(
