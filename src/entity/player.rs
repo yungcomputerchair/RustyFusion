@@ -1276,7 +1276,7 @@ impl Player {
     }
 
     pub fn is_future_done(&self) -> bool {
-        self.flags.payzone_flag
+        self.get_payzone_flag()
     }
 
     pub fn set_taros(&mut self, taros: u32) -> u32 {
@@ -1323,6 +1323,11 @@ impl Player {
             if self.fusion_matter >= level_up_fusion_matter {
                 match config_get().general.protocol.get() {
                     FFProtocol::v0104 => {
+                        // Blossom's nano mission is withheld until the player reaches the Past
+                        if self.level >= 4 && !self.is_future_done() {
+                            return self.fusion_matter;
+                        }
+
                         if !self.mission_journal.has_nano_mission() {
                             let Ok(level_up_task_def) =
                                 tdata_get().get_task_definition(level_up_task_id)
