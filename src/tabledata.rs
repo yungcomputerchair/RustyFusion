@@ -314,6 +314,7 @@ struct DropData {
     rarity_weights: HashMap<i32, RarityWeights>,
     item_sets: HashMap<i32, ItemSet>,
     item_refs: HashMap<i32, ItemReference>,
+    nano_capsules: HashMap<i16, i16>,
 }
 
 struct PathData {
@@ -596,6 +597,10 @@ impl TableData {
             eggs.push(egg);
         }
         eggs
+    }
+
+    pub fn get_nano_from_capsule(&self, crate_id: i16) -> Option<i16> {
+        self.drop_data.nano_capsules.get(&crate_id).copied()
     }
 
     pub fn get_item_from_crate(&self, crate_id: i16, gender: i32) -> FFResult<Item> {
@@ -2172,6 +2177,7 @@ fn load_drop_data() -> Result<DropData, String> {
     const RARITY_WEIGHTS_TABLE_KEY: &str = "RarityWeights";
     const ITEM_SETS_TABLE_KEY: &str = "ItemSets";
     const ITEM_REFERENCES_TABLE_KEY: &str = "ItemReferences";
+    const NANO_CAPSULES_TABLE_KEY: &str = "NanoCapsules";
 
     const CRATE_DROP_CHANCES_ID_KEY: &str = "CrateDropChanceID";
     const CRATE_DROP_TYPES_ID_KEY: &str = "CrateDropTypeID";
@@ -2183,6 +2189,22 @@ fn load_drop_data() -> Result<DropData, String> {
     const RARITY_WEIGHTS_ID_KEY: &str = "RarityWeightID";
     const ITEM_SETS_ID_KEY: &str = "ItemSetID";
     const ITEM_REFERENCES_ID_KEY: &str = "ItemReferenceID";
+
+    fn load_nano_capsules(table: &Map<String, Value>) -> Result<HashMap<i16, i16>, String> {
+        #[derive(Deserialize)]
+        struct NanoCapsuleEntry {
+            CrateID: i16,
+            Nano: i16,
+        }
+
+        let mut capsules = HashMap::new();
+        for (_, v) in table {
+            let entry: NanoCapsuleEntry = serde_json::from_value(v.clone())
+                .map_err(|e| format!("Malformed nano capsule entry: {}", e))?;
+            capsules.insert(entry.CrateID, entry.Nano);
+        }
+        Ok(capsules)
+    }
 
     fn load_drop_table<T: DeserializeOwned>(
         table: &Map<String, Value>,
@@ -2218,6 +2240,12 @@ fn load_drop_data() -> Result<DropData, String> {
     let item_sets_table = get_object(&drop_root, ITEM_SETS_TABLE_KEY)?;
     let item_references_table = get_object(&drop_root, ITEM_REFERENCES_TABLE_KEY)?;
 
+    // only Academy tabledata defines nano capsules
+    let nano_capsules = match drop_root.get(NANO_CAPSULES_TABLE_KEY) {
+        Some(Value::Object(table)) => load_nano_capsules(table)?,
+        _ => HashMap::new(),
+    };
+
     Ok(DropData {
         crate_drop_chances: load_drop_table(crate_drop_chances_table, CRATE_DROP_CHANCES_ID_KEY)?,
         crate_drop_types: load_drop_table(crate_drop_types_table, CRATE_DROP_TYPES_ID_KEY)?,
@@ -2232,6 +2260,7 @@ fn load_drop_data() -> Result<DropData, String> {
         rarity_weights: load_drop_table(rarity_weights_table, RARITY_WEIGHTS_ID_KEY)?,
         item_sets: load_drop_table(item_sets_table, ITEM_SETS_ID_KEY)?,
         item_refs: load_drop_table(item_references_table, ITEM_REFERENCES_ID_KEY)?,
+        nano_capsules,
     })
 }
 

@@ -539,7 +539,7 @@ pub fn task_end(pkt: Packet, clients: &ClientMap, state: &mut ShardServerState) 
                         helpers::push_item_reward(
                             &mut reward_pkt,
                             RewardItem::Normal {
-                                item: item_reward,
+                                item: Some(item_reward),
                                 slot_num,
                             },
                         );

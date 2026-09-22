@@ -14,6 +14,7 @@ use crate::{
     defines::EXIT_CODE_REQ_BY_SVR,
     entity::{Entity as _, Player},
     error::*,
+    helpers::send_announcement,
     net::{
         packet::{PacketID::*, *},
         ClientMap, ClientType, FFClient, FFServer,
@@ -387,20 +388,17 @@ pub fn shutdown_notify_clients(clients: &ClientMap, state: &ShardServerState) {
 
         // We trick the client into attempting to reconnect to this same shard.
         // The login server will attempt to reconnect them for a short amount of time.
-        let alert_pkt = sP_FE2CL_ANNOUNCE_MSG {
-            iAnnounceType: unused!(),
-            iDuringTime: 5,
-            szAnnounceMsg: util::encode_utf16(
-                "Lost connection to shard server.\nAttemping to reconnect...",
-            )
-            .unwrap(),
-        };
-
-        client.send_packet(P_FE2CL_ANNOUNCE_MSG, &alert_pkt);
+        send_announcement(
+            client,
+            "Lost connection to shard server.\nAttemping to reconnect...",
+            Some(5),
+        )
+        .unwrap();
 
         let Ok(player) = state.get_player(pc_id) else {
             continue;
         };
+
         let channel_num = if player.instance_id.channel_num > 1 {
             Some(player.instance_id.channel_num as i32)
         } else {

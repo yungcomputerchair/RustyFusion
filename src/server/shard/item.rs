@@ -301,6 +301,10 @@ pub fn item_chest_open(
             ));
         }
 
+        if let Some(nano_id) = tdata_get().get_nano_from_capsule(chest.id) {
+            return helpers::open_nano_capsule(client, player, nano_id, slot_num);
+        }
+
         let reward_item = tdata_get()
             .get_item_from_crate(chest.id, player.get_style().iGender as i32)
             .unwrap_or_else(|e| {
@@ -328,7 +332,7 @@ pub fn item_chest_open(
         helpers::push_item_reward(
             &mut reward_pkt,
             RewardItem::Normal {
-                item: reward_item,
+                item: Some(reward_item),
                 slot_num: slot_num as usize,
             },
         );

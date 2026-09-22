@@ -804,7 +804,7 @@ pub fn gm_npc_unsummon(
 }
 
 mod helpers {
-    use crate::ai;
+    use crate::{ai, helpers::send_announcement};
 
     use super::*;
 
@@ -829,12 +829,7 @@ mod helpers {
 
     pub fn send_search_fail(client: &FFClient, query: PlayerSearchQuery) -> FFError {
         let err_msg = format!("Player not found: {:?}", query);
-        let pkt = sP_FE2CL_ANNOUNCE_MSG {
-            iAnnounceType: unused!(),
-            iDuringTime: MSG_BOX_DURATION_DEFAULT,
-            szAnnounceMsg: util::encode_utf16(&err_msg).unwrap(),
-        };
-        client.send_packet(P_FE2CL_ANNOUNCE_MSG, &pkt);
+        log_if_failed(send_announcement(client, &err_msg, None));
         FFError::build(Severity::Warning, err_msg)
     }
 

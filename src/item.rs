@@ -98,7 +98,7 @@ impl Item {
 #[derive(Debug, Copy, Clone)]
 pub enum RewardItem {
     Normal {
-        item: Item,
+        item: Option<Item>,
         slot_num: usize,
     },
     Quest {
@@ -125,7 +125,7 @@ impl FromProto<RewardItem> for v0104::sItemReward {
     fn from_proto(reward: RewardItem) -> Self {
         Self {
             sItem: match reward {
-                RewardItem::Normal { item, .. } => Some(item).into_proto(),
+                RewardItem::Normal { item, .. } => item.into_proto(),
                 RewardItem::Quest { id, count, .. } => v0104::sItemBase {
                     iType: ItemType::Quest as i16,
                     iID: id,
@@ -142,7 +142,7 @@ impl FromProto<RewardItem> for v1013::sItemReward {
     fn from_proto(reward: RewardItem) -> Self {
         Self {
             sItem: match reward {
-                RewardItem::Normal { item, .. } => Some(item).into_proto(),
+                RewardItem::Normal { item, .. } => item.into_proto(),
                 RewardItem::Quest { id, count, .. } => v1013::sItemBase {
                     iType: ItemType::Quest as i16,
                     iID: id,
